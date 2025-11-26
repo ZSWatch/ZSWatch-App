@@ -31,7 +31,12 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+| Principle | Compliance | Notes |
+|-----------|------------|-------|
+| I. Flutter-First | ☐ Pass / ☐ Justify | Dart only? Native code only for BLE/DFU/permissions? |
+| II. BLE Abstraction | ☐ Pass / ☐ N/A | UI isolated from GATT? Reconnection logic? |
+| III. Privacy by Default | ☐ Pass / ☐ Justify | Local-only? No cloud/accounts/telemetry? |
+| IV. Modular Architecture | ☐ Pass / ☐ Justify | Layer separation? Riverpod/Bloc state? |
 
 ## Project Structure
 
