@@ -1,51 +1,5 @@
 import 'package:equatable/equatable.dart';
 
-/// Types of firmware images for ZSWatch DFU
-enum FirmwareImageType {
-  /// Main application firmware
-  appCore,
-
-  /// Network processor firmware (nRF5340)
-  netCore,
-
-  /// LittleFS filesystem image
-  filesystem,
-
-  /// Combined zip containing multiple images
-  combined,
-}
-
-/// Extension methods for FirmwareImageType
-extension FirmwareImageTypeExtension on FirmwareImageType {
-  /// Human-readable name
-  String get displayName {
-    switch (this) {
-      case FirmwareImageType.appCore:
-        return 'Application';
-      case FirmwareImageType.netCore:
-        return 'Network Core';
-      case FirmwareImageType.filesystem:
-        return 'Filesystem';
-      case FirmwareImageType.combined:
-        return 'Combined Update';
-    }
-  }
-
-  /// Short description
-  String get description {
-    switch (this) {
-      case FirmwareImageType.appCore:
-        return 'Main application firmware';
-      case FirmwareImageType.netCore:
-        return 'Bluetooth network processor';
-      case FirmwareImageType.filesystem:
-        return 'LittleFS filesystem image';
-      case FirmwareImageType.combined:
-        return 'Multi-image update package';
-    }
-  }
-}
-
 /// Represents a firmware image prepared for upload
 ///
 /// This model holds metadata about firmware files that can be uploaded
@@ -57,17 +11,17 @@ class FirmwareImage extends Equatable {
   /// Firmware version string (e.g., "3.0.0", "v3.0.0-rc1")
   final String? version;
 
-  /// Type of firmware image
-  final FirmwareImageType type;
-
   /// Local file path where the firmware is stored
   final String filePath;
 
   /// File size in bytes
   final int size;
 
-  /// MCUmgr image slot (0=app, 1=net, 2=external)
+  /// MCUmgr image slot from manifest.json (0=app internal, 1=netCore, 2=app external)
   final int? slot;
+
+  /// Board identifier from manifest.json (e.g., "watchdk" or "watchdk@1/nrf5340/cpunet")
+  final String? board;
 
   /// SHA256 hash of the file (optional, for verification)
   final String? hash;
@@ -84,10 +38,10 @@ class FirmwareImage extends Equatable {
   const FirmwareImage({
     required this.name,
     this.version,
-    required this.type,
     required this.filePath,
     required this.size,
     this.slot,
+    this.board,
     this.hash,
     this.downloadedAt,
     this.sourceUrl,
@@ -103,18 +57,13 @@ class FirmwareImage extends Equatable {
     int? slot,
     String? board,
   }) {
-    // Prefer manifest data (slot/image_index and board) if available
-    final type = slot != null || board != null
-        ? _determineTypeFromManifest(imageIndex: slot, board: board)
-        : _determineTypeFromPath(filePath);
-
     return FirmwareImage(
       name: name,
       version: version,
-      type: type,
       filePath: filePath,
       size: size,
       slot: slot,
+      board: board,
     );
   }
 
@@ -128,55 +77,20 @@ class FirmwareImage extends Equatable {
     required String branch,
     String? hash,
     int? slot,
+    String? board,
   }) {
-    final type = _determineTypeFromPath(filePath);
-
     return FirmwareImage(
       name: name,
       version: version,
-      type: type,
       filePath: filePath,
       size: size,
       slot: slot,
+      board: board,
       hash: hash,
       downloadedAt: DateTime.now(),
       sourceUrl: sourceUrl,
       branch: branch,
     );
-  }
-
-  /// Determine type from manifest data (image_index and board)
-  static FirmwareImageType _determineTypeFromManifest({
-    int? imageIndex,
-    String? board,
-  }) {
-    // image_index 1 is always netCore (network processor)
-    if (imageIndex == 1) {
-      return FirmwareImageType.netCore;
-    }
-    
-    // Check board field for netCore indicator
-    if (board != null && board.toLowerCase().contains('cpunet')) {
-      return FirmwareImageType.netCore;
-    }
-    
-    // image_index 0 and 2 are appCore (main app and external app)
-    return FirmwareImageType.appCore;
-  }
-
-  static FirmwareImageType _determineTypeFromPath(String path) {
-    final lowerPath = path.toLowerCase();
-    if (lowerPath.endsWith('.zip')) {
-      return FirmwareImageType.combined;
-    } else if (lowerPath.contains('net_core') ||
-        lowerPath.contains('netcore') ||
-        lowerPath.contains('hci_ipc')) {
-      return FirmwareImageType.netCore;
-    } else if (lowerPath.contains('littlefs') ||
-        lowerPath.contains('filesystem')) {
-      return FirmwareImageType.filesystem;
-    }
-    return FirmwareImageType.appCore;
   }
 
   /// Human-readable file size
@@ -191,7 +105,51 @@ class FirmwareImage extends Equatable {
   }
 
   /// Whether this is a combined/zip package
-  bool get isCombined => type == FirmwareImageType.combined;
+  bool get isCombined => filePath.toLowerCase().endsWith('.zip');
+
+  /// Human-readable display name derived from manifest data
+  String get displayName {
+    // Combined zip packages
+    if (isCombined) {
+      return 'Combined Update';
+    }
+
+    // Use manifest data if available
+    if (slot != null || board != null) {
+      // image_index 1 is always netCore (network processor)
+      if (slot == 1) {
+        return 'Network Core';
+      }
+      
+      // Check board field for netCore indicator
+      if (board?.toLowerCase().contains('cpunet') ?? false) {
+        return 'Network Core';
+      }
+      
+      // image_index 0 and 2 are application (main app and external app)
+      if (slot == 0) {
+        return 'Application (Internal)';
+      } else if (slot == 2) {
+        return 'Application (External)';
+      }
+      
+      return 'Application';
+    }
+
+    // Fallback: guess from filename (for local files without manifest)
+    final lowerPath = filePath.toLowerCase();
+    if (lowerPath.contains('net_core') ||
+        lowerPath.contains('netcore') ||
+        lowerPath.contains('hci_ipc') ||
+        lowerPath.contains('ipc_radio')) {
+      return 'Network Core';
+    } else if (lowerPath.contains('littlefs') ||
+        lowerPath.contains('filesystem')) {
+      return 'Filesystem';
+    }
+    
+    return 'Application';
+  }
 
   /// Whether this is from GitHub
   bool get isFromGitHub => sourceUrl != null;
@@ -207,10 +165,10 @@ class FirmwareImage extends Equatable {
   FirmwareImage copyWith({
     String? name,
     String? version,
-    FirmwareImageType? type,
     String? filePath,
     int? size,
     int? slot,
+    String? board,
     String? hash,
     DateTime? downloadedAt,
     String? sourceUrl,
@@ -219,10 +177,10 @@ class FirmwareImage extends Equatable {
     return FirmwareImage(
       name: name ?? this.name,
       version: version ?? this.version,
-      type: type ?? this.type,
       filePath: filePath ?? this.filePath,
       size: size ?? this.size,
       slot: slot ?? this.slot,
+      board: board ?? this.board,
       hash: hash ?? this.hash,
       downloadedAt: downloadedAt ?? this.downloadedAt,
       sourceUrl: sourceUrl ?? this.sourceUrl,
@@ -234,10 +192,10 @@ class FirmwareImage extends Equatable {
   List<Object?> get props => [
         name,
         version,
-        type,
         filePath,
         size,
         slot,
+        board,
         hash,
         downloadedAt,
         sourceUrl,
@@ -246,7 +204,7 @@ class FirmwareImage extends Equatable {
 
   @override
   String toString() {
-    return 'FirmwareImage(name: $name, slot: $slot, version: $version, type: ${type.displayName}, size: $formattedSize)';
+    return 'FirmwareImage(name: $name, slot: $slot, version: $version, type: $displayName, size: $formattedSize)';
   }
 }
 

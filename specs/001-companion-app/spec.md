@@ -53,6 +53,11 @@ A user wants to update their ZSWatch firmware. They navigate to the Firmware Upd
 - Multi-image DFU uploads each image to correct slot based on manifest
 - CI builds require authentication - app opens in browser for manual download
 - Uses FirmwareUpgradeMode.confirmOnly for proper MCUboot image confirmation
+- Release zip also contains lvgl_resources_raw.bin - a filesystem image that can be uploaded via MCUmgr filesystem commands
+- When dfu_application.zip is selected/extracted, app automatically locates lvgl_resources_raw.bin from the same zip
+- User is presented with three update options: "Start FW Update", "Start Filesystem Update", or "Start Both"
+- When "Start Both" is selected, filesystem upload MUST complete first, then firmware images are uploaded
+- Filesystem upload uses MCUmgr filesystem upload command (not image upload)
 
 **Acceptance Scenarios**:
 
@@ -64,6 +69,11 @@ A user wants to update their ZSWatch firmware. They navigate to the Firmware Upd
 6. **Given** file is selected, **When** user taps "Start Update", **Then** upload begins with progress percentage, speed, and time remaining displayed ✅
 7. **Given** upload completes, **When** watch reboots, **Then** app handles reconnection (fixed loop issue) ✅
 8. **Given** user wants CI builds, **When** they tap "Open" on an artifact, **Then** browser opens GitHub download page ✅
+9. **Given** a release zip is downloaded/selected, **When** dfu_application.zip is extracted, **Then** app also locates lvgl_resources_raw.bin from the same zip (if present)
+10. **Given** both firmware and filesystem images are available, **When** user views update options, **Then** three choices are presented: "Start FW Update", "Start Filesystem Update", "Start Both"
+11. **Given** user selects "Start Filesystem Update", **When** upload begins, **Then** lvgl_resources_raw.bin is uploaded via MCUmgr filesystem commands with progress displayed
+12. **Given** user selects "Start Both", **When** update begins, **Then** filesystem upload completes first, followed by firmware image upload
+13. **Given** only dfu_application.zip is available (no lvgl_resources_raw.bin), **When** user views update options, **Then** only "Start FW Update" option is available
 
 ---
 
@@ -273,6 +283,10 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **FR-016**: App MUST support single .bin firmware files
 - **FR-017**: App MUST display upload progress percentage and estimated time
 - **FR-018**: App MUST fetch prebuilt firmwares from ZSWatch GitHub repository
+- **FR-019**: App MUST support filesystem image upload via MCUmgr filesystem commands (lvgl_resources_raw.bin)
+- **FR-019a**: App MUST automatically detect lvgl_resources_raw.bin when extracting release zip alongside dfu_application.zip
+- **FR-019b**: App MUST present update options (FW only, Filesystem only, Both) based on available images
+- **FR-019c**: When updating both, filesystem upload MUST complete before firmware upload begins
 - **FR-020**: App MUST handle firmware confirmation and reboot sequence per MCUmgr specification
 
 #### Notifications & Media (Platform-Specific)

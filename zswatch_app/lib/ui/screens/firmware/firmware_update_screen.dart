@@ -558,7 +558,7 @@ class _SelectedFirmwareCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   Text(
-                    '${image.formattedSize} • ${image.type.displayName}',
+                    '${image.formattedSize} • ${image.displayName}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   if (image.version != null)
@@ -832,25 +832,28 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
         workflowRunsAsync.when(
           data: (runs) {
             if (runs.isEmpty) {
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppTheme.spacingMd),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.build_circle_outlined,
-                        color: AppTheme.textSecondary.withValues(alpha: 0.5),
-                        size: 32,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('No CI builds loaded'),
-                      Text(
-                        'Tap refresh to fetch from GitHub Actions',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
-                      ),
-                    ],
+              return SizedBox(
+                width: double.infinity,
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppTheme.spacingMd),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.build_circle_outlined,
+                          color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text('No CI builds loaded'),
+                        Text(
+                          'Tap refresh to fetch from GitHub Actions',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondary,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
