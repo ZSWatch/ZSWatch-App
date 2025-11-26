@@ -310,20 +310,30 @@ class _QuickActionsSection extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onFirmwareUpdate,
-                icon: const Icon(Icons.system_update),
-                label: const Text('Update Firmware'),
+              child: SizedBox(
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: onFirmwareUpdate,
+                  icon: const Icon(Icons.system_update, size: 18),
+                  label: const Text('Update Firmware'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: AppTheme.spacingSm),
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onDisconnect,
-                icon: const Icon(Icons.bluetooth_disabled),
-                label: const Text('Disconnect'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.errorColor,
+              child: SizedBox(
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: onDisconnect,
+                  icon: const Icon(Icons.bluetooth_disabled, size: 18),
+                  label: const Text('Disconnect'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.errorColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  ),
                 ),
               ),
             ),

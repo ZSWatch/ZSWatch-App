@@ -228,20 +228,66 @@ Firmware file prepared for upload.
 | `type` | Enum | NOT NULL | Image type |
 | `file_path` | String | NOT NULL | Local file path |
 | `size` | Integer | NOT NULL | File size in bytes |
+| `slot` | Integer | NULLABLE | MCUmgr image slot (from manifest.json) |
 | `hash` | String | NULLABLE | SHA256 hash |
 | `downloaded_at` | DateTime | NULLABLE | When downloaded |
+| `source_url` | String | NULLABLE | GitHub download URL |
+| `branch` | String | NULLABLE | Git branch or tag name |
 
 **Image Types**:
 ```dart
 enum FirmwareImageType {
-  appCore,      // Main application
-  netCore,      // Network processor
+  appCore,      // Main application (slot 0, 2)
+  netCore,      // Network processor (slot 1)
   filesystem,   // LittleFS image
   combined,     // Zip containing multiple
 }
 ```
 
-**Lifecycle**: Downloaded → Extracted → Uploaded → Cleaned up
+**Slot Mapping** (from manifest.json `image_index`):
+- Slot 0: app.internal.bin (main app)
+- Slot 1: ipc_radio.bin (network core)
+- Slot 2: app.external.bin (external flash app)
+
+**Lifecycle**: Downloaded → Extracted (manifest.json parsed) → Uploaded → Cleaned up
+
+### 7a. ReleaseAsset
+
+Represents a single firmware asset in a GitHub release.
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `name` | String | NOT NULL | Asset filename (e.g., watchdk@1_nrf5340_cpuapp_debug.zip) |
+| `downloadUrl` | String | NOT NULL | GitHub download URL |
+| `size` | Integer | NOT NULL | File size in bytes |
+
+**Usage**: GitHub releases contain multiple hardware variants. User selects which to download.
+
+### 7b. GitHubRelease
+
+Represents a GitHub release with available firmware.
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `tagName` | String | NOT NULL | Release tag (e.g., v3.0.0) |
+| `name` | String | NOT NULL | Release title |
+| `body` | String | NULLABLE | Release notes |
+| `isPrerelease` | Boolean | NOT NULL | Pre-release flag |
+| `publishedAt` | DateTime | NOT NULL | Publication date |
+| `assets` | List<ReleaseAsset> | NOT NULL | Available firmware variants |
+
+### 7c. ManifestEntry
+
+Parsed entry from dfu_application.zip manifest.json.
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| `file` | String | NOT NULL | Filename (e.g., app.internal.bin) |
+| `imageIndex` | Integer | NOT NULL | MCUmgr image slot |
+| `size` | Integer | NULLABLE | File size |
+| `version` | String | NULLABLE | Version from version_MCUBOOT |
+| `type` | String | NULLABLE | Type (e.g., "application") |
+| `board` | String | NULLABLE | Board identifier |
 
 ---
 

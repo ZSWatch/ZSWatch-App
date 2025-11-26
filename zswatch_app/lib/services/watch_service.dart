@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -37,6 +38,7 @@ class WatchService {
   bool _autoReconnect = true;
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 3; // Reduced for faster disconnect detection
+  bool _isSettingUp = false; // Prevent concurrent setup calls
 
   /// Stream of connection state changes
   Stream<Connection> get connectionStream => _connectionController.stream;
@@ -125,6 +127,13 @@ class WatchService {
   }
 
   Future<void> _setupAfterConnect(String watchId, String name) async {
+    // Prevent concurrent setup calls (can happen on rapid reconnects)
+    if (_isSettingUp) {
+      debugPrint('Setup already in progress, skipping duplicate call');
+      return;
+    }
+    _isSettingUp = true;
+
     try {
       // Bonding
       _updateConnection(currentConnection.copyWith(
@@ -186,6 +195,9 @@ class WatchService {
       // Sync time
       await syncTime();
 
+      // Reset reconnect attempts on successful setup
+      _reconnectAttempts = 0;
+
     } catch (e) {
       _updateConnection(Connection.error(
         watchId,
@@ -194,6 +206,8 @@ class WatchService {
       ));
       await disconnect();
       rethrow;
+    } finally {
+      _isSettingUp = false;
     }
   }
 
@@ -216,13 +230,16 @@ class WatchService {
       final message = utf8.decode(data).trim();
       if (message.isEmpty) return;
 
+      debugPrint('[BLE RX] $message');
+
       // Try to parse as JSON
       if (message.startsWith('{') && message.endsWith('}')) {
         final json = jsonDecode(message) as Map<String, dynamic>;
         _handleGadgetbridgeMessage(json);
       }
     } catch (e) {
-      // Binary data that can't be decoded as UTF-8 - ignore silently
+      // Binary data that can't be decoded as UTF-8 - log raw bytes
+      debugPrint('[BLE RX] Raw bytes: $data');
     }
   }
 
@@ -315,6 +332,8 @@ class WatchService {
     final txChar = _findCharacteristic(nusService, _guid(NusUuids.txCharacteristic));
     if (txChar == null) return;
 
+    debugPrint('[BLE TX] $data');
+
     final bytes = utf8.encode(data);
     await txChar.write(bytes, withoutResponse: txChar.properties.writeWithoutResponse);
   }
@@ -366,6 +385,9 @@ class WatchService {
   }
 
   void _attemptReconnect(String watchId, String name) {
+    // Cancel any existing reconnect timer to prevent stacking
+    _reconnectTimer?.cancel();
+    
     _reconnectAttempts++;
 
     _updateConnection(currentConnection.copyWith(
@@ -374,10 +396,11 @@ class WatchService {
     ));
 
     _reconnectTimer = Timer(BleConfig.reconnectionDelay, () async {
-      if (_device != null && _autoReconnect) {
+      if (_device != null && _autoReconnect && !_isSettingUp) {
         try {
           await _connectToDevice(_device!, watchId, name);
         } catch (e) {
+          debugPrint('Reconnect attempt $_reconnectAttempts failed: $e');
           if (_reconnectAttempts >= _maxReconnectAttempts) {
             _updateConnection(Connection.error(
               watchId,
@@ -425,6 +448,7 @@ class WatchService {
     _reconnectTimer = null;
     _device = null;
     _services = null;
+    _isSettingUp = false;
   }
 
   void _updateConnection(Connection connection) {

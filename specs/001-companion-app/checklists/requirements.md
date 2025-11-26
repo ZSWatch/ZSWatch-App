@@ -92,3 +92,30 @@
 - **Device info**: Uses Gadgetbridge `t:"ver"` message (no custom protocol)
 - **Extended API**: Minimal - only for bulk health sync, logs, shell, voice memos
 
+## Implementation Progress
+
+| User Story | Status | Notes |
+|------------|--------|-------|
+| US1 - Connect to Watch | ✅ Complete | Scan, connect, bond, dashboard, reconnection |
+| US2 - Firmware Update | ✅ Complete | GitHub releases (multi-variant), CI builds, local files, MCUmgr DFU |
+| US3 - Notifications | 🔲 Not Started | |
+| US4 - Dashboard | ✅ Complete | Part of US1 implementation |
+| US5 - Health | 🔲 Not Started | |
+| US6 - Developer Tools | 🔲 Not Started | |
+| US7 - Multi-Watch | 🔲 Not Started | |
+| US8 - App Settings | 🔲 Not Started | |
+| US9 - Analytics | 🔲 Not Started | |
+| US10 - Voice Recording | 🔲 Placeholder | |
+
+## Firmware Update Implementation Details
+
+- **GitHub Releases**: Fetches all releases with multiple hardware variants (watchdk, zswatch_legacy)
+- **Asset Selection**: User selects which variant to download via dialog
+- **Nested Extraction**: Downloads outer zip → extracts dfu_application.zip → parses manifest.json
+- **Manifest Parsing**: Uses `image_index` from manifest.json for correct MCUmgr slot mapping
+- **Multi-Image DFU**: Uploads each .bin to correct slot (0=app.internal, 1=ipc_radio, 2=app.external)
+- **CI Builds**: Opens in browser (GitHub Actions artifacts require authentication)
+- **Local Files**: Supports dfu_application.zip selection via file picker
+- **Progress**: Real-time speed, percentage, time remaining, multi-image tracking
+- **Confirmation**: Uses FirmwareUpgradeMode.confirmOnly for MCUboot image confirmation
+

@@ -7,6 +7,18 @@
 
 Cross-platform Flutter companion app for ZSWatch smartwatch providing BLE communication, firmware updates via MCUmgr/SMP, notification forwarding (Android), health data visualization, and developer tools. The app implements a dual-protocol architecture: Gadgetbridge API for backwards compatibility and Extended ZSWatch API for new features.
 
+## Implementation Status
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 1: Setup | ✅ Complete | Project initialized, dependencies configured |
+| Phase 2: Foundational | ✅ Complete | Database, BLE abstraction, protocol layer |
+| Phase 3: Connect (US1) | ✅ Complete | Scan, connect, bond, dashboard |
+| Phase 3.5: Gap Tasks | ✅ Complete | Unified WatchService, reconnection fixes |
+| Phase 4: Firmware (US2) | ✅ Complete | GitHub releases, CI builds, local files, MCUmgr DFU |
+| Phase 5: Notifications (US3) | 🔲 Not Started | |
+| Phase 6+: Remaining | 🔲 Not Started | |
+
 ## Technical Context
 
 **Language/Version**: Dart 3.x (Flutter 3.x stable)

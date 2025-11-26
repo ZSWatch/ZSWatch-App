@@ -38,22 +38,32 @@ A user opens the app for the first time and wants to connect to their ZSWatch. T
 
 ---
 
-### User Story 2 - Firmware Update (Priority: P2)
+### User Story 2 - Firmware Update (Priority: P2) ✅ IMPLEMENTED
 
-A user wants to update their ZSWatch firmware. They navigate to the Firmware Update screen, see current firmware version, and can either select a prebuilt firmware from GitHub or upload a local file (zip containing multiple images, or single .bin). The app uploads the firmware via MCUmgr/SMP, shows progress, and confirms success after reboot.
+A user wants to update their ZSWatch firmware. They navigate to the Firmware Update screen, see current firmware version, and can either select a prebuilt firmware from GitHub releases (choosing their hardware variant), open CI builds in browser, or upload a local dfu_application.zip file. The app uploads the firmware via MCUmgr/SMP, shows progress, and confirms success after reboot.
 
 **Why this priority**: Firmware updates are critical for watch functionality and security. Users need a reliable way to update without web tools.
 
 **Independent Test**: Can be tested by downloading a firmware from GitHub, uploading to watch, verifying progress display, and confirming new version after reboot.
 
+**Implementation Notes**:
+- GitHub releases contain multiple hardware variants (watchdk, zswatch_legacy) - user selects which to download
+- Release zip contains dfu_application.zip which is extracted automatically
+- dfu_application.zip contains manifest.json with image_index for each .bin file
+- Multi-image DFU uploads each image to correct slot based on manifest
+- CI builds require authentication - app opens in browser for manual download
+- Uses FirmwareUpgradeMode.confirmOnly for proper MCUboot image confirmation
+
 **Acceptance Scenarios**:
 
-1. **Given** the watch is connected, **When** user navigates to Firmware Update, **Then** current firmware version is displayed
-2. **Given** user has internet access, **When** they tap "Fetch Prebuilt Firmwares", **Then** app fetches available builds from GitHub and displays them organized by branch
-3. **Given** firmwares are displayed, **When** user selects a build, **Then** app downloads the zip artifact and prepares for upload
-4. **Given** user prefers local file, **When** they tap "Select File", **Then** file picker opens allowing .zip or .bin selection
-5. **Given** file is selected and battery levels are acceptable, **When** user taps "Start Update", **Then** upload begins with progress percentage and speed displayed
-6. **Given** upload completes, **When** watch reboots, **Then** app reconnects and displays new firmware version
+1. **Given** the watch is connected, **When** user navigates to Firmware Update, **Then** current firmware version is displayed ✅
+2. **Given** user has internet access, **When** they tap refresh on releases, **Then** app fetches available releases from GitHub with all firmware variants ✅
+3. **Given** releases are displayed, **When** user taps a release, **Then** dialog shows available hardware variants to choose from ✅
+4. **Given** user selects a variant, **When** download completes, **Then** app extracts dfu_application.zip from the release zip ✅
+5. **Given** user prefers local file, **When** they tap "Select .zip firmware file", **Then** file picker opens allowing .zip selection ✅
+6. **Given** file is selected, **When** user taps "Start Update", **Then** upload begins with progress percentage, speed, and time remaining displayed ✅
+7. **Given** upload completes, **When** watch reboots, **Then** app handles reconnection (fixed loop issue) ✅
+8. **Given** user wants CI builds, **When** they tap "Open" on an artifact, **Then** browser opens GitHub download page ✅
 
 ---
 

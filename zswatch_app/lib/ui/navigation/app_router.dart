@@ -6,6 +6,7 @@ import '../../data/models/connection_state.dart';
 import '../../providers/watch_service_provider.dart';
 import '../screens/connection/scan_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
+import '../screens/firmware/firmware_update_screen.dart';
 
 /// Route names for the app
 abstract final class AppRoutes {
@@ -91,8 +92,7 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.firmware,
         name: 'firmware',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Firmware Update'),
+        builder: (context, state) => const FirmwareUpdateScreen(),
       ),
 
       // Health routes
