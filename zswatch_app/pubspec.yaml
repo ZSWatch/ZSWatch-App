@@ -13,12 +13,15 @@ dependencies:
   # UI Components
   cupertino_icons: ^1.0.8
   fl_chart: ^0.69.2
+  flutter_svg: ^2.0.10+1
 
   # BLE Communication
   flutter_blue_plus: ^1.35.2
 
   # Firmware Updates (MCUmgr/SMP)
-  mcumgr_flutter: ^0.6.1
+  # Using local clone for development - will switch back to published version after PR is merged
+  mcumgr_flutter:
+    path: ../Flutter-nRF-Connect-Device-Manager
 
   # State Management
   flutter_riverpod: ^2.6.1
@@ -71,3 +74,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
+  assets:
+    - assets/images/

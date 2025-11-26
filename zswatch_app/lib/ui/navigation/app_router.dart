@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/connection_state.dart';
@@ -192,7 +193,10 @@ class _HomeScreen extends ConsumerWidget {
       final isReconnecting = connection.state == WatchConnectionState.reconnecting;
       return Scaffold(
         appBar: AppBar(
-          title: const Text('ZSWatch'),
+          title: SvgPicture.asset(
+            'assets/images/ZSWatch_Text.svg',
+            height: 24,
+          ),
         ),
         body: Center(
           child: Padding(
@@ -236,7 +240,10 @@ class _HomeScreen extends ConsumerWidget {
     // Not connected - show welcome screen
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ZSWatch'),
+        title: SvgPicture.asset(
+          'assets/images/ZSWatch_Text.svg',
+          height: 24,
+        ),
       ),
       body: Center(
         child: Padding(
@@ -244,14 +251,14 @@ class _HomeScreen extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.watch_rounded,
-                size: 100,
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+              SvgPicture.asset(
+                'assets/images/ZSWatch_Logo.svg',
+                width: 120,
+                height: 120,
               ),
               const SizedBox(height: 32),
               Text(
-                'Welcome to ZSWatch',
+                'Welcome',
                 style: Theme.of(context).textTheme.headlineMedium,
                 textAlign: TextAlign.center,
               ),

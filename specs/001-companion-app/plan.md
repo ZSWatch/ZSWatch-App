@@ -16,6 +16,7 @@ Cross-platform Flutter companion app for ZSWatch smartwatch providing BLE commun
 | Phase 3: Connect (US1) | ✅ Complete | Scan, connect, bond, dashboard |
 | Phase 3.5: Gap Tasks | ✅ Complete | Unified WatchService, reconnection fixes |
 | Phase 4: Firmware (US2) | ✅ Complete | GitHub releases, CI builds, local files, MCUmgr DFU |
+| Phase 4.5: Filesystem (US2) | ✅ Complete | MCUmgr filesystem upload for lvgl_resources_raw.bin |
 | Phase 5: Notifications (US3) | 🔲 Not Started | |
 | Phase 6+: Remaining | 🔲 Not Started | |
 

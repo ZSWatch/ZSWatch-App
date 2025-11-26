@@ -8,6 +8,8 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 
+import '../../core/constants/filesystem_constants.dart';
+import '../../data/models/filesystem_image.dart';
 import '../../data/models/firmware_image.dart';
 
 /// Manages firmware downloads from GitHub and local file handling
@@ -457,8 +459,9 @@ class FirmwareManager {
   /// Download firmware from a GitHub release asset
   /// 
   /// Downloads the selected asset (e.g., watchdk@1_nrf5340_cpuapp_debug.zip),
-  /// extracts it to find dfu_application.zip, and returns that as the firmware image.
-  Future<FirmwareImage> downloadReleaseAsset(
+  /// extracts it to find dfu_application.zip (and optionally lvgl_resources_raw.bin),
+  /// and returns the extraction result.
+  Future<ReleaseExtractionResult> downloadReleaseAsset(
     GitHubRelease release,
     ReleaseAsset asset,
   ) async {
@@ -502,9 +505,9 @@ class FirmwareManager {
       await sink.close();
       _log('Download complete: ${outerZipFile.path}');
 
-      // Now extract the outer zip to find dfu_application.zip
-      _log('Extracting outer zip to find dfu_application.zip...');
-      final dfuZipImage = await _extractDfuApplicationZip(
+      // Now extract the outer zip to find dfu_application.zip and lvgl_resources_raw.bin
+      _log('Extracting release archive...');
+      final result = await _extractReleaseArchive(
         outerZipFile,
         release.version,
         release.tagName,
@@ -517,7 +520,7 @@ class FirmwareManager {
 
       _updateProgress(DownloadProgress(totalBytes, totalBytes, DownloadStatus.completed));
 
-      return dfuZipImage;
+      return result;
     } catch (e) {
       _updateProgress(DownloadProgress(0, 0, DownloadStatus.failed, error: e.toString()));
       _log('Download error: $e');
@@ -528,8 +531,8 @@ class FirmwareManager {
     }
   }
 
-  /// Extract dfu_application.zip from an outer release zip
-  Future<FirmwareImage> _extractDfuApplicationZip(
+  /// Extract dfu_application.zip and optionally lvgl_resources_raw.bin from an outer release zip
+  Future<ReleaseExtractionResult> _extractReleaseArchive(
     File outerZipFile,
     String version,
     String tagName,
@@ -539,16 +542,25 @@ class FirmwareManager {
 
     final downloadDir = await _getDownloadDirectory();
 
-    // Look for dfu_application.zip in the archive
+    FirmwareImage? firmwareImage;
+    FilesystemImage? filesystemImage;
+
+    // Look for dfu_application.zip and lvgl_resources_raw.bin in the archive
     for (final file in archive) {
-      if (file.isFile && file.name.toLowerCase().endsWith('dfu_application.zip')) {
+      if (!file.isFile) continue;
+
+      final fileName = file.name.toLowerCase();
+      final baseName = path.basename(fileName);
+
+      // Check for DFU application zip
+      if (baseName.endsWith('dfu_application.zip')) {
         final dfuZipPath = path.join(downloadDir.path, 'dfu_application.zip');
         final dfuZipFile = File(dfuZipPath);
         await dfuZipFile.writeAsBytes(file.content as List<int>);
 
         _log('Extracted dfu_application.zip: $dfuZipPath');
 
-        return FirmwareImage.fromGitHub(
+        firmwareImage = FirmwareImage.fromGitHub(
           name: 'dfu_application.zip',
           version: version,
           filePath: dfuZipPath,
@@ -557,10 +569,39 @@ class FirmwareManager {
           branch: tagName,
         );
       }
+
+      // Check for filesystem image
+      if (FilesystemConstants.isFilesystemImage(baseName)) {
+        final fsImagePath = path.join(downloadDir.path, baseName);
+        final fsImageFile = File(fsImagePath);
+        await fsImageFile.writeAsBytes(file.content as List<int>);
+
+        _log('Extracted filesystem image: $fsImagePath (${file.size} bytes)');
+
+        filesystemImage = FilesystemImage.fromFile(
+          filePath: fsImagePath,
+          size: file.size,
+          version: version,
+          sourceUrl: outerZipFile.path,
+        );
+      }
     }
 
-    throw FirmwareDownloadException(
-      'No dfu_application.zip found in release archive',
+    if (firmwareImage == null) {
+      throw FirmwareDownloadException(
+        'No dfu_application.zip found in release archive',
+      );
+    }
+
+    if (filesystemImage != null) {
+      _log('Release contains both firmware and filesystem image');
+    } else {
+      _log('Release contains firmware only (no filesystem image)');
+    }
+
+    return ReleaseExtractionResult(
+      firmwareImage: firmwareImage,
+      filesystemImage: filesystemImage,
     );
   }
 
@@ -917,6 +958,26 @@ class FirmwareDownloadException implements Exception {
 
   @override
   String toString() => 'FirmwareDownloadException: $message';
+}
+
+/// Result of extracting a release archive
+/// 
+/// Contains the firmware image (dfu_application.zip) and optionally
+/// a filesystem image (lvgl_resources_raw.bin) if found in the archive.
+class ReleaseExtractionResult {
+  /// The extracted firmware image (dfu_application.zip)
+  final FirmwareImage firmwareImage;
+  
+  /// The extracted filesystem image (lvgl_resources_raw.bin), if found
+  final FilesystemImage? filesystemImage;
+
+  const ReleaseExtractionResult({
+    required this.firmwareImage,
+    this.filesystemImage,
+  });
+
+  /// Whether a filesystem image was found
+  bool get hasFilesystemImage => filesystemImage != null;
 }
 
 /// Represents a GitHub Actions workflow run with firmware artifacts

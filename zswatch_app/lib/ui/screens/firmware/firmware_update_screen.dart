@@ -6,8 +6,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/dfu_state.dart';
+import '../../../data/models/filesystem_image.dart';
 import '../../../data/models/firmware_image.dart';
 import '../../../providers/dfu_providers.dart';
+import '../../../providers/filesystem_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../../services/dfu/firmware_manager.dart';
 
@@ -35,6 +37,15 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // Reset state when entering the screen to clear any stale state
+    // Use addPostFrameCallback to ensure ref is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(dfuNotifierProvider.notifier).reset();
+      }
+    });
+    
     // Listen to DFU logs
     ref.read(dfuServiceProvider).logStream.listen((log) {
       if (mounted) {
@@ -98,25 +109,9 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                         onReconnect: () => context.go('/scan'),
                       ),
 
-                    // Current status card
-                    _StatusCard(
-                      dfuState: dfuState,
-                      downloadProgress: downloadProgress,
-                    ),
-
-                    const SizedBox(height: AppTheme.spacingMd),
-
-                    // Firmware selection or progress
+                    // Firmware selection sections (shown when idle)
                     if (dfuState.status == DfuStatus.idle &&
                         !operationState.isDownloading) ...[
-                      // Selected firmware card
-                      if (operationState.hasFirmware)
-                        _SelectedFirmwareCard(
-                          image: operationState.downloadedImage!,
-                          onClear: () =>
-                              ref.read(dfuNotifierProvider.notifier).reset(),
-                        ),
-
                       // GitHub releases
                       _ReleasesSection(
                         onAssetSelected: (release, asset) {
@@ -183,7 +178,24 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                               .loadLocalFile(path);
                         },
                       ),
+
+                      const SizedBox(height: AppTheme.spacingMd),
+
+                      // Selected firmware card (shown when firmware is selected)
+                      if (operationState.hasFirmware)
+                        _SelectedFirmwareCard(
+                          image: operationState.downloadedImage!,
+                          filesystemImage: operationState.filesystemImage,
+                          onClear: () =>
+                              ref.read(dfuNotifierProvider.notifier).reset(),
+                        ),
                     ],
+
+                    // Progress/status card (shown during download or upload)
+                    _StatusCard(
+                      dfuState: dfuState,
+                      downloadProgress: downloadProgress,
+                    ),
 
                     // Error display
                     if (operationState.hasError)
@@ -200,8 +212,12 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                       dfuState: dfuState,
                       operationState: operationState,
                       isConnected: isConnected,
-                      onStart: () =>
+                      onStartFirmware: () =>
                           ref.read(dfuNotifierProvider.notifier).startUpdate(),
+                      onStartFilesystem: () =>
+                          ref.read(dfuNotifierProvider.notifier).startFilesystemUpload(),
+                      onStartBoth: () =>
+                          ref.read(dfuNotifierProvider.notifier).startBothUpdates(),
                       onCancel: () =>
                           ref.read(dfuNotifierProvider.notifier).cancel(),
                       onReset: () =>
@@ -350,7 +366,7 @@ class _ConnectionWarningCard extends StatelessWidget {
   }
 }
 
-class _StatusCard extends StatelessWidget {
+class _StatusCard extends ConsumerWidget {
   final DfuState dfuState;
   final DownloadProgress downloadProgress;
 
@@ -360,12 +376,54 @@ class _StatusCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDownloading = downloadProgress.status.isInProgress;
     final isDfuInProgress = dfuState.status.isInProgress;
+    final fsUploadState = ref.watch(filesystemUploadStateProvider);
+    final isFsUploading = fsUploadState.status.isInProgress;
+    final operationState = ref.watch(dfuNotifierProvider);
 
-    if (!isDownloading && !isDfuInProgress) {
+    if (!isDownloading && !isDfuInProgress && !isFsUploading) {
       return const SizedBox.shrink();
+    }
+
+    // Determine which operation to show
+    String statusTitle;
+    double progress;
+    String bytesText;
+    String percentText;
+    String? speedText;
+    String? timeRemainingText;
+    String? subStatusText;
+
+    if (isDownloading) {
+      statusTitle = 'Downloading...';
+      progress = downloadProgress.progress;
+      bytesText = '${downloadProgress.formattedBytesReceived} / ${downloadProgress.formattedTotalBytes}';
+      percentText = '${downloadProgress.progressPercent}%';
+    } else if (isFsUploading) {
+      statusTitle = 'Uploading Filesystem...';
+      progress = fsUploadState.progress;
+      bytesText = '${fsUploadState.formattedBytesTransferred} / ${fsUploadState.formattedTotalBytes}';
+      percentText = '${fsUploadState.progressPercent}%';
+      speedText = 'Speed: ${fsUploadState.formattedSpeed}';
+      timeRemainingText = 'Remaining: ${fsUploadState.formattedTimeRemaining}';
+      subStatusText = fsUploadState.imageName;
+    } else {
+      statusTitle = dfuState.status.statusText;
+      progress = dfuState.progress;
+      bytesText = '${dfuState.formattedBytesTransferred} / ${dfuState.formattedTotalBytes}';
+      percentText = '${dfuState.progressPercent}%';
+      if (dfuState.status == DfuStatus.uploading) {
+        speedText = 'Speed: ${dfuState.formattedSpeed}';
+        timeRemainingText = 'Remaining: ${dfuState.formattedTimeRemaining}';
+      }
+      subStatusText = dfuState.currentImageName;
+    }
+
+    // Show step indicator for "both" updates
+    if (operationState.isBothUpdating && operationState.totalSteps > 0) {
+      statusTitle = operationState.currentStepDescription;
     }
 
     return Card(
@@ -380,7 +438,9 @@ class _StatusCard extends StatelessWidget {
                 _StatusIcon(
                   status: isDfuInProgress
                       ? dfuState.status
-                      : (isDownloading ? DfuStatus.preparing : DfuStatus.idle),
+                      : (isFsUploading
+                          ? DfuStatus.uploading
+                          : (isDownloading ? DfuStatus.preparing : DfuStatus.idle)),
                 ),
                 const SizedBox(width: AppTheme.spacingSm),
                 Expanded(
@@ -388,14 +448,12 @@ class _StatusCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isDownloading
-                            ? 'Downloading Firmware...'
-                            : dfuState.status.statusText,
+                        statusTitle,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      if (dfuState.currentImageName != null)
+                      if (subStatusText != null)
                         Text(
-                          dfuState.currentImageName!,
+                          subStatusText,
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                     ],
@@ -408,9 +466,7 @@ class _StatusCard extends StatelessWidget {
 
             // Progress bar
             LinearProgressIndicator(
-              value: isDownloading
-                  ? downloadProgress.progress
-                  : dfuState.progress,
+              value: progress,
               backgroundColor: AppTheme.surfaceColor,
             ),
 
@@ -420,42 +476,26 @@ class _StatusCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  isDownloading
-                      ? '${downloadProgress.formattedBytesReceived} / ${downloadProgress.formattedTotalBytes}'
-                      : '${dfuState.formattedBytesTransferred} / ${dfuState.formattedTotalBytes}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                Text(
-                  isDownloading
-                      ? '${downloadProgress.progressPercent}%'
-                      : '${dfuState.progressPercent}%',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                Text(bytesText, style: Theme.of(context).textTheme.bodySmall),
+                Text(percentText, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
 
-            // Speed and time remaining (DFU only)
-            if (isDfuInProgress && dfuState.status == DfuStatus.uploading)
+            // Speed and time remaining
+            if (speedText != null && timeRemainingText != null)
               Padding(
                 padding: const EdgeInsets.only(top: AppTheme.spacingSm),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Speed: ${dfuState.formattedSpeed}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    Text(
-                      'Remaining: ${dfuState.formattedTimeRemaining}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                    Text(speedText, style: Theme.of(context).textTheme.bodySmall),
+                    Text(timeRemainingText, style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),
               ),
 
-            // Multi-image progress
-            if (dfuState.totalImages > 1)
+            // Multi-image progress (DFU only)
+            if (isDfuInProgress && dfuState.totalImages > 1)
               Padding(
                 padding: const EdgeInsets.only(top: AppTheme.spacingSm),
                 child: Text(
@@ -529,10 +569,12 @@ class _StatusIcon extends StatelessWidget {
 
 class _SelectedFirmwareCard extends StatelessWidget {
   final FirmwareImage image;
+  final FilesystemImage? filesystemImage;
   final VoidCallback onClear;
 
   const _SelectedFirmwareCard({
     required this.image,
+    required this.filesystemImage,
     required this.onClear,
   });
 
@@ -542,40 +584,108 @@ class _SelectedFirmwareCard extends StatelessWidget {
       color: AppTheme.primaryColor.withValues(alpha: 0.1),
       child: Padding(
         padding: const EdgeInsets.all(AppTheme.spacingMd),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              image.isCombined ? Icons.folder_zip : Icons.description,
-              color: AppTheme.primaryColor,
+            Row(
+              children: [
+                Icon(
+                  image.isCombined ? Icons.folder_zip : Icons.description,
+                  color: AppTheme.primaryColor,
+                ),
+                const SizedBox(width: AppTheme.spacingSm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        image.name,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Text(
+                        '${image.formattedSize} • ${image.displayName}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      if (image.version != null)
+                        Text(
+                          'Version: ${image.version}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondary,
+                              ),
+                        ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: onClear,
+                  tooltip: 'Clear selection',
+                ),
+              ],
             ),
-            const SizedBox(width: AppTheme.spacingSm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    image.name,
-                    style: Theme.of(context).textTheme.titleSmall,
+            // Filesystem image indicator
+            if (filesystemImage != null) ...[
+              const SizedBox(height: AppTheme.spacingSm),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacingSm,
+                  vertical: AppTheme.spacingSm / 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.successColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                  border: Border.all(
+                    color: AppTheme.successColor.withValues(alpha: 0.3),
                   ),
-                  Text(
-                    '${image.formattedSize} • ${image.displayName}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (image.version != null)
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.storage,
+                      size: 16,
+                      color: AppTheme.successColor,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
-                      'Version: ${image.version}',
+                      'Filesystem image included (${filesystemImage!.formattedSize})',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.successColor,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: AppTheme.spacingSm),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacingSm,
+                  vertical: AppTheme.spacingSm / 2,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.textSecondary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: AppTheme.textSecondary.withValues(alpha: 0.7),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Firmware only (no filesystem image)',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppTheme.textSecondary,
                           ),
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: onClear,
-              tooltip: 'Clear selection',
-            ),
+            ],
           ],
         ),
       ),
@@ -615,25 +725,28 @@ class _ReleasesSection extends ConsumerWidget {
         releasesAsync.when(
           data: (releases) {
             if (releases.isEmpty) {
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppTheme.spacingMd),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.cloud_download_outlined,
-                        color: AppTheme.textSecondary.withValues(alpha: 0.5),
-                        size: 32,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('No releases loaded'),
-                      Text(
-                        'Tap refresh to fetch from GitHub',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
-                      ),
-                    ],
+              return SizedBox(
+                width: double.infinity,
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppTheme.spacingMd),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.cloud_download_outlined,
+                          color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text('No releases loaded'),
+                        Text(
+                          'Tap refresh to fetch from GitHub',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondary,
+                              ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -1274,11 +1387,13 @@ class _ErrorCard extends StatelessWidget {
   }
 }
 
-class _ActionButtons extends StatelessWidget {
+class _ActionButtons extends ConsumerWidget {
   final DfuState dfuState;
   final DfuOperationState operationState;
   final bool isConnected;
-  final VoidCallback onStart;
+  final VoidCallback onStartFirmware;
+  final VoidCallback onStartFilesystem;
+  final VoidCallback onStartBoth;
   final VoidCallback onCancel;
   final VoidCallback onReset;
 
@@ -1286,15 +1401,27 @@ class _ActionButtons extends StatelessWidget {
     required this.dfuState,
     required this.operationState,
     required this.isConnected,
-    required this.onStart,
+    required this.onStartFirmware,
+    required this.onStartFilesystem,
+    required this.onStartBoth,
     required this.onCancel,
     required this.onReset,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fsUploadState = ref.watch(filesystemUploadStateProvider);
+    final isFsUploading = fsUploadState.status.isInProgress;
+    final isFsCompleted = fsUploadState.status == FilesystemUploadStatus.completed;
+    final isFsFailed = fsUploadState.status == FilesystemUploadStatus.failed;
+    
+    // During "both" update, only show completion when firmware DFU finishes (not just FS)
+    final isBothUpdating = operationState.isBothUpdating;
+    final showFsOnlyComplete = isFsCompleted && !isBothUpdating && dfuState.status == DfuStatus.idle;
+
     // Completed state - show reset button
-    if (dfuState.status == DfuStatus.completed) {
+    if (dfuState.status == DfuStatus.completed || showFsOnlyComplete) {
+      final isFullComplete = dfuState.status == DfuStatus.completed;
       return Column(
         children: [
           const Icon(
@@ -1304,7 +1431,7 @@ class _ActionButtons extends StatelessWidget {
           ),
           const SizedBox(height: AppTheme.spacingMd),
           Text(
-            'Firmware Update Complete!',
+            isFullComplete ? 'Update Complete!' : 'Filesystem Upload Complete!',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: AppTheme.successColor,
                 ),
@@ -1323,7 +1450,10 @@ class _ActionButtons extends StatelessWidget {
     }
 
     // Failed state - show retry/reset buttons
-    if (dfuState.status == DfuStatus.failed) {
+    if (dfuState.status == DfuStatus.failed || isFsFailed) {
+      final errorMessage = dfuState.status == DfuStatus.failed
+          ? dfuState.errorMessage
+          : fsUploadState.errorMessage;
       return Column(
         children: [
           const Icon(
@@ -1338,10 +1468,10 @@ class _ActionButtons extends StatelessWidget {
                   color: AppTheme.errorColor,
                 ),
           ),
-          if (dfuState.errorMessage != null) ...[
+          if (errorMessage != null) ...[
             const SizedBox(height: AppTheme.spacingSm),
             Text(
-              dfuState.errorMessage!,
+              errorMessage,
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -1356,7 +1486,7 @@ class _ActionButtons extends StatelessWidget {
               ),
               const SizedBox(width: AppTheme.spacingMd),
               FilledButton(
-                onPressed: operationState.canStartUpdate ? onStart : null,
+                onPressed: operationState.canStartFirmwareUpdate ? onStartFirmware : null,
                 child: const Text('Retry'),
               ),
             ],
@@ -1365,11 +1495,26 @@ class _ActionButtons extends StatelessWidget {
       );
     }
 
+    // Downloading state - show cancel button only
+    if (operationState.isDownloading) {
+      return OutlinedButton.icon(
+        onPressed: onCancel,
+        icon: const Icon(Icons.cancel),
+        label: const Text('Cancel Download'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+
     // In progress - show cancel button
-    if (dfuState.status.isInProgress) {
+    if (dfuState.status.isInProgress || isFsUploading || operationState.isBothUpdating) {
+      final isCritical = dfuState.status.isCritical;
+      final canCancel = dfuState.status.canCancel || isFsUploading;
+      
       return Column(
         children: [
-          if (dfuState.status.isCritical)
+          if (isCritical)
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingMd),
               decoration: BoxDecoration(
@@ -1389,11 +1534,11 @@ class _ActionButtons extends StatelessWidget {
               ),
             ),
           const SizedBox(height: AppTheme.spacingMd),
-          if (dfuState.status.canCancel)
+          if (canCancel)
             OutlinedButton.icon(
               onPressed: onCancel,
               icon: const Icon(Icons.cancel),
-              label: const Text('Cancel Update'),
+              label: const Text('Cancel'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppTheme.errorColor,
               ),
@@ -1407,33 +1552,88 @@ class _ActionButtons extends StatelessWidget {
       );
     }
 
-    // Idle state - show start button
+    // Idle state - show start buttons
     return Column(
       children: [
-        FilledButton.icon(
-          onPressed:
-              operationState.canStartUpdate && isConnected ? onStart : null,
-          icon: const Icon(Icons.system_update),
-          label: const Text('Start Update'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size(200, 48),
+        // Start Both button (shown when both are available)
+        if (operationState.hasBoth) ...[
+          FilledButton.icon(
+            onPressed: operationState.canStartBoth && isConnected ? onStartBoth : null,
+            icon: const Icon(Icons.playlist_play),
+            label: const Text('Start Both (FS + FW)'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+              backgroundColor: AppTheme.successColor,
+            ),
           ),
+          const SizedBox(height: AppTheme.spacingSm),
+          Text(
+            'Uploads filesystem first, then firmware',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+          ),
+          const SizedBox(height: AppTheme.spacingMd),
+          const Divider(),
+          const SizedBox(height: AppTheme.spacingSm),
+          Text(
+            'Or update individually:',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+          ),
+          const SizedBox(height: AppTheme.spacingSm),
+        ],
+        
+        // Individual buttons row
+        Row(
+          children: [
+            // Firmware Update button
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: operationState.canStartFirmwareUpdate && isConnected
+                    ? onStartFirmware
+                    : null,
+                icon: const Icon(Icons.system_update, size: 18),
+                label: const Text('FW Update'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppTheme.spacingSm),
+            // Filesystem Upload button
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: operationState.canStartFilesystemUpload && isConnected
+                    ? onStartFilesystem
+                    : null,
+                icon: const Icon(Icons.storage, size: 18),
+                label: const Text('FS Upload'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                ),
+              ),
+            ),
+          ],
         ),
+        
+        // Status messages
         if (!isConnected)
           Padding(
-            padding: const EdgeInsets.only(top: AppTheme.spacingSm),
+            padding: const EdgeInsets.only(top: AppTheme.spacingMd),
             child: Text(
-              'Connect to your watch to start the update',
+              'Connect to your watch to start',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppTheme.textSecondary,
                   ),
             ),
           ),
-        if (!operationState.hasFirmware)
+        if (!operationState.hasFirmware && !operationState.hasFilesystem)
           Padding(
-            padding: const EdgeInsets.only(top: AppTheme.spacingSm),
+            padding: const EdgeInsets.only(top: AppTheme.spacingMd),
             child: Text(
-              'Select a firmware to continue',
+              'Select a firmware package to continue',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppTheme.textSecondary,
                   ),

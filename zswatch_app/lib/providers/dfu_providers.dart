@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../data/models/dfu_state.dart';
+import '../data/models/filesystem_image.dart';
 import '../data/models/firmware_image.dart';
 import '../services/dfu/dfu_service.dart';
 import '../services/dfu/firmware_manager.dart';
+import 'filesystem_providers.dart';
 import 'watch_service_provider.dart';
 
 /// Provider for the DFU service singleton
@@ -126,9 +128,10 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     );
 
     try {
-      final image = await _firmwareManager.downloadReleaseAsset(release, asset);
+      final result = await _firmwareManager.downloadReleaseAsset(release, asset);
       state = state.copyWith(
-        downloadedImage: image,
+        downloadedImage: result.firmwareImage,
+        filesystemImage: result.filesystemImage,
         isDownloading: false,
       );
     } catch (e) {
@@ -193,7 +196,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     }
   }
 
-  /// Start the DFU process
+  /// Start the DFU process (firmware only)
   Future<void> startUpdate() async {
     final image = state.downloadedImage;
     if (image == null) {
@@ -243,21 +246,155 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     }
   }
 
+  /// Start filesystem upload only
+  Future<void> startFilesystemUpload() async {
+    final fsImage = state.filesystemImage;
+    if (fsImage == null) {
+      state = state.copyWith(error: 'No filesystem image available');
+      return;
+    }
+
+    state = state.copyWith(
+      isFilesystemUploading: true,
+      error: null,
+    );
+
+    try {
+      // Get the connected device
+      final watchService = _ref.read(watchServiceProvider);
+      if (!watchService.isConnected) {
+        throw Exception('Watch not connected');
+      }
+
+      final connection = watchService.currentConnection;
+      final deviceId = connection.watchId;
+      if (deviceId.isEmpty) {
+        throw Exception('No device ID available');
+      }
+
+      // Start the filesystem upload
+      final fsService = _ref.read(filesystemUploadServiceProvider);
+      await fsService.startUpload(
+        deviceId: deviceId,
+        image: fsImage,
+      );
+
+      state = state.copyWith(isFilesystemUploading: false);
+
+    } catch (e) {
+      state = state.copyWith(
+        isFilesystemUploading: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Start both filesystem upload and firmware update (filesystem first, then firmware)
+  Future<void> startBothUpdates() async {
+    final fsImage = state.filesystemImage;
+    final fwImage = state.downloadedImage;
+
+    if (fsImage == null && fwImage == null) {
+      state = state.copyWith(error: 'No images available');
+      return;
+    }
+
+    state = state.copyWith(
+      isBothUpdating: true,
+      currentStep: fsImage != null ? 1 : 2,
+      totalSteps: fsImage != null ? 2 : 1,
+      error: null,
+    );
+
+    try {
+      // Get the connected device
+      final watchService = _ref.read(watchServiceProvider);
+      if (!watchService.isConnected) {
+        throw Exception('Watch not connected');
+      }
+
+      final connection = watchService.currentConnection;
+      final deviceId = connection.watchId;
+      if (deviceId.isEmpty) {
+        throw Exception('No device ID available');
+      }
+
+      // Step 1: Upload filesystem if available
+      if (fsImage != null) {
+        state = state.copyWith(currentStep: 1);
+        
+        final fsService = _ref.read(filesystemUploadServiceProvider);
+        await fsService.startUpload(
+          deviceId: deviceId,
+          image: fsImage,
+        );
+
+        // Wait for filesystem upload to complete
+        await fsService.stateStream.firstWhere(
+          (s) => s.status.isTerminal,
+        );
+
+        final fsState = fsService.currentState;
+        if (fsState.status != FilesystemUploadStatus.completed) {
+          throw Exception('Filesystem upload failed: ${fsState.errorMessage}');
+        }
+        
+        // Give BLE transport time to fully release before DFU
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+
+      // Step 2: Start firmware update if available
+      if (fwImage != null) {
+        state = state.copyWith(currentStep: 2);
+        
+        // Prepare firmware (extract if needed)
+        final images = await _firmwareManager.prepareFirmware(fwImage);
+        state = state.copyWith(preparedImages: images);
+
+        // Create a BluetoothDevice from the ID
+        final bluetoothDevice = BluetoothDevice.fromId(deviceId);
+        
+        // Start the DFU
+        await _dfuService.startUpdate(
+          device: bluetoothDevice,
+          firmwareImages: images,
+        );
+      }
+
+      state = state.copyWith(isBothUpdating: false);
+
+    } catch (e) {
+      state = state.copyWith(
+        isBothUpdating: false,
+        error: e.toString(),
+      );
+    }
+  }
+
   /// Cancel the current operation
   Future<void> cancel() async {
     if (_dfuService.isInProgress) {
       await _dfuService.cancel();
     }
+    
+    final fsService = _ref.read(filesystemUploadServiceProvider);
+    if (fsService.isInProgress) {
+      await fsService.cancel();
+    }
+    
     _firmwareManager.cancelDownload();
     state = state.copyWith(
       isDownloading: false,
       isUpdating: false,
+      isFilesystemUploading: false,
+      isBothUpdating: false,
     );
   }
 
   /// Reset state
   void reset() {
     _dfuService.reset();
+    _ref.read(filesystemUploadServiceProvider).reset();
     _firmwareManager.resetProgress();
     state = const DfuOperationState();
   }
@@ -287,9 +424,14 @@ class DfuOperationState {
   final WorkflowRun? selectedWorkflowRun;
   final WorkflowArtifact? selectedArtifact;
   final FirmwareImage? downloadedImage;
+  final FilesystemImage? filesystemImage;
   final List<FirmwareImage> preparedImages;
   final bool isDownloading;
   final bool isUpdating;
+  final bool isFilesystemUploading;
+  final bool isBothUpdating;
+  final int currentStep;
+  final int totalSteps;
   final String? error;
 
   const DfuOperationState({
@@ -297,15 +439,36 @@ class DfuOperationState {
     this.selectedWorkflowRun,
     this.selectedArtifact,
     this.downloadedImage,
+    this.filesystemImage,
     this.preparedImages = const [],
     this.isDownloading = false,
     this.isUpdating = false,
+    this.isFilesystemUploading = false,
+    this.isBothUpdating = false,
+    this.currentStep = 0,
+    this.totalSteps = 0,
     this.error,
   });
 
   bool get hasError => error != null;
   bool get hasFirmware => downloadedImage != null;
-  bool get canStartUpdate => hasFirmware && !isDownloading && !isUpdating;
+  bool get hasFilesystem => filesystemImage != null;
+  bool get hasBoth => hasFirmware && hasFilesystem;
+  
+  /// Whether any operation is in progress
+  bool get isAnyInProgress => isDownloading || isUpdating || isFilesystemUploading || isBothUpdating;
+  
+  /// Whether user can start firmware update
+  bool get canStartFirmwareUpdate => hasFirmware && !isAnyInProgress;
+  
+  /// Whether user can start filesystem upload
+  bool get canStartFilesystemUpload => hasFilesystem && !isAnyInProgress;
+  
+  /// Whether user can start both updates
+  bool get canStartBoth => hasBoth && !isAnyInProgress;
+  
+  /// Legacy: alias for canStartFirmwareUpdate
+  bool get canStartUpdate => canStartFirmwareUpdate;
 
   /// Source description for the selected firmware
   String? get sourceDescription {
@@ -318,14 +481,39 @@ class DfuOperationState {
     return null;
   }
 
+  /// Description of what's included in the download
+  String get contentDescription {
+    if (hasBoth) {
+      return 'Firmware + Filesystem';
+    } else if (hasFirmware) {
+      return 'Firmware only';
+    } else if (hasFilesystem) {
+      return 'Filesystem only';
+    }
+    return 'No content';
+  }
+
+  /// Current step description for "both" updates
+  String get currentStepDescription {
+    if (totalSteps == 0) return '';
+    if (currentStep == 1) return 'Step 1/$totalSteps: Uploading filesystem...';
+    if (currentStep == 2) return 'Step 2/$totalSteps: Updating firmware...';
+    return 'Step $currentStep/$totalSteps';
+  }
+
   DfuOperationState copyWith({
     GitHubRelease? selectedRelease,
     WorkflowRun? selectedWorkflowRun,
     WorkflowArtifact? selectedArtifact,
     FirmwareImage? downloadedImage,
+    FilesystemImage? filesystemImage,
     List<FirmwareImage>? preparedImages,
     bool? isDownloading,
     bool? isUpdating,
+    bool? isFilesystemUploading,
+    bool? isBothUpdating,
+    int? currentStep,
+    int? totalSteps,
     String? error,
   }) {
     return DfuOperationState(
@@ -333,22 +521,29 @@ class DfuOperationState {
       selectedWorkflowRun: selectedWorkflowRun ?? this.selectedWorkflowRun,
       selectedArtifact: selectedArtifact ?? this.selectedArtifact,
       downloadedImage: downloadedImage ?? this.downloadedImage,
+      filesystemImage: filesystemImage ?? this.filesystemImage,
       preparedImages: preparedImages ?? this.preparedImages,
       isDownloading: isDownloading ?? this.isDownloading,
       isUpdating: isUpdating ?? this.isUpdating,
+      isFilesystemUploading: isFilesystemUploading ?? this.isFilesystemUploading,
+      isBothUpdating: isBothUpdating ?? this.isBothUpdating,
+      currentStep: currentStep ?? this.currentStep,
+      totalSteps: totalSteps ?? this.totalSteps,
       error: error,
     );
   }
 }
 
-/// Provider for DFU logs (combined from both services)
+/// Provider for DFU logs (combined from all services)
 final dfuLogsProvider = StreamProvider<String>((ref) {
   final dfuService = ref.watch(dfuServiceProvider);
   final firmwareManager = ref.watch(firmwareManagerProvider);
+  final fsService = ref.watch(filesystemUploadServiceProvider);
 
   return Rx.merge([
     dfuService.logStream,
     firmwareManager.logStream,
+    fsService.logStream,
   ]);
 });
 

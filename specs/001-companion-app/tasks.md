@@ -242,6 +242,78 @@
 
 ---
 
+## Phase 4.5: Filesystem Upload via MCUmgr (US2 Extension) ✅ COMPLETE
+
+**Goal**: User can upload filesystem images (lvgl_resources_raw.bin) via MCUmgr filesystem commands
+
+**Independent Test**: Download release → See filesystem option → Upload filesystem → Verify progress → Confirm upload completes
+
+**Note**: This extends User Story 2 (Firmware Update) to support filesystem images found in the same release zip
+
+**Note**: The file lvgl_resources_raw.bin is part of the downloaded firmware zip from github. In the same zip as we find dfu_application.zip.
+
+### Models
+
+- [X] T060a [P] [US2] Create FilesystemImage model in lib/data/models/filesystem_image.dart
+  - Target path on device (`/S/full_fs`)
+  - Source file path (local)
+  - File size
+  - Upload status tracking
+
+### Services
+
+- [X] T060b [US2] Create filesystem upload service in lib/services/dfu/filesystem_upload_service.dart
+  - Uses mcumgr_flutter FsManagerApi for upload
+  - Subscribes to FsManagerEvents.getFileUploadEvents() for progress
+  - Speed calculation and progress tracking
+  - Error handling and retry logic
+- [X] T060c [US2] Update firmware_manager.dart to detect lvgl_resources_raw.bin during zip extraction
+  - Check for lvgl_resources_raw.bin alongside dfu_application.zip
+  - Extract and store filesystem image when found
+  - Return both firmware images and filesystem image availability
+
+### Providers
+
+- [X] T060d [US2] Create filesystem upload providers in lib/providers/filesystem_providers.dart
+  - filesystemImageProvider - detected filesystem image from zip
+  - filesystemUploadStateProvider - upload progress/status
+  - filesystemUploadProgressProvider - percentage, speed, time remaining
+- [X] T060e [US2] Update dfu_providers.dart to coordinate filesystem and firmware uploads
+  - Track which update types are available (FW only, FS only, Both)
+  - Orchestrate "Start Both" flow: filesystem first, then firmware
+  - When a dfu_application.zip is selected, we also behind the scenes pick the lvgl_resources_raw.bin
+
+### UI Updates
+
+- [X] T060f [US2] Update firmware_update_screen.dart with three update options
+  - "Start FW Update" button (existing, always shown when FW available)
+  - "Start Filesystem Update" button (shown when lvgl_resources_raw.bin detected)
+  - "Start Both" button (shown when both available)
+  - Disable unavailable options with tooltip explanation
+- [X] T060g [US2] Add filesystem upload progress UI
+  - Reuse existing progress card pattern
+  - Show percentage, speed (KB/s), time remaining
+  - Show "Uploading filesystem..." status during upload
+- [X] T060h [US2] Implement "Start Both" orchestration flow
+  - Step 1: Upload filesystem with progress
+  - Step 2: After filesystem completes, automatically start firmware upload
+  - Combined progress indication (e.g., "Step 1/2: Filesystem" → "Step 2/2: Firmware")
+  - Handle errors at each step with ability to retry
+- [X] T060i [US2] Update zip selection to show filesystem detection status
+  - Indicate when lvgl_resources_raw.bin was found in release
+  - Show filesystem image size
+  - Warning if filesystem not found in release (FW-only update)
+
+### Constants
+
+- [X] T060j [P] [US2] Add filesystem constants in lib/core/constants/filesystem_constants.dart
+  - Target path: `/S/full_fs`
+  - Expected filename: `lvgl_resources_raw.bin`
+
+**Checkpoint**: User can upload filesystem images from GitHub releases or local files, with option to upload both filesystem and firmware in sequence ✅
+
+---
+
 ## Phase 5: User Story 3 - Notification & Media Integration (Priority: P3)
 
 **Goal**: User receives phone notifications and can control media on watch (platform-specific)
@@ -514,7 +586,11 @@ Phase 2: Foundational ◄──────────────────�
 ┌───────────────────────────────────────────────────┘
 │
 ├──► Phase 3: US1 - Connect (P1) 🎯 MVP
+│       │
 │       └──► Phase 4: US2 - Firmware (P2)
+│               │
+│               └──► Phase 4.5: Filesystem Upload (extends US2)
+│
 │       └──► Phase 5: US3 - Notifications (P3)
 │       └──► Phase 6: US4 - Dashboard (P4)
 │       └──► Phase 7: US5 - Health (P5)
@@ -533,6 +609,7 @@ Phase 2: Foundational ◄──────────────────�
 |-------|------------|-------------------|
 | US1 (Connect) | Foundational | None - MVP foundation |
 | US2 (Firmware) | US1 (needs connection) | US3, US4, US5, US6 |
+| US2 Filesystem Extension | US2 (needs DFU infrastructure) | US3, US4, US5, US6 |
 | US3 (Notifications) | US1 (needs connection) | US2, US4, US5, US6 |
 | US4 (Dashboard) | US1 (needs connection) | US2, US3, US5, US6 |
 | US5 (Health) | US1 (needs connection) | US2, US3, US4, US6 |
@@ -560,6 +637,13 @@ Parallel Set 3: T024, T025, T026 (widgets)
 ```
 Parallel: T030, T031, T032 (models)
 Parallel: T040 (scan screen can start early)
+```
+
+**Phase 4.5 (Filesystem)**:
+```
+Parallel: T060a, T060j (model and constants)
+Sequential: T060b → T060c → T060d → T060e (service → detection → providers)
+Parallel: T060f, T060g, T060h, T060i (UI updates after services ready)
 ```
 
 ---
@@ -604,7 +688,9 @@ With 2+ developers after Foundational phase:
 | Phase 1: Setup | 7 | - |
 | Phase 2: Foundational | 22 | - |
 | Phase 3: US1 Connect | 16 | P1 MVP |
+| Phase 3.5: Gap Tasks | 6 | P1 |
 | Phase 4: US2 Firmware | 15 | P2 |
+| Phase 4.5: Filesystem | 10 | P2 |
 | Phase 5: US3 Notifications | 15 | P3 |
 | Phase 6: US4 Dashboard | 5 | P4 |
 | Phase 7: US5 Health | 14 | P5 |
@@ -614,7 +700,7 @@ With 2+ developers after Foundational phase:
 | Phase 11: US9 Analytics | 9 | P9 |
 | Phase 12: US10 Voice | 4 | P10 |
 | Phase 13: Polish | 9 | - |
-| **Total** | **146** | 10 stories |
+| **Total** | **156** | 10 stories |
 
 ---
 
