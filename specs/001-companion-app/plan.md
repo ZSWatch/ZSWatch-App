@@ -112,10 +112,11 @@ zswatch_app/
 │   │       └── app_database.dart
 │   │
 │   ├── services/                  # Business logic / device communication
+│   │   ├── watch_service.dart     # Unified watch service (connection + protocol)
 │   │   ├── ble/                   # BLE abstraction layer
 │   │   │   ├── ble_service.dart           # Interface
 │   │   │   ├── ble_service_impl.dart      # flutter_blue_plus implementation
-│   │   │   ├── ble_scanner.dart
+│   │   │   ├── ble_scanner.dart           # Device discovery with filtering
 │   │   │   ├── ble_connection_manager.dart
 │   │   │   ├── gatt_operations.dart
 │   │   │   └── sensor_gatt_service.dart   # zsw_gatt_sensor_server client
@@ -139,6 +140,7 @@ zswatch_app/
 │   ├── providers/                 # Riverpod providers
 │   │   ├── ble_providers.dart
 │   │   ├── watch_providers.dart
+│   │   ├── watch_service_provider.dart  # Unified watch state & operations
 │   │   ├── health_providers.dart
 │   │   ├── settings_providers.dart
 │   │   └── dfu_providers.dart

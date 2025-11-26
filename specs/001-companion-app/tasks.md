@@ -19,13 +19,13 @@
 
 **⚠️ IMPORTANT**: The Flutter project MUST be created via `flutter create zswatch_app`. AI assistants must assume this structure already exists.
 
-- [ ] T001 Configure dependencies in pubspec.yaml (flutter_blue_plus, mcumgr_flutter, flutter_riverpod, drift, fl_chart, etc.)
-- [ ] T002 [P] Configure Android permissions in android/app/src/main/AndroidManifest.xml
-- [ ] T003 [P] Configure iOS permissions and background modes in ios/Runner/Info.plist
-- [ ] T004 [P] Create core constants in lib/core/constants/ble_constants.dart (service UUIDs, characteristic UUIDs)
-- [ ] T005 [P] Create app theme in lib/core/theme/app_theme.dart (dark theme, ZSWatch colors)
-- [ ] T006 [P] Create core extensions in lib/core/extensions/datetime_extensions.dart
-- [ ] T007 [P] Setup analysis_options.yaml with Flutter lints
+- [X] T001 Configure dependencies in pubspec.yaml (flutter_blue_plus, mcumgr_flutter, flutter_riverpod, drift, fl_chart, etc.)
+- [X] T002 [P] Configure Android permissions in android/app/src/main/AndroidManifest.xml
+- [X] T003 [P] Configure iOS permissions and background modes in ios/Runner/Info.plist
+- [X] T004 [P] Create core constants in lib/core/constants/ble_constants.dart (service UUIDs, characteristic UUIDs)
+- [X] T005 [P] Create app theme in lib/core/theme/app_theme.dart (dark theme, ZSWatch colors)
+- [X] T006 [P] Create core extensions in lib/core/extensions/datetime_extensions.dart
+- [X] T007 [P] Setup analysis_options.yaml with Flutter lints
 
 ---
 
@@ -37,43 +37,43 @@
 
 ### Database Layer
 
-- [ ] T008 Create drift database configuration in lib/data/database/app_database.dart
-- [ ] T009 [P] Create Watch table schema in lib/data/database/tables/watches_table.dart
-- [ ] T010 [P] Create HealthSamples table schema in lib/data/database/tables/health_samples_table.dart
-- [ ] T011 [P] Create BatteryReadings table schema in lib/data/database/tables/battery_readings_table.dart
-- [ ] T012 [P] Create CommLogEntries table schema in lib/data/database/tables/comm_log_entries_table.dart
-- [ ] T013 Generate drift database code via build_runner
+- [X] T008 Create drift database configuration in lib/data/database/app_database.dart
+- [X] T009 [P] Create Watch table schema in lib/data/database/tables/watches_table.dart
+- [X] T010 [P] Create HealthSamples table schema in lib/data/database/tables/health_samples_table.dart
+- [X] T011 [P] Create BatteryReadings table schema in lib/data/database/tables/battery_readings_table.dart
+- [X] T012 [P] Create CommLogEntries table schema in lib/data/database/tables/comm_log_entries_table.dart
+- [X] T013 Generate drift database code via build_runner
 
 ### BLE Abstraction Layer
 
-- [ ] T014 Create BLE service interface in lib/services/ble/ble_service.dart
-- [ ] T015 Create BLE service implementation in lib/services/ble/ble_service_impl.dart (flutter_blue_plus)
-- [ ] T016 Create GATT operations helper in lib/services/ble/gatt_operations.dart
-- [ ] T017 Create BLE constants (NUS UUIDs, ZSWatch UUIDs) in lib/core/constants/ble_uuids.dart
+- [X] T014 Create BLE service interface in lib/services/ble/ble_service.dart
+- [X] T015 Create BLE service implementation in lib/services/ble/ble_service_impl.dart (flutter_blue_plus)
+- [X] T016 Create GATT operations helper in lib/services/ble/gatt_operations.dart
+- [X] T017 Create BLE constants (NUS UUIDs, ZSWatch UUIDs) in lib/core/constants/ble_uuids.dart
 
 ### Protocol Layer
 
-- [ ] T018 Create protocol service interface in lib/services/protocol/protocol_service.dart
-- [ ] T019 Create Gadgetbridge protocol implementation in lib/services/protocol/gadgetbridge_protocol.dart
-- [ ] T020 Create message types enum/classes in lib/services/protocol/message_types.dart
+- [X] T018 Create protocol service interface in lib/services/protocol/protocol_service.dart
+- [X] T019 Create Gadgetbridge protocol implementation in lib/services/protocol/gadgetbridge_protocol.dart
+- [X] T020 Create message types enum/classes in lib/services/protocol/message_types.dart
 
 ### State Management Foundation
 
-- [ ] T021 Create BLE providers in lib/providers/ble_providers.dart (connection state, scanning state)
-- [ ] T022 [P] Create watch providers in lib/providers/watch_providers.dart
-- [ ] T023 [P] Create settings providers in lib/providers/settings_providers.dart
+- [X] T021 Create BLE providers in lib/providers/ble_providers.dart (connection state, scanning state)
+- [X] T022 [P] Create watch providers in lib/providers/watch_providers.dart
+- [X] T023 [P] Create settings providers in lib/providers/settings_providers.dart
 
 ### Base UI Components
 
-- [ ] T024 [P] Create ConnectionStatusPill widget in lib/ui/widgets/connection_status_pill.dart
-- [ ] T025 [P] Create BatteryRing widget in lib/ui/widgets/battery_ring.dart
-- [ ] T026 [P] Create ProgressCard widget in lib/ui/widgets/progress_card.dart
-- [ ] T027 Create app router/navigation in lib/ui/navigation/app_router.dart
+- [X] T024 [P] Create ConnectionStatusPill widget in lib/ui/widgets/connection_status_pill.dart
+- [X] T025 [P] Create BatteryRing widget in lib/ui/widgets/battery_ring.dart
+- [X] T026 [P] Create ProgressCard widget in lib/ui/widgets/progress_card.dart
+- [X] T027 Create app router/navigation in lib/ui/navigation/app_router.dart
 
 ### App Entry Points
 
-- [ ] T028 Configure main.dart with ProviderScope in lib/main.dart
-- [ ] T029 Create App widget in lib/app.dart with theme and router
+- [X] T028 Configure main.dart with ProviderScope in lib/main.dart
+- [X] T029 Create App widget in lib/app.dart with theme and router
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -87,39 +87,94 @@
 
 ### Models
 
-- [ ] T030 [P] [US1] Create Watch model in lib/data/models/watch.dart
-- [ ] T031 [P] [US1] Create Connection model (in-memory state) in lib/data/models/connection.dart
-- [ ] T032 [P] [US1] Create ConnectionState enum in lib/data/models/connection_state.dart
+- [X] T030 [P] [US1] Create Watch model in lib/data/models/watch.dart
+- [X] T031 [P] [US1] Create Connection model (in-memory state) in lib/data/models/connection.dart
+- [X] T032 [P] [US1] Create ConnectionState enum in lib/data/models/connection_state.dart
 
 ### BLE Services
 
-- [ ] T033 [US1] Implement BLE scanner in lib/services/ble/ble_scanner.dart
-- [ ] T034 [US1] Implement BLE connection manager in lib/services/ble/ble_connection_manager.dart
-- [ ] T035 [US1] Add MTU negotiation and DLE enable to connection manager
-- [ ] T036 [US1] Add 2M PHY request to connection manager
-- [ ] T037 [US1] Implement bonding/pairing flow with secure key storage
+- [X] T033 [US1] Implement BLE scanner in lib/services/ble/ble_scanner.dart
+- [X] T034 [US1] Implement BLE connection manager in lib/services/ble/ble_connection_manager.dart
+- [X] T035 [US1] Add MTU negotiation and DLE enable to connection manager
+- [X] T036 [US1] Add 2M PHY request to connection manager
+- [X] T037 [US1] Implement bonding/pairing flow with secure key storage
 
 ### Repository
 
-- [ ] T038 [US1] Create watch repository in lib/data/repositories/watch_repository.dart
+- [X] T038 [US1] Create watch repository in lib/data/repositories/watch_repository.dart
 
 ### Providers
 
-- [ ] T039 [US1] Update BLE providers with scanner and connection state
+- [X] T039 [US1] Update BLE providers with scanner and connection state
 
 ### UI Screens
 
-- [ ] T040 [P] [US1] Create scan screen in lib/ui/screens/connection/scan_screen.dart
-- [ ] T041 [US1] Create device list component in lib/ui/screens/connection/device_list_screen.dart
-- [ ] T042 [US1] Add connection progress UI with state transitions
-- [ ] T043 [US1] Add permission request handling (Bluetooth, Location for Android)
+- [X] T040 [P] [US1] Create scan screen in lib/ui/screens/connection/scan_screen.dart
+- [X] T041 [US1] Create device list component in lib/ui/screens/connection/device_list_screen.dart
+- [X] T042 [US1] Add connection progress UI with state transitions
+- [X] T043 [US1] Add permission request handling (Bluetooth, Location for Android)
 
 ### Gadgetbridge Integration
 
-- [ ] T044 [US1] Implement device info request (`t:"ver"`) in gadgetbridge_protocol.dart
-- [ ] T045 [US1] Implement time sync on connect in lib/services/time/time_sync_service.dart
+- [X] T044 [US1] Implement device info request (`t:"ver"`) in gadgetbridge_protocol.dart
+- [X] T045 [US1] Implement time sync on connect in lib/services/time/time_sync_service.dart
 
 **Checkpoint**: User can discover, connect, and see basic device info. MVP complete!
+
+---
+
+## Phase 3.5: Connection Flow Completion (Gap Tasks)
+
+**Goal**: Complete the connection flow with dashboard, device info display, and proper state management
+
+**Note**: These tasks were identified as missing during Phase 3 implementation
+
+### Unified Watch Service
+
+- [X] T045a [US1] Create unified WatchService in lib/services/watch_service.dart
+  - Combines BLE connection, protocol, and device info in one service
+  - Handles connection lifecycle, bonding, MTU negotiation
+  - Requests device info and syncs time on connect
+  - Subscribes to battery notifications
+
+### Dashboard Screen
+
+- [X] T045b [US1] Create dashboard screen in lib/ui/screens/dashboard/dashboard_screen.dart
+  - Connection status card with RSSI and MTU
+  - Battery level ring display
+  - Firmware version display
+  - Device info card (name, ID, hardware)
+  - Disconnect button
+  - Feature shortcuts grid
+
+### Watch State Provider
+
+- [X] T045c [US1] Create watch service providers in lib/providers/watch_service_provider.dart
+  - watchServiceProvider - singleton WatchService
+  - watchConnectionProvider - reactive connection state
+  - currentWatchProvider - watch info with battery/firmware
+  - watchNotifierProvider - connect/disconnect actions
+  - knownWatchIdsProvider - saved watch IDs for filtering
+
+### Home Screen Updates
+
+- [X] T045d [US1] Update home screen to show dashboard when connected
+  - Welcome screen when disconnected
+  - Progress indicator when connecting
+  - Dashboard when connected
+
+### Scan Screen Enhancements
+
+- [X] T045e [US1] Show already connected devices in scan list
+  - Display system-connected devices
+  - Filter bonded devices to only show saved watches
+  - Show "Connected", "Saved", or RSSI status appropriately
+  - Track advertising vs bonded-only devices
+
+### Navigation Fixes
+
+- [X] T045f [US1] Fix navigation to use push() instead of go() for sub-screens
+  - Enables Android back button to work correctly
 
 ---
 

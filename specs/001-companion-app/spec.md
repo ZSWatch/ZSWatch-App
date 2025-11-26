@@ -32,6 +32,9 @@ A user opens the app for the first time and wants to connect to their ZSWatch. T
 3. **Given** a device is shown in the list, **When** user taps on it, **Then** app connects and displays connection progress
 4. **Given** connection succeeds, **When** the dashboard loads, **Then** user sees watch name, firmware version, battery level, and "Connected" status
 5. **Given** the watch goes out of range or disconnects, **When** connection is lost, **Then** app shows "Disconnected" and attempts automatic reconnection
+6. **Given** a watch is already connected to the phone, **When** user opens scan screen, **Then** the connected device appears in the list with "Connected" indicator
+7. **Given** a watch was previously paired and saved in the app, **When** user opens scan screen but watch is not advertising, **Then** device shows as "Saved • Out of range"
+8. **Given** a watch was previously paired and is now advertising, **When** user opens scan screen, **Then** device shows as "Saved" with current RSSI
 
 ---
 
@@ -94,9 +97,10 @@ A user wants to see at-a-glance information about their connected watch. The das
 
 **Acceptance Scenarios**:
 
-1. **Given** the app opens with a paired watch, **When** connection is established, **Then** dashboard shows watch name, battery %, and firmware version
+1. **Given** the app opens with a paired watch, **When** connection is established, **Then** dashboard shows watch name, battery %, firmware version, hardware version, RSSI, and MTU
 2. **Given** connection state changes, **When** watch disconnects/reconnects, **Then** status indicator updates immediately
-3. **Given** user wants to access features, **When** they tap Settings/Notifications/Health/Firmware/Developer, **Then** navigation works correctly
+3. **Given** user wants to access features, **When** they tap Settings/Notifications/Health/Firmware/Developer, **Then** navigation works correctly and back button returns to dashboard
+4. **Given** user wants to disconnect, **When** they tap "Disconnect", **Then** app disconnects from watch and returns to welcome screen
 
 ---
 
@@ -217,6 +221,10 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - What happens when raw sensor streaming causes high battery drain? App warns user and offers to reduce streaming frequency
 - How does app handle very large communication logs? Logs are truncated/rotated to prevent memory issues
 - What happens when app is killed by OS while firmware update is in progress? App saves state and offers to resume on restart
+- What happens when user navigates to sub-screens and presses system back button? App navigates back to previous screen (not exit)
+- What happens when opening scan screen while a watch is already connected? Connected device appears in list with "Connected" badge
+- What happens when a previously saved watch is not advertising? Device shows in list as "Saved • Out of range" with MAC address
+- What happens when scanning shows multiple devices? Devices are sorted by signal strength (strongest first)
 
 ## Requirements *(mandatory)*
 
@@ -228,6 +236,10 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **FR-003**: App MUST maintain stable BLE connection when in foreground
 - **FR-004**: App MUST attempt automatic reconnection when connection is lost
 - **FR-005**: App MUST persist paired watch information across app restarts
+- **FR-005a**: App MUST display already-connected devices in the scan list with "Connected" indicator
+- **FR-005b**: App MUST display saved (previously paired) devices in scan list even when not advertising
+- **FR-005c**: Saved devices not currently advertising MUST show as "Out of range"
+- **FR-005d**: Scan list MUST always show MAC address for device identification
 - **FR-006**: App MUST support multiple saved watches with ability to switch between them
 - **FR-007**: App MUST request and use high MTU (Maximum Transmission Unit) on connection
 - **FR-008**: App MUST enable Data Length Extension (DLE) for optimal throughput
@@ -357,6 +369,8 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 #### Navigation
 - **UX-018**: Navigation MUST be simple 2–3 level hierarchy maximum
 - **UX-019**: Back navigation MUST always be predictable
+- **UX-019a**: Sub-screens MUST use push navigation to preserve back stack (not replace)
+- **UX-019b**: System back button/gesture MUST return to previous screen, not exit app
 - **UX-020**: No deep menu trees allowed
 
 #### System Status Display

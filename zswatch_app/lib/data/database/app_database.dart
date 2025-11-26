@@ -1,0 +1,236 @@
+import 'dart:io';
+
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+
+import 'tables/battery_readings_table.dart';
+import 'tables/comm_log_entries_table.dart';
+import 'tables/health_samples_table.dart';
+import 'tables/watches_table.dart';
+
+part 'app_database.g.dart';
+
+/// Main application database using drift (SQLite)
+///
+/// Manages all persistent data:
+/// - Watches: Paired ZSWatch devices
+/// - HealthSamples: Steps, heart rate, and other health metrics
+/// - BatteryReadings: Battery level history for analytics
+/// - CommLogEntries: BLE communication logs for debugging
+@DriftDatabase(
+  tables: [Watches, HealthSamples, BatteryReadings, CommLogEntries],
+)
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+
+  /// Database schema version - increment when making schema changes
+  @override
+  int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onCreate: (Migrator m) async {
+        await m.createAll();
+      },
+      onUpgrade: (Migrator m, int from, int to) async {
+        // Handle migrations here when schema changes
+        // Example:
+        // if (from < 2) {
+        //   await m.addColumn(watches, watches.newColumn);
+        // }
+      },
+    );
+  }
+
+  // ==================== Watch Operations ====================
+
+  /// Get all saved watches
+  Future<List<WatchEntity>> getAllWatches() => select(watches).get();
+
+  /// Watch all saved watches (stream)
+  Stream<List<WatchEntity>> watchAllWatches() => select(watches).watch();
+
+  /// Get watch by ID
+  Future<WatchEntity?> getWatchById(String id) {
+    return (select(watches)..where((w) => w.id.equals(id))).getSingleOrNull();
+  }
+
+  /// Get the primary watch
+  Future<WatchEntity?> getPrimaryWatch() {
+    return (select(watches)..where((w) => w.isPrimary.equals(true)))
+        .getSingleOrNull();
+  }
+
+  /// Insert or update a watch
+  Future<void> upsertWatch(WatchesCompanion watch) {
+    return into(watches).insertOnConflictUpdate(watch);
+  }
+
+  /// Set a watch as primary (clears other primary flags)
+  Future<void> setWatchAsPrimary(String watchId) async {
+    await transaction(() async {
+      // Clear all primary flags
+      await (update(watches)..where((w) => w.isPrimary.equals(true)))
+          .write(const WatchesCompanion(isPrimary: Value(false)));
+      // Set the specified watch as primary
+      await (update(watches)..where((w) => w.id.equals(watchId)))
+          .write(const WatchesCompanion(isPrimary: Value(true)));
+    });
+  }
+
+  /// Delete a watch and all its associated data
+  Future<void> deleteWatch(String watchId) async {
+    await transaction(() async {
+      await (delete(healthSamples)..where((h) => h.watchId.equals(watchId)))
+          .go();
+      await (delete(batteryReadings)..where((b) => b.watchId.equals(watchId)))
+          .go();
+      await (delete(watches)..where((w) => w.id.equals(watchId))).go();
+    });
+  }
+
+  /// Update watch connection timestamp
+  Future<void> updateWatchLastConnected(String watchId) {
+    return (update(watches)..where((w) => w.id.equals(watchId))).write(
+      WatchesCompanion(lastConnectedAt: Value(DateTime.now())),
+    );
+  }
+
+  /// Update watch battery level
+  Future<void> updateWatchBattery(String watchId, int level) {
+    return (update(watches)..where((w) => w.id.equals(watchId))).write(
+      WatchesCompanion(batteryLevel: Value(level)),
+    );
+  }
+
+  // ==================== Health Sample Operations ====================
+
+  /// Insert a health sample
+  Future<int> insertHealthSample(HealthSamplesCompanion sample) {
+    return into(healthSamples).insert(sample);
+  }
+
+  /// Insert multiple health samples
+  Future<void> insertHealthSamples(List<HealthSamplesCompanion> samples) {
+    return batch((b) => b.insertAll(healthSamples, samples));
+  }
+
+  /// Get health samples for a watch within date range
+  Future<List<HealthSampleEntity>> getHealthSamples({
+    required String watchId,
+    required String type,
+    required DateTime from,
+    required DateTime to,
+  }) {
+    return (select(healthSamples)
+          ..where((h) =>
+              h.watchId.equals(watchId) &
+              h.type.equals(type) &
+              h.timestamp.isBetweenValues(from, to))
+          ..orderBy([(h) => OrderingTerm.asc(h.timestamp)]))
+        .get();
+  }
+
+  /// Delete health samples older than specified date
+  Future<int> deleteOldHealthSamples(DateTime cutoff) {
+    return (delete(healthSamples)..where((h) => h.timestamp.isSmallerThanValue(cutoff)))
+        .go();
+  }
+
+  // ==================== Battery Reading Operations ====================
+
+  /// Insert a battery reading
+  Future<int> insertBatteryReading(BatteryReadingsCompanion reading) {
+    return into(batteryReadings).insert(reading);
+  }
+
+  /// Get battery readings for a watch within date range
+  Future<List<BatteryReadingEntity>> getBatteryReadings({
+    required String watchId,
+    required DateTime from,
+    required DateTime to,
+  }) {
+    return (select(batteryReadings)
+          ..where((b) =>
+              b.watchId.equals(watchId) &
+              b.timestamp.isBetweenValues(from, to))
+          ..orderBy([(b) => OrderingTerm.asc(b.timestamp)]))
+        .get();
+  }
+
+  /// Delete battery readings older than specified date
+  Future<int> deleteOldBatteryReadings(DateTime cutoff) {
+    return (delete(batteryReadings)
+          ..where((b) => b.timestamp.isSmallerThanValue(cutoff)))
+        .go();
+  }
+
+  // ==================== Comm Log Operations ====================
+
+  /// Insert a comm log entry
+  Future<int> insertCommLogEntry(CommLogEntriesCompanion entry) {
+    return into(commLogEntries).insert(entry);
+  }
+
+  /// Get recent comm log entries
+  Future<List<CommLogEntryEntity>> getRecentCommLogs({int limit = 100}) {
+    return (select(commLogEntries)
+          ..orderBy([(c) => OrderingTerm.desc(c.timestamp)])
+          ..limit(limit))
+        .get();
+  }
+
+  /// Watch comm log entries (stream)
+  Stream<List<CommLogEntryEntity>> watchCommLogs({int limit = 100}) {
+    return (select(commLogEntries)
+          ..orderBy([(c) => OrderingTerm.desc(c.timestamp)])
+          ..limit(limit))
+        .watch();
+  }
+
+  /// Get comm log entry count
+  Future<int> getCommLogCount() async {
+    final query = selectOnly(commLogEntries)
+      ..addColumns([commLogEntries.id.count()]);
+    final result = await query.getSingle();
+    return result.read(commLogEntries.id.count()) ?? 0;
+  }
+
+  /// Rotate comm logs (keep most recent entries, delete oldest)
+  Future<void> rotateCommLogs({int maxEntries = 5000}) async {
+    final count = await getCommLogCount();
+    if (count > maxEntries) {
+      final deleteCount = count - maxEntries;
+      await customStatement(
+        'DELETE FROM comm_log_entries WHERE id IN '
+        '(SELECT id FROM comm_log_entries ORDER BY timestamp ASC LIMIT ?)',
+        [deleteCount],
+      );
+    }
+  }
+
+  /// Clear all comm logs
+  Future<int> clearCommLogs() => delete(commLogEntries).go();
+
+  // ==================== Data Retention ====================
+
+  /// Clean up old data (60-day retention)
+  Future<void> cleanupOldData() async {
+    final cutoff = DateTime.now().subtract(const Duration(days: 60));
+    await deleteOldHealthSamples(cutoff);
+    await deleteOldBatteryReadings(cutoff);
+  }
+}
+
+/// Opens the database connection
+LazyDatabase _openConnection() {
+  return LazyDatabase(() async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dbFolder.path, 'zswatch_app.db'));
+    return NativeDatabase.createInBackground(file);
+  });
+}
+
