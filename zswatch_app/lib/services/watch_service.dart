@@ -26,6 +26,7 @@ class WatchService {
   StreamSubscription<List<int>>? _nusSubscription;
   StreamSubscription<List<int>>? _batterySubscription;
   Timer? _reconnectTimer;
+  Timer? _rssiTimer;
 
   // Use BehaviorSubject to cache last value for new subscribers
   final _connectionController = BehaviorSubject<Connection>.seeded(
@@ -269,6 +270,10 @@ class WatchService {
 
       // Subscribe to battery service
       await _setupBatteryNotifications();
+      
+      // Read initial RSSI and start periodic updates
+      await _readAndUpdateRssi();
+      _startRssiUpdates();
 
       // Transition to syncing state (FR-088)
       // Connection is established but initial sync not yet complete
@@ -308,6 +313,32 @@ class WatchService {
     } finally {
       _isSettingUp = false;
     }
+  }
+
+  /// Read RSSI and update connection state
+  Future<void> _readAndUpdateRssi() async {
+    if (_device == null || !isConnected) return;
+    
+    try {
+      final rssi = await _device!.readRssi();
+      _updateConnection(currentConnection.copyWith(rssi: rssi));
+    } catch (e) {
+      debugPrint('[WatchService] Failed to read RSSI: $e');
+    }
+  }
+
+  /// Start periodic RSSI updates (every 5 seconds)
+  void _startRssiUpdates() {
+    _rssiTimer?.cancel();
+    _rssiTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _readAndUpdateRssi();
+    });
+  }
+
+  /// Stop RSSI updates
+  void _stopRssiUpdates() {
+    _rssiTimer?.cancel();
+    _rssiTimer = null;
   }
 
   Future<void> _setupNus() async {
@@ -841,6 +872,7 @@ class WatchService {
     _batterySubscription = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _stopRssiUpdates();
     _device = null;
     _services = null;
     _isSettingUp = false;

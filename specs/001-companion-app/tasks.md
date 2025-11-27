@@ -652,8 +652,8 @@
 ### Services
 
 - [ ] T085 [US5] Create health sync service in lib/services/health/health_sync_service.dart
-- [ ] T086 [US5] Implement Gadgetbridge activity messages (`t:"act"`, `t:"actfetch"`)
 - [ ] T087 [US5] Implement HR GATT service subscription (standard 0x180D)
+- [ ] T086 [US5] Implement Gadgetbridge activity messages (`t:"act"`, `t:"actfetch"`). NOTE: Not implemented on watch firmware yet. HR Service sends HR every second or so, this is live mode for now.
 
 ### Providers
 

@@ -196,6 +196,15 @@ class MediaService {
     }
   }
 
+  /// Fetch current state from native side with freshly calculated position.
+  /// 
+  /// This queries the native MediaSession to get the current state with
+  /// position calculated based on elapsed time since last update.
+  /// Use this when you need an up-to-date position (e.g., for initial sync).
+  Future<void> fetchCurrentState() async {
+    await _fetchCurrentState();
+  }
+
   // Media control actions
 
   /// Play

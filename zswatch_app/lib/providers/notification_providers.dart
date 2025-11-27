@@ -426,6 +426,9 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
   StreamSubscription<MediaMetadata>? _metadataSubscription;
   StreamSubscription<Map<String, dynamic>>? _watchMessageSubscription;
   StreamSubscription<Connection>? _connectionSubscription;
+  
+  /// Track previous connection state to detect state changes (not just RSSI updates)
+  bool _wasConnected = false;
 
   MediaControlNotifier(this._mediaService, this._watchService)
       : super(const MediaControlState()) {
@@ -434,13 +437,17 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
 
   Future<void> _initialize() async {
     // Listen for connection changes to sync on connect (FR-085)
+    // Note: connectionStream emits on RSSI updates too, so we track state changes
     _connectionSubscription = _watchService.connectionStream.listen((connection) {
-      if (connection.isConnected) {
+      final isNowConnected = connection.isConnected;
+      // Only sync when transitioning from disconnected to connected
+      if (isNowConnected && !_wasConnected) {
         // Small delay to ensure NUS is set up
         Future.delayed(const Duration(milliseconds: 500), () {
           syncCurrentStateToWatch();
         });
       }
+      _wasConnected = isNowConnected;
     });
 
     if (!Platform.isAndroid) {
@@ -455,22 +462,37 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
       if (success) {
         // Listen for playback state changes
         _playbackSubscription = _mediaService.playbackStateStream.listen((playbackState) {
+          final oldState = state.playbackState;
+          final oldPosition = state.positionSeconds;
+          
           state = state.copyWith(
             playbackState: playbackState.state,
             positionSeconds: playbackState.positionSeconds,
           );
-          _sendStateToWatch();
+          
+          // Only send if state actually changed
+          if (oldState != playbackState.state || oldPosition != playbackState.positionSeconds) {
+            _sendStateToWatch();
+          }
         });
 
         // Listen for metadata changes
         _metadataSubscription = _mediaService.metadataStream.listen((metadata) {
+          final oldTrack = state.track;
+          final oldArtist = state.artist;
+          final oldAlbum = state.album;
+          
           state = state.copyWith(
             artist: metadata.artist,
             album: metadata.album,
             track: metadata.track,
             durationSeconds: metadata.durationSeconds,
           );
-          _sendInfoToWatch();
+          
+          // Only send if metadata actually changed
+          if (oldTrack != metadata.track || oldArtist != metadata.artist || oldAlbum != metadata.album) {
+            _sendInfoToWatch();
+          }
         });
 
         // Listen for music control from watch
@@ -564,6 +586,9 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
     if (!_watchService.isConnected) return;
 
     debugPrint('[MediaControl] Syncing current media state to watch');
+
+    // Fetch fresh state from Android with up-to-date position calculation
+    await _mediaService.fetchCurrentState();
 
     // Send playback state if available
     if (state.playbackState != null) {

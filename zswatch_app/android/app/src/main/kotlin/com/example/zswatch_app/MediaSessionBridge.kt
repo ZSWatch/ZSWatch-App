@@ -32,6 +32,12 @@ class MediaSessionBridge(private val context: Context) {
     private var mediaCallback: MediaCallback? = null
     private val handler = Handler(Looper.getMainLooper())
     
+    // Track last sent values to avoid duplicate callbacks
+    private var lastPlaybackState: String? = null
+    private var lastPosition: Int? = null
+    private var lastTrack: String? = null
+    private var lastArtist: String? = null
+    
     interface MediaCallback {
         fun onPlaybackStateChanged(state: Map<String, Any?>)
         fun onMetadataChanged(metadata: Map<String, Any?>)
@@ -40,21 +46,39 @@ class MediaSessionBridge(private val context: Context) {
     private val controllerCallback = object : MediaController.Callback() {
         override fun onPlaybackStateChanged(state: PlaybackState?) {
             state?.let {
-                val stateMap = mapOf(
-                    "state" to playbackStateToString(it.state),
-                    "position" to (it.position / 1000).toInt(), // Convert to seconds
-                    "playbackSpeed" to it.playbackSpeed
-                )
-                Log.d(TAG, "Playback state changed: ${stateMap["state"]}")
-                mediaCallback?.onPlaybackStateChanged(stateMap)
+                val stateStr = playbackStateToString(it.state)
+                val position = calculateCurrentPosition(it)
+                
+                // Only send if state or position actually changed
+                if (stateStr != lastPlaybackState || position != lastPosition) {
+                    lastPlaybackState = stateStr
+                    lastPosition = position
+                    
+                    val stateMap = mapOf(
+                        "state" to stateStr,
+                        "position" to position,
+                        "playbackSpeed" to it.playbackSpeed
+                    )
+                    Log.d(TAG, "Playback state changed: $stateStr, position: $position")
+                    mediaCallback?.onPlaybackStateChanged(stateMap)
+                }
             }
         }
         
         override fun onMetadataChanged(metadata: MediaMetadata?) {
             metadata?.let {
                 val metadataMap = extractMetadata(it)
-                Log.d(TAG, "Metadata changed: ${metadataMap["track"]}")
-                mediaCallback?.onMetadataChanged(metadataMap)
+                val track = metadataMap["track"] as String?
+                val artist = metadataMap["artist"] as String?
+                
+                // Only send if metadata actually changed
+                if (track != lastTrack || artist != lastArtist) {
+                    lastTrack = track
+                    lastArtist = artist
+                    
+                    Log.d(TAG, "Metadata changed: $track")
+                    mediaCallback?.onMetadataChanged(metadataMap)
+                }
             }
         }
     }
@@ -118,19 +142,34 @@ class MediaSessionBridge(private val context: Context) {
         activeController?.let { controller ->
             controller.registerCallback(controllerCallback, handler)
             
-            // Send current state
+            // Send current state (with deduplication)
             controller.playbackState?.let { state ->
-                val stateMap = mapOf(
-                    "state" to playbackStateToString(state.state),
-                    "position" to (state.position / 1000).toInt(),
-                    "playbackSpeed" to state.playbackSpeed
-                )
-                mediaCallback?.onPlaybackStateChanged(stateMap)
+                val stateStr = playbackStateToString(state.state)
+                val position = calculateCurrentPosition(state)
+                
+                if (stateStr != lastPlaybackState || position != lastPosition) {
+                    lastPlaybackState = stateStr
+                    lastPosition = position
+                    
+                    val stateMap = mapOf(
+                        "state" to stateStr,
+                        "position" to position,
+                        "playbackSpeed" to state.playbackSpeed
+                    )
+                    mediaCallback?.onPlaybackStateChanged(stateMap)
+                }
             }
             
             controller.metadata?.let { metadata ->
                 val metadataMap = extractMetadata(metadata)
-                mediaCallback?.onMetadataChanged(metadataMap)
+                val track = metadataMap["track"] as String?
+                val artist = metadataMap["artist"] as String?
+                
+                if (track != lastTrack || artist != lastArtist) {
+                    lastTrack = track
+                    lastArtist = artist
+                    mediaCallback?.onMetadataChanged(metadataMap)
+                }
             }
             
             Log.d(TAG, "Active controller set: ${controller.packageName}")
@@ -163,6 +202,33 @@ class MediaSessionBridge(private val context: Context) {
             PlaybackState.STATE_SKIPPING_TO_PREVIOUS -> "skippingPrevious"
             PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM -> "skippingToItem"
             else -> "unknown"
+        }
+    }
+    
+    /**
+     * Calculate the actual current playback position.
+     * 
+     * The PlaybackState.position is the position at the time the state was last updated,
+     * not the current position. To get the real position during playback, we need to
+     * calculate: position + (currentTime - lastUpdateTime) * playbackSpeed
+     */
+    private fun calculateCurrentPosition(state: PlaybackState): Int {
+        val position = state.position
+        val lastUpdateTime = state.lastPositionUpdateTime
+        val playbackSpeed = state.playbackSpeed
+        val currentTime = android.os.SystemClock.elapsedRealtime()
+        
+        Log.d(TAG, "Position calc: pos=$position, lastUpdate=$lastUpdateTime, currentTime=$currentTime, speed=$playbackSpeed")
+        
+        // Only calculate elapsed time if playing and we have valid timing data
+        return if (state.state == PlaybackState.STATE_PLAYING && playbackSpeed > 0 && lastUpdateTime > 0) {
+            val elapsedMs = currentTime - lastUpdateTime
+            val currentPositionMs = position + (elapsedMs * playbackSpeed).toLong()
+            Log.d(TAG, "Calculated position: elapsedMs=$elapsedMs, result=${(currentPositionMs / 1000).toInt()}s")
+            (currentPositionMs / 1000).toInt()
+        } else {
+            Log.d(TAG, "Using raw position: ${(position / 1000).toInt()}s")
+            (position / 1000).toInt()
         }
     }
     
@@ -289,7 +355,7 @@ class MediaSessionBridge(private val context: Context) {
                 "playback" to state?.let {
                     mapOf(
                         "state" to playbackStateToString(it.state),
-                        "position" to (it.position / 1000).toInt(),
+                        "position" to calculateCurrentPosition(it),
                         "playbackSpeed" to it.playbackSpeed
                     )
                 },
