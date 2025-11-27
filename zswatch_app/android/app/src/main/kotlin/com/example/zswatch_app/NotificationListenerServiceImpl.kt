@@ -158,6 +158,53 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             return
         }
         
+        val notification = sbn.notification
+        
+        // Skip media transport notifications (category set by the OS)
+        val category = notification.category
+        if (category == Notification.CATEGORY_TRANSPORT) {
+            Log.d(TAG, "Skipping CATEGORY_TRANSPORT notification from ${sbn.packageName}")
+            return
+        }
+        
+        // Skip foreground service notifications (these are persistent service indicators)
+        if ((notification.flags and Notification.FLAG_FOREGROUND_SERVICE) != 0) {
+            Log.d(TAG, "Skipping foreground service notification from ${sbn.packageName}")
+            return
+        }
+        
+        // Skip notifications that can't be cleared by user (persistent/pinned notifications)
+        if ((notification.flags and Notification.FLAG_NO_CLEAR) != 0) {
+            Log.d(TAG, "Skipping non-clearable notification from ${sbn.packageName}")
+            return
+        }
+        
+        // Skip notifications with media session (reliable indicator of media player notification)
+        val extras = notification.extras
+        if (extras.containsKey(Notification.EXTRA_MEDIA_SESSION)) {
+            Log.d(TAG, "Skipping notification with media session from ${sbn.packageName}")
+            return
+        }
+        
+        // On Android O+, skip low importance notifications (silent/minimal notifications)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = try {
+                val channelId = notification.channelId
+                if (channelId != null) {
+                    val nm = getSystemService(android.app.NotificationManager::class.java)
+                    nm?.getNotificationChannel(channelId)
+                } else null
+            } catch (e: Exception) {
+                null
+            }
+            
+            // Skip if importance is LOW or MIN (these are silent notifications)
+            if (channel != null && channel.importance <= android.app.NotificationManager.IMPORTANCE_LOW) {
+                Log.d(TAG, "Skipping low importance notification from ${sbn.packageName}, importance=${channel.importance}")
+                return
+            }
+        }
+        
         val notificationData = extractNotificationData(sbn)
         
         Log.d(TAG, "Notification posted: ${notificationData["appName"]} - ${notificationData["title"]}")
@@ -178,13 +225,16 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             return
         }
         
+        // Convert to unsigned 32-bit to avoid negative IDs
+        val unsignedId = sbn.id.toLong() and 0xFFFFFFFFL
+        
         val notificationData = mapOf(
-            "id" to sbn.id,
+            "id" to unsignedId,
             "packageName" to sbn.packageName,
             "key" to sbn.key
         )
         
-        Log.d(TAG, "Notification removed: ${sbn.packageName} - ${sbn.id}")
+        Log.d(TAG, "Notification removed: ${sbn.packageName} - $unsignedId")
         
         notificationCallback?.onNotificationRemoved(notificationData)
     }
@@ -244,8 +294,11 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         // Determine sender (for messaging)
         val sender = conversationTitle ?: subText
         
+        // Convert to unsigned 32-bit to avoid negative IDs
+        val unsignedId = sbn.id.toLong() and 0xFFFFFFFFL
+        
         return mapOf(
-            "id" to sbn.id,
+            "id" to unsignedId,
             "packageName" to sbn.packageName,
             "appName" to appName,
             "title" to title,

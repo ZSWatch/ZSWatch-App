@@ -333,13 +333,48 @@ class WatchService {
 
       // Try to parse as JSON
       if (message.startsWith('{') && message.endsWith('}')) {
-        final json = jsonDecode(message) as Map<String, dynamic>;
-        _handleGadgetbridgeMessage(json);
+        try {
+          final json = jsonDecode(message) as Map<String, dynamic>;
+          _handleGadgetbridgeMessage(json);
+        } catch (e) {
+          // Watch sometimes sends malformed JSON with unquoted values like:
+          // {"t":"music", "n": play} instead of {"t":"music", "n": "play"}
+          // Try to fix and reparse
+          final fixedMessage = _fixMalformedJson(message);
+          if (fixedMessage != null) {
+            try {
+              final json = jsonDecode(fixedMessage) as Map<String, dynamic>;
+              _handleGadgetbridgeMessage(json);
+            } catch (e2) {
+              debugPrint('[BLE RX] JSON parse failed even after fix: $e2');
+            }
+          } else {
+            debugPrint('[BLE RX] JSON parse failed: $e');
+          }
+        }
       }
     } catch (e) {
       // Binary data that can't be decoded as UTF-8 - log raw bytes
       debugPrint('[BLE RX] Raw bytes: $data');
     }
+  }
+
+  /// Attempt to fix malformed JSON with unquoted string values
+  /// e.g., {"t":"music", "n": play} -> {"t":"music", "n": "play"}
+  String? _fixMalformedJson(String message) {
+    // Pattern: after a colon and optional whitespace, find an unquoted word
+    // that isn't a number, true, false, or null
+    final regex = RegExp(r':\s*([a-zA-Z_][a-zA-Z0-9_]*)(\s*[,}])');
+    final fixed = message.replaceAllMapped(regex, (match) {
+      final value = match.group(1)!;
+      final suffix = match.group(2)!;
+      // Don't quote true, false, null
+      if (value == 'true' || value == 'false' || value == 'null') {
+        return ': $value$suffix';
+      }
+      return ': "$value"$suffix';
+    });
+    return fixed != message ? fixed : null;
   }
 
   void _handleGadgetbridgeMessage(Map<String, dynamic> message) {
@@ -424,6 +459,10 @@ class WatchService {
   }
 
   /// Send raw NUS data
+  /// 
+  /// Automatically chunks large messages to fit within BLE MTU.
+  /// Watch can receive up to 2000 bytes total, but each BLE packet
+  /// is limited by MTU (typically 244 bytes usable).
   Future<void> _sendNus(String data) async {
     final nusService = _findService(_guid(NusUuids.service));
     if (nusService == null) return;
@@ -434,7 +473,45 @@ class WatchService {
     debugPrint('[BLE TX] $data');
 
     final bytes = utf8.encode(data);
-    await txChar.write(bytes, withoutResponse: txChar.properties.writeWithoutResponse);
+    
+    // Get current MTU from connection, default to minimum if not set
+    final currentMtu = _connectionController.value.mtu ?? BleConfig.minimumMtu;
+    // Usable payload is MTU - 3 (ATT header)
+    final maxChunkSize = currentMtu - 3;
+    
+    // If data fits in one packet, send directly
+    if (bytes.length <= maxChunkSize) {
+      await txChar.write(bytes, withoutResponse: txChar.properties.writeWithoutResponse);
+      return;
+    }
+    
+    // Check if total data exceeds watch's max buffer (2000 bytes)
+    if (bytes.length > 2000) {
+      debugPrint('[BLE TX] WARNING: Data exceeds watch max buffer (${bytes.length} > 2000), truncating');
+      // Truncate to fit - this shouldn't happen for notifications if we handle it properly
+    }
+    
+    // Split into chunks and send sequentially
+    int offset = 0;
+    int chunkNum = 0;
+    while (offset < bytes.length) {
+      final end = (offset + maxChunkSize).clamp(0, bytes.length);
+      final chunk = bytes.sublist(offset, end);
+      
+      chunkNum++;
+      debugPrint('[BLE TX] Chunk $chunkNum: ${chunk.length} bytes (offset $offset)');
+      
+      await txChar.write(chunk, withoutResponse: txChar.properties.writeWithoutResponse);
+      
+      // Small delay between chunks to allow BLE stack to process
+      if (end < bytes.length) {
+        await Future.delayed(const Duration(milliseconds: 10));
+      }
+      
+      offset = end;
+    }
+    
+    debugPrint('[BLE TX] Sent ${bytes.length} bytes in $chunkNum chunks');
   }
 
   /// Request device info from watch

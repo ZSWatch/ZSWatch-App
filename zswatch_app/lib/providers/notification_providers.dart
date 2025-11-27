@@ -74,7 +74,16 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
   final WatchService _watchService;
   
   StreamSubscription<PhoneNotification>? _notificationSubscription;
+  StreamSubscription<int>? _notificationRemovedSubscription;
   StreamSubscription<Map<String, dynamic>>? _watchMessageSubscription;
+
+  // Deduplication: Track recently sent notifications to avoid duplicates
+  final Map<String, DateTime> _recentlySentNotifications = {};
+  static const _deduplicationWindowMs = 2000; // 2 second window
+
+  // Track notification id to key mapping for dismiss sync
+  // Key: notification id (int), Value: notification key (String)
+  final Map<int, String> _notificationIdToKey = {};
 
   NotificationForwardingNotifier(
     this._notificationService,
@@ -124,15 +133,23 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
     if (type != 'notify') return;
 
     final action = message['n'] as String?;
-    final key = message['key'] as String?;
+    // Watch sends 'id' (the notification id we sent), look up the Android key
+    final id = message['id'] as int?;
+    final key = id != null ? _notificationIdToKey[id] : null;
 
     if (action == null) return;
+    
+    debugPrint('Watch notification action: $action, id: $id, key: $key');
 
     switch (action) {
       case 'DISMISS':
         if (key != null) {
           _notificationService.dismissNotification(key);
+          _notificationIdToKey.remove(id); // Clean up
           state = state.copyWith(dismissedCount: state.dismissedCount + 1);
+          debugPrint('Dismissed notification with key: $key');
+        } else {
+          debugPrint('Cannot dismiss: no key found for id $id');
         }
         break;
       case 'DISMISS_ALL':
@@ -153,13 +170,34 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
   void _startForwarding() {
     _notificationSubscription?.cancel();
     _notificationSubscription = _notificationService.notificationPosted.listen(_forwardNotification);
+    
+    // Also listen for notification removals to sync dismissals to watch
+    _notificationRemovedSubscription?.cancel();
+    _notificationRemovedSubscription = _notificationService.notificationRemoved.listen(_handleNotificationRemoved);
+    
     debugPrint('Started notification forwarding');
   }
 
   void _stopForwarding() {
     _notificationSubscription?.cancel();
     _notificationSubscription = null;
+    _notificationRemovedSubscription?.cancel();
+    _notificationRemovedSubscription = null;
     debugPrint('Stopped notification forwarding');
+  }
+
+  void _handleNotificationRemoved(int id) {
+    // Sync dismissal to watch if connected
+    if (!_watchService.isConnected) {
+      return;
+    }
+    
+    // Remove from id-to-key map since it's dismissed
+    _notificationIdToKey.remove(id);
+    
+    // Send dismiss to watch
+    _watchService.removeNotification(id);
+    debugPrint('Synced notification dismissal to watch: $id');
   }
 
   void _forwardNotification(PhoneNotification notification) {
@@ -183,6 +221,38 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
     if (notification.isGroupSummary) {
       debugPrint('Notification not forwarded: is group summary');
       return;
+    }
+
+    // Deduplication: Skip if we recently sent this notification
+    final dedupeKey = '${notification.id}_${notification.packageName}_${notification.title}';
+    final now = DateTime.now();
+    final lastSent = _recentlySentNotifications[dedupeKey];
+    if (lastSent != null) {
+      final elapsed = now.difference(lastSent).inMilliseconds;
+      if (elapsed < _deduplicationWindowMs) {
+        debugPrint('Notification skipped (duplicate within ${elapsed}ms): ${notification.appName}');
+        return;
+      }
+    }
+    
+    // Clean up old entries periodically
+    _recentlySentNotifications.removeWhere((key, time) => 
+      now.difference(time).inSeconds > 10
+    );
+    
+    // Record this send
+    _recentlySentNotifications[dedupeKey] = now;
+
+    // Store id-to-key mapping for dismiss sync (if key is available)
+    if (notification.key != null) {
+      _notificationIdToKey[notification.id] = notification.key!;
+      // Clean up old entries (keep last 200 notifications)
+      if (_notificationIdToKey.length > 200) {
+        final keysToRemove = _notificationIdToKey.keys.take(_notificationIdToKey.length - 150).toList();
+        for (final k in keysToRemove) {
+          _notificationIdToKey.remove(k);
+        }
+      }
     }
 
     // Convert to watch notification format and send
@@ -289,6 +359,7 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
   @override
   void dispose() {
     _notificationSubscription?.cancel();
+    _notificationRemovedSubscription?.cancel();
     _watchMessageSubscription?.cancel();
     super.dispose();
   }
