@@ -4,11 +4,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/connection_state.dart';
+import '../../providers/auto_reconnect_provider.dart';
+import '../../providers/ble_providers.dart';
 import '../../providers/watch_service_provider.dart';
 import '../screens/connection/scan_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/firmware/firmware_update_screen.dart';
 import '../screens/notifications/notification_settings_screen.dart';
+import '../screens/start/start_page_screen.dart';
 
 /// Route names for the app
 abstract final class AppRoutes {
@@ -173,7 +176,7 @@ class AppRouter {
   );
 }
 
-/// Home screen - entry point that shows scan or dashboard based on connection
+/// Home screen - entry point that shows start page or dashboard based on connection
 class _HomeScreen extends ConsumerWidget {
   const _HomeScreen();
 
@@ -226,7 +229,12 @@ class _HomeScreen extends ConsumerWidget {
                 const SizedBox(height: 32),
                 OutlinedButton(
                   onPressed: () {
-                    ref.read(watchNotifierProvider.notifier).disconnect();
+                    // Cancel auto-reconnect and suppress for session
+                    ref.read(autoReconnectNotifierProvider.notifier).cancel();
+                    // Also cancel any pending connection on WatchService
+                    ref.read(watchServiceProvider).cancelPendingConnection();
+                    // Also cancel on BleConnectionManager (in case it was used)
+                    ref.read(bleNotifierProvider.notifier).cancelPendingConnection();
                   },
                   child: const Text('Cancel'),
                 ),
@@ -237,60 +245,8 @@ class _HomeScreen extends ConsumerWidget {
       );
     }
 
-    // Not connected - show welcome screen
-    return Scaffold(
-      appBar: AppBar(
-        title: SvgPicture.asset(
-          'assets/images/ZSWatch_Text.svg',
-          height: 24,
-        ),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SvgPicture.asset(
-                'assets/images/ZSWatch_Logo.svg',
-                width: 120,
-                height: 120,
-              ),
-              const SizedBox(height: 32),
-              Text(
-                'Welcome',
-                style: Theme.of(context).textTheme.headlineMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Connect to your ZSWatch to get started',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.color
-                          ?.withValues(alpha: 0.7),
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-              FilledButton.icon(
-                onPressed: () => context.go('/scan'),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Watch'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // Not connected - show start page with stored watches (FR-067)
+    return const StartPageScreen();
   }
 }
 

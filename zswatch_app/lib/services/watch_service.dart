@@ -39,6 +39,9 @@ class WatchService {
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 3; // Reduced for faster disconnect detection
   bool _isSettingUp = false; // Prevent concurrent setup calls
+  bool _isCancelled = false; // Track if user has cancelled the connection
+  bool _isReconnecting = false; // Track if reconnect is in progress (timer scheduled or running)
+  bool _isInitialConnection = false; // Track if this is the first connection attempt (show Connecting not Reconnecting)
 
   /// Stream of connection state changes
   Stream<Connection> get connectionStream => _connectionController.stream;
@@ -62,19 +65,48 @@ class WatchService {
   bool get isConnected => _connectionController.value.isConnected;
 
   /// Connect to a scanned device
-  Future<void> connect(ScannedWatch scannedDevice) async {
-    await _connectToDevice(scannedDevice.device, scannedDevice.id, scannedDevice.name);
+  Future<void> connect(ScannedWatch scannedDevice, {bool autoConnect = false}) async {
+    debugPrint('[WatchService] connect() called: autoConnect=$autoConnect, _isCancelled=$_isCancelled');
+    // Only reset _isCancelled for truly user-initiated connections
+    // Don't reset if this might be from an auto-reconnect attempt
+    if (!autoConnect) {
+      _isCancelled = false;
+      debugPrint('[WatchService] connect() - reset _isCancelled to false (user-initiated)');
+    }
+    await _connectToDevice(scannedDevice.device, scannedDevice.id, scannedDevice.name, autoConnect: autoConnect);
   }
 
   /// Connect by device ID (for saved watches)
-  Future<void> connectById(String deviceId) async {
+  /// 
+  /// [autoConnect] - If true, uses flutter_blue_plus's autoConnect feature which:
+  ///   - Returns immediately (non-blocking)
+  ///   - System handles reconnection when device appears
+  ///   - Doesn't time out - keeps trying until device available
+  ///   - Convenient for auto-reconnect on app launch
+  Future<void> connectById(String deviceId, {bool autoConnect = false}) async {
+    debugPrint('[WatchService] connectById() called: deviceId=$deviceId, autoConnect=$autoConnect, _isCancelled=$_isCancelled');
+    // Only reset _isCancelled for truly user-initiated connections
+    // Don't reset if this might be from an auto-reconnect attempt
+    if (!autoConnect) {
+      _isCancelled = false;
+      debugPrint('[WatchService] connectById() - reset _isCancelled to false (user-initiated)');
+    }
     final device = BluetoothDevice.fromId(deviceId);
-    await _connectToDevice(device, deviceId, 'ZSWatch');
+    await _connectToDevice(device, deviceId, 'ZSWatch', autoConnect: autoConnect);
   }
 
-  Future<void> _connectToDevice(BluetoothDevice device, String watchId, String name) async {
+  Future<void> _connectToDevice(BluetoothDevice device, String watchId, String name, {bool autoConnect = false, bool isReconnectAttempt = false}) async {
+    debugPrint('[WatchService:$hashCode] _connectToDevice called: watchId=$watchId, autoConnect=$autoConnect, isReconnectAttempt=$isReconnectAttempt, _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect, currentState=${currentConnection.state}');
+    
+    // Don't connect if user has cancelled
+    if (_isCancelled) {
+      debugPrint('[WatchService:$hashCode] _connectToDevice skipped - cancelled by user');
+      return;
+    }
+
     // Don't reconnect if already connected to this device
     if (isConnected && _device?.remoteId.str == watchId) {
+      debugPrint('[WatchService:$hashCode] _connectToDevice skipped - already connected');
       return;
     }
     
@@ -84,11 +116,18 @@ class WatchService {
         currentState == WatchConnectionState.bonding ||
         currentState == WatchConnectionState.discoveringServices ||
         currentState == WatchConnectionState.negotiating) {
+      debugPrint('[WatchService:$hashCode] _connectToDevice skipped - already in state: $currentState');
       return;
     }
 
-    _autoReconnect = true;
-    _reconnectAttempts = 0;
+    // Only reset these for fresh connections, not reconnect attempts
+    if (!isReconnectAttempt) {
+      _autoReconnect = true;
+      _reconnectAttempts = 0;
+      _isInitialConnection = true; // Mark as initial connection
+    }
+    // Note: Only reset _isCancelled for user-initiated connections, not internal reconnects
+    // The public connect methods should reset this flag
 
     try {
       _updateConnection(Connection(
@@ -105,16 +144,46 @@ class WatchService {
         (state) => _handleConnectionStateChange(state, watchId, name),
       );
 
-      // Connect
-      await device.connect(
-        timeout: BleConfig.connectionTimeout,
-        autoConnect: false,
-      );
-
       _device = device;
 
-      // Perform post-connection setup
-      await _setupAfterConnect(watchId, name);
+      // Connect with optional autoConnect
+      // When autoConnect is true:
+      // - We don't await - let it run in background
+      // - System will connect when device is available
+      // - Connection events come through connectionState listener
+      // Note: autoConnect is incompatible with mtu argument, so we request MTU after connection
+      if (autoConnect) {
+        // Final check before BLE call - user might have cancelled during setup
+        if (_isCancelled) {
+          debugPrint('[WatchService:$hashCode] autoConnect skipped - cancelled just before BLE call');
+          return;
+        }
+        // Don't await - autoConnect runs in background
+        // The connectionState listener will handle the connection event
+        unawaited(device.connect(
+          license: License.free,
+          timeout: const Duration(seconds: 0),
+          mtu: null, // autoConnect is incompatible with mtu
+          autoConnect: true,
+        ).catchError((e) {
+          // Ignore errors for autoConnect - connection state listener handles everything
+          debugPrint('[WatchService] AutoConnect error (ignored): $e');
+        }));
+      } else {
+        // Final check before BLE call - user might have cancelled during setup
+        if (_isCancelled) {
+          debugPrint('[WatchService:$hashCode] connect skipped - cancelled just before BLE call');
+          return;
+        }
+        debugPrint('[WatchService:$hashCode] About to call device.connect(autoConnect: false)');
+        await device.connect(
+          license: License.free,
+          timeout: BleConfig.connectionTimeout,
+          autoConnect: false,
+        );
+        // Perform post-connection setup only for direct connections
+        await _setupAfterConnect(watchId, name);
+      }
 
     } catch (e) {
       _updateConnection(Connection.error(
@@ -132,6 +201,19 @@ class WatchService {
       debugPrint('Setup already in progress, skipping duplicate call');
       return;
     }
+    
+    // Check if user has cancelled
+    if (_isCancelled) {
+      debugPrint('Setup cancelled - user cancelled connection');
+      return;
+    }
+    
+    // Check if device is still valid (user may have cancelled)
+    if (_device == null) {
+      debugPrint('Setup cancelled - device is null');
+      return;
+    }
+    
     _isSettingUp = true;
 
     try {
@@ -139,6 +221,12 @@ class WatchService {
       _updateConnection(currentConnection.copyWith(
         state: WatchConnectionState.bonding,
       ));
+
+      // Re-check device in case user cancelled during state updates
+      if (_device == null) {
+        debugPrint('Setup cancelled during bonding - device is null');
+        return;
+      }
 
       final bondState = await _device!.bondState.first;
       if (bondState != BluetoothBondState.bonded) {
@@ -195,8 +283,9 @@ class WatchService {
       // Sync time
       await syncTime();
 
-      // Reset reconnect attempts on successful setup
+      // Reset reconnect attempts and initial connection flag on successful setup
       _reconnectAttempts = 0;
+      _isInitialConnection = false;
 
     } catch (e) {
       _updateConnection(Connection.error(
@@ -444,16 +533,73 @@ class WatchService {
     String watchId,
     String name,
   ) {
+    debugPrint('[WatchService:$hashCode] _handleConnectionStateChange: state=$state, _isCancelled=$_isCancelled');
+    
+    // If user has cancelled, ignore all connection events and disconnect
+    if (_isCancelled) {
+      debugPrint('[WatchService:$hashCode] Ignoring connection event - cancelled by user');
+      if (state == BluetoothConnectionState.connected) {
+        // Force disconnect if BLE layer reports connected after cancel
+        BluetoothDevice.fromId(watchId).disconnect();
+      }
+      return;
+    }
+
     switch (state) {
+      case BluetoothConnectionState.connected:
+        // For autoConnect, we need to run setup when connection happens
+        // Check if we're in connecting state (waiting for autoConnect)
+        // Also check _autoReconnect - if false, user cancelled and we should disconnect
+        if (currentConnection.state == WatchConnectionState.connecting && !_isSettingUp) {
+          if (!_autoReconnect) {
+            debugPrint('[WatchService] Connection arrived but cancelled - disconnecting');
+            _device?.disconnect();
+            _cleanup();
+            _updateConnection(Connection(
+              watchId: watchId,
+              watchName: name,
+              state: WatchConnectionState.disconnected,
+            ));
+            return;
+          }
+          debugPrint('[WatchService] AutoConnect triggered - running setup');
+          _setupAfterConnect(watchId, name);
+        }
+        break;
       case BluetoothConnectionState.disconnected:
         _handleDisconnect(watchId, name);
         break;
-      default:
+      // ignore: deprecated_member_use
+      case BluetoothConnectionState.connecting:
+      // ignore: deprecated_member_use
+      case BluetoothConnectionState.disconnecting:
+        // Transient states - no action needed
         break;
     }
   }
 
   void _handleDisconnect(String watchId, String name) {
+    debugPrint('[WatchService:$hashCode] _handleDisconnect: _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect, _reconnectAttempts=$_reconnectAttempts, _isReconnecting=$_isReconnecting');
+    
+    // If user has cancelled, don't attempt reconnection
+    if (_isCancelled) {
+      debugPrint('[WatchService:$hashCode] Disconnect ignored - cancelled by user');
+      _isReconnecting = false;
+      _updateConnection(Connection(
+        watchId: watchId,
+        watchName: name,
+        state: WatchConnectionState.disconnected,
+      ));
+      _cleanup();
+      return;
+    }
+    
+    // Don't start another reconnect if one is already in progress
+    if (_isReconnecting) {
+      debugPrint('[WatchService:$hashCode] Disconnect ignored - reconnect already in progress');
+      return;
+    }
+
     final wasConnected = currentConnection.isConnected || 
                          currentConnection.state == WatchConnectionState.connecting ||
                          currentConnection.state == WatchConnectionState.bonding ||
@@ -473,22 +619,57 @@ class WatchService {
   }
 
   void _attemptReconnect(String watchId, String name) {
+    debugPrint('[WatchService:$hashCode] _attemptReconnect: _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect, _reconnectAttempts=$_reconnectAttempts');
+    
+    // If user has cancelled, don't attempt reconnection
+    if (_isCancelled) {
+      debugPrint('[WatchService:$hashCode] Reconnect skipped - cancelled by user');
+      _isReconnecting = false;
+      return;
+    }
+
     // Cancel any existing reconnect timer to prevent stacking
     _reconnectTimer?.cancel();
     
     _reconnectAttempts++;
+    _isReconnecting = true;  // Mark that we're in reconnect flow
+    debugPrint('[WatchService:$hashCode] Scheduling reconnect timer (attempt $_reconnectAttempts)');
 
-    _updateConnection(currentConnection.copyWith(
-      state: WatchConnectionState.reconnecting,
-      reconnectionCount: _reconnectAttempts,
-    ));
+    // Only show "Reconnecting" if we've actually been connected before
+    // For initial connection failures (e.g., autoConnect assertion error), keep showing "Connecting"
+    if (_isInitialConnection) {
+      debugPrint('[WatchService:$hashCode] Initial connection - keeping Connecting state');
+      // Don't change state, keep showing "Connecting"
+    } else {
+      _updateConnection(currentConnection.copyWith(
+        state: WatchConnectionState.reconnecting,
+        reconnectionCount: _reconnectAttempts,
+      ));
+    }
 
     _reconnectTimer = Timer(BleConfig.reconnectionDelay, () async {
+      debugPrint('[WatchService:$hashCode] Reconnect timer fired: _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect');
+      // Double-check cancellation inside timer callback
+      if (_isCancelled) {
+        debugPrint('[WatchService:$hashCode] Reconnect timer skipped - cancelled by user');
+        _isReconnecting = false;
+        return;
+      }
       if (_device != null && _autoReconnect && !_isSettingUp) {
         try {
-          await _connectToDevice(_device!, watchId, name);
+          await _connectToDevice(_device!, watchId, name, isReconnectAttempt: true);
+          _isReconnecting = false;  // Clear flag on successful connect start
         } catch (e) {
-          debugPrint('Reconnect attempt $_reconnectAttempts failed: $e');
+          debugPrint('[WatchService:$hashCode] Reconnect attempt $_reconnectAttempts failed: $e');
+          _isReconnecting = false;  // Clear flag to allow next attempt from disconnect handler
+          
+          // Check if cancelled during the await - if so, don't continue reconnect logic
+          if (_isCancelled) {
+            debugPrint('[WatchService:$hashCode] Reconnect cancelled during attempt - cleaning up');
+            _cleanup();
+            return;
+          }
+          
           if (_reconnectAttempts >= _maxReconnectAttempts) {
             _updateConnection(Connection.error(
               watchId,
@@ -497,13 +678,52 @@ class WatchService {
             _cleanup();
           }
         }
+      } else {
+        _isReconnecting = false;
       }
     });
+  }
+
+  /// Cancel any pending connection (for autoConnect scenarios)
+  /// This prevents the connection from being established even if the device appears
+  void cancelPendingConnection() {
+    debugPrint('[WatchService:$hashCode] cancelPendingConnection() called - setting _isCancelled=true, _autoReconnect=false');
+    _autoReconnect = false;
+    _isCancelled = true; // Mark as cancelled to ignore future connection events
+    _isReconnecting = false; // Clear reconnecting flag
+    _reconnectTimer?.cancel();
+    
+    // If we're in any connecting state, transition to disconnected
+    final state = currentConnection.state;
+    if (state.isConnectingOrReconnecting) {
+      final watchId = currentConnection.watchId;
+      final watchName = currentConnection.watchName;
+      
+      // IMPORTANT: Call disconnect BEFORE cleanup to cancel any pending BLE operation
+      // Use both the stored device reference AND create one from ID for maximum coverage
+      final device = _device;
+      if (device != null) {
+        debugPrint('[WatchService:$hashCode] Disconnecting device to cancel pending connection');
+        device.disconnect();
+      } else if (watchId.isNotEmpty) {
+        // If _device is null but we have a watchId, create device from ID and disconnect
+        debugPrint('[WatchService:$hashCode] Creating device from ID to cancel: $watchId');
+        BluetoothDevice.fromId(watchId).disconnect();
+      }
+      
+      _cleanup();
+      _updateConnection(Connection(
+        watchId: watchId,
+        watchName: watchName,
+        state: WatchConnectionState.disconnected,
+      ));
+    }
   }
 
   /// Disconnect from current device
   Future<void> disconnect() async {
     _autoReconnect = false;
+    _isCancelled = true; // Mark as cancelled to ignore reconnection attempts
     _reconnectTimer?.cancel();
 
     final device = _device;
@@ -537,6 +757,8 @@ class WatchService {
     _device = null;
     _services = null;
     _isSettingUp = false;
+    _isReconnecting = false;
+    _isInitialConnection = false;
   }
 
   void _updateConnection(Connection connection) {

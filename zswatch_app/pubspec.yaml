@@ -16,7 +16,7 @@ dependencies:
   flutter_svg: ^2.0.10+1
 
   # BLE Communication
-  flutter_blue_plus: ^1.35.2
+  flutter_blue_plus: ^2.0.2
 
   # Firmware Updates (MCUmgr/SMP)
   # Using local clone for development - will switch back to published version after PR is merged

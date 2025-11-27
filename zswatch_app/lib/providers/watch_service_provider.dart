@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/models/connection.dart';
 import '../data/models/connection_state.dart';
@@ -7,12 +7,14 @@ import '../data/models/watch.dart';
 import '../services/watch_service.dart';
 import '../services/ble/ble_scanner.dart';
 
-const _knownWatchIdsKey = 'known_watch_ids';
-
 /// Provider for the unified WatchService
 final watchServiceProvider = Provider<WatchService>((ref) {
   final service = WatchService();
-  ref.onDispose(() => service.dispose());
+  debugPrint('[watchServiceProvider] Created WatchService instance: ${service.hashCode}');
+  ref.onDispose(() {
+    debugPrint('[watchServiceProvider] Disposing WatchService instance: ${service.hashCode}');
+    service.dispose();
+  });
   return service;
 });
 
@@ -146,29 +148,4 @@ final watchNotifierProvider =
   final watchService = ref.watch(watchServiceProvider);
   return WatchNotifier(watchService);
 });
-
-/// Provider for known watch IDs (saved in SharedPreferences)
-final knownWatchIdsProvider = FutureProvider<Set<String>>((ref) async {
-  final prefs = await SharedPreferences.getInstance();
-  final ids = prefs.getStringList(_knownWatchIdsKey) ?? [];
-  return ids.toSet();
-});
-
-/// Save a watch ID to known list
-Future<void> saveKnownWatchId(String watchId) async {
-  final prefs = await SharedPreferences.getInstance();
-  final ids = prefs.getStringList(_knownWatchIdsKey) ?? [];
-  if (!ids.contains(watchId)) {
-    ids.add(watchId);
-    await prefs.setStringList(_knownWatchIdsKey, ids);
-  }
-}
-
-/// Remove a watch ID from known list
-Future<void> removeKnownWatchId(String watchId) async {
-  final prefs = await SharedPreferences.getInstance();
-  final ids = prefs.getStringList(_knownWatchIdsKey) ?? [];
-  ids.remove(watchId);
-  await prefs.setStringList(_knownWatchIdsKey, ids);
-}
 

@@ -16,6 +16,13 @@ final allWatchesProvider = StreamProvider<List<WatchEntity>>((ref) {
   return db.watchAllWatches();
 });
 
+/// Provider for known watch IDs (from database)
+final knownWatchIdsProvider = FutureProvider<Set<String>>((ref) async {
+  final db = ref.watch(databaseProvider);
+  final watches = await db.getAllWatches();
+  return watches.map((w) => w.id).toSet();
+});
+
 /// Provider for the primary watch
 final primaryWatchProvider = FutureProvider<WatchEntity?>((ref) async {
   final db = ref.watch(databaseProvider);

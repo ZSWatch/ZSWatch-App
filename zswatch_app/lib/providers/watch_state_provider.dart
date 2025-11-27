@@ -9,6 +9,7 @@ import '../data/models/connection_state.dart';
 import '../data/repositories/watch_repository.dart';
 import '../services/ble/ble_connection_manager.dart';
 import 'ble_providers.dart';
+import 'watch_providers.dart';
 
 /// The current state of the connected watch
 class WatchState {
@@ -169,10 +170,9 @@ class WatchStateNotifier extends StateNotifier<WatchState> {
 }
 
 /// Provider for WatchRepository
-final watchRepositoryProvider = Provider<WatchRepository?>((ref) {
-  // TODO: Initialize with actual database
-  // For now, return null - we'll add database later
-  return null;
+final watchRepositoryProvider = Provider<WatchRepository>((ref) {
+  final db = ref.watch(databaseProvider);
+  return WatchRepository(db);
 });
 
 /// Provider for the watch state notifier

@@ -26,6 +26,17 @@ class $WatchesTable extends Watches with TableInfo<$WatchesTable, WatchEntity> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _customNameMeta = const VerificationMeta(
+    'customName',
+  );
+  @override
+  late final GeneratedColumn<String> customName = GeneratedColumn<String>(
+    'custom_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _firmwareVersionMeta = const VerificationMeta(
     'firmwareVersion',
   );
@@ -115,6 +126,7 @@ class $WatchesTable extends Watches with TableInfo<$WatchesTable, WatchEntity> {
   List<GeneratedColumn> get $columns => [
     id,
     name,
+    customName,
     firmwareVersion,
     hardwareVersion,
     batteryLevel,
@@ -147,6 +159,12 @@ class $WatchesTable extends Watches with TableInfo<$WatchesTable, WatchEntity> {
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('custom_name')) {
+      context.handle(
+        _customNameMeta,
+        customName.isAcceptableOrUnknown(data['custom_name']!, _customNameMeta),
+      );
     }
     if (data.containsKey('firmware_version')) {
       context.handle(
@@ -224,6 +242,10 @@ class $WatchesTable extends Watches with TableInfo<$WatchesTable, WatchEntity> {
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      customName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}custom_name'],
+      ),
       firmwareVersion: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}firmware_version'],
@@ -268,6 +290,9 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
   /// Advertised device name (e.g., "ZSWatch")
   final String name;
 
+  /// User-defined custom name for the watch (FR-099 to FR-102)
+  final String? customName;
+
   /// Last known firmware version from `t:"ver"` message
   final String? firmwareVersion;
 
@@ -291,6 +316,7 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
   const WatchEntity({
     required this.id,
     required this.name,
+    this.customName,
     this.firmwareVersion,
     this.hardwareVersion,
     this.batteryLevel,
@@ -304,6 +330,9 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
+    if (!nullToAbsent || customName != null) {
+      map['custom_name'] = Variable<String>(customName);
+    }
     if (!nullToAbsent || firmwareVersion != null) {
       map['firmware_version'] = Variable<String>(firmwareVersion);
     }
@@ -326,6 +355,9 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
     return WatchesCompanion(
       id: Value(id),
       name: Value(name),
+      customName: customName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customName),
       firmwareVersion: firmwareVersion == null && nullToAbsent
           ? const Value.absent()
           : Value(firmwareVersion),
@@ -352,6 +384,7 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
     return WatchEntity(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      customName: serializer.fromJson<String?>(json['customName']),
       firmwareVersion: serializer.fromJson<String?>(json['firmwareVersion']),
       hardwareVersion: serializer.fromJson<String?>(json['hardwareVersion']),
       batteryLevel: serializer.fromJson<int?>(json['batteryLevel']),
@@ -369,6 +402,7 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
+      'customName': serializer.toJson<String?>(customName),
       'firmwareVersion': serializer.toJson<String?>(firmwareVersion),
       'hardwareVersion': serializer.toJson<String?>(hardwareVersion),
       'batteryLevel': serializer.toJson<int?>(batteryLevel),
@@ -382,6 +416,7 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
   WatchEntity copyWith({
     String? id,
     String? name,
+    Value<String?> customName = const Value.absent(),
     Value<String?> firmwareVersion = const Value.absent(),
     Value<String?> hardwareVersion = const Value.absent(),
     Value<int?> batteryLevel = const Value.absent(),
@@ -392,6 +427,7 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
   }) => WatchEntity(
     id: id ?? this.id,
     name: name ?? this.name,
+    customName: customName.present ? customName.value : this.customName,
     firmwareVersion: firmwareVersion.present
         ? firmwareVersion.value
         : this.firmwareVersion,
@@ -410,6 +446,9 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
     return WatchEntity(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      customName: data.customName.present
+          ? data.customName.value
+          : this.customName,
       firmwareVersion: data.firmwareVersion.present
           ? data.firmwareVersion.value
           : this.firmwareVersion,
@@ -435,6 +474,7 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
     return (StringBuffer('WatchEntity(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('customName: $customName, ')
           ..write('firmwareVersion: $firmwareVersion, ')
           ..write('hardwareVersion: $hardwareVersion, ')
           ..write('batteryLevel: $batteryLevel, ')
@@ -450,6 +490,7 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
   int get hashCode => Object.hash(
     id,
     name,
+    customName,
     firmwareVersion,
     hardwareVersion,
     batteryLevel,
@@ -464,6 +505,7 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
       (other is WatchEntity &&
           other.id == this.id &&
           other.name == this.name &&
+          other.customName == this.customName &&
           other.firmwareVersion == this.firmwareVersion &&
           other.hardwareVersion == this.hardwareVersion &&
           other.batteryLevel == this.batteryLevel &&
@@ -476,6 +518,7 @@ class WatchEntity extends DataClass implements Insertable<WatchEntity> {
 class WatchesCompanion extends UpdateCompanion<WatchEntity> {
   final Value<String> id;
   final Value<String> name;
+  final Value<String?> customName;
   final Value<String?> firmwareVersion;
   final Value<String?> hardwareVersion;
   final Value<int?> batteryLevel;
@@ -487,6 +530,7 @@ class WatchesCompanion extends UpdateCompanion<WatchEntity> {
   const WatchesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.customName = const Value.absent(),
     this.firmwareVersion = const Value.absent(),
     this.hardwareVersion = const Value.absent(),
     this.batteryLevel = const Value.absent(),
@@ -499,6 +543,7 @@ class WatchesCompanion extends UpdateCompanion<WatchEntity> {
   WatchesCompanion.insert({
     required String id,
     required String name,
+    this.customName = const Value.absent(),
     this.firmwareVersion = const Value.absent(),
     this.hardwareVersion = const Value.absent(),
     this.batteryLevel = const Value.absent(),
@@ -513,6 +558,7 @@ class WatchesCompanion extends UpdateCompanion<WatchEntity> {
   static Insertable<WatchEntity> custom({
     Expression<String>? id,
     Expression<String>? name,
+    Expression<String>? customName,
     Expression<String>? firmwareVersion,
     Expression<String>? hardwareVersion,
     Expression<int>? batteryLevel,
@@ -525,6 +571,7 @@ class WatchesCompanion extends UpdateCompanion<WatchEntity> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (customName != null) 'custom_name': customName,
       if (firmwareVersion != null) 'firmware_version': firmwareVersion,
       if (hardwareVersion != null) 'hardware_version': hardwareVersion,
       if (batteryLevel != null) 'battery_level': batteryLevel,
@@ -540,6 +587,7 @@ class WatchesCompanion extends UpdateCompanion<WatchEntity> {
   WatchesCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
+    Value<String?>? customName,
     Value<String?>? firmwareVersion,
     Value<String?>? hardwareVersion,
     Value<int?>? batteryLevel,
@@ -552,6 +600,7 @@ class WatchesCompanion extends UpdateCompanion<WatchEntity> {
     return WatchesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
+      customName: customName ?? this.customName,
       firmwareVersion: firmwareVersion ?? this.firmwareVersion,
       hardwareVersion: hardwareVersion ?? this.hardwareVersion,
       batteryLevel: batteryLevel ?? this.batteryLevel,
@@ -571,6 +620,9 @@ class WatchesCompanion extends UpdateCompanion<WatchEntity> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (customName.present) {
+      map['custom_name'] = Variable<String>(customName.value);
     }
     if (firmwareVersion.present) {
       map['firmware_version'] = Variable<String>(firmwareVersion.value);
@@ -604,6 +656,7 @@ class WatchesCompanion extends UpdateCompanion<WatchEntity> {
     return (StringBuffer('WatchesCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('customName: $customName, ')
           ..write('firmwareVersion: $firmwareVersion, ')
           ..write('hardwareVersion: $hardwareVersion, ')
           ..write('batteryLevel: $batteryLevel, ')
@@ -1954,6 +2007,7 @@ typedef $$WatchesTableCreateCompanionBuilder =
     WatchesCompanion Function({
       required String id,
       required String name,
+      Value<String?> customName,
       Value<String?> firmwareVersion,
       Value<String?> hardwareVersion,
       Value<int?> batteryLevel,
@@ -1967,6 +2021,7 @@ typedef $$WatchesTableUpdateCompanionBuilder =
     WatchesCompanion Function({
       Value<String> id,
       Value<String> name,
+      Value<String?> customName,
       Value<String?> firmwareVersion,
       Value<String?> hardwareVersion,
       Value<int?> batteryLevel,
@@ -2036,6 +2091,11 @@ class $$WatchesTableFilterComposer
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customName => $composableBuilder(
+    column: $table.customName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2144,6 +2204,11 @@ class $$WatchesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get customName => $composableBuilder(
+    column: $table.customName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get firmwareVersion => $composableBuilder(
     column: $table.firmwareVersion,
     builder: (column) => ColumnOrderings(column),
@@ -2194,6 +2259,11 @@ class $$WatchesTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get customName => $composableBuilder(
+    column: $table.customName,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get firmwareVersion => $composableBuilder(
     column: $table.firmwareVersion,
@@ -2310,6 +2380,7 @@ class $$WatchesTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String?> customName = const Value.absent(),
                 Value<String?> firmwareVersion = const Value.absent(),
                 Value<String?> hardwareVersion = const Value.absent(),
                 Value<int?> batteryLevel = const Value.absent(),
@@ -2321,6 +2392,7 @@ class $$WatchesTableTableManager
               }) => WatchesCompanion(
                 id: id,
                 name: name,
+                customName: customName,
                 firmwareVersion: firmwareVersion,
                 hardwareVersion: hardwareVersion,
                 batteryLevel: batteryLevel,
@@ -2334,6 +2406,7 @@ class $$WatchesTableTableManager
               ({
                 required String id,
                 required String name,
+                Value<String?> customName = const Value.absent(),
                 Value<String?> firmwareVersion = const Value.absent(),
                 Value<String?> hardwareVersion = const Value.absent(),
                 Value<int?> batteryLevel = const Value.absent(),
@@ -2345,6 +2418,7 @@ class $$WatchesTableTableManager
               }) => WatchesCompanion.insert(
                 id: id,
                 name: name,
+                customName: customName,
                 firmwareVersion: firmwareVersion,
                 hardwareVersion: hardwareVersion,
                 batteryLevel: batteryLevel,

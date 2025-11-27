@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/watch.dart';
+import '../../../providers/auto_reconnect_provider.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../widgets/battery_ring.dart';
 
@@ -95,6 +96,8 @@ class DashboardScreen extends ConsumerWidget {
                   _QuickActionsSection(
                     onFirmwareUpdate: () => context.push('/firmware'),
                     onDisconnect: () async {
+                      // Suppress auto-reconnect when user manually disconnects
+                      ref.read(autoReconnectNotifierProvider.notifier).suppressForSession();
                       final notifier = ref.read(watchNotifierProvider.notifier);
                       await notifier.disconnect();
                       if (context.mounted) {

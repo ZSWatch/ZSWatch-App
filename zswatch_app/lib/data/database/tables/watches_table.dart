@@ -12,6 +12,9 @@ class Watches extends Table {
   /// Advertised device name (e.g., "ZSWatch")
   TextColumn get name => text()();
 
+  /// User-defined custom name for the watch (FR-099 to FR-102)
+  TextColumn get customName => text().nullable().named('custom_name')();
+
   /// Last known firmware version from `t:"ver"` message
   TextColumn get firmwareVersion => text().nullable()();
 

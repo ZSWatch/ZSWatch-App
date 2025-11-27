@@ -1,12 +1,15 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../data/database/app_database.dart';
 import '../../../providers/ble_providers.dart' hide bleScannerProvider;
+import '../../../providers/watch_providers.dart' hide watchNotifierProvider;
 import '../../../providers/watch_service_provider.dart';
 import '../../../services/ble/ble_scanner.dart';
 import '../../widgets/connection_status_pill.dart';
@@ -44,7 +47,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     });
 
     try {
-      // Load known watch IDs from storage
+      // Load known watch IDs from database
       final knownIds = await ref.read(knownWatchIdsProvider.future);
       final scanner = ref.read(ble.bleScannerProvider);
       scanner.setKnownWatchIds(knownIds);
@@ -91,10 +94,18 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       final notifier = ref.read(watchNotifierProvider.notifier);
       await notifier.connect(device);
 
-      // Save this watch ID to known list
-      await saveKnownWatchId(device.id);
-      // Invalidate the provider to refresh
+      // Save this watch to the database
+      final db = ref.read(databaseProvider);
+      await db.upsertWatch(WatchesCompanion(
+        id: Value(device.id),
+        name: Value(device.displayName),
+        createdAt: Value(DateTime.now()),
+        lastConnectedAt: Value(DateTime.now()),
+      ));
+
+      // Invalidate providers to refresh
       ref.invalidate(knownWatchIdsProvider);
+      ref.invalidate(allWatchesProvider);
 
       if (mounted) {
         // Show success and navigate

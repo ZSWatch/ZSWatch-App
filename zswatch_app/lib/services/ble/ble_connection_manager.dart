@@ -32,7 +32,9 @@ class BleConnectionManager {
     state: WatchConnectionState.disconnected,
   );
 
-  bool _autoReconnect = true;
+  // Disabled by default - WatchService handles auto-reconnect now
+  bool _autoReconnect = false;
+  bool _isCancelled = false; // Track if user has cancelled
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
 
@@ -58,21 +60,23 @@ class BleConnectionManager {
   /// Connect to a device
   ///
   /// [device] - Device to connect to (from scanner)
-  /// [autoReconnect] - Whether to automatically reconnect on disconnect
+  /// [autoReconnect] - Whether to automatically reconnect on disconnect (disabled by default)
   Future<void> connect(
     ScannedWatch device, {
-    bool autoReconnect = true,
+    bool autoReconnect = false,
   }) async {
     _autoReconnect = autoReconnect;
     _reconnectAttempts = 0;
+    _isCancelled = false; // Reset for new connection
 
     await _connectToDevice(device.device, device.id);
   }
 
   /// Connect to a device by ID (for reconnecting to saved devices)
-  Future<void> connectById(String deviceId, {bool autoReconnect = true}) async {
+  Future<void> connectById(String deviceId, {bool autoReconnect = false}) async {
     _autoReconnect = autoReconnect;
     _reconnectAttempts = 0;
+    _isCancelled = false; // Reset for new connection
 
     // Create a BluetoothDevice from ID
     final device = BluetoothDevice.fromId(deviceId);
@@ -80,6 +84,12 @@ class BleConnectionManager {
   }
 
   Future<void> _connectToDevice(BluetoothDevice device, String watchId) async {
+    // Don't connect if user has cancelled
+    if (_isCancelled) {
+      debugPrint('[BleConnectionManager] _connectToDevice skipped - cancelled by user');
+      return;
+    }
+
     try {
       // Update state to connecting
       _updateConnection(Connection(
@@ -97,6 +107,7 @@ class BleConnectionManager {
 
       // Attempt connection
       await device.connect(
+        license: License.free,
         timeout: BleConfig.connectionTimeout,
         autoConnect: false,
       );
@@ -287,6 +298,17 @@ class BleConnectionManager {
   }
 
   void _handleDisconnect(String watchId) {
+    // If user has cancelled, don't attempt reconnection
+    if (_isCancelled) {
+      debugPrint('[BleConnectionManager] Disconnect ignored - cancelled by user');
+      _updateConnection(Connection(
+        watchId: watchId,
+        state: WatchConnectionState.disconnected,
+      ));
+      _cleanup();
+      return;
+    }
+
     final wasConnected = _currentConnection.isConnected;
 
     if (wasConnected && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts) {
@@ -304,6 +326,12 @@ class BleConnectionManager {
   }
 
   void _attemptReconnect(String watchId) {
+    // If user has cancelled, don't attempt reconnection
+    if (_isCancelled) {
+      debugPrint('[BleConnectionManager] Reconnect skipped - cancelled by user');
+      return;
+    }
+
     _reconnectAttempts++;
 
     _updateConnection(_currentConnection.copyWith(
@@ -313,11 +341,16 @@ class BleConnectionManager {
 
     // Delay before reconnect attempt
     _reconnectTimer = Timer(BleConfig.reconnectionDelay, () async {
+      // Double-check cancellation inside timer callback
+      if (_isCancelled) {
+        debugPrint('[BleConnectionManager] Reconnect timer skipped - cancelled by user');
+        return;
+      }
       if (_connectedDevice != null && _autoReconnect) {
         try {
           await _connectToDevice(_connectedDevice!, watchId);
         } catch (e) {
-          debugPrint('Reconnect attempt $_reconnectAttempts failed: $e');
+          debugPrint('[BleConnectionManager] Reconnect attempt $_reconnectAttempts failed: $e');
           if (_reconnectAttempts >= _maxReconnectAttempts) {
             _updateConnection(Connection.error(
               watchId,
@@ -344,9 +377,27 @@ class BleConnectionManager {
     return rssi;
   }
 
+  /// Cancel any pending connection
+  void cancelPendingConnection() {
+    debugPrint('[BleConnectionManager] Cancelling pending connection');
+    _autoReconnect = false;
+    _isCancelled = true;
+    _reconnectTimer?.cancel();
+    
+    final device = _connectedDevice;
+    _cleanup();
+    device?.disconnect();
+    
+    _updateConnection(Connection(
+      watchId: _currentConnection.watchId,
+      state: WatchConnectionState.disconnected,
+    ));
+  }
+
   /// Disconnect from current device
   Future<void> disconnect() async {
     _autoReconnect = false;
+    _isCancelled = true; // Mark as cancelled to prevent reconnection
     _reconnectTimer?.cancel();
 
     final device = _connectedDevice;

@@ -148,7 +148,9 @@ class BleServiceImpl implements BleService {
           device.connectionState.listen(_handleConnectionStateChange);
 
       await device.connect(
+        license: License.free,
         timeout: BleConfig.connectionTimeout,
+        mtu: autoReconnect ? null : 512, // autoConnect is incompatible with mtu
         autoConnect: autoReconnect,
       );
 

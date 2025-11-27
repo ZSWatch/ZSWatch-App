@@ -199,6 +199,12 @@ class BleNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// Cancel pending connection
+  void cancelPendingConnection() {
+    _connectionManager.cancelPendingConnection();
+    state = const AsyncValue.data(null);
+  }
+
   /// Disconnect from current device
   Future<void> disconnect() async {
     state = const AsyncValue.loading();

@@ -27,7 +27,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Database schema version - increment when making schema changes
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -37,10 +37,10 @@ class AppDatabase extends _$AppDatabase {
       },
       onUpgrade: (Migrator m, int from, int to) async {
         // Handle migrations here when schema changes
-        // Example:
-        // if (from < 2) {
-        //   await m.addColumn(watches, watches.newColumn);
-        // }
+        if (from < 2) {
+          // Add custom_name column for watch rename feature (FR-099 to FR-102)
+          await m.addColumn(watches, watches.customName);
+        }
       },
     );
   }

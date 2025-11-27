@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/models/connection.dart';
 import '../data/models/notification.dart';
 import '../services/notification/notification_service.dart';
 import '../services/media/media_service.dart';
@@ -346,6 +347,7 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
   StreamSubscription<MediaPlaybackState>? _playbackSubscription;
   StreamSubscription<MediaMetadata>? _metadataSubscription;
   StreamSubscription<Map<String, dynamic>>? _watchMessageSubscription;
+  StreamSubscription<Connection>? _connectionSubscription;
 
   MediaControlNotifier(this._mediaService, this._watchService)
       : super(const MediaControlState()) {
@@ -353,6 +355,16 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
   }
 
   Future<void> _initialize() async {
+    // Listen for connection changes to sync on connect (FR-085)
+    _connectionSubscription = _watchService.connectionStream.listen((connection) {
+      if (connection.isConnected) {
+        // Small delay to ensure NUS is set up
+        Future.delayed(const Duration(milliseconds: 500), () {
+          syncCurrentStateToWatch();
+        });
+      }
+    });
+
     if (!Platform.isAndroid) {
       // iOS uses AMS - nothing to initialize
       return;
@@ -467,11 +479,31 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
     // State will be updated via streams when we reinitialize
   }
 
+  /// Send current media state to watch (FR-085)
+  /// Call this on connection to sync initial state
+  Future<void> syncCurrentStateToWatch() async {
+    if (!Platform.isAndroid) return;
+    if (!_watchService.isConnected) return;
+
+    debugPrint('[MediaControl] Syncing current media state to watch');
+
+    // Send playback state if available
+    if (state.playbackState != null) {
+      await _sendStateToWatch();
+    }
+
+    // Send metadata if available
+    if (state.track != null) {
+      await _sendInfoToWatch();
+    }
+  }
+
   @override
   void dispose() {
     _playbackSubscription?.cancel();
     _metadataSubscription?.cancel();
     _watchMessageSubscription?.cancel();
+    _connectionSubscription?.cancel();
     super.dispose();
   }
 }

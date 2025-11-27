@@ -39,6 +39,22 @@ class WatchRepository {
     return entity != null ? _entityToModel(entity) : null;
   }
 
+  /// Get the last connected watch (most recent lastConnectedAt)
+  Future<Watch?> getLastConnectedWatch() async {
+    final watches = await getAllWatches();
+    if (watches.isEmpty) return null;
+    
+    // Sort by lastConnectedAt descending, null values last
+    watches.sort((a, b) {
+      if (a.lastConnectedAt == null && b.lastConnectedAt == null) return 0;
+      if (a.lastConnectedAt == null) return 1;
+      if (b.lastConnectedAt == null) return -1;
+      return b.lastConnectedAt!.compareTo(a.lastConnectedAt!);
+    });
+    
+    return watches.firstOrNull;
+  }
+
   /// Check if a watch exists
   Future<bool> watchExists(String id) async {
     final watch = await _db.getWatchById(id);
@@ -85,6 +101,14 @@ class WatchRepository {
   /// Update watch last connected timestamp
   Future<void> updateLastConnected(String watchId) async {
     await _db.updateWatchLastConnected(watchId);
+  }
+
+  /// Update watch custom name (FR-099 to FR-102)
+  Future<void> updateCustomName(String watchId, String? customName) async {
+    final watch = await getWatchById(watchId);
+    if (watch != null) {
+      await updateWatch(watch.copyWith(customName: customName));
+    }
   }
 
   /// Mark watch as supporting Extended API
@@ -135,6 +159,7 @@ class WatchRepository {
     return Watch(
       id: entity.id,
       name: entity.name,
+      customName: entity.customName,
       firmwareVersion: entity.firmwareVersion,
       hardwareVersion: entity.hardwareVersion,
       batteryLevel: entity.batteryLevel,
@@ -149,6 +174,7 @@ class WatchRepository {
     return WatchesCompanion(
       id: Value(watch.id),
       name: Value(watch.name),
+      customName: Value(watch.customName),
       firmwareVersion: Value(watch.firmwareVersion),
       hardwareVersion: Value(watch.hardwareVersion),
       batteryLevel: Value(watch.batteryLevel),

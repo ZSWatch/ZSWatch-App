@@ -107,9 +107,9 @@
 
 | User Story | Status | Notes |
 |------------|--------|-------|
-| US1 - Connect to Watch | ✅ Complete | Scan, connect, bond, dashboard, reconnection |
+| US1 - Connect to Watch | ✅ Complete | Scan, connect, bond, dashboard, reconnection, start page, auto-reconnect |
 | US2 - Firmware Update | ✅ Complete | GitHub releases (multi-variant), CI builds, local files, MCUmgr DFU |
-| US3 - Notifications | ✅ Complete | Android NotificationListener, MediaSession, Gadgetbridge protocol |
+| US3 - Notifications | ✅ Complete | Android NotificationListener, MediaSession, Gadgetbridge protocol, initial sync |
 | US4 - Dashboard | ✅ Complete | Part of US1 implementation |
 | US5 - Health | 🔲 Not Started | |
 | US6 - Developer Tools | 🔲 Not Started | |
@@ -117,6 +117,27 @@
 | US8 - App Settings | 🔲 Not Started | |
 | US9 - Analytics | 🔲 Not Started | |
 | US10 - Voice Recording | 🔲 Placeholder | |
+
+### Phase 3.6: Start Page & Auto-Reconnect (2025-11-27)
+
+**Completed Requirements:**
+- FR-067: Start page displays list of stored watches ✅
+- FR-068: Each watch shows connection status indicator ✅
+- FR-069: "Connect new watch" button navigates to scan ✅
+- FR-070: Tapping stored watch initiates connection ✅
+- FR-071: Auto-reconnect attempts on app launch ✅
+- FR-072: Uses platform auto-connect (flutter_blue_plus autoConnect: true) ✅
+- FR-073: User can cancel auto-reconnect and select different watch ✅
+- FR-074: Automatic navigation to connected screen on success ✅
+- FR-084: Time sync on connection ✅
+- FR-085: Media state sync on connection (Android) ✅
+- FR-099: Custom name field added to Watch model ✅
+
+**Implementation Details:**
+- `StartPageScreen`: New screen showing stored watches with status, "Add Watch" FAB
+- `AutoReconnectService`: Simplified to leverage flutter_blue_plus's native autoConnect feature
+- Database schema v2: Added customName column with migration
+- `MediaControlNotifier`: Listens to connection stream and syncs media state on connect
 
 ## Firmware Update Implementation Details
 

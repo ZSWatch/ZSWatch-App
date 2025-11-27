@@ -11,6 +11,9 @@ class Watch extends Equatable {
   /// Advertised device name
   final String name;
 
+  /// User-defined custom name for the watch (FR-099 to FR-102)
+  final String? customName;
+
   /// Last known firmware version
   final String? firmwareVersion;
 
@@ -35,6 +38,7 @@ class Watch extends Equatable {
   const Watch({
     required this.id,
     required this.name,
+    this.customName,
     this.firmwareVersion,
     this.hardwareVersion,
     this.batteryLevel,
@@ -60,6 +64,7 @@ class Watch extends Equatable {
   Watch copyWith({
     String? id,
     String? name,
+    String? customName,
     String? firmwareVersion,
     String? hardwareVersion,
     int? batteryLevel,
@@ -71,6 +76,7 @@ class Watch extends Equatable {
     return Watch(
       id: id ?? this.id,
       name: name ?? this.name,
+      customName: customName ?? this.customName,
       firmwareVersion: firmwareVersion ?? this.firmwareVersion,
       hardwareVersion: hardwareVersion ?? this.hardwareVersion,
       batteryLevel: batteryLevel ?? this.batteryLevel,
@@ -93,8 +99,9 @@ class Watch extends Equatable {
   /// Whether battery is critical (below 10%)
   bool get isBatteryCritical => batteryLevel != null && batteryLevel! < 10;
 
-  /// Display name (uses name, falls back to shortened ID)
+  /// Display name (prefers customName, falls back to name, then shortened ID)
   String get displayName {
+    if (customName != null && customName!.isNotEmpty) return customName!;
     if (name.isNotEmpty) return name;
     // Show last 4 chars of ID as fallback
     if (id.length > 4) return '...${id.substring(id.length - 4)}';
@@ -115,6 +122,7 @@ class Watch extends Equatable {
   List<Object?> get props => [
         id,
         name,
+        customName,
         firmwareVersion,
         hardwareVersion,
         batteryLevel,
