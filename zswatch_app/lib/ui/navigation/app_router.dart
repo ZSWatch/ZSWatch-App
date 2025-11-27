@@ -8,6 +8,7 @@ import '../../providers/watch_service_provider.dart';
 import '../screens/connection/scan_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/firmware/firmware_update_screen.dart';
+import '../screens/notifications/notification_settings_screen.dart';
 
 /// Route names for the app
 abstract final class AppRoutes {
@@ -115,8 +116,7 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.notifications,
         name: 'notifications',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Notifications'),
+        builder: (context, state) => const NotificationSettingsScreen(),
       ),
 
       // Analytics

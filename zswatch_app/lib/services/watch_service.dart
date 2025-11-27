@@ -351,6 +351,94 @@ class WatchService {
     await _sendNus('setTime($timestamp);E.setTimeZone($tz);');
   }
 
+  /// Send notification to watch
+  Future<void> sendNotification({
+    required int id,
+    required String source,
+    String? title,
+    String? body,
+    String? sender,
+    String? subject,
+    String? phoneNumber,
+    bool canReply = false,
+  }) async {
+    final data = <String, dynamic>{
+      't': 'notify',
+      'id': id,
+      'src': source,
+    };
+    if (title != null) data['title'] = title;
+    if (body != null) data['body'] = body;
+    if (sender != null) data['sender'] = sender;
+    if (subject != null) data['subject'] = subject;
+    if (phoneNumber != null) data['tel'] = phoneNumber;
+    if (canReply) data['reply'] = true;
+
+    await _sendGb(data);
+  }
+
+  /// Update an existing notification on watch
+  Future<void> updateNotification(int id, String body) async {
+    await _sendGb({
+      't': 'notify~',
+      'id': id,
+      'body': body,
+    });
+  }
+
+  /// Remove a notification from watch
+  Future<void> removeNotification(int id) async {
+    await _sendGb({'t': 'notify-', 'id': id});
+  }
+
+  /// Send music playback state to watch
+  Future<void> sendMusicState({
+    required String state,
+    int? positionSeconds,
+    bool shuffle = false,
+    bool repeat = false,
+  }) async {
+    final data = <String, dynamic>{
+      't': 'musicstate',
+      'state': state,
+    };
+    if (positionSeconds != null) data['position'] = positionSeconds;
+    if (shuffle) data['shuffle'] = 1;
+    if (repeat) data['repeat'] = 1;
+
+    await _sendGb(data);
+  }
+
+  /// Send music track info to watch
+  Future<void> sendMusicInfo({
+    String? artist,
+    String? album,
+    String? track,
+    int? durationSeconds,
+    int? trackNumber,
+    int? trackCount,
+  }) async {
+    final data = <String, dynamic>{'t': 'musicinfo'};
+    if (artist != null) data['artist'] = artist;
+    if (album != null) data['album'] = album;
+    if (track != null) data['track'] = track;
+    if (durationSeconds != null) data['dur'] = durationSeconds;
+    if (trackCount != null) data['c'] = trackCount;
+    if (trackNumber != null) data['n'] = trackNumber;
+
+    await _sendGb(data);
+  }
+
+  /// Start/stop find device (vibrate watch)
+  Future<void> findDevice(bool enabled) async {
+    await _sendGb({'t': 'find', 'n': enabled});
+  }
+
+  /// Vibrate watch with pattern
+  Future<void> vibrate(int pattern) async {
+    await _sendGb({'t': 'vibrate', 'n': pattern});
+  }
+
   void _handleConnectionStateChange(
     BluetoothConnectionState state,
     String watchId,

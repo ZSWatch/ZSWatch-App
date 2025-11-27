@@ -98,7 +98,7 @@
 |------------|--------|-------|
 | US1 - Connect to Watch | ✅ Complete | Scan, connect, bond, dashboard, reconnection |
 | US2 - Firmware Update | ✅ Complete | GitHub releases (multi-variant), CI builds, local files, MCUmgr DFU |
-| US3 - Notifications | 🔲 Not Started | |
+| US3 - Notifications | ✅ Complete | Android NotificationListener, MediaSession, Gadgetbridge protocol |
 | US4 - Dashboard | ✅ Complete | Part of US1 implementation |
 | US5 - Health | 🔲 Not Started | |
 | US6 - Developer Tools | 🔲 Not Started | |

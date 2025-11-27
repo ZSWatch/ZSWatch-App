@@ -314,7 +314,7 @@
 
 ---
 
-## Phase 5: User Story 3 - Notification & Media Integration (Priority: P3)
+## Phase 5: User Story 3 - Notification & Media Integration (Priority: P3) ✅ COMPLETE
 
 **Goal**: User receives phone notifications and can control media on watch (platform-specific)
 
@@ -324,35 +324,35 @@
 
 ### Models
 
-- [ ] T061 [P] [US3] Create Notification model in lib/data/models/notification.dart
+- [X] T061 [P] [US3] Create Notification model in lib/data/models/notification.dart
 
 ### Android Native (Platform Channel)
 
-- [ ] T062 [US3] Create NotificationListenerServiceImpl in android/app/src/main/kotlin/.../NotificationListenerServiceImpl.kt
-- [ ] T063 [US3] Create MediaSessionBridge in android/app/src/main/kotlin/.../MediaSessionBridge.kt
-- [ ] T064 [US3] Register services in AndroidManifest.xml
+- [X] T062 [US3] Create NotificationListenerServiceImpl in android/app/src/main/kotlin/.../NotificationListenerServiceImpl.kt
+- [X] T063 [US3] Create MediaSessionBridge in android/app/src/main/kotlin/.../MediaSessionBridge.kt
+- [X] T064 [US3] Register services in AndroidManifest.xml
 
 ### Flutter Services
 
-- [ ] T065 [US3] Create notification service with MethodChannel in lib/services/notification/notification_service.dart
-- [ ] T066 [US3] Create media service with MethodChannel in lib/services/media/media_service.dart
-- [ ] T067 [US3] Implement notification → Gadgetbridge protocol translation
-- [ ] T068 [US3] Implement music state/info → Gadgetbridge protocol translation
+- [X] T065 [US3] Create notification service with MethodChannel in lib/services/notification/notification_service.dart
+- [X] T066 [US3] Create media service with MethodChannel in lib/services/media/media_service.dart
+- [X] T067 [US3] Implement notification → Gadgetbridge protocol translation
+- [X] T068 [US3] Implement music state/info → Gadgetbridge protocol translation
 
 ### Gadgetbridge Protocol Messages
 
-- [ ] T069 [US3] Implement notify message (`t:"notify"`) in gadgetbridge_protocol.dart
-- [ ] T070 [US3] Implement musicstate message (`t:"musicstate"`) in gadgetbridge_protocol.dart
-- [ ] T071 [US3] Implement musicinfo message (`t:"musicinfo"`) in gadgetbridge_protocol.dart
-- [ ] T072 [US3] Implement music control responses (`t:"music"`) from watch
+- [X] T069 [US3] Implement notify message (`t:"notify"`) in gadgetbridge_protocol.dart
+- [X] T070 [US3] Implement musicstate message (`t:"musicstate"`) in gadgetbridge_protocol.dart
+- [X] T071 [US3] Implement musicinfo message (`t:"musicinfo"`) in gadgetbridge_protocol.dart
+- [X] T072 [US3] Implement music control responses (`t:"music"`) from watch
 
 ### UI
 
-- [ ] T073 [US3] Create notification settings screen in lib/ui/screens/notifications/notification_settings_screen.dart
-- [ ] T074 [US3] Add app filter list for notification sources (Android)
-- [ ] T075 [US3] Add NotificationListenerService permission flow (Android)
+- [X] T073 [US3] Create notification settings screen in lib/ui/screens/notifications/notification_settings_screen.dart
+- [X] T074 [US3] Add app filter list for notification sources (Android)
+- [X] T075 [US3] Add NotificationListenerService permission flow (Android)
 
-**Checkpoint**: Notifications forwarded (Android) or ANCS configured (iOS). Media control works.
+**Checkpoint**: Notifications forwarded (Android) or ANCS configured (iOS). Media control works. ✅
 
 ---
 

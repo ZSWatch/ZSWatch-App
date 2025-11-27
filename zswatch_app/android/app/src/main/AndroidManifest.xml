@@ -20,6 +20,9 @@
     <!-- Notification access (requires user to enable in settings) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Required for NotificationListenerService to bind properly -->
+    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+
     <!-- Network access for firmware downloads -->
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -57,6 +60,16 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        
+        <!-- NotificationListenerService for forwarding notifications to watch -->
+        <service
+            android:name=".NotificationListenerServiceImpl"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
