@@ -19,7 +19,7 @@
 
 ### User Story 1 - Connect to Watch (Priority: P1)
 
-A user opens the app for the first time and wants to connect to their ZSWatch. They tap "Add Watch", the app scans for nearby ZSWatch devices via BLE, displays found devices, and the user selects their watch. The app pairs and connects, displaying basic device info (name, firmware version, battery level).
+A user opens the app for the first time and wants to connect to their ZSWatch. The start page ("Connect to your watch") displays all previously paired/stored watches prominently. The user can select a stored watch to reconnect, or tap "Connect new watch" to scan for and pair a watch not already stored. When a watch is selected or discovered, the app pairs and connects, displaying basic device info (name, firmware version, battery level). Upon successful connection (manual or automatic), the app navigates to the connected dashboard screen.
 
 **Why this priority**: Connection is the foundation; no other feature works without it. This is the absolute minimum viable product.
 
@@ -27,14 +27,17 @@ A user opens the app for the first time and wants to connect to their ZSWatch. T
 
 **Acceptance Scenarios**:
 
-1. **Given** the app is open and Bluetooth is enabled, **When** user taps "Add Watch", **Then** app requests necessary permissions and begins scanning for ZSWatch devices
-2. **Given** a ZSWatch is powered on and in range, **When** scanning completes, **Then** the device appears in the list with its advertised name
-3. **Given** a device is shown in the list, **When** user taps on it, **Then** app connects and displays connection progress
-4. **Given** connection succeeds, **When** the dashboard loads, **Then** user sees watch name, firmware version, battery level, and "Connected" status
-5. **Given** the watch goes out of range or disconnects, **When** connection is lost, **Then** app shows "Disconnected" and attempts automatic reconnection
-6. **Given** a watch is already connected to the phone, **When** user opens scan screen, **Then** the connected device appears in the list with "Connected" indicator
-7. **Given** a watch was previously paired and saved in the app, **When** user opens scan screen but watch is not advertising, **Then** device shows as "Saved • Out of range"
-8. **Given** a watch was previously paired and is now advertising, **When** user opens scan screen, **Then** device shows as "Saved" with current RSSI
+1. **Given** the app is open on the start page, **When** user views the screen, **Then** all previously paired/stored watches are displayed prominently
+2. **Given** stored watches are displayed, **When** user taps on a stored watch, **Then** app attempts to connect to that specific watch
+3. **Given** the app is open and Bluetooth is enabled, **When** user taps "Connect new watch" button, **Then** app requests necessary permissions and begins scanning for ZSWatch devices not already stored
+4. **Given** a ZSWatch is powered on and in range, **When** scanning completes, **Then** the device appears in the list with its advertised name
+5. **Given** a device is shown in the list, **When** user taps on it, **Then** app connects and displays connection progress
+6. **Given** connection succeeds, **When** the dashboard loads, **Then** user sees watch name, firmware version, battery level, and "Connected" status
+7. **Given** the watch goes out of range or disconnects, **When** connection is lost, **Then** app shows "Disconnected" and attempts automatic reconnection
+8. **Given** a watch is already connected to the phone, **When** user opens scan screen, **Then** the connected device appears in the list with "Connected" indicator
+9. **Given** a watch was previously paired and saved in the app, **When** user opens scan screen but watch is not advertising, **Then** device shows as "Saved • Out of range"
+10. **Given** a watch was previously paired and is now advertising, **When** user opens scan screen, **Then** device shows as "Saved" with current RSSI
+11. **Given** a connection is established (manual or auto-connect), **When** connection completes, **Then** app automatically navigates to the connected dashboard screen
 
 ---
 
@@ -83,27 +86,44 @@ A user wants to receive phone notifications and control media on their watch. Th
 - **iOS**: Watch uses native ANCS/AMS services directly with iOS. App provides configuration only.
 - **Android**: App acts as bridge, forwarding notifications and media via BLE to watch.
 
+All notifications sent from the app include a stable unique notification ID to enable bi-directional dismiss synchronization. When a notification is dismissed on the watch, the watch sends the ID back to the app, and the app removes the corresponding notification on the phone. Conversely, when a notification is dismissed on the phone, the app sends a notify command prefixed with "-" plus the notification ID to the watch, so the watch can dismiss the matching notification.
+
+For music control, the app listens for media control commands from the watch (next/previous/play/pause/etc.) and forwards these commands to control the phone's media playback. The app sends updated music information to the watch periodically and immediately whenever the track or playback state changes. After connecting to a watch, the app immediately sends the current "now playing" info if something is playing or paused.
+
 **Why this priority**: Notifications and media control are core smartwatch features providing ongoing value.
 
 **Independent Test**: 
-- Android: Enable notification forwarding, send test notification, verify it appears on watch.
+- Android: Enable notification forwarding, send test notification, verify it appears on watch. Dismiss on watch, verify phone notification is removed. Dismiss on phone, verify watch notification is removed.
 - iOS: Verify ANCS/AMS connection works between watch and iOS (app not involved in data flow).
+- Music: Play media on phone, verify metadata appears on watch. Send play/pause command from watch, verify phone media responds.
 
 **Acceptance Scenarios**:
 
 ##### Android-Specific
 1. **Given** Android device with app installed, **When** user enables notification forwarding, **Then** app requests NotificationListenerService permission
-2. **Given** permission is granted on Android, **When** a phone notification arrives, **Then** app forwards it to watch via BLE within 2 seconds
+2. **Given** permission is granted on Android, **When** a phone notification arrives, **Then** app forwards it to watch via BLE within 2 seconds with a stable unique notification ID
 3. **Given** Android user wants to filter notifications, **When** they access filter settings, **Then** they can enable/disable specific apps
 4. **Given** Android user plays media, **When** media state changes, **Then** app forwards metadata to watch via BLE
 
+##### Notification Dismiss Sync (Android)
+5. **Given** a notification was forwarded to the watch with a stable ID, **When** the watch dismisses the notification and sends the ID back, **Then** app removes the corresponding notification on the phone
+6. **Given** a notification exists on both phone and watch, **When** the notification is dismissed on the phone, **Then** app sends a notify command with "-" prefix plus the notification ID to the watch
+7. **Given** the watch receives a dismiss command with "-" prefix, **When** the ID matches an existing notification, **Then** the watch dismisses the matching notification
+
 ##### iOS-Specific
-5. **Given** iOS device with watch paired, **When** notification arrives, **Then** iOS sends it directly to watch via ANCS (app not involved)
-6. **Given** iOS device with watch paired, **When** media plays, **Then** iOS provides metadata via AMS directly to watch
-7. **Given** iOS user opens app, **When** they access notification settings, **Then** app shows configuration for watch-side ANCS behavior
+8. **Given** iOS device with watch paired, **When** notification arrives, **Then** iOS sends it directly to watch via ANCS (app not involved)
+9. **Given** iOS device with watch paired, **When** media plays, **Then** iOS provides metadata via AMS directly to watch
+10. **Given** iOS user opens app, **When** they access notification settings, **Then** app shows configuration for watch-side ANCS behavior
+
+##### Music Control Integration
+11. **Given** the watch is connected, **When** the watch sends a media control command (play/pause/next/previous/etc.), **Then** app forwards the command to control the phone's media playback
+12. **Given** media is playing on the phone, **When** the track changes, **Then** app immediately sends updated music information (title, artist, album) to the watch
+13. **Given** media playback state changes (play/pause), **When** the change occurs, **Then** app sends updated playback state to the watch
+14. **Given** media is playing or paused, **When** the app connects to the watch, **Then** app immediately sends current "now playing" info to the watch
+15. **Given** music information updates are enabled, **When** connected and media is playing, **Then** app sends periodic music updates to keep watch in sync
 
 ##### Common
-8. **Given** notification permission is revoked (Android), **When** app detects this, **Then** user is informed and prompted to re-enable
+16. **Given** notification permission is revoked (Android), **When** app detects this, **Then** user is informed and prompted to re-enable
 
 ---
 
@@ -146,11 +166,13 @@ A user wants to view detailed health and activity data from the watch. The app d
 
 ### User Story 6 - Developer Tools (Priority: P6)
 
-A developer or power user enables Developer Mode and accesses comprehensive diagnostic tools including: live logs, shell terminal, BLE diagnostics (signal history, MTU, PHY mode, reconnection stats), raw sensor streaming via existing GATT service, and full communication logging.
+A developer or power user enables Developer Mode and accesses comprehensive diagnostic tools including: live logs, shell terminal, BLE diagnostics (signal history, MTU, PHY mode, reconnection stats), raw sensor streaming via existing GATT service, full communication logging, and notification/music debug tools.
+
+The notification debug section allows selecting an app name, entering notification text, and sending a debug notification to the watch. Debug notifications are also created on the phone itself to test dismissal syncing in both directions. Music debug tools provide buttons to send static sample "now playing" metadata (title, artist, album) to the watch.
 
 **Why this priority**: Essential for debugging and development but not needed by typical end users.
 
-**Independent Test**: Enable Developer Mode, view live logs, send a shell command, stream raw sensor data, verify all diagnostics display correctly.
+**Independent Test**: Enable Developer Mode, view live logs, send a shell command, stream raw sensor data, send debug notification, verify all diagnostics display correctly.
 
 **Acceptance Scenarios**:
 
@@ -160,6 +182,9 @@ A developer or power user enables Developer Mode and accesses comprehensive diag
 4. **Given** connection diagnostics are open, **When** user views BLE stats, **Then** current MTU, PHY mode (1M/2M), signal strength history, and reconnection frequency are displayed
 5. **Given** sensor debug mode is enabled, **When** app subscribes to zsw_gatt_sensor_server characteristics, **Then** accelerometer/gyro/PPG/temperature values graph in real-time
 6. **Given** communication log is open, **When** any message is sent/received, **Then** it appears in the log with timestamp and direction
+7. **Given** notification debug section is open, **When** user selects an app name and enters notification text, **Then** a debug notification can be sent to the watch
+8. **Given** user sends a debug notification, **When** it is sent to the watch, **Then** a corresponding notification is also created on the phone to test bi-directional dismiss sync
+9. **Given** music debug section is open, **When** user taps send sample metadata button, **Then** static sample "now playing" metadata (title, artist, album) is sent to the watch
 
 ---
 
@@ -213,19 +238,23 @@ A user owns multiple ZSWatch devices and wants to switch between them. The app r
 
 ### User Story 8 - App Settings (Priority: P8)
 
-A user wants to configure app-specific settings (not watch settings). Watch settings are configured directly on the watch itself.
+A user wants to configure app-specific settings (not watch settings). Watch settings are configured directly on the watch itself. Users can also rename previously paired/bonded watches for easier identification within the Settings section.
 
 **Why this priority**: App configuration enhances user experience.
 
-**Independent Test**: Change an app setting, verify it persists after restart.
+**Independent Test**: Change an app setting, verify it persists after restart. Rename a bonded watch, verify the custom name displays throughout the app.
 
 **Acceptance Scenarios**:
 
 1. **Given** user opens App Settings, **When** screen loads, **Then** app preferences are displayed (notification filters, developer mode toggle, etc.)
 2. **Given** user changes an app setting, **When** they save, **Then** setting is persisted locally
 3. **Given** app restarts, **When** Settings screen loads, **Then** previous settings are retained
+4. **Given** user has paired watches, **When** they access watch management in Settings, **Then** they can see all paired/bonded watches with option to rename
+5. **Given** user wants to rename a watch, **When** they edit the name and save, **Then** the custom name is persisted and displayed throughout the app
 
 **Note**: Watch-specific settings (display timeout, vibration, etc.) are configured on the watch directly. The app does not sync or modify watch settings.
+
+**Note**: Rename bonded watches feature is part of the requirements list but not needed for initial implementation.
 
 ---
 
@@ -245,6 +274,13 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - What happens when opening scan screen while a watch is already connected? Connected device appears in list with "Connected" badge
 - What happens when a previously saved watch is not advertising? Device shows in list as "Saved • Out of range" with MAC address
 - What happens when scanning shows multiple devices? Devices are sorted by signal strength (strongest first)
+- What happens when the app is backgrounded while playing music? App continues sending music updates via background BLE connection
+- What happens when notification dismiss sync fails due to connection loss? App queues dismiss commands and sends when reconnected
+- What happens when auto-reconnect attempts exhaust platform limits? App stops attempts and informs user; manual reconnect available
+- What happens when GPS location permission is denied when watch requests location? App sends error response to watch indicating location unavailable
+- What happens when GPS location is stale? App obtains fresh location before sending to watch
+- What happens when app is reopened after being closed? App automatically attempts to reconnect to last connected watch
+- What happens when initial sync data is incomplete (e.g., no media playing)? App sends available data; omits unavailable data gracefully
 
 ## Requirements *(mandatory)*
 
@@ -263,6 +299,18 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **FR-006**: App MUST support multiple saved watches with ability to switch between them
 - **FR-007**: App MUST request and use high MTU (Maximum Transmission Unit) on connection
 - **FR-008**: App MUST enable Data Length Extension (DLE) for optimal throughput
+
+#### Start Page & Stored Watches
+- **FR-067**: Start page ("Connect to your watch") MUST display all previously paired/stored watches prominently
+- **FR-068**: Start page MUST include a dedicated "Connect new watch" button for pairing watches not already stored
+- **FR-069**: Stored watches on start page MUST allow direct selection to initiate connection
+- **FR-070**: Upon successful connection (manual or automatic), app MUST navigate to the connected dashboard screen
+
+#### Auto-Reconnect Behavior
+- **FR-071**: When app is reopened after being closed, app MUST automatically attempt to reconnect to the last connected watch
+- **FR-072**: Auto-connect attempts MUST run periodically and indefinitely (within platform limits) until connection established or user chooses different watch
+- **FR-073**: Auto-reconnect MUST NOT block user from manually selecting a different watch
+- **FR-074**: When connection is established (manual or auto), app MUST navigate to connected screen
 
 #### BLE Security (Mandatory)
 - **FR-059**: App MUST require BLE bonding/pairing for all connections (encrypted link mandatory)
@@ -311,6 +359,26 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **FR-029**: App MUST allow user to filter notifications by source app (Android only - iOS uses watch-side ANCS filtering)
 - **FR-030**: App MUST support notification actions where platform allows (dismiss, reply)
 
+#### Notification Stable IDs & Dismiss Sync (Android)
+- **FR-075**: All notifications sent from the app MUST include a stable unique notification ID
+- **FR-076**: When watch dismisses a notification and sends ID back, app MUST remove the corresponding notification on the phone
+- **FR-077**: When notification is dismissed on phone, app MUST send notify command prefixed with "-" plus the notification ID to watch
+- **FR-078**: Watch MUST dismiss matching notification when receiving dismiss command with "-" prefix
+
+#### Music Control Integration (Android)
+- **FR-079**: App MUST listen for music control commands from watch (next/previous/play/pause/etc.) and forward to control phone's media playback
+- **FR-080**: App MUST send updated music information (title, artist, album) to watch immediately when track changes
+- **FR-081**: App MUST send updated music information to watch immediately when playback state changes (play/pause)
+- **FR-082**: App MUST send music information to watch periodically while media is playing
+- **FR-083**: After connecting to watch, app MUST immediately send current "now playing" info if media is playing or paused
+
+#### Initial Sync on Connect
+- **FR-084**: Upon connection (including auto-connect and manual connect), app MUST immediately send critical state data to watch
+- **FR-085**: Initial sync MUST include current time
+- **FR-086**: Initial sync MUST include current music/"now playing" information if any media is playing or paused
+- **FR-087**: Initial sync SHOULD include any other key state relevant for watch UI (e.g., notification summary, weather if available)
+- **FR-088**: Initial sync MUST complete before app considers connection fully established
+
 #### Health & Activity
 - **FR-031**: App MUST receive and display step count data from watch (via Extended API when available)
 - **FR-032**: App MUST access heart rate data via standard HR GATT service
@@ -335,6 +403,22 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **FR-044**: Developer tools MUST be accessible via a visible Developer Mode toggle in Settings
 - **FR-066**: Communication logs MUST rotate at 5,000 entries or 5MB (whichever first), discarding oldest entries
 
+#### Notification Debug Tools
+- **FR-093**: Developer tools MUST include notification debug section on notification page
+- **FR-094**: Notification debug MUST allow selecting an app name for test notifications
+- **FR-095**: Notification debug MUST allow entering custom notification text
+- **FR-096**: Notification debug MUST provide button to send debug notification to watch
+- **FR-097**: Debug notifications MUST also be created on phone to test bi-directional dismiss syncing
+
+#### Music Debug Tools
+- **FR-098**: Developer tools MUST include music debug section with buttons to send static sample "now playing" metadata (title, artist, album) to watch
+
+#### Watch Management
+- **FR-099**: Users MUST be able to rename each previously paired/bonded watch for easier identification
+- **FR-100**: Watch rename feature MUST be accessible within App Settings section
+- **FR-101**: Custom watch names MUST persist across app restarts
+- **FR-102**: Custom watch names MUST display throughout app wherever watch is referenced
+
 #### Battery & Analytics
 - **FR-045**: App MUST track and graph battery drain over last 24 hours
 - **FR-046**: App MUST track and graph battery drain over last 7 days
@@ -345,10 +429,16 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **FR-049**: App MUST handle timezone changes and update watch accordingly
 
 #### Background Behavior
-- **FR-050**: Android: App SHOULD support Foreground Service for persistent BLE connection
+- **FR-050**: Android: App MUST use Foreground Service with persistent notification to maintain reliable BLE connection when UI is not active
 - **FR-051**: iOS: App MUST enable Bluetooth background modes for connection maintenance
 - **FR-052**: App MUST disconnect cleanly when user explicitly removes/forgets the device
 - **FR-053**: App MUST throttle health-sync frequency to minimize battery impact
+
+#### Persistent BLE Connection
+- **FR-089**: App MUST maintain reliable BLE connection even when running in background or UI is not active
+- **FR-090**: Persistent connection MUST support sending notifications, music info, and all other BLE features
+- **FR-091**: Persistent connection MUST work on both Android and iOS within their respective background-execution rules
+- **FR-092**: Android: Foreground service notification MUST clearly indicate app is maintaining watch connection
 
 #### Voice Recording (Placeholder)
 - **FR-054**: App MUST be architecturally prepared for future voice memo/dictation sync from watch
@@ -358,6 +448,13 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **FR-056**: App MUST store all data locally on device only
 - **FR-057**: App MUST NOT transmit telemetry, analytics, or user data
 - **FR-058**: App MUST NOT require user accounts or cloud services
+
+#### Gadgetbridge GPS Support
+- **FR-103**: App MUST implement Gadgetbridge GPSPower command to handle GPS location requests from watch
+- **FR-104**: When watch sends GPSPower (or equivalent GPS request) command, app MUST obtain current location from phone
+- **FR-105**: App MUST respect OS location permissions and settings when obtaining GPS location
+- **FR-106**: App MUST send current GPS location back to watch in Gadgetbridge-compatible format
+- **FR-107**: App MUST handle GPS permission denial gracefully with error response to watch
 
 ### UI/UX Requirements
 
@@ -418,10 +515,10 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 
 ### Key Entities
 
-- **Watch**: Represents a ZSWatch device (identifier, name, firmware version, battery level, paired status, supported protocols)
-- **Connection**: BLE connection state and metadata (state, signal strength, MTU, PHY mode, DLE enabled, reconnection count, last seen)
+- **Watch**: Represents a ZSWatch device (identifier, name, customName, firmware version, battery level, paired status, supported protocols, lastConnected timestamp)
+- **Connection**: BLE connection state and metadata (state, signal strength, MTU, PHY mode, DLE enabled, reconnection count, last seen, autoReconnectEnabled)
 - **ProtocolMessage**: Base message type with protocol indicator (Gadgetbridge API or Extended ZSWatch API)
-- **Notification**: Phone notification to be forwarded (id, source app, title, body, timestamp, icon)
+- **Notification**: Phone notification to be forwarded (stableId, source app, title, body, timestamp, icon, dismissedOnPhone, dismissedOnWatch)
 - **FirmwareImage**: Firmware file for upload (name, version, size, hash, type: app/net/filesystem)
 - **HealthSample**: Health data point (type: steps/heartrate/sleep, value, timestamp, granularity: hour/day/week/month)
 - **BatteryReading**: Battery level sample (level, timestamp, charging status)
@@ -430,6 +527,8 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **CommLogEntry**: BLE communication log (direction: in/out, protocol, payload, timestamp)
 - **ShellCommand**: Terminal command/response pair (command, response, timestamp)
 - **VoiceMemo**: Voice recording from watch (id, duration, timestamp, audio data) [placeholder]
+- **MediaState**: Current media playback state (title, artist, album, playbackState, timestamp)
+- **GPSLocation**: GPS coordinates (latitude, longitude, accuracy, timestamp)
 
 ## Success Criteria *(mandatory)*
 
@@ -449,6 +548,13 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **SC-012**: Live heart rate plot updates within 500ms of receiving new data
 - **SC-013**: Battery analytics graph loads within 2 seconds with 7 days of data
 - **SC-014**: Navigation between any two screens completes in under 300ms
+- **SC-015**: Start page displays stored watches within 1 second of app launch
+- **SC-016**: Auto-reconnect begins within 5 seconds of app launch if last connected watch is available
+- **SC-017**: Notification dismiss sync (phone to watch and watch to phone) completes within 2 seconds
+- **SC-018**: Music metadata updates appear on watch within 1 second of track/state change
+- **SC-019**: Initial sync completes within 3 seconds of connection establishment
+- **SC-020**: GPS location response sent to watch within 5 seconds of request (subject to GPS acquisition time)
+- **SC-021**: BLE connection remains stable for at least 8 hours when app is backgrounded (within OS limits)
 
 ## Assumptions
 
@@ -462,3 +568,7 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - Target Android API level 21+ and iOS 13.0+ provide necessary BLE capabilities
 - 2M PHY is supported on most modern smartphones (2017+)
 - Voice recording feature depends on future firmware implementation
+- Watch firmware supports notification dismiss callback with stable notification ID
+- Watch firmware supports Gadgetbridge-compatible GPS location format
+- Android foreground service with persistent notification is acceptable for users who want reliable background connection
+- Watch firmware sends music control commands using Gadgetbridge music control protocol

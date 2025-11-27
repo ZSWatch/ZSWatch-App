@@ -3,6 +3,7 @@
 Auto-generated from all feature plans. Last updated: 2025-11-26
 
 ## Active Technologies
+- SQLite (drift/sqflite) for structured data (health samples, battery readings, logs); SharedPreferences for app settings; Secure storage (flutter_secure_storage) for BLE bonding keys (001-companion-app)
 
 - Dart 3.x (Flutter 3.x stable) (001-companion-app)
 
@@ -22,6 +23,7 @@ tests/
 Dart 3.x (Flutter 3.x stable): Follow standard conventions
 
 ## Recent Changes
+- 001-companion-app: Added Dart 3.x (Flutter 3.x stable)
 
 - 001-companion-app: Added Dart 3.x (Flutter 3.x stable)
 

@@ -5,6 +5,8 @@
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing.
 
+**Updated**: 2025-11-27 - Added tasks for new requirements (Start Page, Auto-Reconnect, Notification Sync, Music Control, Debug Tools, GPS Support)
+
 ## Format: `[ID] [P?] [Story?] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
@@ -178,6 +180,153 @@
 
 ---
 
+## Phase 3.6: Start Page & Auto-Reconnect (US1 Extension) 🆕
+
+**Goal**: Implement start page with stored watches and auto-reconnect behavior per FR-067 to FR-074
+
+**Independent Test**: Open app → See stored watches → Tap stored watch to connect → Close app → Reopen → Auto-reconnect starts
+
+### Models
+
+- [ ] T045g [P] [US1] Update Watch model with customName and lastConnected fields in lib/data/models/watch.dart
+
+### Services
+
+- [ ] T045h [US1] Create auto-reconnect service in lib/services/ble/auto_reconnect_service.dart
+  - Periodic reconnect attempts within platform limits (FR-072)
+  - Non-blocking reconnect that allows manual watch selection (FR-073)
+  - Configurable retry intervals
+
+### Repository
+
+- [ ] T045i [US1] Update watch_repository.dart to track last connected watch
+  - Add getLastConnectedWatch() method
+  - Add updateLastConnected() method
+
+### Providers
+
+- [ ] T045j [US1] Create auto_reconnect_provider.dart in lib/providers/
+  - autoReconnectStateProvider - current reconnect status
+  - autoReconnectEnabledProvider - user preference
+  - lastConnectedWatchProvider - for auto-reconnect target
+
+### UI: Start Page
+
+- [ ] T045k [US1] Create start page screen in lib/ui/screens/connection/start_page_screen.dart
+  - Display all stored/previously paired watches prominently (FR-067)
+  - "Connect new watch" button for scanning (FR-068)
+  - Tap stored watch to initiate connection (FR-069)
+  - Show connection status per stored watch (connecting, out of range)
+
+- [ ] T045l [US1] Create stored_watch_card.dart widget in lib/ui/widgets/
+  - Watch name (custom or default)
+  - Last connected timestamp
+  - Connection status indicator
+  - Tap to connect action
+
+- [ ] T045m [US1] Update app.dart to use start page as initial route
+  - Navigate to dashboard on successful connection (FR-070, FR-074)
+  - Show auto-reconnect progress indicator
+
+### Auto-Reconnect Logic
+
+- [ ] T045n [US1] Implement auto-reconnect on app launch in watch_service.dart
+  - Attempt reconnect to last connected watch (FR-071)
+  - Run periodically until connected or user selects different watch (FR-072)
+  - Allow user to manually select different watch (FR-073)
+
+**Checkpoint**: Start page shows stored watches, auto-reconnect works on app launch
+
+---
+
+## Phase 3.7: Initial Sync on Connect (US1 Extension) 🆕
+
+**Goal**: Send critical state data to watch immediately on connection per FR-084 to FR-088
+
+**Independent Test**: Connect to watch → Verify time synced → Verify music info sent (if playing) → Connection fully established
+
+### Services
+
+- [ ] T045o [US1] Create initial_sync_service.dart in lib/services/sync/
+  - Orchestrate all initial sync operations
+  - Time sync (FR-085)
+  - Music state sync (FR-086)
+  - Other relevant state (FR-087)
+  - Mark connection complete only after sync (FR-088)
+
+### Integration
+
+- [ ] T045p [US1] Update watch_service.dart to call initial sync on connect
+  - Call initial_sync_service after BLE connection established
+  - Send time via Gadgetbridge protocol
+  - Query media service for current playback state
+  - Send music info if playing/paused
+  - Emit "fully connected" only after sync completes
+
+- [ ] T045q [US1] Update connection state to include sync status
+  - Add `syncing` state between `connected` and `ready`
+  - Update ConnectionStatusPill to show sync progress
+
+**Checkpoint**: Watch receives time and music info immediately on connect
+
+---
+
+## Phase 3.8: Persistent BLE Connection (Background Service) 🆕
+
+**Goal**: Maintain reliable BLE connection when app is backgrounded per FR-089 to FR-092
+
+**⚠️ CRITICAL**: This phase is essential for reliable notification forwarding and real-world usage. Must be implemented early.
+
+**Independent Test**: Connect to watch → Background app → Wait 30 min → Verify still connected. Send notification while backgrounded → Verify received on watch.
+
+### Android: Foreground Service
+
+- [ ] T045r [P] Create ForegroundServiceManager in android/app/src/main/kotlin/.../ForegroundServiceManager.kt
+  - Create persistent notification (FR-092)
+  - Indicate "Maintaining watch connection" status
+  - Handle service start/stop
+
+- [ ] T045s Create BleConnectionForegroundService in android/app/src/main/kotlin/.../
+  - Foreground service for background BLE (FR-050, FR-089)
+  - Start when connected, stop when disconnected
+  - Persist connection even when UI not active
+
+- [ ] T045t Update AndroidManifest.xml with foreground service declaration
+  - Add FOREGROUND_SERVICE permission
+  - Declare service with proper type (connectedDevice)
+
+- [ ] T045u Create foreground_service.dart Flutter wrapper in lib/services/background/
+  - MethodChannel to start/stop foreground service
+  - Query service status
+
+### iOS: Background Modes
+
+- [ ] T045v Verify Info.plist has bluetooth-central background mode (FR-051)
+  - Already configured in Phase 1, verify still present
+
+- [ ] T045w Implement iOS background connection handling
+  - Use CoreBluetooth state restoration
+  - Handle reconnection on iOS wake
+
+### Integration
+
+- [ ] T045x Update watch_service.dart to manage background connection
+  - Start foreground service on connect (Android)
+  - Stop foreground service on disconnect
+  - Maintain connection across app lifecycle
+
+- [ ] T045y Update notification and media services for background operation
+  - Verify notifications forward when backgrounded (FR-090)
+  - Verify music info sends when backgrounded
+
+- [ ] T045z Add background connection setting in settings_screen.dart
+  - Toggle to enable/disable persistent connection
+  - Warning about battery impact
+
+**Checkpoint**: BLE connection stable for 8+ hours when backgrounded (SC-021)
+
+---
+
 ## Phase 4: User Story 2 - Firmware Update (Priority: P2) ✅ COMPLETE
 
 **Goal**: User can update watch firmware via MCUmgr/SMP
@@ -314,7 +463,7 @@
 
 ---
 
-## Phase 5: User Story 3 - Notification & Media Integration (Priority: P3) ✅ COMPLETE
+## Phase 5: User Story 3 - Notification & Media Integration (Priority: P3) ✅ PARTIAL
 
 **Goal**: User receives phone notifications and can control media on watch (platform-specific)
 
@@ -353,6 +502,108 @@
 - [X] T075 [US3] Add NotificationListenerService permission flow (Android)
 
 **Checkpoint**: Notifications forwarded (Android) or ANCS configured (iOS). Media control works. ✅
+
+---
+
+## Phase 5.5: Notification Stable IDs & Dismiss Sync (US3 Extension) 🆕
+
+**Goal**: Implement bi-directional notification dismiss sync per FR-075 to FR-078
+
+**Independent Test**: Send notification → Dismiss on watch → Verify removed from phone. Send notification → Dismiss on phone → Verify removed from watch.
+
+### Models
+
+- [ ] T075a [P] [US3] Update Notification model with stableId, dismissedOnPhone, dismissedOnWatch fields in lib/data/models/notification.dart
+
+### Services
+
+- [ ] T075b [US3] Create notification_sync_service.dart in lib/services/notification/
+  - Generate stable unique notification IDs (FR-075)
+  - Handle dismiss callback from watch (FR-076)
+  - Send dismiss command to watch on phone dismiss (FR-077)
+  - Track pending dismiss sync for offline queuing
+
+- [ ] T075c [US3] Update notification_service.dart to use stable IDs
+  - Generate stable ID per notification
+  - Include stable ID in Gadgetbridge notify message
+  - Listen for notification removal on phone
+
+### Gadgetbridge Protocol
+
+- [ ] T075d [US3] Implement dismiss callback handling in gadgetbridge_protocol.dart
+  - Parse dismiss message from watch with notification ID
+  - Trigger phone notification removal via NotificationService
+
+- [ ] T075e [US3] Implement dismiss command with "-" prefix in gadgetbridge_protocol.dart
+  - Format: notify with "-" + stableId
+  - Send when phone notification is dismissed
+
+### Android Native
+
+- [ ] T075f [US3] Update NotificationListenerServiceImpl to track stable IDs
+  - Map system notification key to stable ID
+  - Expose cancelNotification(stableId) method
+  - Report notification dismissal with stable ID
+
+- [ ] T075g [US3] Handle notification removal callback in Android
+  - Detect when user dismisses notification on phone
+  - Notify Flutter via MethodChannel with stable ID
+
+### Integration
+
+- [ ] T075h [US3] Wire dismiss sync in watch_service.dart or dedicated provider
+  - On watch dismiss: remove phone notification
+  - On phone dismiss: send dismiss to watch
+  - Queue dismiss commands if disconnected, send on reconnect
+
+**Checkpoint**: Notification dismissals sync bi-directionally between phone and watch
+
+---
+
+## Phase 5.6: Music Control Integration Enhancement (US3 Extension) 🆕
+
+**Goal**: Enhanced music control per FR-079 to FR-083
+
+**Independent Test**: Play music → Connect watch → Verify immediate music info. Change track → Verify update on watch. Tap play/pause on watch → Verify phone responds.
+
+### Services
+
+- [ ] T075i [US3] Update media_service.dart for enhanced music control
+  - Listen for media control commands from watch (FR-079)
+  - Forward commands to MediaController (play/pause/next/previous)
+  - Immediate update on track change (FR-080)
+  - Immediate update on playback state change (FR-081)
+  - Periodic updates while playing (FR-082)
+
+- [ ] T075j [US3] Create MediaState model in lib/data/models/media_state.dart
+  - title, artist, album, playbackState, position, duration
+  - timestamp for last update
+
+### Android Native
+
+- [ ] T075k [US3] Update MediaSessionBridge for control commands
+  - Receive control commands from Flutter
+  - Execute on active MediaSession (play, pause, next, previous, etc.)
+  - Detect track changes and notify Flutter immediately
+  - Detect playback state changes and notify Flutter immediately
+
+### Protocol
+
+- [ ] T075l [US3] Implement music control command parsing in gadgetbridge_protocol.dart
+  - Parse `t:"music"` with action (play, pause, next, prev, volumeup, volumedown)
+  - Forward to media_service
+
+### Integration
+
+- [ ] T075m [US3] Update initial_sync_service to include music state
+  - Query current music state on connect
+  - Send immediately if playing or paused (FR-083)
+
+- [ ] T075n [US3] Implement periodic music updates in media_service.dart
+  - Send updates every 30 seconds while playing (configurable)
+  - Stop periodic updates when paused/stopped
+
+**Checkpoint**: Full bi-directional music control with immediate and periodic updates
 
 ---
 
@@ -415,9 +666,9 @@
 
 ## Phase 8: User Story 6 - Developer Tools (Priority: P6)
 
-**Goal**: Developer enables Developer Mode and accesses diagnostics, logs, shell, sensor streaming
+**Goal**: Developer enables Developer Mode and accesses diagnostics, logs, shell, sensor streaming, notification/music debug tools
 
-**Independent Test**: Enable Developer Mode → View live logs → Send shell command → Stream raw sensor data → View comm log
+**Independent Test**: Enable Developer Mode → View live logs → Send shell command → Stream raw sensor data → Send debug notification → Send sample music metadata → View comm log
 
 ### Models
 
@@ -453,7 +704,37 @@
 - [ ] T112 [US6] Create comm log screen in lib/ui/screens/developer/comm_log_screen.dart
 - [ ] T113 [US6] Add Developer Mode toggle in settings
 
-**Checkpoint**: Full developer diagnostics available when Developer Mode enabled
+### Notification Debug Tools (FR-093 to FR-097) 🆕
+
+- [ ] T113a [P] [US6] Create notification_debug_section.dart widget in lib/ui/widgets/developer/
+  - App name dropdown/selector (FR-094)
+  - Notification text input field (FR-095)
+  - "Send Debug Notification" button (FR-096)
+
+- [ ] T113b [US6] Implement debug notification service in lib/services/notification/debug_notification_service.dart
+  - Create test notification on phone (FR-097)
+  - Send notification to watch via Gadgetbridge protocol
+  - Use stable ID for bi-directional dismiss testing
+
+- [ ] T113c [US6] Add notification debug section to notification_settings_screen.dart
+  - Only visible when Developer Mode enabled
+  - Show debug section below main settings
+
+### Music Debug Tools (FR-098) 🆕
+
+- [ ] T113d [P] [US6] Create music_debug_section.dart widget in lib/ui/widgets/developer/
+  - Buttons for sample track 1, 2, 3
+  - Each sends different static metadata (title, artist, album)
+  - Play/Pause state toggle
+
+- [ ] T113e [US6] Implement debug music service in lib/services/media/debug_music_service.dart
+  - Send static sample "now playing" metadata to watch
+  - Predefined test tracks with different metadata
+  - Useful for testing music display without actual playback
+
+- [ ] T113f [US6] Add music debug section to developer_screen.dart or notification_settings_screen.dart
+
+**Checkpoint**: Full developer diagnostics available when Developer Mode enabled, including notification and music debug tools
 
 ---
 
@@ -481,9 +762,9 @@
 
 ## Phase 10: User Story 8 - App Settings (Priority: P8)
 
-**Goal**: User configures app-specific settings (not watch settings)
+**Goal**: User configures app-specific settings (not watch settings), including watch rename
 
-**Independent Test**: Open Settings → Change a preference → Restart app → Verify persisted
+**Independent Test**: Open Settings → Change a preference → Restart app → Verify persisted. Rename a watch → Verify custom name shows throughout app.
 
 ### Repository
 
@@ -496,7 +777,36 @@
 - [ ] T123 [US8] Add Developer Mode toggle (reference T113)
 - [ ] T124 [US8] Add About section (app version, links)
 
-**Checkpoint**: App settings persist across sessions
+### Watch Rename Feature (FR-099 to FR-102) 🆕
+
+- [ ] T124a [US8] Update Watch model with customName field (nullable)
+  - Store user-defined name alongside default name
+  - Display customName if set, otherwise default name (FR-102)
+
+- [ ] T124b [US8] Create watch_management_screen.dart in lib/ui/screens/settings/
+  - List all paired/bonded watches (FR-100)
+  - Show current name (custom or default)
+  - Edit button per watch to rename
+
+- [ ] T124c [US8] Create rename_watch_dialog.dart in lib/ui/widgets/
+  - Text input for custom name
+  - Save/Cancel buttons
+  - Validate name not empty
+
+- [ ] T124d [US8] Update watch_repository.dart with renameWatch method
+  - Persist customName to database (FR-101)
+  - Emit update to notify UI
+
+- [ ] T124e [US8] Update all UI components to use displayName getter
+  - stored_watch_card.dart
+  - dashboard_screen.dart
+  - device_list_screen.dart
+  - Any other places showing watch name
+
+- [ ] T124f [US8] Add "Manage Watches" navigation from settings_screen.dart
+  - Links to watch_management_screen
+
+**Checkpoint**: App settings persist across sessions, watches can be renamed
 
 ---
 
@@ -528,6 +838,58 @@
 - [ ] T133 [US9] Add connection signal (RSSI) history chart
 
 **Checkpoint**: Battery and connection analytics visualized over time
+
+---
+
+## Phase 11.5: GPS Location Support (Gadgetbridge GPSPower) 🆕
+
+*Note: Persistent BLE Connection moved to Phase 3.8 for earlier implementation*
+
+**Goal**: Handle GPS location requests from watch per FR-103 to FR-107
+
+**Independent Test**: Connect to watch → Watch requests GPS → Phone obtains location → Watch receives coordinates
+
+### Models
+
+- [ ] T133j [P] Create GPSLocation model in lib/data/models/gps_location.dart
+  - latitude, longitude, accuracy, altitude, timestamp
+
+### Services
+
+- [ ] T133k Create gps_service.dart in lib/services/location/
+  - Request location permission (FR-105)
+  - Obtain current location from phone
+  - Handle permission denial gracefully (FR-107)
+  - Return fresh location (not stale)
+
+### Gadgetbridge Protocol
+
+- [ ] T133l Implement GPSPower command handling in gadgetbridge_protocol.dart
+  - Parse GPS request from watch (FR-103)
+  - Format: `t:"gps"` or similar Gadgetbridge GPS message
+
+- [ ] T133m Implement GPS response in gadgetbridge_protocol.dart
+  - Send location in Gadgetbridge-compatible format (FR-106)
+  - Include lat, lon, accuracy, speed, bearing
+
+### Integration
+
+- [ ] T133n Create gps_handler.dart in lib/services/location/
+  - Listen for GPS requests from protocol service
+  - Call gps_service to obtain location
+  - Send response via protocol service
+
+- [ ] T133o Add location permission request in permission_handler
+  - Request ACCESS_FINE_LOCATION on Android
+  - Request location when-in-use on iOS
+  - Handle permission denied with error response to watch
+
+### Dependencies
+
+- [ ] T133p Add geolocator package to pubspec.yaml
+  - Or use location package for cross-platform GPS
+
+**Checkpoint**: Watch can request and receive phone GPS location
 
 ---
 
@@ -587,37 +949,58 @@ Phase 2: Foundational ◄──────────────────�
 │
 ├──► Phase 3: US1 - Connect (P1) 🎯 MVP
 │       │
-│       └──► Phase 4: US2 - Firmware (P2)
-│               │
-│               └──► Phase 4.5: Filesystem Upload (extends US2)
+│       ├──► Phase 3.5: Gap Tasks (connection completion)
+│       │
+│       ├──► Phase 3.6: Start Page & Auto-Reconnect 🆕
+│       │
+│       └──► Phase 3.7: Initial Sync on Connect 🆕
+│       │
+│       └──► Phase 3.8: Persistent BLE Connection 🆕 ⚠️ CRITICAL
 │
-│       └──► Phase 5: US3 - Notifications (P3)
-│       └──► Phase 6: US4 - Dashboard (P4)
-│       └──► Phase 7: US5 - Health (P5)
-│       └──► Phase 8: US6 - Developer Tools (P6)
-│       └──► Phase 9: US7 - Multi-Watch (P7)
-│       └──► Phase 10: US8 - Settings (P8)
-│       └──► Phase 11: US9 - Analytics (P9)
-│       └──► Phase 12: US10 - Voice [STUB] (P10)
+├──► Phase 4: US2 - Firmware (P2)
+│       │
+│       └──► Phase 4.5: Filesystem Upload (extends US2)
+│
+├──► Phase 5: US3 - Notifications (P3)
+│       │
+│       ├──► Phase 5.5: Notification Dismiss Sync 🆕
+│       │
+│       └──► Phase 5.6: Music Control Enhancement 🆕
+│
+├──► Phase 6: US4 - Dashboard (P4)
+├──► Phase 7: US5 - Health (P5)
+├──► Phase 8: US6 - Developer Tools (P6)
+│       │
+│       └──► (includes Notification/Music Debug Tools 🆕)
+│
+├──► Phase 9: US7 - Multi-Watch (P7)
+├──► Phase 10: US8 - Settings (P8)
+│       │
+│       └──► (includes Watch Rename 🆕)
+│
+├──► Phase 11: US9 - Analytics (P9)
+├──► Phase 11.5: GPS Support 🆕
+├──► Phase 12: US10 - Voice [STUB] (P10)
 │
 └──► Phase 13: Polish (after desired stories complete)
 ```
 
 ### User Story Dependencies
 
-| Story | Depends On | Can Parallel With |
-|-------|------------|-------------------|
-| US1 (Connect) | Foundational | None - MVP foundation |
-| US2 (Firmware) | US1 (needs connection) | US3, US4, US5, US6 |
-| US2 Filesystem Extension | US2 (needs DFU infrastructure) | US3, US4, US5, US6 |
-| US3 (Notifications) | US1 (needs connection) | US2, US4, US5, US6 |
-| US4 (Dashboard) | US1 (needs connection) | US2, US3, US5, US6 |
-| US5 (Health) | US1 (needs connection) | US2, US3, US4, US6 |
-| US6 (Developer) | US1 (needs connection) | US2, US3, US4, US5 |
-| US7 (Multi-Watch) | US1 (needs watch model) | US2-US6 |
-| US8 (Settings) | Foundational | All stories |
-| US9 (Analytics) | US1 (needs connection) | US2-US8 |
-| US10 (Voice) | US1 (stub only) | All stories |
+| Story | Depends On | Can Parallel With | New Tasks |
+|-------|------------|-------------------|-----------|
+| US1 (Connect) | Foundational | None - MVP foundation | Start Page, Auto-Reconnect, Initial Sync, Persistent BLE |
+| US2 (Firmware) | US1 (needs connection) | US3, US4, US5, US6 | - |
+| US2 Filesystem Extension | US2 (needs DFU infrastructure) | US3, US4, US5, US6 | - |
+| US3 (Notifications) | US1 (needs connection) | US2, US4, US5, US6 | Dismiss Sync, Music Control |
+| US4 (Dashboard) | US1 (needs connection) | US2, US3, US5, US6 | - |
+| US5 (Health) | US1 (needs connection) | US2, US3, US4, US6 | - |
+| US6 (Developer) | US1 (needs connection) | US2, US3, US4, US5 | Debug Tools |
+| US7 (Multi-Watch) | US1 (needs watch model) | US2-US6 | - |
+| US8 (Settings) | Foundational | All stories | Watch Rename |
+| US9 (Analytics) | US1 (needs connection) | US2-US8 | - |
+| GPS Support | US1 (needs connection) | All stories | Gadgetbridge GPS |
+| US10 (Voice) | US1 (stub only) | All stories | - |
 
 ### Parallel Opportunities Per Phase
 
@@ -639,11 +1022,37 @@ Parallel: T030, T031, T032 (models)
 Parallel: T040 (scan screen can start early)
 ```
 
+**Phase 3.6 (Start Page) 🆕**:
+```
+Parallel: T045g (model update)
+Sequential: T045h → T045i → T045j (services, repo, providers)
+Parallel: T045k, T045l (UI components after services)
+```
+
 **Phase 4.5 (Filesystem)**:
 ```
 Parallel: T060a, T060j (model and constants)
 Sequential: T060b → T060c → T060d → T060e (service → detection → providers)
 Parallel: T060f, T060g, T060h, T060i (UI updates after services ready)
+```
+
+**Phase 5.5 (Dismiss Sync) 🆕**:
+```
+Parallel: T075a (model update)
+Sequential: T075b → T075c → T075d → T075e (service chain)
+Parallel: T075f, T075g (Android native)
+```
+
+**Phase 3.8 (Persistent BLE) 🆕**:
+```
+Parallel: T045r, T045v (Android/iOS can be parallel)
+Sequential: T045s → T045t → T045u (Android service chain)
+```
+
+**Phase 11.5 (GPS) 🆕**:
+```
+Parallel: T133j, T133p (model and dependency)
+Sequential: T133k → T133l → T133m → T133n (service → protocol → integration)
 ```
 
 ---
@@ -655,52 +1064,98 @@ Parallel: T060f, T060g, T060h, T060i (UI updates after services ready)
 1. Complete Phase 1: Setup
 2. Complete Phase 2: Foundational ⚠️ CRITICAL
 3. Complete Phase 3: User Story 1 (Connect to Watch)
-4. **STOP AND VALIDATE**: Test connection flow end-to-end
-5. Deploy/demo the MVP
+4. Complete Phase 3.5: Gap Tasks (dashboard, navigation)
+5. Complete Phase 3.6: Start Page & Auto-Reconnect 🆕
+6. Complete Phase 3.7: Initial Sync on Connect 🆕
+7. Complete Phase 3.8: Persistent BLE Connection 🆕 ⚠️ CRITICAL
+8. **STOP AND VALIDATE**: Test connection flow end-to-end
+8. Deploy/demo the MVP
 
 ### Recommended Build Order
 
-| Order | Story | Rationale |
-|-------|-------|-----------|
-| 1 | US1 (Connect) | Foundation for everything |
-| 2 | US4 (Dashboard) | Provides navigation hub |
-| 3 | US2 (Firmware) | High user value, critical |
-| 4 | US3 (Notifications) | Core smartwatch feature |
-| 5 | US5 (Health) | Key value proposition |
-| 6 | US8 (Settings) | Enhances UX |
-| 7 | US7 (Multi-Watch) | Convenience feature |
-| 8 | US9 (Analytics) | Power user feature |
-| 9 | US6 (Developer) | Developer-focused |
-| 10 | US10 (Voice) | Future placeholder |
+| Order | Story | Rationale | New Work |
+|-------|-------|-----------|----------|
+| 1 | US1 (Connect) | Foundation for everything | Start Page, Auto-Reconnect, Initial Sync, Persistent BLE |
+| 2 | US4 (Dashboard) | Provides navigation hub | - |
+| 3 | US2 (Firmware) | High user value, critical | - |
+| 4 | US3 (Notifications) | Core smartwatch feature | Dismiss Sync, Music Control |
+| 5 | US5 (Health) | Key value proposition | - |
+| 6 | US8 (Settings) | Enhances UX | Watch Rename |
+| 7 | US7 (Multi-Watch) | Convenience feature | - |
+| 8 | US9 (Analytics) | Power user feature | - |
+| 9 | US6 (Developer) | Developer-focused | Debug Tools |
+| 10 | GPS Support | Watch feature | Gadgetbridge GPS |
+| 11 | US10 (Voice) | Future placeholder | - |
 
 ### Parallel Team Strategy
 
 With 2+ developers after Foundational phase:
-- **Developer A**: US1 → US2 → US5
-- **Developer B**: US4 → US3 → US6
+- **Developer A**: US1 (+ Start Page + Auto-Reconnect + Initial Sync + Persistent BLE) → US2 → US5
+- **Developer B**: US4 → US3 (+ Dismiss Sync + Music Control) → US6 (+ Debug Tools) → GPS Support
+
+### New Feature Priority
+
+Based on user value and dependencies:
+
+1. **High Priority (Core Experience)**:
+   - Start Page with Stored Watches (US1)
+   - Auto-Reconnect (US1)
+   - Initial Sync (US1)
+   - Notification Dismiss Sync (US3)
+   - Persistent BLE Connection (Background)
+
+2. **Medium Priority (Enhanced Features)**:
+   - Music Control Enhancement (US3)
+   - Watch Rename (US8)
+   - GPS Support
+
+3. **Lower Priority (Developer/Debug)**:
+   - Notification Debug Tools (US6)
+   - Music Debug Tools (US6)
 
 ---
 
 ## Task Summary
 
-| Phase | Task Count | Stories |
-|-------|------------|---------|
-| Phase 1: Setup | 7 | - |
-| Phase 2: Foundational | 22 | - |
-| Phase 3: US1 Connect | 16 | P1 MVP |
-| Phase 3.5: Gap Tasks | 6 | P1 |
-| Phase 4: US2 Firmware | 15 | P2 |
-| Phase 4.5: Filesystem | 10 | P2 |
-| Phase 5: US3 Notifications | 15 | P3 |
-| Phase 6: US4 Dashboard | 5 | P4 |
-| Phase 7: US5 Health | 14 | P5 |
-| Phase 8: US6 Developer | 19 | P6 |
-| Phase 9: US7 Multi-Watch | 6 | P7 |
-| Phase 10: US8 Settings | 5 | P8 |
-| Phase 11: US9 Analytics | 9 | P9 |
-| Phase 12: US10 Voice | 4 | P10 |
-| Phase 13: Polish | 9 | - |
-| **Total** | **156** | 10 stories |
+| Phase | Task Count | Stories | New Tasks 🆕 |
+|-------|------------|---------|--------------|
+| Phase 1: Setup | 7 | - | - |
+| Phase 2: Foundational | 22 | - | - |
+| Phase 3: US1 Connect | 16 | P1 MVP | - |
+| Phase 3.5: Gap Tasks | 6 | P1 | - |
+| Phase 3.6: Start Page & Auto-Reconnect 🆕 | 8 | P1 | 8 |
+| Phase 3.7: Initial Sync 🆕 | 3 | P1 | 3 |
+| Phase 3.8: Persistent BLE 🆕 | 9 | P1 | 9 |
+| Phase 4: US2 Firmware | 15 | P2 | - |
+| Phase 4.5: Filesystem | 10 | P2 | - |
+| Phase 5: US3 Notifications | 15 | P3 | - |
+| Phase 5.5: Dismiss Sync 🆕 | 8 | P3 | 8 |
+| Phase 5.6: Music Control 🆕 | 6 | P3 | 6 |
+| Phase 6: US4 Dashboard | 5 | P4 | - |
+| Phase 7: US5 Health | 14 | P5 | - |
+| Phase 8: US6 Developer | 25 | P6 | 6 (debug tools) |
+| Phase 9: US7 Multi-Watch | 6 | P7 | - |
+| Phase 10: US8 Settings | 11 | P8 | 6 (rename) |
+| Phase 11: US9 Analytics | 9 | P9 | - |
+| Phase 11.5: GPS Support 🆕 | 7 | - | 7 |
+| Phase 12: US10 Voice | 4 | P10 | - |
+| Phase 13: Polish | 9 | - | - |
+| **Total** | **~205** | 10 stories | **~53 new** |
+
+### New Requirements Coverage
+
+| Requirement | Phase | Tasks |
+|-------------|-------|-------|
+| Start Page: Stored Watches (FR-067-070) | 3.6 | T045g-T045n |
+| Auto-Reconnect (FR-071-074) | 3.6 | T045h, T045j, T045n |
+| Initial Sync (FR-084-088) | 3.7 | T045o-T045q |
+| Notification Stable IDs (FR-075-078) | 5.5 | T075a-T075h |
+| Music Control Enhancement (FR-079-083) | 5.6 | T075i-T075n |
+| Notification Debug Tools (FR-093-097) | 8 | T113a-T113c |
+| Music Debug Tools (FR-098) | 8 | T113d-T113f |
+| Watch Rename (FR-099-102) | 10 | T124a-T124f |
+| Persistent BLE (FR-089-092) | 3.8 | T045r-T045z |
+| GPS Support (FR-103-107) | 11.5 | T133j-T133p |
 
 ---
 
@@ -708,6 +1163,7 @@ With 2+ developers after Foundational phase:
 
 - [P] tasks = different files, no dependencies on incomplete tasks
 - [Story] label maps task to specific user story for traceability
+- 🆕 marks new tasks added for 2025-11-27 requirements
 - Each user story should be independently testable after completion
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently

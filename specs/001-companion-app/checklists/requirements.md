@@ -62,15 +62,26 @@
 - **Updated**: Added time/timezone sync requirements
 - **Updated**: Added background behavior requirements (Foreground Service, iOS BG modes)
 - **Updated**: Added comprehensive UI/UX requirements (dark theme, ZSWatch colors, typography, animations, navigation)
+- **Updated 2025-11-27**: Added Start Page with stored watches and "Connect new watch" button (FR-067 to FR-070)
+- **Updated 2025-11-27**: Added Auto-Reconnect behavior (FR-071 to FR-074)
+- **Updated 2025-11-27**: Added Notification Stable IDs and bi-directional dismiss sync (FR-075 to FR-078)
+- **Updated 2025-11-27**: Added Music Control Integration with media commands and updates (FR-079 to FR-083)
+- **Updated 2025-11-27**: Added Initial Sync on Connect for time and media state (FR-084 to FR-088)
+- **Updated 2025-11-27**: Enhanced Persistent BLE Connection requirements (FR-089 to FR-092)
+- **Updated 2025-11-27**: Added Notification Debug Tools (FR-093 to FR-097)
+- **Updated 2025-11-27**: Added Music Debug Tools (FR-098)
+- **Updated 2025-11-27**: Added Watch Rename feature (FR-099 to FR-102)
+- **Updated 2025-11-27**: Added Gadgetbridge GPS Support (FR-103 to FR-107)
+- **Updated 2025-11-27**: Added new success criteria (SC-015 to SC-021)
 
 ## Summary Statistics
 
 - **User Stories**: 10
-- **Functional Requirements**: 66
+- **Functional Requirements**: 107 (expanded from 66)
 - **UI/UX Requirements**: 28
-- **Success Criteria**: 14
-- **Edge Cases**: 10
-- **Key Entities**: 12
+- **Success Criteria**: 21 (expanded from 14)
+- **Edge Cases**: 17 (expanded from 10)
+- **Key Entities**: 14 (expanded from 12)
 
 ## Platform-Specific Notes
 

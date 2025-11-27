@@ -79,7 +79,7 @@ The app MUST use modular architecture with clearly separated layers and predicta
 |------------|-------------|
 | **Language** | Dart (Flutter) |
 | **iOS** | 13.0+ |
-| **Android** | API 19+ (minSdkVersion) |
+| **Android** | API 21+ (minSdkVersion) |
 | **BLE Library** | `flutter_blue_plus` |
 | **DFU Library** | [`mcumgr_flutter`](https://github.com/NordicSemiconductor/Flutter-nRF-Connect-Device-Manager) (nRF Connect Device Manager) |
 | **State Management** | Riverpod (preferred) or Bloc |
