@@ -188,54 +188,54 @@
 
 ### Models
 
-- [ ] T045g [P] [US1] Update Watch model with customName and lastConnected fields in lib/data/models/watch.dart
+- [X] T045g [P] [US1] Update Watch model with customName and lastConnected fields in lib/data/models/watch.dart
 
 ### Services
 
-- [ ] T045h [US1] Create auto-reconnect service in lib/services/ble/auto_reconnect_service.dart
+- [X] T045h [US1] Create auto-reconnect service in lib/services/ble/auto_reconnect_service.dart
   - Periodic reconnect attempts within platform limits (FR-072)
   - Non-blocking reconnect that allows manual watch selection (FR-073)
   - Configurable retry intervals
 
 ### Repository
 
-- [ ] T045i [US1] Update watch_repository.dart to track last connected watch
+- [X] T045i [US1] Update watch_repository.dart to track last connected watch
   - Add getLastConnectedWatch() method
   - Add updateLastConnected() method
 
 ### Providers
 
-- [ ] T045j [US1] Create auto_reconnect_provider.dart in lib/providers/
+- [X] T045j [US1] Create auto_reconnect_provider.dart in lib/providers/
   - autoReconnectStateProvider - current reconnect status
   - autoReconnectEnabledProvider - user preference
   - lastConnectedWatchProvider - for auto-reconnect target
 
 ### UI: Start Page
 
-- [ ] T045k [US1] Create start page screen in lib/ui/screens/connection/start_page_screen.dart
+- [X] T045k [US1] Create start page screen in lib/ui/screens/start/start_page_screen.dart
   - Display all stored/previously paired watches prominently (FR-067)
   - "Connect new watch" button for scanning (FR-068)
   - Tap stored watch to initiate connection (FR-069)
   - Show connection status per stored watch (connecting, out of range)
 
-- [ ] T045l [US1] Create stored_watch_card.dart widget in lib/ui/widgets/
+- [X] T045l [US1] Create stored_watch_card.dart widget (implemented as _WatchListTile in start_page_screen.dart)
   - Watch name (custom or default)
   - Last connected timestamp
   - Connection status indicator
   - Tap to connect action
 
-- [ ] T045m [US1] Update app.dart to use start page as initial route
+- [X] T045m [US1] Update app_router.dart to use start page as initial route
   - Navigate to dashboard on successful connection (FR-070, FR-074)
   - Show auto-reconnect progress indicator
 
 ### Auto-Reconnect Logic
 
-- [ ] T045n [US1] Implement auto-reconnect on app launch in watch_service.dart
+- [X] T045n [US1] Implement auto-reconnect on app launch in watch_service.dart
   - Attempt reconnect to last connected watch (FR-071)
   - Run periodically until connected or user selects different watch (FR-072)
   - Allow user to manually select different watch (FR-073)
 
-**Checkpoint**: Start page shows stored watches, auto-reconnect works on app launch
+**Checkpoint**: Start page shows stored watches, auto-reconnect works on app launch ✅
 
 ---
 
@@ -247,7 +247,7 @@
 
 ### Services
 
-- [ ] T045o [US1] Create initial_sync_service.dart in lib/services/sync/
+- [X] T045o [US1] Create initial_sync_service.dart in lib/services/sync/
   - Orchestrate all initial sync operations
   - Time sync (FR-085)
   - Music state sync (FR-086)
@@ -256,18 +256,18 @@
 
 ### Integration
 
-- [ ] T045p [US1] Update watch_service.dart to call initial sync on connect
+- [X] T045p [US1] Update watch_service.dart to call initial sync on connect
   - Call initial_sync_service after BLE connection established
   - Send time via Gadgetbridge protocol
   - Query media service for current playback state
   - Send music info if playing/paused
   - Emit "fully connected" only after sync completes
 
-- [ ] T045q [US1] Update connection state to include sync status
+- [X] T045q [US1] Update connection state to include sync status
   - Add `syncing` state between `connected` and `ready`
   - Update ConnectionStatusPill to show sync progress
 
-**Checkpoint**: Watch receives time and music info immediately on connect
+**Checkpoint**: Watch receives time and music info immediately on connect ✅
 
 ---
 

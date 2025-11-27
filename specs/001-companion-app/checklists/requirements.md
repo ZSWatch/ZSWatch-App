@@ -139,6 +139,21 @@
 - Database schema v2: Added customName column with migration
 - `MediaControlNotifier`: Listens to connection stream and syncs media state on connect
 
+### Phase 3.7: Initial Sync on Connect (2025-11-27)
+
+**Completed Requirements:**
+- FR-084: Initial sync performed immediately after BLE connection ✅
+- FR-085: Time sync (via Gadgetbridge setTime command) ✅
+- FR-086: Music state sync on connect (Android, via MediaControlNotifier) ✅
+- FR-087: Other relevant state synced (device info request) ✅
+- FR-088: Connection marked "connected" only after sync completes ✅
+
+**Implementation Details:**
+- `InitialSyncService`: New service to orchestrate sync operations (time, music, future state)
+- `WatchConnectionState.syncing`: New state between negotiating and connected
+- `ConnectionStatusPill`: Updated to show "Syncing..." during sync phase
+- `WatchService._setupAfterConnect`: Transitions through syncing state, performs sync, then connected
+
 ## Firmware Update Implementation Details
 
 - **GitHub Releases**: Fetches all releases with multiple hardware variants (watchdk, zswatch_legacy)

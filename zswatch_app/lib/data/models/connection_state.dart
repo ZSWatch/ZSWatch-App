@@ -20,7 +20,10 @@ enum WatchConnectionState {
   /// Negotiating connection parameters (MTU, PHY)
   negotiating,
 
-  /// Fully connected and ready for communication
+  /// BLE connected, performing initial sync (time, media state)
+  syncing,
+
+  /// Fully connected, synced, and ready for communication
   connected,
 
   /// Connection lost, attempting to reconnect
@@ -43,7 +46,8 @@ extension WatchConnectionStateExtension on WatchConnectionState {
       this == WatchConnectionState.connecting ||
       this == WatchConnectionState.bonding ||
       this == WatchConnectionState.discoveringServices ||
-      this == WatchConnectionState.negotiating;
+      this == WatchConnectionState.negotiating ||
+      this == WatchConnectionState.syncing;
 
   /// Whether the state represents any form of connection attempt
   bool get isConnectingOrReconnecting =>
@@ -75,6 +79,8 @@ extension WatchConnectionStateExtension on WatchConnectionState {
         return 'Discovering services...';
       case WatchConnectionState.negotiating:
         return 'Optimizing connection...';
+      case WatchConnectionState.syncing:
+        return 'Syncing...';
       case WatchConnectionState.connected:
         return 'Connected';
       case WatchConnectionState.reconnecting:
@@ -98,6 +104,8 @@ extension WatchConnectionStateExtension on WatchConnectionState {
       case WatchConnectionState.discoveringServices:
       case WatchConnectionState.negotiating:
         return 'Connecting';
+      case WatchConnectionState.syncing:
+        return 'Syncing';
       case WatchConnectionState.connected:
         return 'Connected';
       case WatchConnectionState.reconnecting:

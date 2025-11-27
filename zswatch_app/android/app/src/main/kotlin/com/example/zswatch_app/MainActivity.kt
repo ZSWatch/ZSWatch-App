@@ -76,11 +76,13 @@ class MainActivity : FlutterActivity() {
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, NOTIFICATION_EVENTS_CHANNEL).setStreamHandler(
             object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    android.util.Log.d("ZSWNotificationBridge", "Flutter started listening to notification events")
                     notificationEventSink = events
                     
                     // Set up callback to forward notifications to Flutter
                     NotificationListenerServiceImpl.notificationCallback = object : NotificationListenerServiceImpl.NotificationCallback {
                         override fun onNotificationPosted(notification: Map<String, Any?>) {
+                            android.util.Log.d("ZSWNotificationBridge", "Callback invoked, forwarding to Flutter event sink")
                             runOnUiThread {
                                 notificationEventSink?.success(mapOf(
                                     "event" to "posted",
@@ -101,6 +103,7 @@ class MainActivity : FlutterActivity() {
                 }
                 
                 override fun onCancel(arguments: Any?) {
+                    android.util.Log.d("ZSWNotificationBridge", "Flutter stopped listening to notification events")
                     notificationEventSink = null
                     NotificationListenerServiceImpl.notificationCallback = null
                 }

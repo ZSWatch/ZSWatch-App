@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
 import 'providers/ble_providers.dart';
+import 'providers/notification_providers.dart';
 import 'ui/navigation/app_router.dart';
 
 /// Main application widget
@@ -28,6 +29,12 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
   Future<void> _initializeBle() async {
     try {
       await ref.read(bleNotifierProvider.notifier).initialize();
+      // Initialize notification forwarding so it works even when the
+      // notification settings screen hasn't been opened yet
+      // This is a read to trigger the provider initialization
+      ref.read(notificationForwardingProvider);
+      // Initialize media control for music info forwarding
+      ref.read(mediaControlProvider);
     } catch (e) {
       debugPrint('BLE initialization error: $e');
     }

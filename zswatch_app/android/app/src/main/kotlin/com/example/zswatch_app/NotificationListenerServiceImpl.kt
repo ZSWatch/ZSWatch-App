@@ -162,7 +162,12 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         
         Log.d(TAG, "Notification posted: ${notificationData["appName"]} - ${notificationData["title"]}")
         
-        notificationCallback?.onNotificationPosted(notificationData)
+        if (notificationCallback == null) {
+            Log.w(TAG, "Notification callback is null - Flutter not listening!")
+        } else {
+            Log.d(TAG, "Forwarding notification to Flutter via callback")
+            notificationCallback?.onNotificationPosted(notificationData)
+        }
     }
     
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {

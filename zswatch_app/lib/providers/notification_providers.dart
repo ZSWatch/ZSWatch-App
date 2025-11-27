@@ -164,8 +164,14 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
 
   void _forwardNotification(PhoneNotification notification) {
     // Don't forward if not enabled or no watch connected
-    if (!state.isEnabled) return;
-    if (!_watchService.isConnected) return;
+    if (!state.isEnabled) {
+      debugPrint('Notification not forwarded: forwarding is disabled');
+      return;
+    }
+    if (!_watchService.isConnected) {
+      debugPrint('Notification not forwarded: watch not connected');
+      return;
+    }
 
     // Don't forward blocked apps
     if (state.blockedApps.contains(notification.packageName)) {
@@ -175,6 +181,7 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
 
     // Don't forward group summaries
     if (notification.isGroupSummary) {
+      debugPrint('Notification not forwarded: is group summary');
       return;
     }
 

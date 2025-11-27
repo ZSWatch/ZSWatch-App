@@ -125,6 +125,12 @@ class ConnectionStatusPill extends ConsumerWidget {
           'Optimizing...',
           Icons.bluetooth_searching_rounded,
         );
+      case WatchConnectionState.syncing:
+        return (
+          AppTheme.connecting,
+          'Syncing...',
+          Icons.sync_rounded,
+        );
       case WatchConnectionState.reconnecting:
         return (
           AppTheme.connecting,

@@ -252,13 +252,6 @@ class WatchService {
         connectionPriorityRequest: ConnectionPriority.high,
       );
 
-      // Mark as connected
-      _updateConnection(currentConnection.copyWith(
-        state: WatchConnectionState.connected,
-        mtu: mtu,
-        connectedAt: DateTime.now(),
-      ));
-
       // Create or update watch object - preserve existing firmware/battery info
       final existingWatch = currentWatch;
       final watch = existingWatch != null && existingWatch.id == watchId
@@ -271,17 +264,34 @@ class WatchService {
             );
       _watchInfoController.add(watch);
 
-      // Setup NUS for Gadgetbridge protocol
+      // Setup NUS for Gadgetbridge protocol (needed for sync)
       await _setupNus();
 
       // Subscribe to battery service
       await _setupBatteryNotifications();
 
+      // Transition to syncing state (FR-088)
+      // Connection is established but initial sync not yet complete
+      _updateConnection(currentConnection.copyWith(
+        state: WatchConnectionState.syncing,
+        mtu: mtu,
+        connectedAt: DateTime.now(),
+      ));
+
+      // Perform initial sync operations (FR-084 to FR-087)
+      // Time sync (FR-085)
+      await syncTime();
+      
       // Request device info via Gadgetbridge
       await requestDeviceInfo();
 
-      // Sync time
-      await syncTime();
+      // Note: Music state sync (FR-086) is handled by MediaControlNotifier
+      // which listens to connectionStream and syncs when state becomes connected
+
+      // Mark as fully connected and ready (FR-088)
+      _updateConnection(currentConnection.copyWith(
+        state: WatchConnectionState.connected,
+      ));
 
       // Reset reconnect attempts and initial connection flag on successful setup
       _reconnectAttempts = 0;
