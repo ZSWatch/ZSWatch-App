@@ -23,7 +23,7 @@ Cross-platform Flutter companion app for ZSWatch smartwatch providing BLE commun
 | Phase 5: Notifications (US3) | ✅ Complete | Android NotificationListener, MediaSession, Gadgetbridge protocol |
 | Phase 5.5: Notification Dismiss Sync | 🆕 Not Started | FR-075 to FR-078: Bi-directional dismiss sync |
 | Phase 5.6: Music Control | 🆕 Not Started | FR-079 to FR-083: Music forwarding & control |
-| Phase 6+: Dashboard (US4) | 🔲 Not Started | |
+| Phase 6: Dashboard (US4) | ✅ Complete | Connection status, battery, firmware, navigation |
 | Phase 7: Health (US5) | 🔲 Not Started | |
 | Phase 8: Developer Tools (US6) | 🔲 Not Started | |
 | Phase 8.5: Debug Tools | 🆕 Not Started | FR-093 to FR-098: Notification & music debug |
