@@ -633,7 +633,7 @@
 
 ---
 
-## Phase 7: User Story 5 - Health & Activity Data (Priority: P5)
+## Phase 7: User Story 5 - Health & Activity Data (Priority: P5) ✅ COMPLETE
 
 **Goal**: User views step counts, heart rate history, and live HR streaming
 
@@ -641,34 +641,34 @@
 
 ### Models
 
-- [ ] T081 [P] [US5] Create HealthSample model in lib/data/models/health_sample.dart
-- [ ] T082 [P] [US5] Create HealthType and Granularity enums
+- [X] T081 [P] [US5] Create HealthSample model in lib/data/models/health_sample.dart
+- [X] T082 [P] [US5] Create HealthType and Granularity enums
 
 ### Repository
 
-- [ ] T083 [US5] Create health repository in lib/data/repositories/health_repository.dart
-- [ ] T084 [US5] Implement 60-day data cleanup query
+- [X] T083 [US5] Create health repository in lib/data/repositories/health_repository.dart
+- [X] T084 [US5] Implement 60-day data cleanup query
 
 ### Services
 
-- [ ] T085 [US5] Create health sync service in lib/services/health/health_sync_service.dart
-- [ ] T087 [US5] Implement HR GATT service subscription (standard 0x180D)
-- [ ] T086 [US5] Implement Gadgetbridge activity messages (`t:"act"`, `t:"actfetch"`). NOTE: Not implemented on watch firmware yet. HR Service sends HR every second or so, this is live mode for now.
+- [X] T085 [US5] Create health sync service in lib/services/health/health_sync_service.dart
+- [X] T087 [US5] Implement HR GATT service subscription (standard 0x180D)
+- [X] T086 [US5] Implement Gadgetbridge activity messages (`t:"act"`, `t:"actfetch"`). NOTE: Not implemented on watch firmware yet. HR Service sends HR every second or so, this is live mode for now.
 
 ### Providers
 
-- [ ] T088 [US5] Create health providers in lib/providers/health_providers.dart
+- [X] T088 [US5] Create health providers in lib/providers/health_providers.dart
 
 ### UI
 
-- [ ] T089 [US5] Create health screen in lib/ui/screens/health/health_screen.dart
-- [ ] T090 [US5] Add daily step summary with hourly breakdown chart
-- [ ] T091 [US5] Add daily/weekly/monthly history tabs
-- [ ] T092 [US5] Create heart rate screen in lib/ui/screens/health/heart_rate_screen.dart
-- [ ] T093 [US5] Add real-time HR chart widget using fl_chart
-- [ ] T094 [US5] Create RealTimeChart widget in lib/ui/widgets/real_time_chart.dart
+- [X] T089 [US5] Create health screen in lib/ui/screens/health/health_screen.dart
+- [X] T090 [US5] Add daily step summary with hourly breakdown chart
+- [X] T091 [US5] Add daily/weekly/monthly history tabs
+- [X] T092 [US5] Create heart rate screen in lib/ui/screens/health/heart_rate_screen.dart
+- [X] T093 [US5] Add real-time HR chart widget using fl_chart
+- [X] T094 [US5] Create RealTimeChart widget in lib/ui/widgets/real_time_chart.dart
 
-**Checkpoint**: Health data syncs, persists, and displays with live HR streaming
+**Checkpoint**: Health data syncs, persists, and displays with live HR streaming ✅
 
 ---
 

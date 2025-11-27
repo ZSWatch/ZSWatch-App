@@ -146,21 +146,26 @@ A user wants to see at-a-glance information about their connected watch. The das
 
 ### User Story 5 - Health & Activity Data (Priority: P5)
 
-A user wants to view detailed health and activity data from the watch. The app displays step count (hourly breakdown, daily/weekly/monthly history), live heart rate streaming with real-time plot, and historical summaries. Data is stored locally and persisted across sessions.
+A user wants to view detailed health and activity data from the watch. The app displays step count (hourly breakdown, daily/weekly/monthly history), live heart rate streaming with real-time plot, activity state breakdown showing time spent in each activity (walking, running, still, not worn, sleep states, etc.), and historical summaries. Data is stored locally and persisted across sessions.
+
+Heart rate data comes from activity messages sent by the watch via Gadgetbridge protocol (`t:"act"` with `hrm` field), not from the standard BLE Heart Rate GATT service. Activity messages may include an optional `ts` timestamp field (milliseconds since 1970) to support historical/cached data from when the phone was not connected.
 
 **Why this priority**: Health data is a key smartwatch value proposition but depends on firmware implementation status.
 
-**Independent Test**: Connect to watch, view today's steps with hourly breakdown, see live HR plot, verify historical data displays correctly.
+**Independent Test**: Connect to watch, view today's steps with hourly breakdown, see live HR values, view activity breakdown pie chart, verify historical data displays correctly.
 
 **Acceptance Scenarios**:
 
 1. **Given** watch is connected, **When** user navigates to Health, **Then** today's step count is displayed with hourly breakdown graph
-2. **Given** HR streaming is supported, **When** user opens heart rate view, **Then** live HR values plot in real-time
+2. **Given** watch sends activity messages with HR data, **When** user opens heart rate view, **Then** live HR values plot in real-time
 3. **Given** historical data exists, **When** user views daily history, **Then** step counts per day are shown
 4. **Given** user switches to weekly view, **When** data loads, **Then** weekly aggregates are displayed
 5. **Given** user switches to monthly view, **When** data loads, **Then** monthly trends are displayed
 6. **Given** new health data arrives, **When** sync completes, **Then** data is persisted locally
 7. **Given** app restarts, **When** Health screen loads, **Then** previously synced data is still available
+8. **Given** watch sends activity state updates, **When** user views Health screen, **Then** activity breakdown pie chart shows time spent in each state (walking, running, still, not worn, etc.)
+9. **Given** watch sends activity messages with `ts` timestamp, **When** app processes message, **Then** data is stored with the provided timestamp (not current time)
+10. **Given** watch was disconnected and cached activity data, **When** watch reconnects and sends historical data, **Then** app correctly stores and displays backdated samples
 
 ---
 
@@ -320,10 +325,11 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 
 #### BLE Protocol Architecture
 - **FR-009**: App MUST implement Gadgetbridge API as primary protocol for watch communication
-- **FR-010**: Gadgetbridge API MUST support: notifications, weather, music, GPS, HTTP relay, activity data, device version/status
+- **FR-010**: Gadgetbridge API MUST support: notifications, weather, music, GPS, HTTP relay, activity data (steps, heart rate, activity state), device version/status
 - **FR-011**: Extended ZSWatch API used only for: bulk health sync, log streaming, shell commands, voice memos (future)
 - **FR-012**: Sensor streaming MUST use existing zsw_gatt_sensor_server GATT service (not custom protocol)
 - **FR-013**: Device info (firmware/hardware version) MUST use Gadgetbridge `t:"ver"` message (no custom API)
+- **FR-013a**: Health data (steps, heart rate, activity state) MUST be received via Gadgetbridge `t:"act"` messages
 
 #### Firmware Update
 - **FR-014**: App MUST support firmware upload via MCUmgr/SMP protocol
@@ -380,10 +386,22 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **FR-088**: Initial sync MUST complete before app considers connection fully established
 
 #### Health & Activity
-- **FR-031**: App MUST receive and display step count data from watch (via Extended API when available)
-- **FR-032**: App MUST access heart rate data via standard HR GATT service
+- **FR-031**: App MUST receive and display step count data from watch (via Gadgetbridge `t:"act"` messages)
+- **FR-032**: App MUST receive heart rate data from Gadgetbridge activity messages (`t:"act"` with `hrm` field)
+- **FR-032a**: Heart rate values MUST be displayed in real-time as they arrive from activity messages
 - **FR-033**: App MUST persist health data locally on device
 - **FR-034**: App MUST display today's summary and 7-day history
+
+#### Activity State Tracking
+- **FR-108**: App MUST receive and process activity state from Gadgetbridge `t:"act"` messages (`act` field)
+- **FR-109**: App MUST support all Gadgetbridge ActivityKind values: UNKNOWN, NOT_WORN, DEEP_SLEEP, LIGHT_SLEEP, REM_SLEEP, ACTIVITY (still), RUNNING, WALKING, SWIMMING, CYCLING, EXERCISE
+- **FR-110**: App MUST persist activity state changes to local database with timestamps
+- **FR-111**: App MUST calculate and display activity breakdown showing time spent in each state
+- **FR-112**: Activity breakdown MUST be calculated from persisted database records (not in-memory only)
+- **FR-113**: Activity breakdown MUST show duration and percentage for each activity state
+- **FR-114**: App MUST support optional `ts` timestamp field in activity messages (milliseconds since 1970)
+- **FR-115**: When `ts` field is present, app MUST use provided timestamp instead of current time
+- **FR-116**: Historical/cached activity data (with `ts` field) MUST be stored with correct timestamps for accurate breakdown calculation
 
 #### Data Retention
 - **FR-063**: App MUST retain health and analytics data for 60 days
@@ -520,7 +538,9 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **ProtocolMessage**: Base message type with protocol indicator (Gadgetbridge API or Extended ZSWatch API)
 - **Notification**: Phone notification to be forwarded (stableId, source app, title, body, timestamp, icon, dismissedOnPhone, dismissedOnWatch)
 - **FirmwareImage**: Firmware file for upload (name, version, size, hash, type: app/net/filesystem)
-- **HealthSample**: Health data point (type: steps/heartrate/sleep, value, timestamp, granularity: hour/day/week/month)
+- **HealthSample**: Health data point (type: steps/heartrate/sleep/activity, value, timestamp, granularity: realtime/hour/day/week/month)
+- **ActivityState**: Activity state enumeration (unknown, notWorn, deepSleep, lightSleep, remSleep, still, running, walking, swimming, cycling, exercise) with integer value for database storage
+- **ActivityBreakdown**: Aggregated time spent in each activity state (durations map, currentState, lastUpdate timestamp)
 - **BatteryReading**: Battery level sample (level, timestamp, charging status)
 - **SensorReading**: Raw sensor data (type: accel/gyro/ppg/temp, x/y/z or value, timestamp)
 - **LogEntry**: Debug log from watch (level, message, timestamp, source module)

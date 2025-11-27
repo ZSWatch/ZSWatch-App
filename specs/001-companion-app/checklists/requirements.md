@@ -111,7 +111,7 @@
 | US2 - Firmware Update | ✅ Complete | GitHub releases (multi-variant), CI builds, local files, MCUmgr DFU |
 | US3 - Notifications | ✅ Complete | Android NotificationListener, MediaSession, Gadgetbridge protocol, initial sync |
 | US4 - Dashboard | ✅ Complete | Connection status, battery ring, firmware version, feature navigation tiles |
-| US5 - Health | 🔲 Not Started | |
+| US5 - Health | ✅ Complete | Health screen with step charts, heart rate screen with live streaming, 60-day retention |
 | US6 - Developer Tools | 🔲 Not Started | |
 | US7 - Multi-Watch | 🔲 Not Started | |
 | US8 - App Settings | 🔲 Not Started | |

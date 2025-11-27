@@ -10,6 +10,8 @@ import '../../providers/watch_service_provider.dart';
 import '../screens/connection/scan_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/firmware/firmware_update_screen.dart';
+import '../screens/health/health_screen.dart';
+import '../screens/health/heart_rate_screen.dart';
 import '../screens/notifications/notification_settings_screen.dart';
 import '../screens/start/start_page_screen.dart';
 
@@ -104,13 +106,12 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.health,
         name: 'health',
-        builder: (context, state) => const _PlaceholderScreen(title: 'Health'),
+        builder: (context, state) => const HealthScreen(),
         routes: [
           GoRoute(
             path: 'heart-rate',
             name: 'heart-rate',
-            builder: (context, state) =>
-                const _PlaceholderScreen(title: 'Heart Rate'),
+            builder: (context, state) => const HeartRateScreen(),
           ),
         ],
       ),
