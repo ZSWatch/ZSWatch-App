@@ -48,25 +48,53 @@ abstract final class HeartRateUuids {
   static const String bodySensorLocation = '00002a38-0000-1000-8000-00805f9b34fb';
 }
 
-/// ZSWatch Sensor Service UUIDs
+/// ZSWatch Sensor Service UUIDs (Adafruit Bluefruit format)
 ///
-/// GATT service for streaming raw sensor data (accel, gyro, PPG, temp).
-/// Implemented in zsw_gatt_sensor_server.c on firmware.
+/// GATT services for streaming raw sensor data.
+/// Implemented in zsw_gatt_sensor_server.c on firmware using Adafruit UUIDs.
+/// Each sensor is a separate GATT service with one characteristic.
 abstract final class SensorServiceUuids {
-  /// ZSWatch Sensor Service UUID (from firmware)
-  static const String service = 'e6c90001-2a76-4094-917e-9af7d7a7a5b1';
+  /// Temperature Service UUID (ADAFRUIT_SERVICE_TEMPERATURE 0xADAF0100)
+  static const String temperatureService = 'adaf0100-c332-42a8-93bd-25e905756cb8';
+  
+  /// Temperature Characteristic UUID (ADAFRUIT_CHAR_TEMPERATURE 0xADAF0101)
+  static const String temperatureChar = 'adaf0101-c332-42a8-93bd-25e905756cb8';
 
-  /// Accelerometer Data Characteristic
-  static const String accelerometer = 'e6c90002-2a76-4094-917e-9af7d7a7a5b1';
+  /// Accelerometer Service UUID (ADAFRUIT_SERVICE_ACCEL 0xADAF0200)
+  static const String accelerometerService = 'adaf0200-c332-42a8-93bd-25e905756cb8';
+  
+  /// Accelerometer Characteristic UUID (ADAFRUIT_CHAR_ACCEL 0xADAF0201)
+  static const String accelerometerChar = 'adaf0201-c332-42a8-93bd-25e905756cb8';
 
-  /// Gyroscope Data Characteristic
-  static const String gyroscope = 'e6c90003-2a76-4094-917e-9af7d7a7a5b1';
+  /// Light Sensor Service UUID (ADAFRUIT_SERVICE_LIGHT 0xADAF0300)
+  static const String lightService = 'adaf0300-c332-42a8-93bd-25e905756cb8';
+  
+  /// Light Sensor Characteristic UUID (ADAFRUIT_CHAR_LIGHT 0xADAF0301)
+  static const String lightChar = 'adaf0301-c332-42a8-93bd-25e905756cb8';
 
-  /// PPG (Photoplethysmography) Data Characteristic
-  static const String ppg = 'e6c90004-2a76-4094-917e-9af7d7a7a5b1';
+  /// Gyroscope Service UUID (ADAFRUIT_SERVICE_GYRO 0xADAF0400)
+  static const String gyroscopeService = 'adaf0400-c332-42a8-93bd-25e905756cb8';
+  
+  /// Gyroscope Characteristic UUID (ADAFRUIT_CHAR_GYRO 0xADAF0401)
+  static const String gyroscopeChar = 'adaf0401-c332-42a8-93bd-25e905756cb8';
 
-  /// Temperature Data Characteristic
-  static const String temperature = 'e6c90005-2a76-4094-917e-9af7d7a7a5b1';
+  /// Magnetometer Service UUID (ADAFRUIT_SERVICE_MAG 0xADAF0500)
+  static const String magnetometerService = 'adaf0500-c332-42a8-93bd-25e905756cb8';
+  
+  /// Magnetometer Characteristic UUID (ADAFRUIT_CHAR_MAG 0xADAF0501)
+  static const String magnetometerChar = 'adaf0501-c332-42a8-93bd-25e905756cb8';
+
+  /// Humidity Service UUID (ADAFRUIT_SERVICE_HUMIDITY 0xADAF0700)
+  static const String humidityService = 'adaf0700-c332-42a8-93bd-25e905756cb8';
+  
+  /// Humidity Characteristic UUID (ADAFRUIT_CHAR_HUMIDITY 0xADAF0701)
+  static const String humidityChar = 'adaf0701-c332-42a8-93bd-25e905756cb8';
+
+  /// Pressure Service UUID (ADAFRUIT_SERVICE_PRESSURE 0xADAF0800)
+  static const String pressureService = 'adaf0800-c332-42a8-93bd-25e905756cb8';
+  
+  /// Pressure Characteristic UUID (ADAFRUIT_CHAR_PRESSURE 0xADAF0801)
+  static const String pressureChar = 'adaf0801-c332-42a8-93bd-25e905756cb8';
 }
 
 /// MCUmgr/SMP Service UUIDs

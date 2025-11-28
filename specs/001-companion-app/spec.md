@@ -175,9 +175,11 @@ A developer or power user enables Developer Mode and accesses comprehensive diag
 
 The notification debug section allows selecting an app name, entering notification text, and sending a debug notification to the watch. Debug notifications are also created on the phone itself to test dismissal syncing in both directions. Music debug tools provide buttons to send static sample "now playing" metadata (title, artist, album) to the watch.
 
+**Log Streaming Architecture**: Logs are transmitted from the watch over the BLE NUS (Nordic UART Service) characteristic - the same channel used for all Gadgetbridge protocol messages. The Log Viewer displays ALL incoming data over BLE NUS, which includes both watch logs and regular protocol data (notifications, music info, etc.). Pre-defined filters allow filtering the log view to show only specific message types. The app can dynamically enable/disable log streaming on the watch by sending `{"t":"log","status":true/false}`. Note that the watch may also have its own setting to enable logs, so logs may be received even if the app hasn't explicitly requested them.
+
 **Why this priority**: Essential for debugging and development but not needed by typical end users.
 
-**Independent Test**: Enable Developer Mode, view live logs, send a shell command, stream raw sensor data, send debug notification, verify all diagnostics display correctly.
+**Independent Test**: Enable Developer Mode, view live logs, send a shell command, stream raw sensor data, send debug notification, verify all diagnostics display correctly. Open Log Viewer, verify all incoming BLE data is shown, apply filter, verify filtered view shows only selected message types.
 
 **Acceptance Scenarios**:
 
@@ -190,6 +192,11 @@ The notification debug section allows selecting an app name, entering notificati
 7. **Given** notification debug section is open, **When** user selects an app name and enters notification text, **Then** a debug notification can be sent to the watch
 8. **Given** user sends a debug notification, **When** it is sent to the watch, **Then** a corresponding notification is also created on the phone to test bi-directional dismiss sync
 9. **Given** music debug section is open, **When** user taps send sample metadata button, **Then** static sample "now playing" metadata (title, artist, album) is sent to the watch
+10. **Given** Log Viewer is open, **When** any data arrives over BLE NUS, **Then** it appears in the log (including both logs and protocol messages)
+11. **Given** Log Viewer shows all incoming data, **When** user selects a filter (e.g., "Logs only", "Notifications", "Music"), **Then** view filters to show only matching messages
+12. **Given** user wants to enable watch logging, **When** they tap "Enable Logs" button, **Then** app sends `{"t":"log","status":true}` to watch
+13. **Given** user wants to disable watch logging, **When** they tap "Disable Logs" button, **Then** app sends `{"t":"log","status":false}` to watch
+14. **Given** watch has logging enabled in its own settings, **When** app connects, **Then** logs may arrive even without app requesting them
 
 ---
 
@@ -409,7 +416,12 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **FR-065**: Data cleanup MUST run periodically without user intervention
 
 #### Developer Tools
-- **FR-035**: App MUST provide live log viewer receiving logs over BLE (via Extended API)
+- **FR-035**: App MUST provide live log viewer receiving logs over BLE NUS (same channel as Gadgetbridge protocol)
+- **FR-035a**: Log viewer MUST display ALL incoming data over BLE NUS, including both watch logs and protocol messages (notifications, music, etc.)
+- **FR-035b**: Log viewer MUST provide pre-defined filters to filter messages by type (e.g., "Logs only", "Notifications", "Music", "Activity", "All")
+- **FR-035c**: App MUST support sending `{"t":"log","status":true}` to dynamically enable log streaming on watch
+- **FR-035d**: App MUST support sending `{"t":"log","status":false}` to dynamically disable log streaming on watch
+- **FR-035e**: App MUST handle receiving logs even when not explicitly requested (watch may have logging enabled independently)
 - **FR-036**: App MUST provide shell terminal for sending commands to watch (via Extended API)
 - **FR-037**: App MUST display BLE connection diagnostics: current MTU, PHY mode (1M/2M), signal strength (RSSI)
 - **FR-038**: App MUST request 2M PHY mode if supported by device for improved throughput

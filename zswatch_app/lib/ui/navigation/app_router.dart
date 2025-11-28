@@ -9,6 +9,10 @@ import '../../providers/ble_providers.dart';
 import '../../providers/watch_service_provider.dart';
 import '../screens/connection/scan_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
+import '../screens/developer/comm_log_screen.dart';
+import '../screens/developer/developer_screen.dart';
+import '../screens/developer/log_viewer_screen.dart';
+import '../screens/developer/sensor_debug_screen.dart';
 import '../screens/firmware/firmware_update_screen.dart';
 import '../screens/health/health_screen.dart';
 import '../screens/health/heart_rate_screen.dart';
@@ -135,32 +139,28 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.developer,
         name: 'developer',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Developer Tools'),
+        builder: (context, state) => const DeveloperScreen(),
         routes: [
           GoRoute(
             path: 'logs',
             name: 'logs',
-            builder: (context, state) =>
-                const _PlaceholderScreen(title: 'Log Viewer'),
+            builder: (context, state) => const LogViewerScreen(),
           ),
           GoRoute(
             path: 'shell',
             name: 'shell',
             builder: (context, state) =>
-                const _PlaceholderScreen(title: 'Shell Terminal'),
+                const _PlaceholderScreen(title: 'Shell Terminal (Not Available)'),
           ),
           GoRoute(
             path: 'sensors',
             name: 'sensors',
-            builder: (context, state) =>
-                const _PlaceholderScreen(title: 'Sensor Debug'),
+            builder: (context, state) => const SensorDebugScreen(),
           ),
           GoRoute(
             path: 'comm-log',
             name: 'comm-log',
-            builder: (context, state) =>
-                const _PlaceholderScreen(title: 'Comm Log'),
+            builder: (context, state) => const CommLogScreen(),
           ),
         ],
       ),

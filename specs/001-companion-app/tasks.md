@@ -680,67 +680,93 @@
 
 ### Models
 
-- [ ] T095 [P] [US6] Create LogEntry model in lib/data/models/log_entry.dart
-- [ ] T096 [P] [US6] Create CommLogEntry model in lib/data/models/comm_log_entry.dart
+- [X] T095 [P] [US6] Create LogEntry model in lib/data/models/log_entry.dart
+- [X] T096 [P] [US6] Create CommLogEntry model in lib/data/models/comm_log_entry.dart
 - [ ] T097 [P] [US6] Create ShellCommand model in lib/data/models/shell_command.dart
-- [ ] T098 [P] [US6] Create SensorReading model (in-memory) in lib/data/models/sensor_reading.dart
+- [X] T098 [P] [US6] Create SensorReading model (in-memory) in lib/data/models/sensor_reading.dart
+- [X] T098a [P] [US6] Create LogFilter enum/model in lib/data/models/log_filter.dart
+  - Filter types: All, LogsOnly, Notifications, Music, Activity, Health, Other
 
 ### Services
 
 - [ ] T099 [US6] Create Extended API protocol in lib/services/protocol/extended_protocol.dart
-- [ ] T100 [US6] Implement log streaming messages (Extended API `log_stream`)
+- [X] T100 [US6] Implement log streaming via BLE NUS in gadgetbridge_protocol.dart
+  - All incoming BLE NUS data is captured for log viewer
+  - Log messages identified by `<BLELOG>...</BLELOG>` wrapper
+  - Supports multi-packet log messages
+- [X] T100a [US6] Implement log enable/disable command in gadgetbridge_protocol.dart
+  - Send `{"t":"log","status":true}` to enable watch logging
+  - Send `{"t":"log","status":false}` to disable watch logging
+  - Handle watch-initiated logs (may arrive without app request)
 - [ ] T101 [US6] Implement shell command messages (Extended API `shell`)
-- [ ] T102 [US6] Create sensor GATT service client in lib/services/ble/sensor_gatt_service.dart
-- [ ] T103 [US6] Implement comm log recording in protocol service
+- [X] T102 [US6] Create sensor GATT service client in lib/services/ble/sensor_gatt_service.dart
+- [X] T103 [US6] Implement comm log recording in protocol service
 
 ### Repository
 
-- [ ] T104 [US6] Create comm log repository with rotation (5000 entries / 5MB)
+- [X] T104 [US6] Create comm log repository with rotation (5000 entries / 5MB)
 
 ### Providers
 
-- [ ] T105 [US6] Create developer providers in lib/providers/developer_providers.dart
+- [X] T105 [US6] Create developer providers in lib/providers/developer_providers.dart
+- [X] T105a [US6] Create log viewer providers in lib/providers/developer_providers.dart
+  - rawBleDataStreamProvider - stream of all incoming BLE NUS data
+  - logFilterProvider - currently selected filter
+  - filteredLogEntriesProvider - applies filter to raw stream
+  - logEnabledProvider - whether logging is enabled on watch
 
 ### UI
 
-- [ ] T106 [US6] Create developer screen (hub) in lib/ui/screens/developer/developer_screen.dart
-- [ ] T107 [US6] Add BLE diagnostics display (MTU, PHY, RSSI, reconnection count)
-- [ ] T108 [US6] Create log viewer screen in lib/ui/screens/developer/log_viewer_screen.dart
+- [X] T106 [US6] Create developer screen (hub) in lib/ui/screens/developer/developer_screen.dart
+- [X] T107 [US6] Add BLE diagnostics display (MTU, PHY, RSSI, reconnection count)
+- [X] T108 [US6] Create log viewer screen in lib/ui/screens/developer/log_viewer_screen.dart
+  - Display ALL incoming BLE NUS log data (BLELOG wrapped messages only)
+  - Timestamp and direction for each entry
+  - Auto-scroll with pause option
+  - Clear log button
+- [X] T108a [US6] ~~Add log filter dropdown/chips to log viewer screen~~ REMOVED - Filter moved to comm log for TX/RX filtering
+- [X] T108b [US6] Add log enable/disable toggle button to log viewer screen
+  - Shows current log streaming state
+  - Sends enable/disable command to watch
+  - Note: logs may still arrive if watch has logging enabled independently
 - [ ] T109 [US6] Create shell terminal screen in lib/ui/screens/developer/shell_terminal_screen.dart
-- [ ] T110 [US6] Create sensor debug screen in lib/ui/screens/developer/sensor_debug_screen.dart
-- [ ] T111 [US6] Add real-time sensor charts (accel, gyro, PPG, temp)
-- [ ] T112 [US6] Create comm log screen in lib/ui/screens/developer/comm_log_screen.dart
-- [ ] T113 [US6] Add Developer Mode toggle in settings
+- [X] T110 [US6] Create sensor debug screen in lib/ui/screens/developer/sensor_debug_screen.dart
+- [X] T111 [US6] Add real-time sensor charts (accel, gyro, mag, temp, humidity, pressure, light)
+- [X] T112 [US6] Create comm log screen in lib/ui/screens/developer/comm_log_screen.dart
 
 ### Notification Debug Tools (FR-093 to FR-097) 🆕
 
-- [ ] T113a [P] [US6] Create notification_debug_section.dart widget in lib/ui/widgets/developer/
+- [X] T113a [P] [US6] Create notification_debug_section.dart widget in lib/ui/widgets/developer/
   - App name dropdown/selector (FR-094)
   - Notification text input field (FR-095)
   - "Send Debug Notification" button (FR-096)
 
-- [ ] T113b [US6] Implement debug notification service in lib/services/notification/debug_notification_service.dart
+- [X] T113b [US6] Implement debug notification service in lib/services/notification/debug_notification_service.dart
   - Create test notification on phone (FR-097)
   - Send notification to watch via Gadgetbridge protocol
   - Use stable ID for bi-directional dismiss testing
+  - **Note**: Implemented directly in notification_debug_section.dart using WatchService.sendNotification
 
-- [ ] T113c [US6] Add notification debug section to notification_settings_screen.dart
+- [X] T113c [US6] Add notification debug section to notification_settings_screen.dart
   - Only visible when Developer Mode enabled
   - Show debug section below main settings
+  - **Note**: Added to developer_screen.dart under "Debug Tools" section
 
 ### Music Debug Tools (FR-098) 🆕
 
-- [ ] T113d [P] [US6] Create music_debug_section.dart widget in lib/ui/widgets/developer/
+- [X] T113d [P] [US6] Create music_debug_section.dart widget in lib/ui/widgets/developer/
   - Buttons for sample track 1, 2, 3
   - Each sends different static metadata (title, artist, album)
   - Play/Pause state toggle
 
-- [ ] T113e [US6] Implement debug music service in lib/services/media/debug_music_service.dart
+- [X] T113e [US6] Implement debug music service in lib/services/media/debug_music_service.dart
   - Send static sample "now playing" metadata to watch
   - Predefined test tracks with different metadata
   - Useful for testing music display without actual playback
+  - **Note**: Implemented directly in music_debug_section.dart using WatchService.sendMusicInfo/sendMusicState
 
-- [ ] T113f [US6] Add music debug section to developer_screen.dart or notification_settings_screen.dart
+- [X] T113f [US6] Add music debug section to developer_screen.dart or notification_settings_screen.dart
+  - **Note**: Added to developer_screen.dart under "Debug Tools" section
 
 **Checkpoint**: Full developer diagnostics available when Developer Mode enabled, including notification and music debug tools
 

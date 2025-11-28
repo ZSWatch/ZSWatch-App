@@ -19,6 +19,7 @@ Guid _guid(String uuid) => Guid(uuid);
 /// - Device info retrieval
 /// - Protocol communication (Gadgetbridge)
 /// - Battery monitoring
+/// - Raw data streaming for log viewer
 class WatchService {
   BluetoothDevice? _device;
   List<BluetoothService>? _services;
@@ -35,6 +36,13 @@ class WatchService {
   final _watchInfoController = BehaviorSubject<Watch?>.seeded(null);
   final _batteryController = BehaviorSubject<int>.seeded(0);
   final _incomingMessageController = StreamController<Map<String, dynamic>>.broadcast();
+  
+  // Raw data streams for developer tools (FR-035a)
+  final _rawIncomingDataController = StreamController<String>.broadcast();
+  final _rawOutgoingDataController = StreamController<String>.broadcast();
+  
+  // Log streaming state (FR-035c, FR-035d)
+  bool _logStreamingEnabled = false;
 
   bool _autoReconnect = true;
   int _reconnectAttempts = 0;
@@ -56,6 +64,16 @@ class WatchService {
   /// Stream of incoming messages from watch
   Stream<Map<String, dynamic>> get incomingMessages => _incomingMessageController.stream;
 
+  /// Stream of ALL raw incoming BLE NUS data for log viewer (FR-035a)
+  /// Includes both logs and protocol messages
+  Stream<String> get rawIncomingData => _rawIncomingDataController.stream;
+
+  /// Stream of ALL raw outgoing BLE NUS data for log viewer
+  Stream<String> get rawOutgoingData => _rawOutgoingDataController.stream;
+
+  /// Whether log streaming is enabled on watch
+  bool get logStreamingEnabled => _logStreamingEnabled;
+
   /// Current connection state
   Connection get currentConnection => _connectionController.value;
 
@@ -64,6 +82,12 @@ class WatchService {
 
   /// Whether connected
   bool get isConnected => _connectionController.value.isConnected;
+
+  /// Current BLE device (for sensor GATT service initialization)
+  BluetoothDevice? get device => _device;
+
+  /// Discovered BLE services (for sensor GATT service initialization)
+  List<BluetoothService>? get services => _services;
 
   /// Connect to a scanned device
   Future<void> connect(ScannedWatch scannedDevice, {bool autoConnect = false}) async {
@@ -248,10 +272,11 @@ class WatchService {
 
       final mtu = await _device!.requestMtu(BleConfig.preferredMtu);
 
-      // Request high priority connection (enables 2M PHY)
-      await _device!.requestConnectionPriority(
-        connectionPriorityRequest: ConnectionPriority.high,
-      );
+      // Note: We don't request connection priority here.
+      // The watch manages connection intervals based on its current needs
+      // (e.g., short intervals during DFU, longer intervals when idle).
+      // Forcing high priority from the phone would override the watch's
+      // power-saving preferences.
 
       // Create or update watch object - preserve existing firmware/battery info
       final existingWatch = currentWatch;
@@ -361,6 +386,9 @@ class WatchService {
       if (message.isEmpty) return;
 
       debugPrint('[BLE RX] $message');
+      
+      // Emit to raw data stream for log viewer (FR-035a)
+      _rawIncomingDataController.add(message);
 
       // Try to parse as JSON
       if (message.startsWith('{') && message.endsWith('}')) {
@@ -387,6 +415,8 @@ class WatchService {
     } catch (e) {
       // Binary data that can't be decoded as UTF-8 - log raw bytes
       debugPrint('[BLE RX] Raw bytes: $data');
+      // Still emit to raw stream for debugging
+      _rawIncomingDataController.add('RAW: $data');
     }
   }
 
@@ -502,6 +532,9 @@ class WatchService {
     if (txChar == null) return;
 
     debugPrint('[BLE TX] $data');
+    
+    // Emit to raw data stream for log viewer (FR-035a)
+    _rawOutgoingDataController.add(data);
 
     final bytes = utf8.encode(data);
     
@@ -645,6 +678,22 @@ class WatchService {
   Future<void> vibrate(int pattern) async {
     await _sendGb({'t': 'vibrate', 'n': pattern});
   }
+
+  /// Enable/disable log streaming from watch (FR-035c, FR-035d)
+  /// 
+  /// Sends {"t":"log","status":true/false} to watch.
+  /// Note: Watch may also have its own setting for this, so logs may be
+  /// received even if the app hasn't explicitly requested them (FR-035e).
+  Future<void> setLogStreaming(bool enabled) async {
+    await _sendGb({'t': 'log', 'status': enabled});
+    _logStreamingEnabled = enabled;
+  }
+
+  /// Enable log streaming from watch
+  Future<void> enableLogStreaming() => setLogStreaming(true);
+
+  /// Disable log streaming from watch
+  Future<void> disableLogStreaming() => setLogStreaming(false);
 
   void _handleConnectionStateChange(
     BluetoothConnectionState state,
@@ -905,6 +954,8 @@ class WatchService {
     await _watchInfoController.close();
     await _batteryController.close();
     await _incomingMessageController.close();
+    await _rawIncomingDataController.close();
+    await _rawOutgoingDataController.close();
   }
 }
 

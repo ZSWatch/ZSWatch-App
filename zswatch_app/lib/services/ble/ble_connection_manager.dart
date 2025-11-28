@@ -191,22 +191,6 @@ class BleConnectionManager {
     return mtu;
   }
 
-  /// Request 2M PHY for higher throughput
-  Future<void> request2MPhy() async {
-    if (_connectedDevice == null) {
-      throw StateError('Not connected');
-    }
-
-    // Request high connection priority (enables 2M PHY on supported devices)
-    await _connectedDevice!.requestConnectionPriority(
-      connectionPriorityRequest: ConnectionPriority.high,
-    );
-
-    _updateConnection(_currentConnection.copyWith(
-      phyMode: PhyMode.phy2M,
-    ));
-  }
-
   /// Enable Data Length Extension
   void enableDle() {
     // DLE is typically enabled automatically with MTU negotiation
@@ -222,9 +206,11 @@ class BleConnectionManager {
       final mtu = await negotiateMtu();
       debugPrint('Negotiated MTU: $mtu');
 
-      // Request 2M PHY
-      await request2MPhy();
-      debugPrint('Requested 2M PHY');
+      // Note: We don't request connection priority here.
+      // The watch manages connection intervals based on its current needs
+      // (e.g., short intervals during DFU, longer intervals when idle).
+      // Forcing high priority from the phone would override the watch's
+      // power-saving preferences.
 
       // Mark DLE as enabled (automatic with MTU negotiation)
       enableDle();

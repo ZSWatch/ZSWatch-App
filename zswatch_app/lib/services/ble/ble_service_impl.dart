@@ -284,20 +284,14 @@ class BleServiceImpl implements BleService {
 
   @override
   Future<void> request2MPhy() async {
-    if (_connectedDevice == null) {
-      throw StateError('Not connected to a device');
-    }
-
-    // Request 2M PHY for faster throughput
-    await _connectedDevice!.requestConnectionPriority(
-      connectionPriorityRequest: ConnectionPriority.high,
-    );
-
-    // Note: PHY mode reporting is not directly available in flutter_blue_plus
-    // The actual PHY negotiation happens at the BLE stack level
-    _updateConnectionState(
-      _currentConnection?.copyWith(phyMode: BlePhyMode.phy2M),
-    );
+    // Note: We don't request connection priority here.
+    // The watch manages connection intervals based on its current needs
+    // (e.g., short intervals during DFU, longer intervals when idle).
+    // Forcing high priority from the phone would override the watch's
+    // power-saving preferences.
+    //
+    // PHY mode is also not directly readable from flutter_blue_plus.
+    // The actual PHY negotiation happens at the BLE stack level.
   }
 
   @override
