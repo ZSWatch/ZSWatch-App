@@ -956,6 +956,39 @@
 
 ---
 
+## Phase 11.6: User Story 11 - HTTP Relay (Priority: P4) 🆕 ✅ COMPLETE
+
+**Goal**: Phone performs HTTP/HTTPS (with optional XPath) on behalf of the watch via Gadgetbridge `t:"http"` and returns `resp`/`err` with the integer `id` echoed.
+
+**Independent Test**: From developer console send `{"t":"http","url":"https://pur3.co.uk/hello.txt","id":1}` → phone replies `{"t":"http","resp":"hello","id":1}`; repeat with `xpath` and `insecure:true` against a host with an invalid cert to verify TLS override path.
+
+### Models
+
+- [X] T147 [P] [US11] Create HttpRequest model in lib/data/models/http_request.dart (url, xpath?, insecure?, id:int?, resp?, err?, timestamps)
+
+### Services
+
+- [X] T148 [US11] Create http_relay_service.dart in lib/services/http/ to perform requests, optional XPath evaluation, and per-request insecure TLS override
+
+### Protocol Integration
+
+- [X] T149 [US11] Handle inbound `t:"http"` in gadgetbridge_protocol.dart, invoke http_relay_service, and send `{"t":"http","resp"/"err",...,"id"}` back to watch (support concurrent requests)
+  - Note: Gadgetbridge protocol already parses `t:"http"` messages
+  - Added sendHttpResponse/sendHttpError methods to watch_service.dart
+
+### Providers / Wiring
+
+- [X] T150 [US11] Wire HTTP relay into watch service/providers (e.g., http_providers.dart) and ensure comm log captures request/response entries
+  - Created http_providers.dart with HttpRelayNotifier
+  - Listens to incomingMessages stream for t:"http" requests
+  - Performs requests via HttpRelayService
+  - Sends responses back via WatchService.sendHttpResponse/sendHttpError
+  - Tracks pending and recent requests for debugging
+
+**Checkpoint**: Watch-initiated HTTP relay works end-to-end with XPath and insecure TLS override. ✅
+
+---
+
 ## Phase 12: User Story 10 - Voice Recording Playback (Priority: P10) [PLACEHOLDER]
 
 **Goal**: User plays back voice memos from watch (depends on future firmware feature)
@@ -1043,6 +1076,7 @@ Phase 2: Foundational ◄──────────────────�
 │
 ├──► Phase 11: US9 - Analytics (P9)
 ├──► Phase 11.5: GPS Support 🆕
+├──► Phase 11.6: US11 - HTTP Relay 🆕
 ├──► Phase 12: US10 - Voice [STUB] (P10)
 │
 └──► Phase 13: Polish (after desired stories complete)
@@ -1063,6 +1097,7 @@ Phase 2: Foundational ◄──────────────────�
 | US8 (Settings) | Foundational | All stories | - |
 | US9 (Analytics) | US1 (needs connection) | US2-US8 | - |
 | GPS Support | US1 (needs connection) | All stories | Gadgetbridge GPS |
+| US11 (HTTP Relay) | US1 (needs connection) | All stories | HTTP relay |
 | US10 (Voice) | US1 (stub only) | All stories | - |
 
 ### Parallel Opportunities Per Phase
@@ -1148,7 +1183,8 @@ Sequential: T133k → T133l → T133m → T133n (service → protocol → integr
 | 8 | US9 (Analytics) | Power user feature | - |
 | 9 | US6 (Developer) | Developer-focused | Debug Tools |
 | 10 | GPS Support | Watch feature | Gadgetbridge GPS |
-| 11 | US10 (Voice) | Future placeholder | - |
+| 11 | US11 (HTTP Relay) | Needed for watch-initiated internet access | HTTP relay |
+| 12 | US10 (Voice) | Future placeholder | - |
 
 ### Parallel Team Strategy
 
@@ -1201,9 +1237,10 @@ Based on user value and dependencies:
 | Phase 10: US8 Settings | 5 | P8 | - |
 | Phase 11: US9 Analytics | 9 | P9 | - |
 | Phase 11.5: GPS Support 🆕 | 7 | - | 7 |
+| Phase 11.6: US11 HTTP Relay 🆕 | 4 | P4 | 4 |
 | Phase 12: US10 Voice | 4 | P10 | - |
 | Phase 13: Polish | 9 | - | - |
-| **Total** | **~195** | 10 stories | **~54 new** |
+| **Total** | **~199** | 11 stories | **~58 new** |
 
 ### New Requirements Coverage
 
@@ -1220,6 +1257,7 @@ Based on user value and dependencies:
 | Watch Forget/Unbond | 9 | T115, T116, T118 |
 | Persistent BLE (FR-089-092) | 3.8 | T045r-T045z |
 | GPS Support (FR-103-107) | 11.5 | T133j-T133p |
+| HTTP Relay (FR-117-122) | 11.6 | T147-T150 |
 
 ---
 
@@ -1232,4 +1270,3 @@ Based on user value and dependencies:
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
 - Voice Recording (US10) is a placeholder stub - full implementation depends on firmware
-

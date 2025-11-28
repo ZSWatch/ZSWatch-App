@@ -270,6 +270,25 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 
 ---
 
+### User Story 11 - HTTP Relay (Priority: P4)
+
+The watch needs phone-assisted network access. It sends `t:"http"` Gadgetbridge messages with a URL and optional `xpath`, `id` (integer), and `insecure` fields. The app performs the HTTP/HTTPS request, optionally evaluates the XPath on XML content, and returns either the body or an error to the watch, echoing the integer `id` so multiple requests can be in-flight.
+
+**Why this priority**: Enables watch apps (weather/news/custom data) without adding a full network stack to firmware; required to meet Gadgetbridge compatibility for HTTP relay.
+
+**Independent Test**: From Developer Tools or a BLE console, send `{"t":"http","url":"https://pur3.co.uk/hello.txt","id":1}` from the watch; verify the phone replies with `{"t":"http","resp":"hello","id":1}`. Repeat with `xpath` and with `insecure:true` targeting a test host with an invalid certificate to confirm TLS override behavior.
+
+**Acceptance Scenarios**:
+
+1. **Given** the watch sends `{"t":"http","url":"https://pur3.co.uk/hello.txt"}`, **When** the request succeeds, **Then** the app replies over BLE with `{"t":"http","resp":<body>}`
+2. **Given** the watch includes an `xpath` in the request, **When** the document is fetched, **Then** the app parses as XML and returns the XPath result in `resp`
+3. **Given** the watch supplies an integer `id`, **When** the app responds, **Then** the response (or error) echoes the same `id` so concurrent requests can be matched
+4. **Given** no `insecure` flag is provided, **When** the app performs HTTPS, **Then** TLS validation is enforced; **When** `insecure:true` is provided, **Then** the request bypasses certificate validation for that call only
+5. **Given** the HTTP request fails (network error, TLS failure, XML/XPath parse failure), **When** the app responds, **Then** it returns `{"t":"http","err":<message>}` including `id` if supplied
+6. **Given** several `t:"http"` requests are issued with different `id` values, **When** responses are delivered, **Then** each response includes the originating `id` regardless of completion order
+
+---
+
 ### Edge Cases
 
 - What happens when Bluetooth is disabled on the phone? App prompts user to enable Bluetooth
@@ -486,6 +505,14 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **FR-106**: App MUST send current GPS location back to watch in Gadgetbridge-compatible format
 - **FR-107**: App MUST handle GPS permission denial gracefully with error response to watch
 
+#### Gadgetbridge HTTP Relay
+- **FR-117**: App MUST handle Gadgetbridge `t:"http"` requests from the watch containing `url` and optional `xpath`, integer `id`, and `insecure` fields
+- **FR-118**: App MUST perform HTTP/HTTPS requests for `t:"http"` messages; TLS certificate validation MUST be enabled by default and ONLY disabled when `insecure:true` is explicitly provided
+- **FR-119**: When `xpath` is provided, app MUST parse the fetched document as XML and return the XPath evaluation result in the response (failing with error if parsing or evaluation fails)
+- **FR-120**: App MUST return HTTP responses to the watch using `{"t":"http","resp":<body or xpath result>}` and MUST echo the integer `id` when provided to allow concurrent in-flight requests
+- **FR-121**: App MUST return HTTP errors to the watch using `{"t":"http","err":<error message>}` and MUST echo the integer `id` when provided
+- **FR-122**: App MUST support multiple concurrent HTTP relay requests and MUST NOT drop or reorder responses across different `id` values
+
 ### UI/UX Requirements
 
 #### Visual Theme
@@ -561,6 +588,7 @@ A user wants to configure app-specific settings (not watch settings). Watch sett
 - **VoiceMemo**: Voice recording from watch (id, duration, timestamp, audio data) [placeholder]
 - **MediaState**: Current media playback state (title, artist, album, playbackState, timestamp)
 - **GPSLocation**: GPS coordinates (latitude, longitude, accuracy, timestamp)
+- **HttpRequest**: HTTP relay request from watch (url, xpath?, insecure?, id?:int, startedAt, completedAt, resp?, err?)
 
 ## Success Criteria *(mandatory)*
 

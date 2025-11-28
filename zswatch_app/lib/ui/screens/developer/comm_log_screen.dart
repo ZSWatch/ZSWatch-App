@@ -403,6 +403,7 @@ class _CommLogEntryTile extends StatelessWidget {
     final data = showHex ? _toHex(entry.data) : entry.data;
 
     return InkWell(
+      onTap: () => _showFullEntryDialog(context, data, isIncoming),
       onLongPress: () {
         Clipboard.setData(ClipboardData(text: entry.data));
         ScaffoldMessenger.of(context).showSnackBar(
@@ -488,6 +489,78 @@ class _CommLogEntryTile extends StatelessWidget {
         .map((c) => c.toRadixString(16).padLeft(2, '0'))
         .join(' ')
         .toUpperCase();
+  }
+
+  void _showFullEntryDialog(BuildContext context, String displayData, bool isIncoming) {
+    final directionColor = isIncoming ? AppTheme.successColor : AppTheme.primaryColor;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: directionColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                isIncoming ? 'RX' : 'TX',
+                style: TextStyle(
+                  color: directionColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              entry.formattedTimestamp,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                    fontFamily: 'monospace',
+                  ),
+            ),
+            const Spacer(),
+            Text(
+              entry.formattedSize,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            displayData,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: entry.data));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Copied to clipboard'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+            },
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('Copy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

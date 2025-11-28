@@ -40,6 +40,7 @@ dependencies:
   # HTTP / Networking
   http: ^1.2.2
   archive: ^4.0.0
+  xml: ^6.5.0
 
   # Permissions
   permission_handler: ^11.3.1

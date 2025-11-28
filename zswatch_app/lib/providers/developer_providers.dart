@@ -237,10 +237,14 @@ final commLogRepositoryProvider = StateNotifierProvider<CommLogNotifier, List<Co
 
 /// State notifier that maintains the comm log repository and subscribes to watch streams
 class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
+  static const String _bleLogPrefix = '<BLELOG>';
+  static const String _bleLogSuffix = '</BLELOG>';
+
   final WatchService _watchService;
   final CommLogRepository _repo = CommLogRepository();
   StreamSubscription<String>? _rxSubscription;
   StreamSubscription<String>? _txSubscription;
+  bool _discardingBleLog = false;
 
   CommLogNotifier(this._watchService) : super([]) {
     _subscribeToStreams();
@@ -248,9 +252,55 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
 
   CommLogRepository get repository => _repo;
 
+  /// Remove BLELOG-wrapped firmware debug logs so the comm log only shows protocol traffic.
+  /// Returns null if the entire chunk was debug-only.
+  String? _stripDebugLogs(String data) {
+    var remaining = data;
+    final buffer = StringBuffer();
+
+    while (remaining.isNotEmpty) {
+      if (_discardingBleLog) {
+        final endIndex = remaining.indexOf(_bleLogSuffix);
+        if (endIndex == -1) {
+          // Still inside a debug log segment - discard everything in this chunk.
+          return buffer.isEmpty ? null : buffer.toString();
+        }
+        remaining = remaining.substring(endIndex + _bleLogSuffix.length);
+        _discardingBleLog = false;
+        continue;
+      }
+
+      final startIndex = remaining.indexOf(_bleLogPrefix);
+      if (startIndex == -1) {
+        buffer.write(remaining);
+        break;
+      }
+
+      if (startIndex > 0) {
+        buffer.write(remaining.substring(0, startIndex));
+      }
+
+      remaining = remaining.substring(startIndex + _bleLogPrefix.length);
+      final endIndex = remaining.indexOf(_bleLogSuffix);
+
+      if (endIndex == -1) {
+        _discardingBleLog = true;
+        break;
+      }
+
+      remaining = remaining.substring(endIndex + _bleLogSuffix.length);
+    }
+
+    final sanitized = buffer.toString();
+    return sanitized.isEmpty ? null : sanitized;
+  }
+
   void _subscribeToStreams() {
     _rxSubscription = _watchService.rawIncomingData.listen((data) {
-      _repo.addRx(data);
+      final sanitized = _stripDebugLogs(data);
+      if (sanitized == null) return;
+
+      _repo.addRx(sanitized);
       // Return a new list to trigger rebuild
       state = List.from(_repo.entries);
     });

@@ -44,6 +44,9 @@ class WatchService {
   
   // Log streaming state (FR-035c, FR-035d)
   bool _logStreamingEnabled = false;
+  
+  // Buffer for multi-packet JSON messages
+  String _messageBuffer = '';
 
   bool _autoReconnect = true;
   int _reconnectAttempts = 0;
@@ -52,6 +55,8 @@ class WatchService {
   bool _isCancelled = false; // Track if user has cancelled the connection
   bool _isReconnecting = false; // Track if reconnect is in progress (timer scheduled or running)
   bool _isInitialConnection = false; // Track if this is the first connection attempt (show Connecting not Reconnecting)
+  bool _isWaitingForAutoConnect = false; // Track when waiting for autoConnect to establish connection
+  bool _isInitiatingConnection = false; // Track when we're in the process of starting a connection (ignore initial disconnect)
 
   /// Stream of connection state changes
   Stream<Connection> get connectionStream => _connectionController.stream;
@@ -165,6 +170,11 @@ class WatchService {
       // Cancel existing subscriptions
       await _connectionSubscription?.cancel();
 
+      // Mark that we're initiating a connection - ignore initial disconnect events
+      // The BLE subscription may fire with the current state (disconnected) immediately
+      // before the actual connection is established
+      _isInitiatingConnection = true;
+
       // Subscribe to connection state BEFORE connecting
       _connectionSubscription = device.connectionState.listen(
         (state) => _handleConnectionStateChange(state, watchId, name),
@@ -182,8 +192,11 @@ class WatchService {
         // Final check before BLE call - user might have cancelled during setup
         if (_isCancelled) {
           debugPrint('[WatchService:$hashCode] autoConnect skipped - cancelled just before BLE call');
+          _isInitiatingConnection = false;
           return;
         }
+        // Mark that we're waiting for autoConnect - ignore initial disconnect events
+        _isWaitingForAutoConnect = true;
         // Don't await - autoConnect runs in background
         // The connectionState listener will handle the connection event
         unawaited(device.connect(
@@ -194,11 +207,14 @@ class WatchService {
         ).catchError((e) {
           // Ignore errors for autoConnect - connection state listener handles everything
           debugPrint('[WatchService] AutoConnect error (ignored): $e');
+          _isWaitingForAutoConnect = false;
+          _isInitiatingConnection = false;
         }));
       } else {
         // Final check before BLE call - user might have cancelled during setup
         if (_isCancelled) {
           debugPrint('[WatchService:$hashCode] connect skipped - cancelled just before BLE call');
+          _isInitiatingConnection = false;
           return;
         }
         debugPrint('[WatchService:$hashCode] About to call device.connect(autoConnect: false)');
@@ -207,6 +223,8 @@ class WatchService {
           timeout: BleConfig.connectionTimeout,
           autoConnect: false,
         );
+        // Clear the initiating flag - we're now connected
+        _isInitiatingConnection = false;
         // Perform post-connection setup only for direct connections
         await _setupAfterConnect(watchId, name);
       }
@@ -426,36 +444,19 @@ class WatchService {
 
   void _handleNusData(List<int> data) {
     try {
-      final message = utf8.decode(data).trim();
-      if (message.isEmpty) return;
+      final chunk = utf8.decode(data);
+      if (chunk.isEmpty) return;
 
-      debugPrint('[BLE RX] $message');
+      debugPrint('[BLE RX] $chunk');
       
       // Emit to raw data stream for log viewer (FR-035a)
-      _rawIncomingDataController.add(message);
+      _rawIncomingDataController.add(chunk);
 
-      // Try to parse as JSON
-      if (message.startsWith('{') && message.endsWith('}')) {
-        try {
-          final json = jsonDecode(message) as Map<String, dynamic>;
-          _handleGadgetbridgeMessage(json);
-        } catch (e) {
-          // Watch sometimes sends malformed JSON with unquoted values like:
-          // {"t":"music", "n": play} instead of {"t":"music", "n": "play"}
-          // Try to fix and reparse
-          final fixedMessage = _fixMalformedJson(message);
-          if (fixedMessage != null) {
-            try {
-              final json = jsonDecode(fixedMessage) as Map<String, dynamic>;
-              _handleGadgetbridgeMessage(json);
-            } catch (e2) {
-              debugPrint('[BLE RX] JSON parse failed even after fix: $e2');
-            }
-          } else {
-            debugPrint('[BLE RX] JSON parse failed: $e');
-          }
-        }
-      }
+      // Buffer data and process complete JSON messages
+      _messageBuffer += chunk;
+      
+      // Process all complete JSON messages in the buffer
+      _processMessageBuffer();
     } catch (e) {
       // Binary data that can't be decoded as UTF-8 - log raw bytes
       debugPrint('[BLE RX] Raw bytes: $data');
@@ -464,13 +465,127 @@ class WatchService {
     }
   }
 
-  /// Attempt to fix malformed JSON with unquoted string values
-  /// e.g., {"t":"music", "n": play} -> {"t":"music", "n": "play"}
+  /// Process the message buffer to extract complete JSON messages.
+  /// Handles multi-packet messages that arrive in chunks due to BLE MTU limits.
+  void _processMessageBuffer() {
+    while (_messageBuffer.isNotEmpty) {
+      // Find the start of a JSON object
+      final jsonStart = _messageBuffer.indexOf('{');
+      if (jsonStart == -1) {
+        // No JSON start found, clear buffer (non-JSON data)
+        _messageBuffer = '';
+        break;
+      }
+      
+      // Skip any data before the JSON start
+      if (jsonStart > 0) {
+        _messageBuffer = _messageBuffer.substring(jsonStart);
+      }
+      
+      // Try to find a complete JSON object by counting braces
+      var braceCount = 0;
+      var inString = false;
+      var escaped = false;
+      var jsonEnd = -1;
+      
+      for (var i = 0; i < _messageBuffer.length; i++) {
+        final char = _messageBuffer[i];
+        
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        
+        if (char == r'\' && inString) {
+          escaped = true;
+          continue;
+        }
+        
+        if (char == '"') {
+          inString = !inString;
+          continue;
+        }
+        
+        if (!inString) {
+          if (char == '{') {
+            braceCount++;
+          } else if (char == '}') {
+            braceCount--;
+            if (braceCount == 0) {
+              jsonEnd = i + 1;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (jsonEnd == -1) {
+        // Incomplete JSON, wait for more data
+        debugPrint('[BLE RX] Buffering incomplete JSON (${_messageBuffer.length} bytes)');
+        break;
+      }
+      
+      // Extract the complete JSON string
+      final jsonStr = _messageBuffer.substring(0, jsonEnd);
+      _messageBuffer = _messageBuffer.substring(jsonEnd);
+      
+      debugPrint('[BLE RX] Complete message: ${jsonStr.length} bytes');
+      
+      // Parse and handle the message
+      _parseAndHandleJson(jsonStr);
+    }
+  }
+
+  /// Parse a JSON string and handle it as a Gadgetbridge message
+  void _parseAndHandleJson(String jsonStr) {
+    try {
+      final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+      _handleGadgetbridgeMessage(json);
+    } catch (e) {
+      // Watch sometimes sends malformed JSON with unquoted values like:
+      // {"t":"music", "n": play} instead of {"t":"music", "n": "play"}
+      // Try to fix and reparse
+      final fixedMessage = _fixMalformedJson(jsonStr);
+      if (fixedMessage != null) {
+        try {
+          final json = jsonDecode(fixedMessage) as Map<String, dynamic>;
+          _handleGadgetbridgeMessage(json);
+        } catch (e2) {
+          debugPrint('[BLE RX] JSON parse failed even after fix: $e2');
+        }
+      } else {
+        debugPrint('[BLE RX] JSON parse failed: $e');
+      }
+    }
+  }
+
+  /// Attempt to fix malformed JSON with unquoted keys and values.
+  /// 
+  /// Handles:
+  /// - Unquoted string values: {"t":"music", "n": play} -> {"t":"music", "n": "play"}
+  /// - Unquoted keys: {id:"4"} -> {"id":"4"}
   String? _fixMalformedJson(String message) {
+    var fixed = message;
+    var wasModified = false;
+    
+    // Fix unquoted keys: { id:"value" or , id:"value"
+    // Pattern: after { or , and optional whitespace, find an unquoted key followed by :
+    final unquotedKeyRegex = RegExp(r'([{,])\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:');
+    final fixedKeys = fixed.replaceAllMapped(unquotedKeyRegex, (match) {
+      final prefix = match.group(1)!; // { or ,
+      final key = match.group(2)!;
+      return '$prefix"$key":';
+    });
+    if (fixedKeys != fixed) {
+      fixed = fixedKeys;
+      wasModified = true;
+    }
+    
+    // Fix unquoted string values: : value, or : value}
     // Pattern: after a colon and optional whitespace, find an unquoted word
     // that isn't a number, true, false, or null
-    final regex = RegExp(r':\s*([a-zA-Z_][a-zA-Z0-9_]*)(\s*[,}])');
-    final fixed = message.replaceAllMapped(regex, (match) {
+    final unquotedValueRegex = RegExp(r':\s*([a-zA-Z_][a-zA-Z0-9_]*)(\s*[,}])');
+    final fixedValues = fixed.replaceAllMapped(unquotedValueRegex, (match) {
       final value = match.group(1)!;
       final suffix = match.group(2)!;
       // Don't quote true, false, null
@@ -479,7 +594,12 @@ class WatchService {
       }
       return ': "$value"$suffix';
     });
-    return fixed != message ? fixed : null;
+    if (fixedValues != fixed) {
+      fixed = fixedValues;
+      wasModified = true;
+    }
+    
+    return wasModified ? fixed : null;
   }
 
   void _handleGadgetbridgeMessage(Map<String, dynamic> message) {
@@ -744,6 +864,38 @@ class WatchService {
     await _sendGb(gpsData);
   }
 
+  /// Send HTTP response to watch (for HTTP relay)
+  /// 
+  /// Used when watch requests a URL via `t:"http"` and app successfully fetches it.
+  /// [requestId] is echoed back to match responses with requests.
+  /// [response] is the response body or XPath-evaluated result.
+  Future<void> sendHttpResponse(String requestId, String response) async {
+    final data = <String, dynamic>{
+      't': 'http',
+      'resp': response,
+    };
+    if (requestId.isNotEmpty) {
+      data['id'] = requestId;
+    }
+    await _sendGb(data);
+  }
+
+  /// Send HTTP error to watch (for HTTP relay)
+  /// 
+  /// Used when watch requests a URL via `t:"http"` and app fails to fetch it.
+  /// [requestId] is echoed back to match responses with requests.
+  /// [error] describes what went wrong.
+  Future<void> sendHttpError(String requestId, String error) async {
+    final data = <String, dynamic>{
+      't': 'http',
+      'err': error,
+    };
+    if (requestId.isNotEmpty) {
+      data['id'] = requestId;
+    }
+    await _sendGb(data);
+  }
+
   /// Enable/disable log streaming from watch (FR-035c, FR-035d)
   /// 
   /// Sends {"t":"log","status":true/false} to watch.
@@ -765,7 +917,7 @@ class WatchService {
     String watchId,
     String name,
   ) {
-    debugPrint('[WatchService:$hashCode] _handleConnectionStateChange: state=$state, _isCancelled=$_isCancelled');
+    debugPrint('[WatchService:$hashCode] _handleConnectionStateChange: state=$state, _isCancelled=$_isCancelled, _isWaitingForAutoConnect=$_isWaitingForAutoConnect, _isInitiatingConnection=$_isInitiatingConnection');
     
     // If user has cancelled, ignore all connection events and disconnect
     if (_isCancelled) {
@@ -779,6 +931,9 @@ class WatchService {
 
     switch (state) {
       case BluetoothConnectionState.connected:
+        // Clear the waiting/initiating flags - we're now connected
+        _isWaitingForAutoConnect = false;
+        _isInitiatingConnection = false;
         // For autoConnect, we need to run setup when connection happens
         // Check if we're in connecting state (waiting for autoConnect)
         // Also check _autoReconnect - if false, user cancelled and we should disconnect
@@ -811,18 +966,28 @@ class WatchService {
   }
 
   void _handleDisconnect(String watchId, String name) {
-    debugPrint('[WatchService:$hashCode] _handleDisconnect: _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect, _reconnectAttempts=$_reconnectAttempts, _isReconnecting=$_isReconnecting, _isSettingUp=$_isSettingUp');
+    debugPrint('[WatchService:$hashCode] _handleDisconnect: _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect, _reconnectAttempts=$_reconnectAttempts, _isReconnecting=$_isReconnecting, _isSettingUp=$_isSettingUp, _isWaitingForAutoConnect=$_isWaitingForAutoConnect, _isInitiatingConnection=$_isInitiatingConnection');
     
     // If user has cancelled, don't attempt reconnection
     if (_isCancelled) {
       debugPrint('[WatchService:$hashCode] Disconnect ignored - cancelled by user');
       _isReconnecting = false;
+      _isWaitingForAutoConnect = false;
+      _isInitiatingConnection = false;
       _updateConnection(Connection(
         watchId: watchId,
         watchName: name,
         state: WatchConnectionState.disconnected,
       ));
       _cleanup();
+      return;
+    }
+    
+    // If we're initiating a connection (either autoConnect or regular), this is just
+    // the initial state notification (BLE layer reports disconnected when we first
+    // subscribe to connection state). Don't treat this as a real disconnect.
+    if (_isWaitingForAutoConnect || _isInitiatingConnection) {
+      debugPrint('[WatchService:$hashCode] Disconnect ignored - connection in progress (waiting for BLE to connect)');
       return;
     }
     
@@ -938,6 +1103,8 @@ class WatchService {
     _autoReconnect = false;
     _isCancelled = true; // Mark as cancelled to ignore future connection events
     _isReconnecting = false; // Clear reconnecting flag
+    _isWaitingForAutoConnect = false; // Clear waiting flag
+    _isInitiatingConnection = false; // Clear initiating flag
     _reconnectTimer?.cancel();
     
     // If we're in any connecting state, transition to disconnected
@@ -1007,6 +1174,9 @@ class WatchService {
     _isSettingUp = false;
     _isReconnecting = false;
     _isInitialConnection = false;
+    _isWaitingForAutoConnect = false;
+    _isInitiatingConnection = false;
+    _messageBuffer = ''; // Clear any incomplete messages
   }
 
   void _updateConnection(Connection connection) {

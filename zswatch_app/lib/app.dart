@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'providers/ble_providers.dart';
 import 'providers/developer_providers.dart';
 import 'providers/gps_providers.dart';
+import 'providers/http_providers.dart';
 import 'providers/notification_providers.dart';
 import 'ui/navigation/app_router.dart';
 
@@ -39,6 +40,8 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       ref.read(mediaControlProvider);
       // Initialize GPS handler to respond to watch GPS power requests
       ref.read(gpsNotifierProvider);
+      // Initialize HTTP relay handler to process watch HTTP requests
+      ref.read(httpRelayNotifierProvider);
       // Initialize comm log and log viewer to start collecting data in background
       // These subscribe to watch service streams for BLE traffic logging
       ref.read(commLogRepositoryProvider);
