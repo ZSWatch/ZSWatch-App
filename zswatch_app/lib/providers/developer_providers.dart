@@ -284,8 +284,37 @@ final commLogEntriesProvider = Provider<List<CommLogEntry>>((ref) {
 
 /// Provider for communication log statistics
 final commLogStatsProvider = Provider<CommLogStats>((ref) {
-  final notifier = ref.watch(commLogRepositoryProvider.notifier);
-  return notifier.repository.stats;
+  // Watch the state to trigger rebuild when entries change
+  final entries = ref.watch(commLogRepositoryProvider);
+  
+  if (entries.isEmpty) {
+    return const CommLogStats();
+  }
+
+  int txCount = 0;
+  int rxCount = 0;
+  int totalTxBytes = 0;
+  int totalRxBytes = 0;
+
+  for (final entry in entries) {
+    if (entry.direction == CommDirection.tx) {
+      txCount++;
+      totalTxBytes += entry.sizeBytes;
+    } else {
+      rxCount++;
+      totalRxBytes += entry.sizeBytes;
+    }
+  }
+
+  return CommLogStats(
+    totalEntries: entries.length,
+    txCount: txCount,
+    rxCount: rxCount,
+    totalTxBytes: totalTxBytes,
+    totalRxBytes: totalRxBytes,
+    oldestEntry: entries.first.timestamp,
+    newestEntry: entries.last.timestamp,
+  );
 });
 
 // ============================================================================

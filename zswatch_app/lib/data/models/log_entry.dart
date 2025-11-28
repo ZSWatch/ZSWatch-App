@@ -6,6 +6,15 @@ enum LogDirection {
   outgoing,
 }
 
+/// Log level parsed from log messages (<dbg>, <inf>, <wrn>, <err>)
+enum LogLevel {
+  debug,   // <dbg>
+  info,    // <inf>
+  warning, // <wrn>
+  error,   // <err>
+  unknown, // No level tag found
+}
+
 /// Type of log entry to enable filtering
 enum LogEntryType {
   /// Raw log message from watch (t:"log" or raw text)
@@ -87,6 +96,16 @@ class LogEntry {
     required this.direction,
     this.isJson = false,
   });
+
+  /// Log level parsed from message (<dbg>, <inf>, <wrn>, <err>)
+  /// Computed on-demand from message content to avoid issues with hot reload
+  LogLevel get level {
+    if (message.contains('<dbg>')) return LogLevel.debug;
+    if (message.contains('<inf>')) return LogLevel.info;
+    if (message.contains('<wrn>')) return LogLevel.warning;
+    if (message.contains('<err>')) return LogLevel.error;
+    return LogLevel.unknown;
+  }
 
   /// Create a log entry from incoming BLE data
   factory LogEntry.incoming({
@@ -228,6 +247,22 @@ class LogEntry {
 
   /// Get direction arrow for display
   String get directionArrow => direction == LogDirection.incoming ? '←' : '→';
+
+  /// Get display name for log level
+  String get levelDisplayName {
+    switch (level) {
+      case LogLevel.debug:
+        return 'DBG';
+      case LogLevel.info:
+        return 'INF';
+      case LogLevel.warning:
+        return 'WRN';
+      case LogLevel.error:
+        return 'ERR';
+      case LogLevel.unknown:
+        return '';
+    }
+  }
 
   @override
   bool operator ==(Object other) =>

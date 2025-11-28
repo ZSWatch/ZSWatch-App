@@ -28,6 +28,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _autoScroll = true;
   bool _isAtBottom = true;
+  LogLevel? _levelFilter; // null = all levels
 
   @override
   void initState() {
@@ -48,9 +49,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
     if (isAtBottom != _isAtBottom) {
       setState(() {
         _isAtBottom = isAtBottom;
-        if (isAtBottom) {
-          _autoScroll = true;
-        }
+        // Enable auto-scroll when at bottom, disable when scrolling away
+        _autoScroll = isAtBottom;
       });
     }
   }
@@ -67,9 +67,14 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final entries = ref.watch(logEntriesProvider);
+    final allEntries = ref.watch(logEntriesProvider);
     final connection = ref.watch(watchConnectionProvider);
     final logStreamingState = ref.watch(logStreamingStateProvider);
+
+    // Apply level filter
+    final entries = _levelFilter == null
+        ? allEntries
+        : allEntries.where((e) => e.level == _levelFilter).toList();
 
     // Auto-scroll to bottom when new entries arrive
     ref.listen(logEntriesProvider, (previous, next) {
@@ -84,6 +89,92 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
       appBar: AppBar(
         title: const Text('Log Viewer'),
         actions: [
+          // Log level filter
+          PopupMenuButton<_LogLevelFilter>(
+            icon: Icon(
+              Icons.filter_list,
+              color: _levelFilter != null ? AppTheme.primaryColor : null,
+            ),
+            tooltip: 'Filter by level',
+            onSelected: (filter) {
+              setState(() {
+                _levelFilter = filter.level;
+              });
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: const _LogLevelFilter(null),
+                child: Row(
+                  children: [
+                    Icon(
+                      _levelFilter == null ? Icons.check : null,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('All levels'),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: const _LogLevelFilter(LogLevel.debug),
+                child: Row(
+                  children: [
+                    Icon(
+                      _levelFilter == LogLevel.debug ? Icons.check : null,
+                      size: 18,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Debug', style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: const _LogLevelFilter(LogLevel.info),
+                child: Row(
+                  children: [
+                    Icon(
+                      _levelFilter == LogLevel.info ? Icons.check : null,
+                      size: 18,
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Info', style: TextStyle(color: Colors.blue)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: const _LogLevelFilter(LogLevel.warning),
+                child: Row(
+                  children: [
+                    Icon(
+                      _levelFilter == LogLevel.warning ? Icons.check : null,
+                      size: 18,
+                      color: Colors.orange,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Warning', style: TextStyle(color: Colors.orange)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: const _LogLevelFilter(LogLevel.error),
+                child: Row(
+                  children: [
+                    Icon(
+                      _levelFilter == LogLevel.error ? Icons.check : null,
+                      size: 18,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Error', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
           // Clear button
           IconButton(
             icon: const Icon(Icons.delete_outline),
@@ -151,7 +242,9 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
           // Stats bar
           _StatsBar(
             entryCount: entries.length,
+            totalCount: allEntries.length,
             autoScroll: _autoScroll,
+            levelFilter: _levelFilter,
           ),
 
           // Log entries list
@@ -266,15 +359,21 @@ class _LogStreamingBar extends StatelessWidget {
 
 class _StatsBar extends StatelessWidget {
   final int entryCount;
+  final int totalCount;
   final bool autoScroll;
+  final LogLevel? levelFilter;
 
   const _StatsBar({
     required this.entryCount,
+    required this.totalCount,
     required this.autoScroll,
+    this.levelFilter,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isFiltered = levelFilter != null;
+    
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppTheme.spacingMd,
@@ -291,11 +390,28 @@ class _StatsBar extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            '$entryCount entries',
+            isFiltered ? '$entryCount / $totalCount entries' : '$entryCount entries',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: AppTheme.textSecondary,
                 ),
           ),
+          if (isFiltered) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _getLevelColor(levelFilter!).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                _getLevelName(levelFilter!),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: _getLevelColor(levelFilter!),
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+          ],
           const Spacer(),
           if (autoScroll)
             Row(
@@ -319,6 +435,36 @@ class _StatsBar extends StatelessWidget {
       ),
     );
   }
+
+  Color _getLevelColor(LogLevel level) {
+    switch (level) {
+      case LogLevel.debug:
+        return Colors.grey;
+      case LogLevel.info:
+        return Colors.blue;
+      case LogLevel.warning:
+        return Colors.orange;
+      case LogLevel.error:
+        return Colors.red;
+      case LogLevel.unknown:
+        return Colors.grey;
+    }
+  }
+
+  String _getLevelName(LogLevel level) {
+    switch (level) {
+      case LogLevel.debug:
+        return 'DEBUG';
+      case LogLevel.info:
+        return 'INFO';
+      case LogLevel.warning:
+        return 'WARNING';
+      case LogLevel.error:
+        return 'ERROR';
+      case LogLevel.unknown:
+        return 'UNKNOWN';
+    }
+  }
 }
 
 class _LogEntryTile extends StatelessWidget {
@@ -328,10 +474,10 @@ class _LogEntryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isIncoming = entry.direction == LogDirection.incoming;
-    final typeColor = _getTypeColor(entry.type);
+    final levelColor = _getLevelColor(entry.level);
 
     return InkWell(
+      onTap: () => _showFullLogDialog(context),
       onLongPress: () {
         Clipboard.setData(ClipboardData(text: entry.message));
         ScaffoldMessenger.of(context).showSnackBar(
@@ -356,56 +502,28 @@ class _LogEntryTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Timestamp
-            SizedBox(
-              width: 85,
-              child: Text(
-                entry.formattedTimestamp,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      color: AppTheme.textSecondary,
-                      fontSize: 11,
-                    ),
-              ),
+            // Timestamp with milliseconds
+            Text(
+              entry.formattedTimestamp,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    color: AppTheme.textSecondary,
+                    fontSize: 10,
+                  ),
             ),
 
-            // Direction indicator
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Icon(
-                isIncoming ? Icons.arrow_back : Icons.arrow_forward,
-                size: 14,
-                color: isIncoming ? AppTheme.successColor : AppTheme.primaryColor,
-              ),
-            ),
+            const SizedBox(width: 6),
 
-            // Type badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              margin: const EdgeInsets.only(right: 6),
-              decoration: BoxDecoration(
-                color: typeColor.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                entry.typeDisplayName,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: typeColor,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-            ),
-
-            // Message
+            // Message (colored by log level)
             Expanded(
               child: Text(
                 entry.message,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       fontFamily: 'monospace',
-                      fontSize: 12,
+                      fontSize: 11,
+                      color: levelColor,
                     ),
-                maxLines: 3,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -415,39 +533,88 @@ class _LogEntryTile extends StatelessWidget {
     );
   }
 
-  Color _getTypeColor(LogEntryType type) {
-    switch (type) {
-      case LogEntryType.log:
+  Color _getLevelColor(LogLevel level) {
+    switch (level) {
+      case LogLevel.debug:
         return Colors.grey;
-      case LogEntryType.notification:
+      case LogLevel.info:
+        return Colors.blue.shade300;
+      case LogLevel.warning:
         return Colors.orange;
-      case LogEntryType.music:
-        return Colors.purple;
-      case LogEntryType.activity:
-        return Colors.green;
-      case LogEntryType.status:
-        return Colors.blue;
-      case LogEntryType.gps:
-        return Colors.teal;
-      case LogEntryType.weather:
-        return Colors.cyan;
-      case LogEntryType.call:
+      case LogLevel.error:
         return Colors.red;
-      case LogEntryType.find:
-        return Colors.amber;
-      case LogEntryType.navigation:
-        return Colors.indigo;
-      case LogEntryType.http:
-        return Colors.brown;
-      case LogEntryType.alarm:
-        return Colors.pink;
-      case LogEntryType.calendar:
-        return Colors.deepPurple;
-      case LogEntryType.alert:
-        return Colors.redAccent;
-      case LogEntryType.other:
-        return Colors.blueGrey;
+      case LogLevel.unknown:
+        return Colors.white70;
     }
+  }
+
+  void _showFullLogDialog(BuildContext context) {
+    final levelColor = _getLevelColor(entry.level);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            if (entry.level != LogLevel.unknown) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: levelColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  entry.levelDisplayName,
+                  style: TextStyle(
+                    color: levelColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            const Spacer(),
+            Text(
+              entry.formattedTimestamp,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                    fontFamily: 'monospace',
+                  ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            entry.message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  color: levelColor,
+                ),
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: entry.message));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Copied to clipboard'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+            },
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('Copy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -487,4 +654,11 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Wrapper class for LogLevel to allow null values in PopupMenuButton
+/// (PopupMenuButton doesn't call onSelected for null values)
+class _LogLevelFilter {
+  final LogLevel? level;
+  const _LogLevelFilter(this.level);
 }

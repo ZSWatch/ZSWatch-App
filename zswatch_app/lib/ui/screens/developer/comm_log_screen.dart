@@ -23,6 +23,7 @@ class CommLogScreen extends ConsumerStatefulWidget {
 class _CommLogScreenState extends ConsumerState<CommLogScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _autoScroll = true;
+  bool _isAtBottom = true;
   CommDirection? _directionFilter; // null = all, rx = incoming only, tx = outgoing only
   bool _showHex = false;
 
@@ -34,6 +35,7 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
@@ -41,9 +43,11 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
   void _onScroll() {
     final isAtBottom = _scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 50;
-    if (isAtBottom && !_autoScroll) {
+    if (isAtBottom != _isAtBottom) {
       setState(() {
-        _autoScroll = true;
+        _isAtBottom = isAtBottom;
+        // Enable auto-scroll when at bottom, disable when scrolling away
+        _autoScroll = isAtBottom;
       });
     }
   }
@@ -93,21 +97,20 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
           ),
 
           // Direction filter
-          PopupMenuButton<CommDirection?>(
+          PopupMenuButton<_DirectionFilter>(
             icon: Badge(
               isLabelVisible: _directionFilter != null,
               child: const Icon(Icons.filter_list),
             ),
             tooltip: 'Filter by direction',
-            initialValue: _directionFilter,
-            onSelected: (value) {
+            onSelected: (filter) {
               setState(() {
-                _directionFilter = value;
+                _directionFilter = filter.direction;
               });
             },
             itemBuilder: (context) => [
               PopupMenuItem(
-                value: null,
+                value: const _DirectionFilter(null),
                 child: Row(
                   children: [
                     if (_directionFilter == null)
@@ -120,7 +123,7 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
                 ),
               ),
               PopupMenuItem(
-                value: CommDirection.rx,
+                value: const _DirectionFilter(CommDirection.rx),
                 child: Row(
                   children: [
                     if (_directionFilter == CommDirection.rx)
@@ -135,7 +138,7 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
                 ),
               ),
               PopupMenuItem(
-                value: CommDirection.tx,
+                value: const _DirectionFilter(CommDirection.tx),
                 child: Row(
                   children: [
                     if (_directionFilter == CommDirection.tx)
@@ -221,6 +224,15 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
           ),
         ],
       ),
+      floatingActionButton: !_isAtBottom
+          ? FloatingActionButton.small(
+              onPressed: () {
+                _autoScroll = true;
+                _scrollToBottom();
+              },
+              child: const Icon(Icons.arrow_downward),
+            )
+          : null,
     );
   }
 
@@ -477,4 +489,11 @@ class _CommLogEntryTile extends StatelessWidget {
         .join(' ')
         .toUpperCase();
   }
+}
+
+/// Wrapper class for CommDirection to allow null values in PopupMenuButton
+/// (PopupMenuButton doesn't call onSelected for null values)
+class _DirectionFilter {
+  final CommDirection? direction;
+  const _DirectionFilter(this.direction);
 }
