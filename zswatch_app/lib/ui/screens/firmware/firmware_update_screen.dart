@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/dfu_state.dart';
@@ -10,6 +11,7 @@ import '../../../data/models/filesystem_image.dart';
 import '../../../data/models/firmware_image.dart';
 import '../../../providers/dfu_providers.dart';
 import '../../../providers/filesystem_providers.dart';
+import '../../../providers/settings_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../../services/dfu/firmware_manager.dart';
 
@@ -33,6 +35,7 @@ class FirmwareUpdateScreen extends ConsumerStatefulWidget {
 class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
   bool _showLogs = false;
   final List<String> _logs = [];
+  bool _wakelockEnabled = false;
 
   @override
   void initState() {
@@ -60,12 +63,45 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
   }
 
   @override
+  void dispose() {
+    // Ensure wakelock is disabled when leaving the screen
+    _disableWakelock();
+    super.dispose();
+  }
+
+  /// Enable wakelock if setting is enabled and DFU is in progress
+  void _updateWakelock(bool dfuInProgress) {
+    final keepScreenOn = ref.read(keepScreenOnDuringDfuProvider);
+    
+    if (dfuInProgress && keepScreenOn && !_wakelockEnabled) {
+      WakelockPlus.enable();
+      _wakelockEnabled = true;
+    } else if (!dfuInProgress && _wakelockEnabled) {
+      _disableWakelock();
+    }
+  }
+
+  void _disableWakelock() {
+    if (_wakelockEnabled) {
+      WakelockPlus.disable();
+      _wakelockEnabled = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final dfuState = ref.watch(dfuStateProvider);
     final operationState = ref.watch(dfuNotifierProvider);
     final downloadProgress = ref.watch(downloadProgressProvider);
     final watch = ref.watch(currentWatchProvider);
     final isConnected = ref.watch(isWatchConnectedProvider);
+    final fsUploadState = ref.watch(filesystemUploadStateProvider);
+
+    // Manage wakelock based on DFU/upload state
+    final isDfuInProgress = dfuState.status.isInProgress || 
+                            fsUploadState.status.isInProgress ||
+                            operationState.isDownloading;
+    _updateWakelock(isDfuInProgress);
 
     // Prevent back navigation during critical DFU phase
     return PopScope(

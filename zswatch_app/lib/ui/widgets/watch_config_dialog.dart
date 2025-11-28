@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/database/app_database.dart';
@@ -250,10 +251,10 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
             color: AppTheme.primaryColor.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
           ),
-          child: const Icon(
-            Icons.watch,
-            color: AppTheme.primaryColor,
-            size: 28,
+          child: SvgPicture.asset(
+            'assets/images/ZSWatch_Logo.svg',
+            width: 28,
+            height: 28,
           ),
         ),
         const SizedBox(width: AppTheme.spacingMd),

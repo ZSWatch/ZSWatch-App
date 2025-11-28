@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -319,11 +320,17 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            isScanning ? Icons.radar : Icons.watch,
-            size: 64,
-            color: AppTheme.textSecondary.withValues(alpha: 0.5),
-          ),
+          isScanning
+              ? Icon(
+                  Icons.radar,
+                  size: 64,
+                  color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                )
+              : SvgPicture.asset(
+                  'assets/images/ZSWatch_Logo.svg',
+                  width: 64,
+                  height: 64,
+                ),
           const SizedBox(height: AppTheme.spacingMd),
           Text(
             isScanning ? 'Looking for devices...' : 'No devices found',
@@ -472,11 +479,17 @@ class _DeviceListTile extends StatelessWidget {
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
       ),
-      child: Icon(
-        _getIcon(),
-        color: color,
-        size: 24,
-      ),
+      child: device.isConnected
+          ? Icon(
+              Icons.bluetooth_connected,
+              color: color,
+              size: 24,
+            )
+          : SvgPicture.asset(
+              'assets/images/ZSWatch_Logo.svg',
+              width: 24,
+              height: 24,
+            ),
     );
   }
 
@@ -486,12 +499,6 @@ class _DeviceListTile extends StatelessWidget {
     if (device.rssi >= -50) return AppTheme.successColor;
     if (device.rssi >= -70) return AppTheme.warningColor;
     return AppTheme.errorColor;
-  }
-
-  IconData _getIcon() {
-    if (device.isConnected) return Icons.bluetooth_connected;
-    if (device.isBonded) return Icons.watch;
-    return Icons.watch;
   }
 
   String _getSubtitleText() {

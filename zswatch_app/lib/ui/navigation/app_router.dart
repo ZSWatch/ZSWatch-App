@@ -17,6 +17,7 @@ import '../screens/firmware/firmware_update_screen.dart';
 import '../screens/health/health_screen.dart';
 import '../screens/health/heart_rate_screen.dart';
 import '../screens/notifications/notification_settings_screen.dart';
+import '../screens/settings/settings_screen.dart';
 import '../screens/start/start_page_screen.dart';
 
 /// Route names for the app
@@ -95,8 +96,7 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.settings,
         name: 'settings',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Settings'),
+        builder: (context, state) => const SettingsScreen(),
       ),
 
       // Firmware update

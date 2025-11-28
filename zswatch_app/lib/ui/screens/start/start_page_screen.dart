@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -234,10 +235,10 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.watch_outlined,
-              size: 80,
-              color: AppTheme.textSecondary.withValues(alpha: 0.5),
+            SvgPicture.asset(
+              'assets/images/ZSWatch_Logo.svg',
+              width: 80,
+              height: 80,
             ),
             const SizedBox(height: AppTheme.spacingLg),
             Text(
@@ -423,10 +424,10 @@ class _WatchListTile extends StatelessWidget {
           : Stack(
               alignment: Alignment.center,
               children: [
-                const Icon(
-                  Icons.watch,
-                  color: AppTheme.primaryColor,
-                  size: 28,
+                SvgPicture.asset(
+                  'assets/images/ZSWatch_Logo.svg',
+                  width: 28,
+                  height: 28,
                 ),
                 if (watch.batteryLevel != null)
                   Positioned(

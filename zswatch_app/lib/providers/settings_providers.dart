@@ -11,6 +11,7 @@ abstract final class SettingsKeys {
   static const String lastConnectedWatchId = 'last_connected_watch_id';
   static const String notificationFilterPackages = 'notification_filter_packages';
   static const String onboardingCompleted = 'onboarding_completed';
+  static const String keepScreenOnDuringDfu = 'keep_screen_on_during_dfu';
 }
 
 /// Provider for SharedPreferences instance
@@ -195,6 +196,30 @@ class OnboardingCompletedNotifier extends StateNotifier<bool> {
   void reset() {
     state = false;
     _prefs?.setBool(SettingsKeys.onboardingCompleted, false);
+  }
+}
+
+/// Provider for keep screen on during DFU setting
+final keepScreenOnDuringDfuProvider =
+    StateNotifierProvider<KeepScreenOnDuringDfuNotifier, bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return KeepScreenOnDuringDfuNotifier(prefs.valueOrNull);
+});
+
+class KeepScreenOnDuringDfuNotifier extends StateNotifier<bool> {
+  final SharedPreferences? _prefs;
+
+  KeepScreenOnDuringDfuNotifier(this._prefs)
+      : super(_prefs?.getBool(SettingsKeys.keepScreenOnDuringDfu) ?? true);
+
+  void toggle() {
+    state = !state;
+    _prefs?.setBool(SettingsKeys.keepScreenOnDuringDfu, state);
+  }
+
+  void setEnabled(bool enabled) {
+    state = enabled;
+    _prefs?.setBool(SettingsKeys.keepScreenOnDuringDfu, enabled);
   }
 }
 
