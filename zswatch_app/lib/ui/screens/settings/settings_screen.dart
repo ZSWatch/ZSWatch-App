@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../providers/gps_providers.dart';
 import '../../../providers/settings_providers.dart';
 
 /// Settings screen for app configuration
@@ -41,6 +43,12 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ),
+
+          const Divider(height: 32),
+
+          // GPS / Location Settings
+          _SectionHeader(title: 'Location'),
+          _GpsPermissionTile(),
 
           const Divider(height: 32),
 
@@ -242,6 +250,135 @@ class _InfoRow extends StatelessWidget {
           Text(
             value,
             style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Provider for GPS permission status
+final _gpsPermissionProvider = FutureProvider<LocationPermission>((ref) async {
+  return Geolocator.checkPermission();
+});
+
+/// GPS permission settings tile
+class _GpsPermissionTile extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final permissionAsync = ref.watch(_gpsPermissionProvider);
+
+    return permissionAsync.when(
+      data: (permission) {
+        final isGranted = permission == LocationPermission.always ||
+            permission == LocationPermission.whileInUse;
+        final statusText = _getPermissionStatusText(permission);
+        final statusColor = isGranted ? AppTheme.successColor : AppTheme.warningColor;
+
+        return _SettingsTile(
+          leading: Icon(
+            isGranted ? Icons.location_on : Icons.location_off,
+            color: statusColor,
+          ),
+          title: 'Watch GPS Requests',
+          subtitle: statusText,
+          trailing: TextButton(
+            onPressed: () async {
+              if (permission == LocationPermission.deniedForever) {
+                // Open app settings
+                await ref.read(gpsNotifierProvider.notifier).openAppSettings();
+              } else if (!isGranted) {
+                // Request permission
+                await Geolocator.requestPermission();
+              } else {
+                // Already granted - open settings to revoke if desired
+                await ref.read(gpsNotifierProvider.notifier).openAppSettings();
+              }
+              // Refresh permission status
+              ref.invalidate(_gpsPermissionProvider);
+            },
+            child: Text(isGranted ? 'Settings' : 'Enable'),
+          ),
+          onTap: () => _showGpsInfoDialog(context, permission),
+        );
+      },
+      loading: () => _SettingsTile(
+        leading: const Icon(Icons.location_searching, color: AppTheme.textSecondary),
+        title: 'Watch GPS Requests',
+        subtitle: 'Checking permission...',
+      ),
+      error: (_, __) => _SettingsTile(
+        leading: const Icon(Icons.location_off, color: AppTheme.errorColor),
+        title: 'Watch GPS Requests',
+        subtitle: 'Unable to check permission',
+      ),
+    );
+  }
+
+  String _getPermissionStatusText(LocationPermission permission) {
+    switch (permission) {
+      case LocationPermission.always:
+        return 'Allowed (always)';
+      case LocationPermission.whileInUse:
+        return 'Allowed (while using app)';
+      case LocationPermission.denied:
+        return 'Not allowed - tap to enable';
+      case LocationPermission.deniedForever:
+        return 'Denied - tap to open settings';
+      case LocationPermission.unableToDetermine:
+        return 'Unable to determine';
+    }
+  }
+
+  void _showGpsInfoDialog(BuildContext context, LocationPermission permission) {
+    final isGranted = permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Watch GPS Requests'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'When enabled, your watch can request GPS location from your phone '
+              'for features like weather (location-based forecasts) and fitness tracking.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(
+                  isGranted ? Icons.check_circle : Icons.cancel,
+                  color: isGranted ? AppTheme.successColor : AppTheme.warningColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Status: ${_getPermissionStatusText(permission)}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            if (!isGranted) ...[
+              const SizedBox(height: 16),
+              Text(
+                'To enable, tap "Enable" or go to your phone\'s Settings > Apps > ZSWatch > Permissions > Location.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
           ),
         ],
       ),

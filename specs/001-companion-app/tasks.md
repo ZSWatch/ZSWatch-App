@@ -900,7 +900,7 @@
 
 ---
 
-## Phase 11.5: GPS Location Support (Gadgetbridge GPSPower) 🆕
+## Phase 11.5: GPS Location Support (Gadgetbridge GPSPower) 🆕 ✅ COMPLETE
 
 *Note: Persistent BLE Connection moved to Phase 3.8 for earlier implementation*
 
@@ -910,45 +910,49 @@
 
 ### Models
 
-- [ ] T133j [P] Create GPSLocation model in lib/data/models/gps_location.dart
+- [X] T133j [P] Create GPSLocation model in lib/data/models/gps_location.dart
   - latitude, longitude, accuracy, altitude, timestamp
+  - **Note**: Using geolocator's Position class directly
 
 ### Services
 
-- [ ] T133k Create gps_service.dart in lib/services/location/
+- [X] T133k Create gps_service.dart in lib/services/location/
   - Request location permission (FR-105)
   - Obtain current location from phone
   - Handle permission denial gracefully (FR-107)
   - Return fresh location (not stale)
+  - Added openAppSettings() and openLocationSettings() for permission management
 
 ### Gadgetbridge Protocol
 
-- [ ] T133l Implement GPSPower command handling in gadgetbridge_protocol.dart
+- [X] T133l Implement GPSPower command handling in gadgetbridge_protocol.dart
   - Parse GPS request from watch (FR-103)
-  - Format: `t:"gps"` or similar Gadgetbridge GPS message
+  - Format: `t:"gps_power"` with status boolean
 
-- [ ] T133m Implement GPS response in gadgetbridge_protocol.dart
+- [X] T133m Implement GPS response in gadgetbridge_protocol.dart
   - Send location in Gadgetbridge-compatible format (FR-106)
-  - Include lat, lon, accuracy, speed, bearing
+  - Include lat, lon, alt, speed, course, time, hdop, gpsSource
 
 ### Integration
 
-- [ ] T133n Create gps_handler.dart in lib/services/location/
-  - Listen for GPS requests from protocol service
-  - Call gps_service to obtain location
-  - Send response via protocol service
+- [X] T133n Create gps_handler.dart in lib/providers/gps_providers.dart
+  - GpsNotifier listens for GPS requests from watch service
+  - Calls gps_service to obtain location
+  - Sends response via watch service
+  - Periodic updates (5 seconds) when GPS active
 
-- [ ] T133o Add location permission request in permission_handler
-  - Request ACCESS_FINE_LOCATION on Android
-  - Request location when-in-use on iOS
-  - Handle permission denied with error response to watch
+- [X] T133o Add location permission request in settings
+  - GPS permission tile in Settings screen
+  - Shows current permission status
+  - Button to enable or open app settings
+  - Info dialog explaining GPS feature
 
 ### Dependencies
 
-- [ ] T133p Add geolocator package to pubspec.yaml
-  - Or use location package for cross-platform GPS
+- [X] T133p Add geolocator package to pubspec.yaml
+  - geolocator: ^13.0.2
 
-**Checkpoint**: Watch can request and receive phone GPS location
+**Checkpoint**: Watch can request and receive phone GPS location ✅
 
 ---
 
