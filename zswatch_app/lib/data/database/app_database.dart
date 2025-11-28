@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'tables/battery_readings_table.dart';
 import 'tables/comm_log_entries_table.dart';
+import 'tables/connection_events_table.dart';
 import 'tables/health_samples_table.dart';
 import 'tables/watches_table.dart';
 
@@ -19,15 +20,16 @@ part 'app_database.g.dart';
 /// - HealthSamples: Steps, heart rate, and other health metrics
 /// - BatteryReadings: Battery level history for analytics
 /// - CommLogEntries: BLE communication logs for debugging
+/// - ConnectionEvents: Connection/disconnection events for analytics
 @DriftDatabase(
-  tables: [Watches, HealthSamples, BatteryReadings, CommLogEntries],
+  tables: [Watches, HealthSamples, BatteryReadings, CommLogEntries, ConnectionEvents],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   /// Database schema version - increment when making schema changes
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -40,6 +42,10 @@ class AppDatabase extends _$AppDatabase {
         if (from < 2) {
           // Add custom_name column for watch rename feature (FR-099 to FR-102)
           await m.addColumn(watches, watches.customName);
+        }
+        if (from < 3) {
+          // Add connection events table for analytics (US9)
+          await m.createTable(connectionEvents);
         }
       },
     );
@@ -215,6 +221,87 @@ class AppDatabase extends _$AppDatabase {
   /// Clear all comm logs
   Future<int> clearCommLogs() => delete(commLogEntries).go();
 
+  // ==================== Connection Events Operations ====================
+
+  /// Insert a connection event
+  Future<int> insertConnectionEvent(ConnectionEventsCompanion event) {
+    return into(connectionEvents).insert(event);
+  }
+
+  /// Get connection events for a watch within date range
+  Future<List<ConnectionEventEntity>> getConnectionEvents({
+    required String watchId,
+    required DateTime from,
+    required DateTime to,
+  }) {
+    return (select(connectionEvents)
+          ..where((e) =>
+              e.watchId.equals(watchId) &
+              e.timestamp.isBetweenValues(from, to))
+          ..orderBy([(e) => OrderingTerm.asc(e.timestamp)]))
+        .get();
+  }
+
+  /// Get all connection events within date range (all watches)
+  Future<List<ConnectionEventEntity>> getAllConnectionEvents({
+    required DateTime from,
+    required DateTime to,
+  }) {
+    return (select(connectionEvents)
+          ..where((e) => e.timestamp.isBetweenValues(from, to))
+          ..orderBy([(e) => OrderingTerm.asc(e.timestamp)]))
+        .get();
+  }
+
+  /// Get recent disconnection events for a watch
+  Future<List<ConnectionEventEntity>> getRecentDisconnections({
+    required String watchId,
+    int limit = 20,
+  }) {
+    return (select(connectionEvents)
+          ..where((e) =>
+              e.watchId.equals(watchId) &
+              e.eventType.equals('disconnected'))
+          ..orderBy([(e) => OrderingTerm.desc(e.timestamp)])
+          ..limit(limit))
+        .get();
+  }
+
+  /// Get connection events count by type for a watch within date range
+  Future<int> getConnectionEventCount({
+    required String watchId,
+    required String eventType,
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final query = selectOnly(connectionEvents)
+      ..addColumns([connectionEvents.id.count()])
+      ..where(connectionEvents.watchId.equals(watchId) &
+          connectionEvents.eventType.equals(eventType) &
+          connectionEvents.timestamp.isBetweenValues(from, to));
+    final result = await query.getSingle();
+    return result.read(connectionEvents.id.count()) ?? 0;
+  }
+
+  /// Delete connection events older than specified date
+  Future<int> deleteOldConnectionEvents(DateTime cutoff) {
+    return (delete(connectionEvents)
+          ..where((e) => e.timestamp.isSmallerThanValue(cutoff)))
+        .go();
+  }
+
+  /// Watch connection events (stream)
+  Stream<List<ConnectionEventEntity>> watchConnectionEvents({
+    required String watchId,
+    int limit = 100,
+  }) {
+    return (select(connectionEvents)
+          ..where((e) => e.watchId.equals(watchId))
+          ..orderBy([(e) => OrderingTerm.desc(e.timestamp)])
+          ..limit(limit))
+        .watch();
+  }
+
   // ==================== Data Retention ====================
 
   /// Clean up old data (60-day retention)
@@ -222,6 +309,7 @@ class AppDatabase extends _$AppDatabase {
     final cutoff = DateTime.now().subtract(const Duration(days: 60));
     await deleteOldHealthSamples(cutoff);
     await deleteOldBatteryReadings(cutoff);
+    await deleteOldConnectionEvents(cutoff);
   }
 }
 

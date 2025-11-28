@@ -7,6 +7,7 @@ import '../../data/models/connection_state.dart';
 import '../../providers/auto_reconnect_provider.dart';
 import '../../providers/ble_providers.dart';
 import '../../providers/watch_service_provider.dart';
+import '../screens/analytics/analytics_screen.dart';
 import '../screens/connection/scan_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/developer/comm_log_screen.dart';
@@ -131,8 +132,7 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.analytics,
         name: 'analytics',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Analytics'),
+        builder: (context, state) => const AnalyticsScreen(),
       ),
 
       // Developer routes

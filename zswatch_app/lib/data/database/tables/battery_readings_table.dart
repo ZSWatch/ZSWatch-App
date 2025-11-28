@@ -4,7 +4,7 @@ import 'watches_table.dart';
 
 /// Battery readings table - battery level samples for analytics
 ///
-/// Samples are taken every 5 minutes when connected.
+/// Samples are stored when received from the watch.
 /// Data is retained for 60 days for trend analysis.
 @DataClassName('BatteryReadingEntity')
 class BatteryReadings extends Table {

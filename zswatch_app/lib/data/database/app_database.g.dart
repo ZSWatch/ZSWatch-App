@@ -1982,6 +1982,481 @@ class CommLogEntriesCompanion extends UpdateCompanion<CommLogEntryEntity> {
   }
 }
 
+class $ConnectionEventsTable extends ConnectionEvents
+    with TableInfo<$ConnectionEventsTable, ConnectionEventEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ConnectionEventsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _watchIdMeta = const VerificationMeta(
+    'watchId',
+  );
+  @override
+  late final GeneratedColumn<String> watchId = GeneratedColumn<String>(
+    'watch_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES watches (id)',
+    ),
+  );
+  static const VerificationMeta _eventTypeMeta = const VerificationMeta(
+    'eventType',
+  );
+  @override
+  late final GeneratedColumn<String> eventType = GeneratedColumn<String>(
+    'event_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _timestampMeta = const VerificationMeta(
+    'timestamp',
+  );
+  @override
+  late final GeneratedColumn<DateTime> timestamp = GeneratedColumn<DateTime>(
+    'timestamp',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<String> reason = GeneratedColumn<String>(
+    'reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _detailsMeta = const VerificationMeta(
+    'details',
+  );
+  @override
+  late final GeneratedColumn<String> details = GeneratedColumn<String>(
+    'details',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    watchId,
+    eventType,
+    timestamp,
+    reason,
+    details,
+    sessionId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'connection_events';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ConnectionEventEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('watch_id')) {
+      context.handle(
+        _watchIdMeta,
+        watchId.isAcceptableOrUnknown(data['watch_id']!, _watchIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_watchIdMeta);
+    }
+    if (data.containsKey('event_type')) {
+      context.handle(
+        _eventTypeMeta,
+        eventType.isAcceptableOrUnknown(data['event_type']!, _eventTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eventTypeMeta);
+    }
+    if (data.containsKey('timestamp')) {
+      context.handle(
+        _timestampMeta,
+        timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_timestampMeta);
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    }
+    if (data.containsKey('details')) {
+      context.handle(
+        _detailsMeta,
+        details.isAcceptableOrUnknown(data['details']!, _detailsMeta),
+      );
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ConnectionEventEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ConnectionEventEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      watchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}watch_id'],
+      )!,
+      eventType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}event_type'],
+      )!,
+      timestamp: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}timestamp'],
+      )!,
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reason'],
+      ),
+      details: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}details'],
+      ),
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      ),
+    );
+  }
+
+  @override
+  $ConnectionEventsTable createAlias(String alias) {
+    return $ConnectionEventsTable(attachedDatabase, alias);
+  }
+}
+
+class ConnectionEventEntity extends DataClass
+    implements Insertable<ConnectionEventEntity> {
+  /// Auto-incrementing row identifier
+  final int id;
+
+  /// Foreign key to source watch
+  final String watchId;
+
+  /// Type of event: connected, disconnected, reconnect_attempt, reconnect_failed
+  final String eventType;
+
+  /// When the event occurred
+  final DateTime timestamp;
+
+  /// Reason for disconnection (only for disconnect events)
+  /// Values: user_requested, connection_lost, device_unavailable,
+  ///         bluetooth_disabled, app_terminated, unknown
+  final String? reason;
+
+  /// Additional details (e.g., error message)
+  final String? details;
+
+  /// Session ID to group connect/disconnect pairs
+  /// Generated as UUID when connection is established
+  final String? sessionId;
+  const ConnectionEventEntity({
+    required this.id,
+    required this.watchId,
+    required this.eventType,
+    required this.timestamp,
+    this.reason,
+    this.details,
+    this.sessionId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['watch_id'] = Variable<String>(watchId);
+    map['event_type'] = Variable<String>(eventType);
+    map['timestamp'] = Variable<DateTime>(timestamp);
+    if (!nullToAbsent || reason != null) {
+      map['reason'] = Variable<String>(reason);
+    }
+    if (!nullToAbsent || details != null) {
+      map['details'] = Variable<String>(details);
+    }
+    if (!nullToAbsent || sessionId != null) {
+      map['session_id'] = Variable<String>(sessionId);
+    }
+    return map;
+  }
+
+  ConnectionEventsCompanion toCompanion(bool nullToAbsent) {
+    return ConnectionEventsCompanion(
+      id: Value(id),
+      watchId: Value(watchId),
+      eventType: Value(eventType),
+      timestamp: Value(timestamp),
+      reason: reason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reason),
+      details: details == null && nullToAbsent
+          ? const Value.absent()
+          : Value(details),
+      sessionId: sessionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionId),
+    );
+  }
+
+  factory ConnectionEventEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ConnectionEventEntity(
+      id: serializer.fromJson<int>(json['id']),
+      watchId: serializer.fromJson<String>(json['watchId']),
+      eventType: serializer.fromJson<String>(json['eventType']),
+      timestamp: serializer.fromJson<DateTime>(json['timestamp']),
+      reason: serializer.fromJson<String?>(json['reason']),
+      details: serializer.fromJson<String?>(json['details']),
+      sessionId: serializer.fromJson<String?>(json['sessionId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'watchId': serializer.toJson<String>(watchId),
+      'eventType': serializer.toJson<String>(eventType),
+      'timestamp': serializer.toJson<DateTime>(timestamp),
+      'reason': serializer.toJson<String?>(reason),
+      'details': serializer.toJson<String?>(details),
+      'sessionId': serializer.toJson<String?>(sessionId),
+    };
+  }
+
+  ConnectionEventEntity copyWith({
+    int? id,
+    String? watchId,
+    String? eventType,
+    DateTime? timestamp,
+    Value<String?> reason = const Value.absent(),
+    Value<String?> details = const Value.absent(),
+    Value<String?> sessionId = const Value.absent(),
+  }) => ConnectionEventEntity(
+    id: id ?? this.id,
+    watchId: watchId ?? this.watchId,
+    eventType: eventType ?? this.eventType,
+    timestamp: timestamp ?? this.timestamp,
+    reason: reason.present ? reason.value : this.reason,
+    details: details.present ? details.value : this.details,
+    sessionId: sessionId.present ? sessionId.value : this.sessionId,
+  );
+  ConnectionEventEntity copyWithCompanion(ConnectionEventsCompanion data) {
+    return ConnectionEventEntity(
+      id: data.id.present ? data.id.value : this.id,
+      watchId: data.watchId.present ? data.watchId.value : this.watchId,
+      eventType: data.eventType.present ? data.eventType.value : this.eventType,
+      timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      details: data.details.present ? data.details.value : this.details,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ConnectionEventEntity(')
+          ..write('id: $id, ')
+          ..write('watchId: $watchId, ')
+          ..write('eventType: $eventType, ')
+          ..write('timestamp: $timestamp, ')
+          ..write('reason: $reason, ')
+          ..write('details: $details, ')
+          ..write('sessionId: $sessionId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    watchId,
+    eventType,
+    timestamp,
+    reason,
+    details,
+    sessionId,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ConnectionEventEntity &&
+          other.id == this.id &&
+          other.watchId == this.watchId &&
+          other.eventType == this.eventType &&
+          other.timestamp == this.timestamp &&
+          other.reason == this.reason &&
+          other.details == this.details &&
+          other.sessionId == this.sessionId);
+}
+
+class ConnectionEventsCompanion extends UpdateCompanion<ConnectionEventEntity> {
+  final Value<int> id;
+  final Value<String> watchId;
+  final Value<String> eventType;
+  final Value<DateTime> timestamp;
+  final Value<String?> reason;
+  final Value<String?> details;
+  final Value<String?> sessionId;
+  const ConnectionEventsCompanion({
+    this.id = const Value.absent(),
+    this.watchId = const Value.absent(),
+    this.eventType = const Value.absent(),
+    this.timestamp = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.details = const Value.absent(),
+    this.sessionId = const Value.absent(),
+  });
+  ConnectionEventsCompanion.insert({
+    this.id = const Value.absent(),
+    required String watchId,
+    required String eventType,
+    required DateTime timestamp,
+    this.reason = const Value.absent(),
+    this.details = const Value.absent(),
+    this.sessionId = const Value.absent(),
+  }) : watchId = Value(watchId),
+       eventType = Value(eventType),
+       timestamp = Value(timestamp);
+  static Insertable<ConnectionEventEntity> custom({
+    Expression<int>? id,
+    Expression<String>? watchId,
+    Expression<String>? eventType,
+    Expression<DateTime>? timestamp,
+    Expression<String>? reason,
+    Expression<String>? details,
+    Expression<String>? sessionId,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (watchId != null) 'watch_id': watchId,
+      if (eventType != null) 'event_type': eventType,
+      if (timestamp != null) 'timestamp': timestamp,
+      if (reason != null) 'reason': reason,
+      if (details != null) 'details': details,
+      if (sessionId != null) 'session_id': sessionId,
+    });
+  }
+
+  ConnectionEventsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? watchId,
+    Value<String>? eventType,
+    Value<DateTime>? timestamp,
+    Value<String?>? reason,
+    Value<String?>? details,
+    Value<String?>? sessionId,
+  }) {
+    return ConnectionEventsCompanion(
+      id: id ?? this.id,
+      watchId: watchId ?? this.watchId,
+      eventType: eventType ?? this.eventType,
+      timestamp: timestamp ?? this.timestamp,
+      reason: reason ?? this.reason,
+      details: details ?? this.details,
+      sessionId: sessionId ?? this.sessionId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (watchId.present) {
+      map['watch_id'] = Variable<String>(watchId.value);
+    }
+    if (eventType.present) {
+      map['event_type'] = Variable<String>(eventType.value);
+    }
+    if (timestamp.present) {
+      map['timestamp'] = Variable<DateTime>(timestamp.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<String>(reason.value);
+    }
+    if (details.present) {
+      map['details'] = Variable<String>(details.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ConnectionEventsCompanion(')
+          ..write('id: $id, ')
+          ..write('watchId: $watchId, ')
+          ..write('eventType: $eventType, ')
+          ..write('timestamp: $timestamp, ')
+          ..write('reason: $reason, ')
+          ..write('details: $details, ')
+          ..write('sessionId: $sessionId')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1991,6 +2466,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $CommLogEntriesTable commLogEntries = $CommLogEntriesTable(this);
+  late final $ConnectionEventsTable connectionEvents = $ConnectionEventsTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2000,6 +2478,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     healthSamples,
     batteryReadings,
     commLogEntries,
+    connectionEvents,
   ];
 }
 
@@ -2068,6 +2547,29 @@ final class $$WatchesTableReferences
 
     final cache = $_typedResult.readTableOrNull(
       _batteryReadingsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $ConnectionEventsTable,
+    List<ConnectionEventEntity>
+  >
+  _connectionEventsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.connectionEvents,
+    aliasName: $_aliasNameGenerator(db.watches.id, db.connectionEvents.watchId),
+  );
+
+  $$ConnectionEventsTableProcessedTableManager get connectionEventsRefs {
+    final manager = $$ConnectionEventsTableTableManager(
+      $_db,
+      $_db.connectionEvents,
+    ).filter((f) => f.watchId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _connectionEventsRefsTable($_db),
     );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
@@ -2175,6 +2677,31 @@ class $$WatchesTableFilterComposer
           }) => $$BatteryReadingsTableFilterComposer(
             $db: $db,
             $table: $db.batteryReadings,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> connectionEventsRefs(
+    Expression<bool> Function($$ConnectionEventsTableFilterComposer f) f,
+  ) {
+    final $$ConnectionEventsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.connectionEvents,
+      getReferencedColumn: (t) => t.watchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConnectionEventsTableFilterComposer(
+            $db: $db,
+            $table: $db.connectionEvents,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2345,6 +2872,31 @@ class $$WatchesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> connectionEventsRefs<T extends Object>(
+    Expression<T> Function($$ConnectionEventsTableAnnotationComposer a) f,
+  ) {
+    final $$ConnectionEventsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.connectionEvents,
+      getReferencedColumn: (t) => t.watchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConnectionEventsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.connectionEvents,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$WatchesTableTableManager
@@ -2363,6 +2915,7 @@ class $$WatchesTableTableManager
           PrefetchHooks Function({
             bool healthSamplesRefs,
             bool batteryReadingsRefs,
+            bool connectionEventsRefs,
           })
         > {
   $$WatchesTableTableManager(_$AppDatabase db, $WatchesTable table)
@@ -2437,12 +2990,17 @@ class $$WatchesTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({healthSamplesRefs = false, batteryReadingsRefs = false}) {
+              ({
+                healthSamplesRefs = false,
+                batteryReadingsRefs = false,
+                connectionEventsRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (healthSamplesRefs) db.healthSamples,
                     if (batteryReadingsRefs) db.batteryReadings,
+                    if (connectionEventsRefs) db.connectionEvents,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -2489,6 +3047,27 @@ class $$WatchesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (connectionEventsRefs)
+                        await $_getPrefetchedData<
+                          WatchEntity,
+                          $WatchesTable,
+                          ConnectionEventEntity
+                        >(
+                          currentTable: table,
+                          referencedTable: $$WatchesTableReferences
+                              ._connectionEventsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$WatchesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).connectionEventsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.watchId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -2509,7 +3088,11 @@ typedef $$WatchesTableProcessedTableManager =
       $$WatchesTableUpdateCompanionBuilder,
       (WatchEntity, $$WatchesTableReferences),
       WatchEntity,
-      PrefetchHooks Function({bool healthSamplesRefs, bool batteryReadingsRefs})
+      PrefetchHooks Function({
+        bool healthSamplesRefs,
+        bool batteryReadingsRefs,
+        bool connectionEventsRefs,
+      })
     >;
 typedef $$HealthSamplesTableCreateCompanionBuilder =
     HealthSamplesCompanion Function({
@@ -3439,6 +4022,370 @@ typedef $$CommLogEntriesTableProcessedTableManager =
       CommLogEntryEntity,
       PrefetchHooks Function()
     >;
+typedef $$ConnectionEventsTableCreateCompanionBuilder =
+    ConnectionEventsCompanion Function({
+      Value<int> id,
+      required String watchId,
+      required String eventType,
+      required DateTime timestamp,
+      Value<String?> reason,
+      Value<String?> details,
+      Value<String?> sessionId,
+    });
+typedef $$ConnectionEventsTableUpdateCompanionBuilder =
+    ConnectionEventsCompanion Function({
+      Value<int> id,
+      Value<String> watchId,
+      Value<String> eventType,
+      Value<DateTime> timestamp,
+      Value<String?> reason,
+      Value<String?> details,
+      Value<String?> sessionId,
+    });
+
+final class $$ConnectionEventsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $ConnectionEventsTable,
+          ConnectionEventEntity
+        > {
+  $$ConnectionEventsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $WatchesTable _watchIdTable(_$AppDatabase db) =>
+      db.watches.createAlias(
+        $_aliasNameGenerator(db.connectionEvents.watchId, db.watches.id),
+      );
+
+  $$WatchesTableProcessedTableManager get watchId {
+    final $_column = $_itemColumn<String>('watch_id')!;
+
+    final manager = $$WatchesTableTableManager(
+      $_db,
+      $_db.watches,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_watchIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ConnectionEventsTableFilterComposer
+    extends Composer<_$AppDatabase, $ConnectionEventsTable> {
+  $$ConnectionEventsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventType => $composableBuilder(
+    column: $table.eventType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get timestamp => $composableBuilder(
+    column: $table.timestamp,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get details => $composableBuilder(
+    column: $table.details,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$WatchesTableFilterComposer get watchId {
+    final $$WatchesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.watchId,
+      referencedTable: $db.watches,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WatchesTableFilterComposer(
+            $db: $db,
+            $table: $db.watches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConnectionEventsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ConnectionEventsTable> {
+  $$ConnectionEventsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventType => $composableBuilder(
+    column: $table.eventType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get timestamp => $composableBuilder(
+    column: $table.timestamp,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get details => $composableBuilder(
+    column: $table.details,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$WatchesTableOrderingComposer get watchId {
+    final $$WatchesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.watchId,
+      referencedTable: $db.watches,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WatchesTableOrderingComposer(
+            $db: $db,
+            $table: $db.watches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConnectionEventsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ConnectionEventsTable> {
+  $$ConnectionEventsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get eventType =>
+      $composableBuilder(column: $table.eventType, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get timestamp =>
+      $composableBuilder(column: $table.timestamp, builder: (column) => column);
+
+  GeneratedColumn<String> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+
+  GeneratedColumn<String> get details =>
+      $composableBuilder(column: $table.details, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  $$WatchesTableAnnotationComposer get watchId {
+    final $$WatchesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.watchId,
+      referencedTable: $db.watches,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WatchesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.watches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConnectionEventsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ConnectionEventsTable,
+          ConnectionEventEntity,
+          $$ConnectionEventsTableFilterComposer,
+          $$ConnectionEventsTableOrderingComposer,
+          $$ConnectionEventsTableAnnotationComposer,
+          $$ConnectionEventsTableCreateCompanionBuilder,
+          $$ConnectionEventsTableUpdateCompanionBuilder,
+          (ConnectionEventEntity, $$ConnectionEventsTableReferences),
+          ConnectionEventEntity,
+          PrefetchHooks Function({bool watchId})
+        > {
+  $$ConnectionEventsTableTableManager(
+    _$AppDatabase db,
+    $ConnectionEventsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ConnectionEventsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ConnectionEventsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ConnectionEventsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> watchId = const Value.absent(),
+                Value<String> eventType = const Value.absent(),
+                Value<DateTime> timestamp = const Value.absent(),
+                Value<String?> reason = const Value.absent(),
+                Value<String?> details = const Value.absent(),
+                Value<String?> sessionId = const Value.absent(),
+              }) => ConnectionEventsCompanion(
+                id: id,
+                watchId: watchId,
+                eventType: eventType,
+                timestamp: timestamp,
+                reason: reason,
+                details: details,
+                sessionId: sessionId,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String watchId,
+                required String eventType,
+                required DateTime timestamp,
+                Value<String?> reason = const Value.absent(),
+                Value<String?> details = const Value.absent(),
+                Value<String?> sessionId = const Value.absent(),
+              }) => ConnectionEventsCompanion.insert(
+                id: id,
+                watchId: watchId,
+                eventType: eventType,
+                timestamp: timestamp,
+                reason: reason,
+                details: details,
+                sessionId: sessionId,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ConnectionEventsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({watchId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (watchId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.watchId,
+                                referencedTable:
+                                    $$ConnectionEventsTableReferences
+                                        ._watchIdTable(db),
+                                referencedColumn:
+                                    $$ConnectionEventsTableReferences
+                                        ._watchIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ConnectionEventsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ConnectionEventsTable,
+      ConnectionEventEntity,
+      $$ConnectionEventsTableFilterComposer,
+      $$ConnectionEventsTableOrderingComposer,
+      $$ConnectionEventsTableAnnotationComposer,
+      $$ConnectionEventsTableCreateCompanionBuilder,
+      $$ConnectionEventsTableUpdateCompanionBuilder,
+      (ConnectionEventEntity, $$ConnectionEventsTableReferences),
+      ConnectionEventEntity,
+      PrefetchHooks Function({bool watchId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3451,4 +4398,6 @@ class $AppDatabaseManager {
       $$BatteryReadingsTableTableManager(_db, _db.batteryReadings);
   $$CommLogEntriesTableTableManager get commLogEntries =>
       $$CommLogEntriesTableTableManager(_db, _db.commLogEntries);
+  $$ConnectionEventsTableTableManager get connectionEvents =>
+      $$ConnectionEventsTableTableManager(_db, _db.connectionEvents);
 }
