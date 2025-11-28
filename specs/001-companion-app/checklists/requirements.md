@@ -113,7 +113,7 @@
 | US4 - Dashboard | ✅ Complete | Connection status, battery ring, firmware version, feature navigation tiles |
 | US5 - Health | ✅ Complete | Health screen with step charts, heart rate screen with live streaming, 60-day retention |
 | US6 - Developer Tools | 🔲 Not Started | |
-| US7 - Multi-Watch | 🔲 Not Started | |
+| US7 - Multi-Watch | ✅ Complete | Rename/forget watches via Start Screen config dialog, BLE unbond on forget |
 | US8 - App Settings | 🔲 Not Started | |
 | US9 - Analytics | 🔲 Not Started | |
 | US10 - Voice Recording | 🔲 Placeholder | |

@@ -772,75 +772,72 @@
 
 ---
 
-## Phase 9: User Story 7 - Multiple Watch Management (Priority: P7)
+## Phase 9: User Story 7 - Multiple Watch Management (Priority: P7) ✅ COMPLETE
 
-**Goal**: User manages multiple paired ZSWatch devices
+**Goal**: User manages multiple paired ZSWatch devices via the Start Screen
 
-**Independent Test**: Pair two watches → View saved devices → Switch between them → Forget one
+**Independent Test**: Pair two watches → See both on Start Screen → Tap config on one → Rename it → Verify name shows → Tap config → Forget watch → Verify removed and unbonded
+
+**Note**: The Start Screen (from Phase 3.6) already shows all paired watches. This phase adds management actions (rename, forget) via a config button on each watch card. The "active" watch is simply the last one the user tapped to connect.
 
 ### Repository Updates
 
-- [ ] T114 [US7] Extend watch repository for multi-watch management
-- [ ] T115 [US7] Implement `is_primary` toggle logic
+- [X] T114 [US7] Add `renameWatch(watchId, customName)` method to watch_repository.dart
+- [X] T115 [US7] Add `forgetWatch(watchId)` method to watch_repository.dart
+  - Delete watch from database
+  - Unbond/unpair device via BLE (FlutterBluePlus removeBond)
 
-### UI
+### UI: Start Screen Enhancements
 
-- [ ] T116 [US7] Create saved watches list in lib/ui/screens/connection/saved_watches_screen.dart
-- [ ] T117 [US7] Add switch watch flow
-- [ ] T118 [US7] Add forget device flow with confirmation
-- [ ] T119 [US7] Update dashboard to show current watch selection
+- [X] T116 [US7] Add config/settings icon button to each watch card in start_page_screen.dart
+  - Gear icon or three-dot menu on each paired watch tile
+  - Opens watch management bottom sheet or dialog
 
-**Checkpoint**: User can manage and switch between multiple watches
+- [X] T117 [US7] Create watch_config_dialog.dart in lib/ui/widgets/
+  - Shows watch name (editable text field)
+  - "Rename" button to save custom name
+  - "Forget Watch" button with red styling
+  - Cancel button
+
+- [X] T118 [US7] Implement forget watch flow with confirmation
+  - Show confirmation dialog: "Forget [Watch Name]? This will remove the watch and unpair it."
+  - On confirm: call forgetWatch() which deletes from DB and unbonds BLE
+  - Refresh Start Screen to remove the watch
+
+- [X] T119 [US7] Implement rename watch flow
+  - Text field pre-populated with current name (custom or default)
+  - Save persists customName to database
+  - Start Screen updates to show new name immediately
+
+### Model Updates
+
+- [X] T120 [US7] Ensure Watch model supports customName field (may already exist from Phase 3.6)
+  - Display customName if set, otherwise use default advertised name
+
+**Checkpoint**: User can rename and forget watches directly from Start Screen ✅
 
 ---
 
 ## Phase 10: User Story 8 - App Settings (Priority: P8)
 
-**Goal**: User configures app-specific settings (not watch settings), including watch rename
+**Goal**: User configures app-specific settings (not watch settings)
 
-**Independent Test**: Open Settings → Change a preference → Restart app → Verify persisted. Rename a watch → Verify custom name shows throughout app.
+**Independent Test**: Open Settings → Change a preference → Restart app → Verify persisted
+
+**Note**: Watch rename functionality moved to Phase 9 (Start Screen management)
 
 ### Repository
 
-- [ ] T120 [US8] Create settings repository in lib/data/repositories/settings_repository.dart (SharedPreferences)
+- [ ] T121 [US8] Create settings repository in lib/data/repositories/settings_repository.dart (SharedPreferences)
 
 ### UI
 
-- [ ] T121 [US8] Create settings screen in lib/ui/screens/settings/settings_screen.dart
-- [ ] T122 [US8] Add notification filter preferences (Android)
-- [ ] T123 [US8] Add Developer Mode toggle (reference T113)
-- [ ] T124 [US8] Add About section (app version, links)
+- [ ] T122 [US8] Create settings screen in lib/ui/screens/settings/settings_screen.dart
+- [ ] T123 [US8] Add notification filter preferences (Android)
+- [ ] T124 [US8] Add Developer Mode toggle (reference T113)
+- [ ] T125 [US8] Add About section (app version, links)
 
-### Watch Rename Feature (FR-099 to FR-102) 🆕
-
-- [ ] T124a [US8] Update Watch model with customName field (nullable)
-  - Store user-defined name alongside default name
-  - Display customName if set, otherwise default name (FR-102)
-
-- [ ] T124b [US8] Create watch_management_screen.dart in lib/ui/screens/settings/
-  - List all paired/bonded watches (FR-100)
-  - Show current name (custom or default)
-  - Edit button per watch to rename
-
-- [ ] T124c [US8] Create rename_watch_dialog.dart in lib/ui/widgets/
-  - Text input for custom name
-  - Save/Cancel buttons
-  - Validate name not empty
-
-- [ ] T124d [US8] Update watch_repository.dart with renameWatch method
-  - Persist customName to database (FR-101)
-  - Emit update to notify UI
-
-- [ ] T124e [US8] Update all UI components to use displayName getter
-  - stored_watch_card.dart
-  - dashboard_screen.dart
-  - device_list_screen.dart
-  - Any other places showing watch name
-
-- [ ] T124f [US8] Add "Manage Watches" navigation from settings_screen.dart
-  - Links to watch_management_screen
-
-**Checkpoint**: App settings persist across sessions, watches can be renamed
+**Checkpoint**: App settings persist across sessions
 
 ---
 
@@ -1030,8 +1027,8 @@ Phase 2: Foundational ◄──────────────────�
 | US4 (Dashboard) | US1 (needs connection) | US2, US3, US5, US6 | - |
 | US5 (Health) | US1 (needs connection) | US2, US3, US4, US6 | - |
 | US6 (Developer) | US1 (needs connection) | US2, US3, US4, US5 | Debug Tools |
-| US7 (Multi-Watch) | US1 (needs watch model) | US2-US6 | - |
-| US8 (Settings) | Foundational | All stories | Watch Rename |
+| US7 (Multi-Watch) | US1 (Start Page) | US2-US6 | Rename, Forget via Start Screen |
+| US8 (Settings) | Foundational | All stories | - |
 | US9 (Analytics) | US1 (needs connection) | US2-US8 | - |
 | GPS Support | US1 (needs connection) | All stories | Gadgetbridge GPS |
 | US10 (Voice) | US1 (stub only) | All stories | - |
@@ -1168,13 +1165,13 @@ Based on user value and dependencies:
 | Phase 6: US4 Dashboard | 5 | P4 | - |
 | Phase 7: US5 Health | 14 | P5 | - |
 | Phase 8: US6 Developer | 25 | P6 | 6 (debug tools) |
-| Phase 9: US7 Multi-Watch | 6 | P7 | - |
-| Phase 10: US8 Settings | 11 | P8 | 6 (rename) |
+| Phase 9: US7 Multi-Watch | 7 | P7 | 7 (Start Screen mgmt) |
+| Phase 10: US8 Settings | 5 | P8 | - |
 | Phase 11: US9 Analytics | 9 | P9 | - |
 | Phase 11.5: GPS Support 🆕 | 7 | - | 7 |
 | Phase 12: US10 Voice | 4 | P10 | - |
 | Phase 13: Polish | 9 | - | - |
-| **Total** | **~205** | 10 stories | **~53 new** |
+| **Total** | **~195** | 10 stories | **~54 new** |
 
 ### New Requirements Coverage
 
@@ -1187,7 +1184,8 @@ Based on user value and dependencies:
 | Music Control Enhancement (FR-079-083) | 5.6 | T075i-T075n |
 | Notification Debug Tools (FR-093-097) | 8 | T113a-T113c |
 | Music Debug Tools (FR-098) | 8 | T113d-T113f |
-| Watch Rename (FR-099-102) | 10 | T124a-T124f |
+| Watch Rename (FR-099-102) | 9 | T114, T117, T119, T120 |
+| Watch Forget/Unbond | 9 | T115, T116, T118 |
 | Persistent BLE (FR-089-092) | 3.8 | T045r-T045z |
 | GPS Support (FR-103-107) | 11.5 | T133j-T133p |
 

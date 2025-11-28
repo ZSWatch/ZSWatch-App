@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database/app_database.dart';
+import '../data/repositories/watch_repository.dart';
 
 /// Provider for the database singleton
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -47,8 +48,11 @@ final connectedWatchProvider = Provider<WatchEntity?>((ref) {
 /// Notifier for watch operations
 class WatchNotifier extends StateNotifier<AsyncValue<void>> {
   final AppDatabase _db;
+  late final WatchRepository _repository;
 
-  WatchNotifier(this._db) : super(const AsyncValue.data(null));
+  WatchNotifier(this._db) : super(const AsyncValue.data(null)) {
+    _repository = WatchRepository(_db);
+  }
 
   /// Add or update a watch
   Future<void> saveWatch({
@@ -112,6 +116,33 @@ class WatchNotifier extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await _db.deleteWatch(watchId);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  /// Rename a watch by setting its custom name (T114, T119)
+  /// 
+  /// If [customName] is null or empty, clears the custom name.
+  Future<void> renameWatch(String watchId, String? customName) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repository.renameWatch(watchId, customName);
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  /// Forget a watch completely (T115, T118)
+  /// 
+  /// Removes the watch from the database AND unbonds the BLE device.
+  /// After calling this, the user will need to re-pair to use the watch again.
+  Future<void> forgetWatch(String watchId) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repository.forgetWatch(watchId);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../database/app_database.dart';
 import '../models/watch.dart';
@@ -111,6 +112,16 @@ class WatchRepository {
     }
   }
 
+  /// Rename a watch by setting its custom name (T114)
+  /// 
+  /// If [customName] is null or empty, clears the custom name and
+  /// falls back to the default advertised name.
+  Future<void> renameWatch(String watchId, String? customName) async {
+    final trimmed = customName?.trim();
+    final finalName = (trimmed != null && trimmed.isNotEmpty) ? trimmed : null;
+    await updateCustomName(watchId, finalName);
+  }
+
   /// Mark watch as supporting Extended API
   Future<void> setSupportsExtendedApi(String watchId, bool supports) async {
     final watch = await getWatchById(watchId);
@@ -124,6 +135,28 @@ class WatchRepository {
   /// Delete a watch and all associated data
   Future<void> deleteWatch(String watchId) async {
     await _db.deleteWatch(watchId);
+  }
+
+  /// Forget a watch completely (T115)
+  /// 
+  /// This removes the watch from the database AND removes the BLE bond.
+  /// After calling this, the user will need to re-pair if they want to
+  /// use the watch again.
+  /// 
+  /// Note: removeBond() only works on Android. On iOS, users must
+  /// manually forget the device in Bluetooth settings.
+  Future<void> forgetWatch(String watchId) async {
+    // First, remove the BLE bond
+    try {
+      final device = BluetoothDevice.fromId(watchId);
+      await device.removeBond();
+    } catch (e) {
+      // Bond removal may fail if device is not bonded or on iOS
+      // Continue with database deletion anyway
+    }
+    
+    // Then delete from database
+    await deleteWatch(watchId);
   }
 
   /// Delete all watches

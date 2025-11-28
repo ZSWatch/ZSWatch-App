@@ -12,6 +12,7 @@ import '../../../providers/ble_providers.dart';
 import '../../../providers/watch_providers.dart' as db;
 import '../../../providers/watch_service_provider.dart';
 import '../../widgets/connection_status_pill.dart';
+import '../../widgets/watch_config_dialog.dart';
 
 /// Start page showing stored watches and option to add new watch (FR-067 to FR-070)
 ///
@@ -144,6 +145,50 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
     }
   }
 
+  /// Open the watch config dialog for renaming or forgetting a watch (T116)
+  Future<void> _openWatchConfig(WatchEntity watch) async {
+    final wasDeleted = await WatchConfigDialog.show(
+      context: context,
+      watch: watch,
+      onRename: (watchId, customName) async {
+        await ref.read(db.watchNotifierProvider.notifier).renameWatch(watchId, customName);
+        if (mounted) {
+          final newName = customName ?? watch.name;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Watch renamed to "$newName"'),
+              backgroundColor: AppTheme.successColor,
+            ),
+          );
+        }
+      },
+      onForget: (watchId) async {
+        // Disconnect if currently connected to this watch
+        final watchService = ref.read(watchServiceProvider);
+        final currentDeviceId = watchService.currentConnection.watchId;
+        if (currentDeviceId == watchId) {
+          await watchService.disconnect();
+        }
+        
+        // Forget the watch (removes from DB and unbonds BLE)
+        await ref.read(db.watchNotifierProvider.notifier).forgetWatch(watchId);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${watch.customName ?? watch.name} forgotten'),
+            ),
+          );
+        }
+      },
+    );
+
+    // If watch was deleted/forgotten, the list will auto-refresh via provider
+    if (wasDeleted == true && mounted) {
+      // Already handled in onForget callback
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final watchesAsync = ref.watch(db.allWatchesProvider);
@@ -242,7 +287,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
           watch: watch,
           isConnecting: _connectingWatchId == watch.id,
           onTap: () => _connectToWatch(watch),
-          onDelete: () => _deleteWatch(watch),
+          onConfig: () => _openWatchConfig(watch),
         );
       },
     );
@@ -280,41 +325,25 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
   }
 }
 
-/// Individual watch list tile (FR-067, FR-068)
+/// Individual watch list tile (FR-067, FR-068, T116)
 class _WatchListTile extends StatelessWidget {
   final WatchEntity watch;
   final bool isConnecting;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final VoidCallback onConfig;
 
   const _WatchListTile({
     required this.watch,
     required this.isConnecting,
     required this.onTap,
-    required this.onDelete,
+    required this.onConfig,
   });
 
   @override
   Widget build(BuildContext context) {
     final displayName = watch.customName ?? watch.name;
     
-    return Dismissible(
-      key: Key(watch.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        onDelete();
-        return false; // We handle deletion in onDelete
-      },
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppTheme.spacingLg),
-        color: AppTheme.errorColor,
-        child: const Icon(
-          Icons.delete_outline,
-          color: Colors.white,
-        ),
-      ),
-      child: ListTile(
+    return ListTile(
         leading: _buildLeadingIcon(),
         title: Row(
           children: [
@@ -343,18 +372,38 @@ class _WatchListTile extends StatelessWidget {
           ],
         ),
         subtitle: _buildSubtitle(),
-        trailing: isConnecting
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(
-                Icons.chevron_right,
-                color: AppTheme.textSecondary,
-              ),
+        trailing: _buildTrailing(),
         onTap: isConnecting ? null : onTap,
-      ),
+    );
+  }
+
+  Widget _buildTrailing() {
+    if (isConnecting) {
+      return const SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Config/Settings button (T116)
+        IconButton(
+          icon: const Icon(
+            Icons.settings,
+            color: AppTheme.textSecondary,
+            size: 28,
+          ),
+          onPressed: onConfig,
+          tooltip: 'Watch Settings',
+        ),
+        const Icon(
+          Icons.chevron_right,
+          color: AppTheme.textSecondary,
+        ),
+      ],
     );
   }
 
