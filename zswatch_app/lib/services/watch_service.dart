@@ -10,6 +10,7 @@ import '../data/models/connection.dart';
 import '../data/models/connection_state.dart';
 import '../data/models/watch.dart';
 import 'ble/ble_scanner.dart';
+import 'protocol/protocol_service.dart';
 
 // Convert String UUIDs to Guid for flutter_blue_plus
 Guid _guid(String uuid) => Guid(uuid);
@@ -220,6 +221,23 @@ class WatchService {
     }
   }
 
+  /// Helper to check if device is still connected and setup should continue
+  bool _shouldContinueSetup() {
+    if (_isCancelled) {
+      debugPrint('[Setup] Aborting - user cancelled');
+      return false;
+    }
+    if (_device == null) {
+      debugPrint('[Setup] Aborting - device is null');
+      return false;
+    }
+    if (!_device!.isConnected) {
+      debugPrint('[Setup] Aborting - device disconnected');
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _setupAfterConnect(String watchId, String name) async {
     // Prevent concurrent setup calls (can happen on rapid reconnects)
     if (_isSettingUp) {
@@ -233,9 +251,14 @@ class WatchService {
       return;
     }
     
-    // Check if device is still valid (user may have cancelled)
+    // Check if device is still valid and connected
     if (_device == null) {
       debugPrint('Setup cancelled - device is null');
+      return;
+    }
+    
+    if (!_device!.isConnected) {
+      debugPrint('Setup cancelled - device not connected');
       return;
     }
     
@@ -248,14 +271,14 @@ class WatchService {
       ));
 
       // Re-check device in case user cancelled during state updates
-      if (_device == null) {
-        debugPrint('Setup cancelled during bonding - device is null');
-        return;
-      }
+      if (!_shouldContinueSetup()) return;
 
       final bondState = await _device!.bondState.first;
+      if (!_shouldContinueSetup()) return;
+      
       if (bondState != BluetoothBondState.bonded) {
         await _device!.createBond();
+        if (!_shouldContinueSetup()) return;
       }
 
       // Discover services
@@ -263,6 +286,7 @@ class WatchService {
         state: WatchConnectionState.discoveringServices,
       ));
 
+      if (!_shouldContinueSetup()) return;
       _services = await _device!.discoverServices();
 
       // Negotiate MTU
@@ -270,6 +294,7 @@ class WatchService {
         state: WatchConnectionState.negotiating,
       ));
 
+      if (!_shouldContinueSetup()) return;
       final mtu = await _device!.requestMtu(BleConfig.preferredMtu);
 
       // Note: We don't request connection priority here.
@@ -277,6 +302,8 @@ class WatchService {
       // (e.g., short intervals during DFU, longer intervals when idle).
       // Forcing high priority from the phone would override the watch's
       // power-saving preferences.
+
+      if (!_shouldContinueSetup()) return;
 
       // Create or update watch object - preserve existing firmware/battery info
       final existingWatch = currentWatch;
@@ -291,17 +318,22 @@ class WatchService {
       _watchInfoController.add(watch);
 
       // Setup NUS for Gadgetbridge protocol (needed for sync)
+      if (!_shouldContinueSetup()) return;
       await _setupNus();
 
       // Subscribe to battery service
+      if (!_shouldContinueSetup()) return;
       await _setupBatteryNotifications();
       
       // Read initial RSSI and start periodic updates
-      await _readAndUpdateRssi();
-      _startRssiUpdates();
+      if (_shouldContinueSetup()) {
+        await _readAndUpdateRssi();
+        _startRssiUpdates();
+      }
 
       // Transition to syncing state (FR-088)
       // Connection is established but initial sync not yet complete
+      if (!_shouldContinueSetup()) return;
       _updateConnection(currentConnection.copyWith(
         state: WatchConnectionState.syncing,
         mtu: mtu,
@@ -310,15 +342,20 @@ class WatchService {
 
       // Perform initial sync operations (FR-084 to FR-087)
       // Time sync (FR-085)
-      await syncTime();
+      if (_shouldContinueSetup()) {
+        await syncTime();
+      }
       
       // Request device info via Gadgetbridge
-      await requestDeviceInfo();
+      if (_shouldContinueSetup()) {
+        await requestDeviceInfo();
+      }
 
       // Note: Music state sync (FR-086) is handled by MediaControlNotifier
       // which listens to connectionStream and syncs when state becomes connected
 
       // Mark as fully connected and ready (FR-088)
+      if (!_shouldContinueSetup()) return;
       _updateConnection(currentConnection.copyWith(
         state: WatchConnectionState.connected,
       ));
@@ -328,13 +365,20 @@ class WatchService {
       _isInitialConnection = false;
 
     } catch (e) {
-      _updateConnection(Connection.error(
-        watchId,
-        ConnectionErrorType.serviceDiscoveryFailed,
-        details: e.toString(),
-      ));
-      await disconnect();
-      rethrow;
+      // Only report error if we're still supposed to be connected
+      // If device disconnected during setup, let the disconnect handler manage state
+      if (_device != null && _device!.isConnected) {
+        _updateConnection(Connection.error(
+          watchId,
+          ConnectionErrorType.serviceDiscoveryFailed,
+          details: e.toString(),
+        ));
+        await disconnect();
+        rethrow;
+      } else {
+        debugPrint('[Setup] Error during setup but device disconnected - letting disconnect handler manage: $e');
+        // Don't rethrow - the disconnect handler will manage reconnection
+      }
     } finally {
       _isSettingUp = false;
     }
@@ -679,6 +723,27 @@ class WatchService {
     await _sendGb({'t': 'vibrate', 'n': pattern});
   }
 
+  /// Send GPS data to watch (Gadgetbridge format)
+  /// 
+  /// Called in response to watch GPS power request ({"t":"gps_power","status":true})
+  Future<void> sendGpsData(WatchGpsData data) async {
+    final gpsData = <String, dynamic>{
+      't': 'gps',
+      'lat': data.latitude,
+      'lon': data.longitude,
+      'externalSource': true,
+    };
+    if (data.altitude != null) gpsData['alt'] = data.altitude;
+    if (data.speedKph != null) gpsData['speed'] = data.speedKph;
+    if (data.courseDegrees != null) gpsData['course'] = data.courseDegrees;
+    if (data.timestampMs != null) gpsData['time'] = data.timestampMs;
+    if (data.satellites != null) gpsData['satellites'] = data.satellites;
+    if (data.hdop != null) gpsData['hdop'] = data.hdop;
+    if (data.source != null) gpsData['gpsSource'] = data.source;
+
+    await _sendGb(gpsData);
+  }
+
   /// Enable/disable log streaming from watch (FR-035c, FR-035d)
   /// 
   /// Sends {"t":"log","status":true/false} to watch.
@@ -746,7 +811,7 @@ class WatchService {
   }
 
   void _handleDisconnect(String watchId, String name) {
-    debugPrint('[WatchService:$hashCode] _handleDisconnect: _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect, _reconnectAttempts=$_reconnectAttempts, _isReconnecting=$_isReconnecting');
+    debugPrint('[WatchService:$hashCode] _handleDisconnect: _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect, _reconnectAttempts=$_reconnectAttempts, _isReconnecting=$_isReconnecting, _isSettingUp=$_isSettingUp');
     
     // If user has cancelled, don't attempt reconnection
     if (_isCancelled) {
@@ -766,12 +831,27 @@ class WatchService {
       debugPrint('[WatchService:$hashCode] Disconnect ignored - reconnect already in progress');
       return;
     }
+    
+    // If setup is in progress, it will detect the disconnect via _shouldContinueSetup()
+    // and exit gracefully. Wait for setup to complete before attempting reconnect.
+    if (_isSettingUp) {
+      debugPrint('[WatchService:$hashCode] Setup in progress - delaying reconnect until setup completes');
+      // Schedule a check after a short delay to allow setup to finish
+      Timer(const Duration(milliseconds: 500), () {
+        if (!_isSettingUp && !_isReconnecting && _autoReconnect && !_isCancelled) {
+          debugPrint('[WatchService:$hashCode] Setup completed - now attempting reconnect');
+          _attemptReconnect(watchId, name);
+        }
+      });
+      return;
+    }
 
     final wasConnected = currentConnection.isConnected || 
                          currentConnection.state == WatchConnectionState.connecting ||
                          currentConnection.state == WatchConnectionState.bonding ||
                          currentConnection.state == WatchConnectionState.discoveringServices ||
-                         currentConnection.state == WatchConnectionState.negotiating;
+                         currentConnection.state == WatchConnectionState.negotiating ||
+                         currentConnection.state == WatchConnectionState.syncing;
 
     if (wasConnected && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts) {
       _attemptReconnect(watchId, name);

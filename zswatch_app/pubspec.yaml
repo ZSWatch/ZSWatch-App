@@ -57,6 +57,9 @@ dependencies:
   file_picker: ^8.1.6
   wakelock_plus: ^1.2.8
 
+  # Location (for GPS requests from watch)
+  geolocator: ^13.0.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -278,8 +278,9 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
 /// Provider for communication log entries (refreshes on change)
 final commLogEntriesProvider = Provider<List<CommLogEntry>>((ref) {
   final entries = ref.watch(commLogRepositoryProvider);
-  // Return reversed so newest entries are first
-  return entries.toList().reversed.toList();
+  // Return in chronological order (oldest first, newest last)
+  // This matches the auto-scroll to bottom behavior in the UI
+  return entries.toList();
 });
 
 /// Provider for communication log statistics
