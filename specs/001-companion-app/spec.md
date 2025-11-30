@@ -488,6 +488,10 @@ The watch needs phone-assisted network access. It sends `t:"http"` Gadgetbridge 
 - **FR-090**: Persistent connection MUST support sending notifications, music info, and all other BLE features
 - **FR-091**: Persistent connection MUST work on both Android and iOS within their respective background-execution rules
 - **FR-092**: Android: Foreground service notification MUST clearly indicate app is maintaining watch connection
+- **FR-092a**: Android: Foreground service MUST start when user initiates connection to a watch
+- **FR-092b**: Android: Foreground service MUST remain running when watch disconnects unexpectedly (to enable auto-reconnect)
+- **FR-092c**: Android: Foreground service MUST stop only when user explicitly disconnects, disables persistent connection setting, or forgets the watch
+- **FR-092d**: Android: Foreground service notification MUST update to reflect current state ("Connected to [Watch]" vs "Reconnecting to [Watch]...")
 
 #### Voice Recording (Placeholder)
 - **FR-054**: App MUST be architecturally prepared for future voice memo/dictation sync from watch

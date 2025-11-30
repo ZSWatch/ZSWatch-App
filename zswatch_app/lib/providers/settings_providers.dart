@@ -12,6 +12,7 @@ abstract final class SettingsKeys {
   static const String notificationFilterPackages = 'notification_filter_packages';
   static const String onboardingCompleted = 'onboarding_completed';
   static const String keepScreenOnDuringDfu = 'keep_screen_on_during_dfu';
+  static const String backgroundConnectionEnabled = 'background_connection_enabled';
 }
 
 /// Provider for SharedPreferences instance
@@ -220,6 +221,31 @@ class KeepScreenOnDuringDfuNotifier extends StateNotifier<bool> {
   void setEnabled(bool enabled) {
     state = enabled;
     _prefs?.setBool(SettingsKeys.keepScreenOnDuringDfu, enabled);
+  }
+}
+
+/// Provider for background connection setting (FR-089 to FR-092)
+/// When enabled, the app maintains a persistent BLE connection when backgrounded
+final backgroundConnectionEnabledProvider =
+    StateNotifierProvider<BackgroundConnectionEnabledNotifier, bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return BackgroundConnectionEnabledNotifier(prefs.valueOrNull);
+});
+
+class BackgroundConnectionEnabledNotifier extends StateNotifier<bool> {
+  final SharedPreferences? _prefs;
+
+  BackgroundConnectionEnabledNotifier(this._prefs)
+      : super(_prefs?.getBool(SettingsKeys.backgroundConnectionEnabled) ?? true);
+
+  void toggle() {
+    state = !state;
+    _prefs?.setBool(SettingsKeys.backgroundConnectionEnabled, state);
+  }
+
+  void setEnabled(bool enabled) {
+    state = enabled;
+    _prefs?.setBool(SettingsKeys.backgroundConnectionEnabled, enabled);
   }
 }
 

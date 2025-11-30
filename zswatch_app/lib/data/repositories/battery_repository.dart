@@ -88,40 +88,36 @@ class BatteryRepository {
 
     if (readings.length < 2) return null;
 
-    // Filter out charging periods
-    final dischargingReadings = <BatteryReadingEntity>[];
-    for (int i = 0; i < readings.length; i++) {
-      if (!readings[i].isCharging) {
-        // Also check if this is part of a discharging sequence
-        // (not immediately after charging)
-        if (i == 0 || !readings[i - 1].isCharging) {
-          dischargingReadings.add(readings[i]);
-        }
-      }
-    }
-
+    // Focus on discharging readings only
+    final dischargingReadings =
+        readings.where((r) => !r.isCharging).toList(growable: false);
     if (dischargingReadings.length < 2) return null;
 
-    // Calculate drain between consecutive readings while discharging
-    double totalDrain = 0;
-    int drainSegments = 0;
-
+    // Find the start of the current discharge cycle (last upward jump → new slope)
+    int startIndex = 0;
     for (int i = 1; i < dischargingReadings.length; i++) {
       final prev = dischargingReadings[i - 1];
       final curr = dischargingReadings[i];
-
-      // Only count if battery decreased
-      if (curr.level < prev.level) {
-        final drain = prev.level - curr.level;
-        final hours = curr.timestamp.difference(prev.timestamp).inMinutes / 60;
-        if (hours > 0) {
-          totalDrain += drain / hours;
-          drainSegments++;
-        }
+      if (curr.level > prev.level) {
+        startIndex = i;
       }
     }
 
-    return drainSegments > 0 ? totalDrain / drainSegments : null;
+    final start = dischargingReadings[startIndex];
+    final end = dischargingReadings.last;
+
+    // Use the full window up to "to" so long idle periods don't inflate the rate
+    final effectiveEndTime = to.isAfter(end.timestamp) ? to : end.timestamp;
+    final elapsedMinutes =
+        effectiveEndTime.difference(start.timestamp).inMinutes;
+
+    // Require a reasonable span to avoid noisy spikes
+    if (elapsedMinutes < 30) return null;
+
+    final drain = start.level - end.level;
+    if (drain <= 0) return null;
+
+    return drain / (elapsedMinutes / 60);
   }
 
   /// Calculate estimated battery life based on recent drain rate
@@ -137,6 +133,9 @@ class BatteryRepository {
 
     final latest = await getLatestReading(watchId);
     if (latest == null || latest.isCharging) return null;
+    if (now.difference(latest.timestamp) > const Duration(hours: 2)) {
+      return null; // avoid estimating from stale data
+    }
 
     final hoursRemaining = latest.level / drainRate;
     return Duration(minutes: (hoursRemaining * 60).round());

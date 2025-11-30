@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/ble_providers.dart';
 import 'providers/developer_providers.dart';
+import 'providers/foreground_service_providers.dart';
 import 'providers/gps_providers.dart';
 import 'providers/http_providers.dart';
 import 'providers/notification_providers.dart';
@@ -46,6 +47,9 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       // These subscribe to watch service streams for BLE traffic logging
       ref.read(commLogRepositoryProvider);
       ref.read(logEntriesProvider);
+      // Initialize foreground service manager to handle background connection (FR-089 to FR-092)
+      // This subscribes to connection state changes and manages the Android foreground service
+      ref.read(foregroundServiceNotifierProvider);
     } catch (e) {
       debugPrint('BLE initialization error: $e');
     }

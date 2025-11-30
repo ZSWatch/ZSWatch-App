@@ -281,49 +281,79 @@
 
 ### Android: Foreground Service
 
-- [ ] T045r [P] Create ForegroundServiceManager in android/app/src/main/kotlin/.../ForegroundServiceManager.kt
+- [X] T045r [P] Create ForegroundServiceManager in android/app/src/main/kotlin/.../ForegroundServiceManager.kt
   - Create persistent notification (FR-092)
-  - Indicate "Maintaining watch connection" status
+  - Update notification text based on state:
+    - "Connected to [Watch Name]" when connected
+    - "Reconnecting to [Watch Name]..." when disconnected/reconnecting
   - Handle service start/stop
+  - Notification actions: Disconnect button (stops service and disconnects)
+  - **Note**: Combined with T045s into BleConnectionForegroundService.kt
 
-- [ ] T045s Create BleConnectionForegroundService in android/app/src/main/kotlin/.../
+- [X] T045r2 [P] Create notification channel for foreground service (Android 8+)
+  - Channel ID: "ble_connection"
+  - Channel name: "Watch Connection"
+  - Low importance (minimize intrusiveness)
+  - Create channel on app startup in MainActivity
+
+- [X] T045s Create BleConnectionForegroundService in android/app/src/main/kotlin/.../
   - Foreground service for background BLE (FR-050, FR-089)
-  - Start when connected, stop when disconnected
   - Persist connection even when UI not active
+  - Service stays alive until explicitly stopped (not tied to connection state)
 
-- [ ] T045t Update AndroidManifest.xml with foreground service declaration
+- [X] T045t Update AndroidManifest.xml with foreground service declaration
   - Add FOREGROUND_SERVICE permission
   - Declare service with proper type (connectedDevice)
 
-- [ ] T045u Create foreground_service.dart Flutter wrapper in lib/services/background/
+- [X] T045u Create foreground_service.dart Flutter wrapper in lib/services/background/
   - MethodChannel to start/stop foreground service
-  - Query service status
+  - Method to update notification text (for connection state changes)
+  - Query service status (running/stopped)
 
 ### iOS: Background Modes
 
-- [ ] T045v Verify Info.plist has bluetooth-central background mode (FR-051)
-  - Already configured in Phase 1, verify still present
+- [X] T045v Verify Info.plist has bluetooth-central background mode (FR-051)
+  - Already configured in Phase 1, verified still present
 
-- [ ] T045w Implement iOS background connection handling
-  - Use CoreBluetooth state restoration
-  - Handle reconnection on iOS wake
+- [X] T045w Implement iOS background connection handling
+  - Use CoreBluetooth state restoration (handled by flutter_blue_plus)
+  - Handle reconnection on iOS wake (handled by flutter_blue_plus autoConnect)
+  - **Note**: iOS background BLE handled natively via bluetooth-central background mode
 
 ### Integration
 
-- [ ] T045x Update watch_service.dart to manage background connection
-  - Start foreground service on connect (Android)
-  - Stop foreground service on disconnect
+- [X] T045x Update watch_service.dart to manage background connection
+  - Start foreground service when user initiates connection (Android)
+  - Keep foreground service running on unexpected disconnect (enables auto-reconnect)
+  - Stop foreground service only on explicit user disconnect or setting disabled
   - Maintain connection across app lifecycle
+  - Listen to connection state changes and update notification text accordingly
+  - **Note**: Implemented via ForegroundServiceNotifier in foreground_service_providers.dart
 
-- [ ] T045y Update notification and media services for background operation
+- [X] T045x2 Integrate auto_reconnect_service with foreground service
+  - When running in background and watch disconnects, trigger auto-reconnect
+  - Auto-reconnect must work when app UI is not active
+  - Use flutter_blue_plus autoConnect feature for system-level reconnect
+  - **Note**: ForegroundServiceNotifier updates notification to "Reconnecting..." state
+
+- [X] T045y Update notification and media services for background operation
   - Verify notifications forward when backgrounded (FR-090)
   - Verify music info sends when backgrounded
+  - **Note**: Existing notification/media services work when app backgrounded with foreground service
 
-- [ ] T045z Add background connection setting in settings_screen.dart
-  - Toggle to enable/disable persistent connection
+- [X] T045z Add background connection setting in settings_screen.dart
+  - Toggle to enable/disable persistent connection (default: enabled)
   - Warning about battery impact
+  - When disabled while connected: stop foreground service but keep current connection
+  - When enabled while connected: start foreground service
 
-**Checkpoint**: BLE connection stable for 8+ hours when backgrounded (SC-021)
+- [X] T045z2 [P] Add battery optimization guidance (Android)
+  - Detect if app is battery-optimized (affects background reliability)
+  - Show info dialog explaining battery optimization impact
+  - Provide button to open battery optimization settings
+  - Note: Don't auto-request exemption, let user decide
+
+**Checkpoint**: BLE connection stable for 8+ hours when backgrounded (SC-021) ✅
 
 ---
 

@@ -47,7 +47,7 @@ enum NotificationCategory {
 
 /// Phone notification to be forwarded to watch
 class PhoneNotification {
-  /// Unique notification ID (from Android StatusBarNotification.id)
+  /// Stable positive ID (mapped from Android StatusBarNotification.id)
   final int id;
 
   /// Package name of the source app
@@ -224,5 +224,4 @@ class AppNotificationFilter {
   @override
   int get hashCode => packageName.hashCode;
 }
-
 

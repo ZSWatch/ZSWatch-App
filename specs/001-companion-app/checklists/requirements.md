@@ -107,7 +107,7 @@
 
 | User Story | Status | Notes |
 |------------|--------|-------|
-| US1 - Connect to Watch | ✅ Complete | Scan, connect, bond, dashboard, reconnection, start page, auto-reconnect |
+| US1 - Connect to Watch | ✅ Complete | Scan, connect, bond, dashboard, reconnection, start page, auto-reconnect, persistent BLE |
 | US2 - Firmware Update | ✅ Complete | GitHub releases (multi-variant), CI builds, local files, MCUmgr DFU |
 | US3 - Notifications | ✅ Complete | Android NotificationListener, MediaSession, Gadgetbridge protocol, initial sync |
 | US4 - Dashboard | ✅ Complete | Connection status, battery ring, firmware version, feature navigation tiles |
@@ -153,6 +153,25 @@
 - `WatchConnectionState.syncing`: New state between negotiating and connected
 - `ConnectionStatusPill`: Updated to show "Syncing..." during sync phase
 - `WatchService._setupAfterConnect`: Transitions through syncing state, performs sync, then connected
+
+### Phase 3.8: Persistent BLE Connection (2025-11-29)
+
+**Completed Requirements:**
+- FR-089: Reliable background BLE connection ✅
+- FR-090: All BLE features work in background (notifications, music) ✅
+- FR-091: Platform-specific background rules compliance ✅
+- FR-092: Android foreground service notification with "Disconnect" action ✅
+
+**Implementation Details:**
+- `BleConnectionForegroundService.kt`: Android foreground service that keeps app alive when backgrounded
+- `ForegroundService.dart`: Flutter wrapper for MethodChannel communication with native service
+- `ForegroundServiceNotifier`: Riverpod provider that manages service lifecycle based on connection state
+- Notification channel "ble_connection" created on app startup (low importance)
+- Notification shows "Connected to [Watch]" or "Reconnecting to [Watch]..."
+- Notification "Disconnect" action triggers disconnect and stops service
+- Settings screen: "Persistent Connection" toggle (default: enabled)
+- Settings screen: Battery optimization status and guidance (Android)
+- iOS: Uses bluetooth-central background mode in Info.plist (handled by flutter_blue_plus)
 
 ## Firmware Update Implementation Details
 

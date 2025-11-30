@@ -36,6 +36,12 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         // Callback for notification events (set by Flutter plugin)
         var notificationCallback: NotificationCallback? = null
         
+        // Fallback mapping for sbn.id == 0 (apps that use 0 as ID)
+        // We assign a unique positive ID above the 32-bit range to avoid clashes.
+        private var nextFallbackId = 0x8000_0000L // start at high positive 32-bit range (non-zero)
+        private val keyToFallbackId = mutableMapOf<String, Long>()
+        private val fallbackIdToOriginalId = mutableMapOf<Long, Int>()
+        
         // Check if service is running
         val isRunning: Boolean
             get() = instance != null
@@ -56,6 +62,23 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
                 ?.filter { !it.isOngoing }
                 ?.mapNotNull { sbn -> instance?.extractNotificationData(sbn) }
                 ?: emptyList()
+        }
+
+        /**
+         * Decode a previously encoded notification ID back to the original sbn.id.
+         * If the ID was in the normal (non-zero) range, we can derive it directly.
+         * If it was a fallback (zero case), we consult the mapping.
+         */
+        fun decodeNotificationId(encodedId: Long): Int? {
+            // Check fallback first (zero-case)
+            fallbackIdToOriginalId[encodedId]?.let { return it }
+
+            // If within 32-bit range and non-zero, convert back (wraps negatives correctly)
+            if (encodedId in 1..0xFFFF_FFFFL) {
+                return encodedId.toInt()
+            }
+
+            return null
         }
         
         // Dismiss a notification by key
@@ -224,24 +247,29 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         if (sbn.packageName == packageName) {
             return
         }
-        
-        // Convert to unsigned 32-bit to avoid negative IDs
-        val unsignedId = sbn.id.toLong() and 0xFFFFFFFFL
-        
+
+        // Use the same encoded ID that was sent when posted
+        val encodedId = encodeNotificationId(sbn)
+
         val notificationData = mapOf(
-            "id" to unsignedId,
+            "id" to encodedId,
             "packageName" to sbn.packageName,
             "key" to sbn.key
         )
-        
-        Log.d(TAG, "Notification removed: ${sbn.packageName} - $unsignedId")
-        
+
+        Log.d(TAG, "Notification removed: ${sbn.packageName} - $encodedId")
+
         notificationCallback?.onNotificationRemoved(notificationData)
+
+        // Clean up mapping for this notification
+        clearFallbackId(sbn.key)
     }
     
     private fun extractNotificationData(sbn: StatusBarNotification): Map<String, Any?> {
         val notification = sbn.notification
         val extras = notification.extras
+
+        val encodedId = encodeNotificationId(sbn)
         
         // Get app name
         val pm = packageManager
@@ -294,11 +322,8 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         // Determine sender (for messaging)
         val sender = conversationTitle ?: subText
         
-        // Convert to unsigned 32-bit to avoid negative IDs
-        val unsignedId = sbn.id.toLong() and 0xFFFFFFFFL
-        
         return mapOf(
-            "id" to unsignedId,
+            "id" to encodedId,
             "packageName" to sbn.packageName,
             "appName" to appName,
             "title" to title,
@@ -311,6 +336,33 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             "key" to sbn.key
         )
     }
+
+    /**
+     * Get (or create) a stable, positive, non-zero ID for a notification.
+     * - Non-zero IDs: return unsigned 32-bit representation (handles negatives).
+     * - Zero IDs: assign a unique fallback above the 32-bit range, stored per sbn.key.
+     */
+    @Synchronized
+    private fun encodeNotificationId(sbn: StatusBarNotification): Long {
+        val rawId = sbn.id
+        val unsigned = rawId.toLong() and 0xFFFF_FFFFL
+        if (unsigned != 0L) {
+            return unsigned // covers normal and negative IDs
+        }
+
+        // Zero-case fallback
+        val key = sbn.key
+        keyToFallbackId[key]?.let { return it }
+
+        val fallbackId = nextFallbackId++
+        keyToFallbackId[key] = fallbackId
+        fallbackIdToOriginalId[fallbackId] = rawId
+        return fallbackId
+    }
+
+    @Synchronized
+    private fun clearFallbackId(key: String) {
+        val fallbackId = keyToFallbackId.remove(key) ?: return
+        fallbackIdToOriginalId.remove(fallbackId)
+    }
 }
-
-
