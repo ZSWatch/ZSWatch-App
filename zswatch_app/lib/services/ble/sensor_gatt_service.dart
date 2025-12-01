@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../../core/constants/ble_constants.dart';
+import '../../data/models/sensor_fusion_data.dart';
 import '../../data/models/sensor_reading.dart';
 
 // Convert String UUIDs to Guid for flutter_blue_plus
@@ -35,6 +36,7 @@ class SensorGattService {
   BluetoothCharacteristic? _magChar;
   BluetoothCharacteristic? _humidityChar;
   BluetoothCharacteristic? _pressureChar;
+  BluetoothCharacteristic? _fusionChar;
 
   // Subscriptions
   StreamSubscription<List<int>>? _tempSubscription;
@@ -44,6 +46,7 @@ class SensorGattService {
   StreamSubscription<List<int>>? _magSubscription;
   StreamSubscription<List<int>>? _humiditySubscription;
   StreamSubscription<List<int>>? _pressureSubscription;
+  StreamSubscription<List<int>>? _fusionSubscription;
 
   // Stream controllers
   final _tempController = StreamController<SensorReading>.broadcast();
@@ -53,6 +56,7 @@ class SensorGattService {
   final _magController = StreamController<SensorReading>.broadcast();
   final _humidityController = StreamController<SensorReading>.broadcast();
   final _pressureController = StreamController<SensorReading>.broadcast();
+  final _fusionController = StreamController<SensorFusionData>.broadcast();
 
   bool _isConnected = false;
 
@@ -79,6 +83,9 @@ class SensorGattService {
   /// Stream of pressure readings
   Stream<SensorReading> get pressureStream => _pressureController.stream;
 
+  /// Stream of sensor fusion (quaternion) readings
+  Stream<SensorFusionData> get sensorFusionStream => _fusionController.stream;
+
   /// Combined stream of all sensor readings
   Stream<SensorReading> get allSensorsStream {
     return StreamGroup.merge([
@@ -103,6 +110,7 @@ class SensorGattService {
   bool get hasMagnetometer => _magChar != null;
   bool get hasHumidity => _humidityChar != null;
   bool get hasPressure => _pressureChar != null;
+  bool get hasSensorFusion => _fusionChar != null;
 
   /// Initialize the sensor service
   ///
@@ -141,6 +149,10 @@ class SensorGattService {
         SensorServiceUuids.pressureService,
         SensorServiceUuids.pressureChar,
       );
+      _fusionChar = _findCharInService(
+        SensorServiceUuids.sensorFusionService,
+        SensorServiceUuids.sensorFusionChar,
+      );
 
       debugPrint('[SensorGatt] Found sensors: '
           'temp=${_tempChar != null}, '
@@ -149,7 +161,8 @@ class SensorGattService {
           'gyro=${_gyroChar != null}, '
           'mag=${_magChar != null}, '
           'humidity=${_humidityChar != null}, '
-          'pressure=${_pressureChar != null}');
+          'pressure=${_pressureChar != null}, '
+          'fusion=${_fusionChar != null}');
 
       _isConnected = true;
       return true;
@@ -457,6 +470,48 @@ class SensorGattService {
   }
 
   // =========================================================================
+  // Sensor Fusion (Quaternion)
+  // =========================================================================
+
+  /// Start streaming sensor fusion (quaternion) data
+  Future<void> startSensorFusion() async {
+    if (_fusionChar == null) {
+      debugPrint('[SensorGatt] Sensor fusion not available');
+      return;
+    }
+
+    try {
+      await _fusionChar!.setNotifyValue(true);
+      _fusionSubscription =
+          _fusionChar!.onValueReceived.listen(_handleFusionData);
+      debugPrint('[SensorGatt] Sensor fusion streaming started');
+    } catch (e) {
+      debugPrint('[SensorGatt] Failed to start sensor fusion: $e');
+    }
+  }
+
+  /// Stop streaming sensor fusion data
+  Future<void> stopSensorFusion() async {
+    await _fusionSubscription?.cancel();
+    _fusionSubscription = null;
+    try {
+      await _fusionChar?.setNotifyValue(false);
+    } catch (_) {}
+  }
+
+  void _handleFusionData(List<int> data) {
+    if (data.length < 16) return;
+
+    // Firmware sends quaternion [w, x, y, z] as 4x float32 little-endian
+    try {
+      final fusionData = SensorFusionData.fromBleData(data);
+      _fusionController.add(fusionData);
+    } catch (e) {
+      debugPrint('[SensorGatt] Failed to parse fusion data: $e');
+    }
+  }
+
+  // =========================================================================
   // Utility methods
   // =========================================================================
 
@@ -469,6 +524,7 @@ class SensorGattService {
     await startMagnetometer();
     await startHumidity();
     await startPressure();
+    await startSensorFusion();
   }
 
   /// Stop all sensors
@@ -480,6 +536,7 @@ class SensorGattService {
     await stopMagnetometer();
     await stopHumidity();
     await stopPressure();
+    await stopSensorFusion();
   }
 
   /// Dispose resources
@@ -492,6 +549,7 @@ class SensorGattService {
     await _magController.close();
     await _humidityController.close();
     await _pressureController.close();
+    await _fusionController.close();
     _isConnected = false;
   }
 }

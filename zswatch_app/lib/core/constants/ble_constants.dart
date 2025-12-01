@@ -95,6 +95,13 @@ abstract final class SensorServiceUuids {
   
   /// Pressure Characteristic UUID (ADAFRUIT_CHAR_PRESSURE 0xADAF0801)
   static const String pressureChar = 'adaf0801-c332-42a8-93bd-25e905756cb8';
+
+  /// 3D/Sensor Fusion Service UUID (ADAFRUIT_SERVICE_3D 0xADAF0D00)
+  static const String sensorFusionService = 'adaf0d00-c332-42a8-93bd-25e905756cb8';
+  
+  /// 3D/Sensor Fusion Characteristic UUID (ADAFRUIT_CHAR_3D 0xADAF0D01)
+  /// Data: quaternion [w, x, y, z] as 4x float32 little-endian (16 bytes)
+  static const String sensorFusionChar = 'adaf0d01-c332-42a8-93bd-25e905756cb8';
 }
 
 /// MCUmgr/SMP Service UUIDs

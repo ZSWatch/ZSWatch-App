@@ -216,6 +216,37 @@ A user or developer wants to analyze battery drain patterns and connection relia
 
 ---
 
+### User Story 12 - IMU Sensor Fusion Viewer (Priority: P6)
+
+A user or developer wants to visualize the watch's physical orientation in real-time. The app displays an interactive 3D model of the watch that mirrors the actual watch's rotation in real-time. The watch firmware performs sensor fusion onboard and outputs quaternion orientation data via a GATT characteristic.
+
+The watch outputs a quaternion (w, x, y, z) representing the fused orientation. The app subscribes to this GATT characteristic (same enable/disable pattern as other sensors via CCCD notification) and applies the quaternion to a 3D model of the watch, creating a real-time digital twin visualization. Euler angles (roll, pitch, yaw) are computed client-side from the quaternion for display purposes.
+
+This feature is integrated into the existing Sensor Debug Screen alongside other sensor visualizations (accelerometer, gyroscope, magnetometer, etc.), using the same toggle pattern to enable/disable streaming.
+
+Note: The magnetometer is optional on the watch. When magnetometer data is not available, the watch's sensor fusion will experience yaw drift over time (rotation around vertical axis). The app provides a "Reset Orientation" button to re-zero the heading reference, compensating for this drift.
+
+**Why this priority**: Provides a compelling visual demonstration of the watch's sensor capabilities, useful for developers testing IMU calibration and for users to verify sensor functionality. Grouped with Developer Tools priority.
+
+**Independent Test**: Connect to watch, open Sensor Debug Screen, enable Sensor Fusion toggle, physically rotate the watch in hand, verify 3D model rotates correspondingly with minimal latency (<200ms perceived lag).
+
+**Acceptance Scenarios**:
+
+1. **Given** watch is connected, **When** user navigates to Sensor Debug Screen, **Then** a "Sensor Fusion" toggle is available alongside other sensor toggles
+2. **Given** Sensor Fusion toggle is enabled, **When** CCCD notification is set, **Then** quaternion data streams at 5Hz (200ms intervals)
+3. **Given** quaternion data is streaming, **When** user rotates the physical watch, **Then** the 3D model rotates to match within 200ms
+4. **Given** 3D model is displayed, **When** user tilts watch forward/backward, **Then** model pitches correspondingly
+5. **Given** 3D model is displayed, **When** user rolls watch left/right, **Then** model rolls correspondingly
+6. **Given** 3D model is displayed, **When** user rotates watch around vertical axis, **Then** model yaws correspondingly
+7. **Given** Sensor Fusion is enabled, **When** watch is placed flat on table, **Then** model shows watch face-up orientation
+8. **Given** magnetometer is not available on watch, **When** watch rotates around vertical axis over time, **Then** yaw drift may occur (expected behavior)
+9. **Given** Sensor Fusion is active, **When** user taps "Reset Orientation" button, **Then** current orientation becomes the reference (zeroed), compensating for yaw drift
+10. **Given** Sensor Fusion is enabled, **When** user disables toggle or navigates away, **Then** CCCD notification is disabled, stopping watch streaming to preserve battery
+11. **Given** connection is lost while Sensor Fusion enabled, **When** reconnection occurs, **Then** sensor subscription resumes automatically if toggle still enabled
+12. **Given** quaternion data is streaming, **When** user views raw data section, **Then** current quaternion (w,x,y,z) and computed Euler angles (roll,pitch,yaw in degrees) display numerically
+
+---
+
 ### User Story 10 - Voice Recording Playback (Priority: P10) [PLACEHOLDER]
 
 A user records a voice memo or dictation on their watch and wants to play it back on the phone. The app receives the audio data and allows playback.
@@ -517,6 +548,32 @@ The watch needs phone-assisted network access. It sends `t:"http"` Gadgetbridge 
 - **FR-121**: App MUST return HTTP errors to the watch using `{"t":"http","err":<error message>}` and MUST echo the integer `id` when provided
 - **FR-122**: App MUST support multiple concurrent HTTP relay requests and MUST NOT drop or reorder responses across different `id` values
 
+#### Permission Onboarding (First Launch)
+- **FR-123**: App MUST request all necessary permissions on first launch before allowing main app usage
+- **FR-124**: App MUST clearly explain why each permission is needed before requesting it
+- **FR-125**: App MUST handle permission denial gracefully and allow user to proceed with reduced functionality
+- **FR-126**: App MUST show a persistent banner/indicator on relevant screens when required permissions are denied
+- **FR-127**: App MUST provide easy access to system settings from denied permission indicators
+- **FR-128**: App MUST re-check permission status when returning from background (user may have changed settings)
+- **FR-129**: App MUST NOT repeatedly request permissions that user has denied (Android "don't ask again")
+- **FR-130**: App MUST provide a "Re-request permissions" option in Settings for users who want to reconsider
+
+#### IMU Sensor Fusion Viewer
+- **FR-131**: App MUST provide IMU Sensor Fusion visualization within the Sensor Debug Screen (Developer Tools)
+- **FR-132**: Sensor Fusion section MUST render an interactive 3D model of the ZSWatch
+- **FR-133**: App MUST subscribe to the sensor fusion GATT characteristic (ADAFRUIT_CHAR_3D) to receive quaternion data from watch
+- **FR-134**: Watch firmware outputs quaternion only (w, x, y, z) as 4 floats (16 bytes); Euler angles are computed client-side
+- **FR-135**: App MUST apply received quaternion directly to 3D model rotation
+- **FR-136**: 3D model rotation MUST update at 5Hz to match sensor notification frequency (200ms interval)
+- **FR-137**: App MUST provide "Reset Orientation" button to zero the current orientation as reference heading
+- **FR-138**: Reset Orientation MUST store current quaternion as offset and apply inverse to subsequent readings
+- **FR-139**: App MUST handle yaw drift gracefully when magnetometer is not available on watch (Reset Orientation compensates)
+- **FR-140**: Enabling/disabling Sensor Fusion toggle MUST enable/disable CCCD notification on characteristic (same pattern as other sensors)
+- **FR-141**: App MUST re-subscribe to sensor fusion characteristic if connection is lost and restored while toggle is enabled
+- **FR-142**: App MUST display raw quaternion values (w,x,y,z) and computed Euler angles (roll,pitch,yaw in degrees)
+- **FR-143**: 3D model MUST accurately represent pitch, roll, and yaw rotations of the physical watch
+- **FR-144**: Magnetometer availability is optional; app MUST function correctly with or without magnetometer data from watch
+
 ### UI/UX Requirements
 
 #### Visual Theme
@@ -593,6 +650,7 @@ The watch needs phone-assisted network access. It sends `t:"http"` Gadgetbridge 
 - **MediaState**: Current media playback state (title, artist, album, playbackState, timestamp)
 - **GPSLocation**: GPS coordinates (latitude, longitude, accuracy, timestamp)
 - **HttpRequest**: HTTP relay request from watch (url, xpath?, insecure?, id?:int, startedAt, completedAt, resp?, err?)
+- **SensorFusionData**: Quaternion orientation from watch's onboard sensor fusion (w, x, y, z as floats), timestamp; Euler angles (roll, pitch, yaw) computed client-side from quaternion
 
 ## Success Criteria *(mandatory)*
 
@@ -619,6 +677,7 @@ The watch needs phone-assisted network access. It sends `t:"http"` Gadgetbridge 
 - **SC-019**: Initial sync completes within 3 seconds of connection establishment
 - **SC-020**: GPS location response sent to watch within 5 seconds of request (subject to GPS acquisition time)
 - **SC-021**: BLE connection remains stable for at least 8 hours when app is backgrounded (within OS limits)
+- **SC-022**: IMU Sensor Fusion 3D model rotation latency is under 200ms from physical watch movement
 
 ## Assumptions
 
@@ -636,3 +695,5 @@ The watch needs phone-assisted network access. It sends `t:"http"` Gadgetbridge 
 - Watch firmware supports Gadgetbridge-compatible GPS location format
 - Android foreground service with persistent notification is acceptable for users who want reliable background connection
 - Watch firmware sends music control commands using Gadgetbridge music control protocol
+- Watch firmware performs onboard sensor fusion and outputs quaternion (w, x, y, z) via GATT characteristic at 5Hz when subscribed
+- Magnetometer is optional on watch hardware; sensor fusion may experience yaw drift without it

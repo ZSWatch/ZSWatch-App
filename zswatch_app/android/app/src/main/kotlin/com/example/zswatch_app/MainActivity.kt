@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -106,6 +107,37 @@ class MainActivity : FlutterActivity() {
                 }
                 "isServiceRunning" -> {
                     result.success(NotificationListenerServiceImpl.isRunning)
+                }
+                "sendTestNotification" -> {
+                    val title = call.argument<String>("title") ?: "ZSWatch debug notification"
+                    val body = call.argument<String>("body") ?: "This is a native Android test notification."
+
+                    val notificationsEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
+                    if (!notificationsEnabled) {
+                        result.error(
+                            "NOTIFICATIONS_DISABLED",
+                            "Posting notifications is not allowed (permission not granted)",
+                            null
+                        )
+                        return@setMethodCallHandler
+                    }
+
+                    try {
+                        val posted = NotificationDebugHelper.postDebugNotification(this, title, body)
+                        result.success(posted)
+                    } catch (e: SecurityException) {
+                        result.error(
+                            "NOTIFICATION_PERMISSION",
+                            "Missing POST_NOTIFICATIONS permission",
+                            e.localizedMessage
+                        )
+                    } catch (e: Exception) {
+                        result.error(
+                            "NOTIFICATION_ERROR",
+                            e.localizedMessage ?: "Failed to post notification",
+                            null
+                        )
+                    }
                 }
                 else -> result.notImplemented()
             }

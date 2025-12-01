@@ -192,6 +192,32 @@ class NotificationService {
     }
   }
 
+  /// Post a native Android notification for debugging and return its metadata.
+  Future<Map<String, dynamic>?> sendNativeTestNotification({
+    required String title,
+    required String body,
+  }) async {
+    if (!Platform.isAndroid) return null;
+
+    try {
+      final result = await _methodChannel.invokeMapMethod<String, dynamic>(
+        'sendTestNotification',
+        {
+          'title': title,
+          'body': body,
+        },
+      );
+
+      return result;
+    } on PlatformException catch (e) {
+      debugPrint('Error sending test notification: ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('Error sending test notification: $e');
+      rethrow;
+    }
+  }
+
   /// Refresh permission status
   Future<void> refreshPermissionStatus() async {
     if (!Platform.isAndroid) return;
@@ -212,4 +238,3 @@ class NotificationService {
     _initialized = false;
   }
 }
-

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../data/models/sensor_fusion_data.dart';
 import '../../../data/models/sensor_reading.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../../services/ble/sensor_gatt_service.dart';
@@ -30,6 +31,12 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
   SensorGattService? _sensorService;
   final Map<SensorType, bool> _enabledSensors = {};
   final Map<SensorType, StreamSubscription<SensorReading>?> _subscriptions = {};
+
+  // Sensor fusion state
+  bool _fusionEnabled = false;
+  StreamSubscription<SensorFusionData>? _fusionSubscription;
+  SensorFusionData? _latestFusionData;
+  SensorFusionData? _orientationOffset;
 
   @override
   void initState() {
@@ -69,8 +76,65 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
     for (final sub in _subscriptions.values) {
       sub?.cancel();
     }
+    _fusionSubscription?.cancel();
     _sensorService?.stopAll();
     super.dispose();
+  }
+
+  // Sensor fusion methods
+  Future<void> _toggleSensorFusion(bool enable) async {
+    if (_sensorService == null) return;
+    
+    setState(() {
+      _fusionEnabled = enable;
+    });
+    
+    try {
+      if (enable) {
+        await _sensorService!.startSensorFusion();
+        _fusionSubscription = _sensorService!.sensorFusionStream.listen((data) {
+          if (!mounted) return;
+          setState(() {
+            _latestFusionData = data;
+          });
+        });
+      } else {
+        await _fusionSubscription?.cancel();
+        _fusionSubscription = null;
+        await _sensorService!.stopSensorFusion();
+        setState(() {
+          _latestFusionData = null;
+          _orientationOffset = null;
+        });
+      }
+    } catch (e) {
+      debugPrint('[SensorDebug] Error toggling sensor fusion: $e');
+      if (mounted) {
+        setState(() {
+          _fusionEnabled = !enable;
+        });
+      }
+    }
+  }
+
+  void _resetOrientation() {
+    if (_latestFusionData != null) {
+      setState(() {
+        _orientationOffset = _latestFusionData;
+      });
+    }
+  }
+
+  void _clearOrientation() {
+    setState(() {
+      _orientationOffset = null;
+    });
+  }
+
+  SensorFusionData? get _correctedFusionData {
+    if (_latestFusionData == null) return null;
+    if (_orientationOffset == null) return _latestFusionData;
+    return _latestFusionData!.applyOffset(_orientationOffset!);
   }
 
   Future<void> _toggleSensor(SensorType type, bool enable) async {
@@ -184,6 +248,18 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
                 // Info text
                 _buildInfoText(),
                 const SizedBox(height: AppTheme.spacingMd),
+
+                // Sensor Fusion Card (at top)
+                _SensorFusionCard(
+                  latestData: _correctedFusionData,
+                  rawData: _latestFusionData,
+                  hasOffset: _orientationOffset != null,
+                  enabled: _fusionEnabled,
+                  available: _sensorService?.hasSensorFusion ?? false,
+                  onToggle: _toggleSensorFusion,
+                  onResetOrientation: _resetOrientation,
+                  onClearOrientation: _clearOrientation,
+                ),
 
                 // Sensor cards - based on firmware supported sensors
                 _SensorCard(
@@ -758,4 +834,509 @@ class _ChartPainter extends CustomPainter {
         (history.isNotEmpty && oldDelegate.history.isNotEmpty &&
          oldDelegate.history.last != history.last);
   }
+}
+
+/// Sensor fusion card showing quaternion data and Euler angles
+class _SensorFusionCard extends StatelessWidget {
+  final SensorFusionData? latestData;
+  final SensorFusionData? rawData;
+  final bool hasOffset;
+  final bool enabled;
+  final bool available;
+  final ValueChanged<bool> onToggle;
+  final VoidCallback onResetOrientation;
+  final VoidCallback onClearOrientation;
+
+  const _SensorFusionCard({
+    required this.latestData,
+    required this.rawData,
+    required this.hasOffset,
+    required this.enabled,
+    required this.available,
+    required this.onToggle,
+    required this.onResetOrientation,
+    required this.onClearOrientation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final euler = latestData?.toEulerAngles();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: AppTheme.spacingMd),
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with toggle
+            Row(
+              children: [
+                Icon(
+                  Icons.threed_rotation,
+                  color: enabled ? AppTheme.primaryColor : AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sensor Fusion',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      if (!available)
+                        Text(
+                          'Not available on this device',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.warningColor,
+                              ),
+                        ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: enabled,
+                  onChanged: available ? onToggle : null,
+                ),
+              ],
+            ),
+
+            if (enabled) ...[
+              const SizedBox(height: AppTheme.spacingMd),
+
+              // Quaternion values
+              Text(
+                'Quaternion',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              if (latestData != null) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _QuatChip(label: 'W', value: latestData!.w),
+                    _QuatChip(label: 'X', value: latestData!.x),
+                    _QuatChip(label: 'Y', value: latestData!.y),
+                    _QuatChip(label: 'Z', value: latestData!.z),
+                  ],
+                ),
+              ] else ...[
+                Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Waiting for data...',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: AppTheme.spacingMd),
+
+              // Euler angles with axis visualization
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Axis visualization
+                  if (euler != null)
+                    SizedBox(
+                      width: 100,
+                      height: 100,
+                      child: CustomPaint(
+                        painter: _AxisPainter(
+                          roll: euler.roll,
+                          pitch: euler.pitch,
+                          yaw: euler.yaw,
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 100, height: 100),
+                  const SizedBox(width: 12),
+                  // Euler values
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Euler Angles${hasOffset ? ' (corrected)' : ''}',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                color: AppTheme.textSecondary,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (euler != null) ...[
+                          _EulerRow(label: 'Roll', value: euler.rollDegrees, color: Colors.red),
+                          const SizedBox(height: 4),
+                          _EulerRow(label: 'Pitch', value: euler.pitchDegrees, color: Colors.green),
+                          const SizedBox(height: 4),
+                          _EulerRow(label: 'Yaw', value: euler.yawDegrees, color: Colors.blue),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: AppTheme.spacingMd),
+
+              // Reset orientation button
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: latestData != null ? onResetOrientation : null,
+                      icon: const Icon(Icons.restart_alt, size: 18),
+                      label: const Text('Reset Orientation'),
+                    ),
+                  ),
+                  if (hasOffset) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: onClearOrientation,
+                      icon: const Icon(Icons.clear),
+                      tooltip: 'Clear offset',
+                      style: IconButton.styleFrom(
+                        foregroundColor: AppTheme.errorColor,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              if (hasOffset)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Orientation offset applied',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.successColor,
+                        ),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuatChip extends StatelessWidget {
+  final String label;
+  final double value;
+
+  const _QuatChip({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          Text(
+            value.toStringAsFixed(3),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EulerChip extends StatelessWidget {
+  final String label;
+  final double value;
+  final Color color;
+
+  const _EulerChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          Text(
+            '${value.toStringAsFixed(1)}°',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Row widget for displaying Euler angle with label and value
+class _EulerRow extends StatelessWidget {
+  final String label;
+  final double value;
+  final Color color;
+
+  const _EulerRow({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 40,
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            '${value.toStringAsFixed(1)}°',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Custom painter for 3D axis visualization
+class _AxisPainter extends CustomPainter {
+  final double roll;
+  final double pitch;
+  final double yaw;
+
+  _AxisPainter({
+    required this.roll,
+    required this.pitch,
+    required this.yaw,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final axisLength = size.width * 0.35;
+
+    // Apply rotations to get axis endpoints
+    // We'll use a simplified 3D to 2D projection
+    
+    // X-axis (red) - points right initially
+    final xEnd = _rotateAndProject(1, 0, 0, axisLength, center);
+    // Y-axis (green) - points up initially  
+    final yEnd = _rotateAndProject(0, 1, 0, axisLength, center);
+    // Z-axis (blue) - points out of screen initially
+    final zEnd = _rotateAndProject(0, 0, 1, axisLength, center);
+
+    // Draw coordinate circle background
+    final bgPaint = Paint()
+      ..color = Colors.grey.withValues(alpha: 0.1)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, axisLength + 5, bgPaint);
+
+    final circlePaint = Paint()
+      ..color = Colors.grey.withValues(alpha: 0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.drawCircle(center, axisLength + 5, circlePaint);
+
+    // Draw axes with depth sorting (draw farthest first)
+    final axes = [
+      _AxisData('X', xEnd, Colors.red, _getDepth(1, 0, 0)),
+      _AxisData('Y', yEnd, Colors.green, _getDepth(0, 1, 0)),
+      _AxisData('Z', zEnd, Colors.blue, _getDepth(0, 0, 1)),
+    ];
+    axes.sort((a, b) => a.depth.compareTo(b.depth));
+
+    for (final axis in axes) {
+      _drawAxis(canvas, center, axis.end, axis.color, axis.label);
+    }
+
+    // Draw center dot
+    final centerPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 3, centerPaint);
+    canvas.drawCircle(center, 3, Paint()..color = Colors.grey..style = PaintingStyle.stroke);
+  }
+
+  Offset _rotateAndProject(double x, double y, double z, double scale, Offset center) {
+    // Apply Euler rotations (ZXY order: yaw, roll, pitch)
+    // Yaw (around Z)
+    final cosYaw = math.cos(yaw);
+    final sinYaw = math.sin(yaw);
+    final x1 = x * cosYaw - y * sinYaw;
+    final y1 = x * sinYaw + y * cosYaw;
+    final z1 = z;
+
+    // Roll (around X) - swapped with pitch
+    final cosRoll = math.cos(roll);
+    final sinRoll = math.sin(roll);
+    final x2 = x1;
+    final y2 = y1 * cosRoll - z1 * sinRoll;
+    final z2 = y1 * sinRoll + z1 * cosRoll;
+
+    // Pitch (around Y) - swapped with roll
+    final cosPitch = math.cos(pitch);
+    final sinPitch = math.sin(pitch);
+    final x3 = x2 * cosPitch + z2 * sinPitch;
+    final y3 = y2;
+    final z3 = -x2 * sinPitch + z2 * cosPitch;
+
+    // Project to 2D (simple orthographic with slight perspective)
+    final perspectiveFactor = 1 + z3 * 0.2;
+    return Offset(
+      center.dx + x3 * scale * perspectiveFactor,
+      center.dy - y3 * scale * perspectiveFactor, // Flip Y for screen coords
+    );
+  }
+
+  double _getDepth(double x, double y, double z) {
+    // Get Z coordinate after rotation for depth sorting (ZXY order)
+    final cosYaw = math.cos(yaw);
+    final sinYaw = math.sin(yaw);
+    final x1 = x * cosYaw - y * sinYaw;
+    final y1 = x * sinYaw + y * cosYaw;
+    final z1 = z;
+
+    final cosRoll = math.cos(roll);
+    final sinRoll = math.sin(roll);
+    final y2 = y1 * cosRoll - z1 * sinRoll;
+    final z2 = y1 * sinRoll + z1 * cosRoll;
+
+    final cosPitch = math.cos(pitch);
+    final sinPitch = math.sin(pitch);
+    final z3 = -x1 * sinPitch + z2 * cosPitch;
+
+    return z3;
+  }
+
+  void _drawAxis(Canvas canvas, Offset start, Offset end, Color color, String label) {
+    // Draw axis line
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(start, end, paint);
+
+    // Draw arrowhead
+    final direction = (end - start);
+    final length = direction.distance;
+    if (length > 10) {
+      final normalized = direction / length;
+      final perpendicular = Offset(-normalized.dy, normalized.dx);
+      final arrowSize = 6.0;
+      final arrowBase = end - normalized * arrowSize;
+      
+      final path = Path()
+        ..moveTo(end.dx, end.dy)
+        ..lineTo(arrowBase.dx + perpendicular.dx * arrowSize * 0.5, 
+                 arrowBase.dy + perpendicular.dy * arrowSize * 0.5)
+        ..lineTo(arrowBase.dx - perpendicular.dx * arrowSize * 0.5,
+                 arrowBase.dy - perpendicular.dy * arrowSize * 0.5)
+        ..close();
+      
+      canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
+    }
+
+    // Draw label
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    
+    final labelOffset = end + (end - start) / (end - start).distance * 8;
+    textPainter.paint(
+      canvas,
+      Offset(labelOffset.dx - textPainter.width / 2, labelOffset.dy - textPainter.height / 2),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _AxisPainter oldDelegate) {
+    return oldDelegate.roll != roll ||
+        oldDelegate.pitch != pitch ||
+        oldDelegate.yaw != yaw;
+  }
+}
+
+class _AxisData {
+  final String label;
+  final Offset end;
+  final Color color;
+  final double depth;
+
+  _AxisData(this.label, this.end, this.color, this.depth);
 }

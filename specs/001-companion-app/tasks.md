@@ -802,6 +802,81 @@
 
 ---
 
+## Phase 8.5: User Story 12 - IMU Sensor Fusion Viewer (Priority: P6) 🆕 ✅ COMPLETE
+
+**Goal**: User visualizes watch orientation in real-time via Euler angles and 3D axis visualization that mirrors physical watch rotation
+
+**Independent Test**: Connect to watch → Open Sensor Debug → Enable Sensor Fusion → Rotate watch → 3D axis rotates correspondingly → Euler angles update in real-time
+
+**Technical Details**:
+- Watch firmware performs sensor fusion onboard using Madgwick/Mahony algorithm
+- Watch outputs quaternion (w, x, y, z) via GATT characteristic `ADAFRUIT_CHAR_3D` (UUID: `ADAF0D01-C332-42A8-93BD-25E905756CB8`)
+- Service UUID: `ADAFRUIT_SERVICE_3D` (`ADAF0D00-C332-42A8-93BD-25E905756CB8`)
+- Data format: 4 floats (16 bytes) - quaternion w, x, y, z
+- Update rate: 5Hz (200ms interval) when subscribed
+- Magnetometer is optional; without it, yaw drift occurs over time
+
+### Models
+
+- [X] T168 [P] [US12] Create SensorFusionData model in lib/data/models/sensor_fusion_data.dart
+  - Quaternion: w, x, y, z (floats)
+  - Timestamp
+  - Factory constructor to parse from BLE notification (16 bytes → 4 floats)
+  - Method to compute Euler angles (roll, pitch, yaw) from quaternion
+  - Quaternion math: conjugate, inverse, multiply, applyOffset
+
+### Constants
+
+- [X] T169 [P] [US12] Add sensor fusion GATT UUIDs to lib/core/constants/ble_constants.dart
+  - sensorFusionService: `ADAF0D00-C332-42A8-93BD-25E905756CB8`
+  - sensorFusionChar: `ADAF0D01-C332-42A8-93BD-25E905756CB8`
+
+### Services
+
+- [X] T170 [US12] Update sensor_gatt_service.dart to support sensor fusion characteristic
+  - Added _fusionChar, _fusionSubscription, _fusionController
+  - startSensorFusion() / stopSensorFusion() methods
+  - hasSensorFusion getter for availability check
+  - sensorFusionStream for UI consumption
+  - Parses 16-byte notification into SensorFusionData
+
+### UI Integration (Sensor Debug Screen)
+
+- [X] T175 [US12] Add Sensor Fusion card to sensor_debug_screen.dart
+  - Moved to top of sensor list for prominence
+  - Toggle switch to enable/disable sensor fusion streaming
+  - Shows quaternion values (W, X, Y, Z) with 3 decimal places
+  - Shows Euler angles (Roll, Pitch, Yaw) in degrees
+  - 3D axis visualization that rotates based on orientation
+
+- [X] T176 [US12] Add "Reset Orientation" button
+  - Stores current quaternion as reference offset
+  - Applies inverse offset to subsequent readings: q_corrected = q_raw * q_offset^-1
+  - "Clear offset" button to remove correction
+  - Visual indicator when offset is active
+
+- [X] T177 [US12] Add 3D axis visualization (_AxisPainter)
+  - X-axis (red), Y-axis (green), Z-axis (blue) with arrowheads and labels
+  - Rotates based on roll, pitch, yaw using ZXY Euler order
+  - Depth sorting so front axes drawn on top
+  - Circle background for visual context
+
+- [X] T177a [US12] Add Euler angle display with axis colors
+  - Roll (red), Pitch (green), Yaw (blue) color-coded
+  - Displayed alongside 3D axis visualization
+  - Updates in real-time as watch orientation changes
+
+### Lifecycle Management
+
+- [X] T178 [US12] Handle sensor fusion subscription lifecycle
+  - CCCD notification enable/disable controls watch streaming
+  - Unsubscribe when leaving sensor debug screen
+  - Toggle disabled and shows "Not available" if characteristic not found
+
+**Checkpoint**: Sensor Fusion card in Sensor Debug Screen shows quaternion, Euler angles, and 3D axis visualization that rotates in real-time mirroring physical watch orientation ✅
+
+---
+
 ## Phase 9: User Story 7 - Multiple Watch Management (Priority: P7) ✅ COMPLETE
 
 **Goal**: User manages multiple paired ZSWatch devices via the Start Screen
@@ -1044,7 +1119,45 @@
 
 ---
 
-## Phase 13: Polish & Cross-Cutting Concerns
+## Phase 13: Permission Onboarding (First Launch Experience) 🆕
+
+**Purpose**: Centralized permission handling on first launch to ensure all permissions are requested upfront, avoiding missed permission dialogs when app runs in background
+
+**Problem**: Currently permissions are requested on-demand when features are used. Since the watch connection runs in background, users may miss permission dialogs (e.g., notification listener, location for GPS, POST_NOTIFICATIONS). This leads to broken features without clear indication why.
+
+**Solution**: Request all necessary permissions during first app launch with clear explanations. If user denies, show a banner/indicator on relevant screens with link to re-enable in Settings.
+
+### Permission Onboarding Screen
+
+- [ ] T151 [US1] Create PermissionOnboardingScreen in lib/ui/screens/onboarding/permission_onboarding_screen.dart
+- [ ] T152 [P] Create permission state model in lib/data/models/permission_state.dart (tracks granted/denied for each permission)
+- [ ] T153 [P] Create permission providers in lib/providers/permission_providers.dart (centralized permission state management)
+- [ ] T154 [US1] Implement permission request flow for Bluetooth (BLUETOOTH_SCAN, BLUETOOTH_CONNECT) on Android
+- [ ] T155 [US1] Implement permission request flow for Notification Listener Service (Android) with explanation
+- [ ] T156 [US1] Implement permission request flow for POST_NOTIFICATIONS (Android 13+) for foreground service notification
+- [ ] T157 [US1] Implement permission request flow for Location (for GPS relay feature) with explanation
+- [ ] T158 [US1] Implement permission request flow for Battery Optimization exemption with explanation
+- [ ] T159 [US1] Show first-launch onboarding flow before navigating to main app
+- [ ] T160 [US1] Persist onboarding completion state in SharedPreferences
+
+### Permission Status Indicators
+
+- [ ] T161 [P] Create PermissionStatusBanner widget in lib/ui/widgets/permission_status_banner.dart
+- [ ] T162 [US1] Show permission denied banner on Settings screen with link to system settings
+- [ ] T163 [US3] Show notification permission banner on Notifications screen if not granted
+- [ ] T164 [US1] Show location permission banner on GPS-related screens if not granted
+- [ ] T165 [P] Add "Re-request permissions" option in Settings screen
+
+### Permission Re-check on Resume
+
+- [ ] T166 [US1] Re-check permission status when app resumes from background (user may have changed in system settings)
+- [ ] T167 [US1] Update permission providers automatically when returning from system settings
+
+**Checkpoint**: Users are guided through permissions on first launch; denied permissions are clearly indicated with paths to re-enable
+
+---
+
+## Phase 14: Polish & Cross-Cutting Concerns
 
 **Purpose**: Final improvements affecting multiple user stories
 
@@ -1097,7 +1210,9 @@ Phase 2: Foundational ◄──────────────────�
 ├──► Phase 7: US5 - Health (P5)
 ├──► Phase 8: US6 - Developer Tools (P6)
 │       │
-│       └──► (includes Notification/Music Debug Tools 🆕)
+│       ├──► (includes Notification/Music Debug Tools 🆕)
+│       │
+│       └──► Phase 8.5: US12 - IMU Sensor Fusion Viewer 🆕
 │
 ├──► Phase 9: US7 - Multi-Watch (P7)
 ├──► Phase 10: US8 - Settings (P8)
@@ -1109,7 +1224,9 @@ Phase 2: Foundational ◄──────────────────�
 ├──► Phase 11.6: US11 - HTTP Relay 🆕
 ├──► Phase 12: US10 - Voice [STUB] (P10)
 │
-└──► Phase 13: Polish (after desired stories complete)
+├──► Phase 13: Permission Onboarding 🆕 (first launch experience)
+│
+└──► Phase 14: Polish (after desired stories complete)
 ```
 
 ### User Story Dependencies
@@ -1123,6 +1240,7 @@ Phase 2: Foundational ◄──────────────────�
 | US4 (Dashboard) | US1 (needs connection) | US2, US3, US5, US6 | - |
 | US5 (Health) | US1 (needs connection) | US2, US3, US4, US6 | - |
 | US6 (Developer) | US1 (needs connection) | US2, US3, US4, US5 | Debug Tools |
+| US12 (IMU Viewer) | US6 (extends Developer Tools) | US7-US11 | 3D orientation viewer 🆕 |
 | US7 (Multi-Watch) | US1 (Start Page) | US2-US6 | Rename, Forget via Start Screen |
 | US8 (Settings) | Foundational | All stories | - |
 | US9 (Analytics) | US1 (needs connection) | US2-US8 | - |
@@ -1181,6 +1299,13 @@ Sequential: T045s → T045t → T045u (Android service chain)
 ```
 Parallel: T133j, T133p (model and dependency)
 Sequential: T133k → T133l → T133m → T133n (service → protocol → integration)
+```
+
+**Phase 8.5 (IMU Viewer) 🆕**:
+```
+Parallel: T168, T169, T172, T173 (model, constants, dependency, 3D asset)
+Sequential: T170 → T171 → T174 → T175 (service → providers → widget → screen)
+Sequential: T176, T177 (features after screen exists)
 ```
 
 ---
@@ -1263,14 +1388,16 @@ Based on user value and dependencies:
 | Phase 6: US4 Dashboard | 5 | P4 | - |
 | Phase 7: US5 Health | 14 | P5 | - |
 | Phase 8: US6 Developer | 25 | P6 | 6 (debug tools) |
+| Phase 8.5: US12 IMU Viewer 🆕 | 11 | P6 | 11 |
 | Phase 9: US7 Multi-Watch | 7 | P7 | 7 (Start Screen mgmt) |
 | Phase 10: US8 Settings | 5 | P8 | - |
 | Phase 11: US9 Analytics | 9 | P9 | - |
 | Phase 11.5: GPS Support 🆕 | 7 | - | 7 |
 | Phase 11.6: US11 HTTP Relay 🆕 | 4 | P4 | 4 |
 | Phase 12: US10 Voice | 4 | P10 | - |
-| Phase 13: Polish | 9 | - | - |
-| **Total** | **~199** | 11 stories | **~58 new** |
+| Phase 13: Permission Onboarding 🆕 | 17 | - | 17 |
+| Phase 14: Polish | 9 | - | - |
+| **Total** | **~227** | 12 stories | **~86 new** |
 
 ### New Requirements Coverage
 
@@ -1288,6 +1415,8 @@ Based on user value and dependencies:
 | Persistent BLE (FR-089-092) | 3.8 | T045r-T045z |
 | GPS Support (FR-103-107) | 11.5 | T133j-T133p |
 | HTTP Relay (FR-117-122) | 11.6 | T147-T150 |
+| IMU Sensor Fusion Viewer (FR-131-144) | 8.5 | T168-T179 |
+| Permission Onboarding (FR-123-130) | 13 | T151-T167 |
 
 ---
 

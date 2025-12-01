@@ -169,6 +169,9 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
     
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         sbn ?: return
+        val isDebugNotification = sbn.notification.extras?.getBoolean(
+            NotificationDebugHelper.EXTRA_DEBUG_NOTIFICATION
+        ) == true
         
         // Skip ongoing notifications (media players, downloads, etc.)
         if (sbn.isOngoing) {
@@ -177,7 +180,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         }
         
         // Skip notifications from our own app
-        if (sbn.packageName == packageName) {
+        if (sbn.packageName == packageName && !isDebugNotification) {
             return
         }
         
@@ -242,9 +245,12 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
     
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         sbn ?: return
+        val isDebugNotification = sbn.notification.extras?.getBoolean(
+            NotificationDebugHelper.EXTRA_DEBUG_NOTIFICATION
+        ) == true
         
         // Skip our own notifications
-        if (sbn.packageName == packageName) {
+        if (sbn.packageName == packageName && !isDebugNotification) {
             return
         }
 

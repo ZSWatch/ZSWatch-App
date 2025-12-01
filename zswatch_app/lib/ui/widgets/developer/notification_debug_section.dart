@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../providers/notification_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 
 /// Debug section for sending test notifications to the watch.
@@ -23,7 +27,10 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
   final _bodyController = TextEditingController(text: 'This is a debug notification from the companion app.');
   String _selectedApp = 'Messages';
   int _notificationId = 1000; // Start from 1000 to avoid conflicts with real notifications
+  int? _nativeNotificationId;
+  String? _nativeNotificationTag;
   bool _isSending = false;
+  bool _isPostingNative = false;
 
   // App sources supported by ZSWatch firmware (zsw_notification_manager.c)
   static const List<String> _appOptions = [
@@ -87,6 +94,48 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
       _showSnackBar('Cleared notification ${_notificationId - 1}');
     } catch (e) {
       _showSnackBar('Failed to clear: $e', isError: true);
+    }
+  }
+
+  Future<void> _sendNativeAndroidNotification() async {
+    if (_isPostingNative) return;
+    if (!Platform.isAndroid) {
+      _showSnackBar('Native notification testing is only available on Android', isError: true);
+      return;
+    }
+
+    final notificationService = ref.read(notificationServiceProvider);
+
+    setState(() => _isPostingNative = true);
+
+    try {
+      final result = await notificationService.sendNativeTestNotification(
+        title: _titleController.text.isNotEmpty ? _titleController.text : 'ZSWatch Debug',
+        body: _bodyController.text.isNotEmpty ? _bodyController.text : 'Debug notification from ZSWatch app',
+      );
+
+      final id = result?['id'] as int?;
+      final tag = result?['tag'] as String?;
+
+      setState(() {
+        _nativeNotificationId = id;
+        _nativeNotificationTag = tag;
+      });
+
+      if (id != null) {
+        final suffix = tag != null ? ' (tag: $tag)' : '';
+        _showSnackBar('Android notification posted (ID: $id$suffix)');
+      } else {
+        _showSnackBar('Android notification posted');
+      }
+    } on PlatformException catch (e) {
+      _showSnackBar(e.message ?? 'Failed to post notification', isError: true);
+    } catch (e) {
+      _showSnackBar('Failed to post notification: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isPostingNative = false);
+      }
     }
   }
 
@@ -210,6 +259,30 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
                 ),
               ],
             ),
+
+            const SizedBox(height: AppTheme.spacingSm),
+
+            // Post native Android notification (uses system-assigned ID)
+            ElevatedButton.icon(
+              onPressed: _isPostingNative ? null : _sendNativeAndroidNotification,
+              icon: _isPostingNative
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.phone_android),
+              label: const Text('Send Android Notification'),
+            ),
+
+            if (_nativeNotificationId != null) ...[
+              const SizedBox(height: AppTheme.spacingXs),
+              Text(
+                'Last Android notification ID: $_nativeNotificationId'
+                '${_nativeNotificationTag != null ? ' (tag: $_nativeNotificationTag)' : ''}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
 
             if (!isConnected) ...[
               const SizedBox(height: AppTheme.spacingSm),

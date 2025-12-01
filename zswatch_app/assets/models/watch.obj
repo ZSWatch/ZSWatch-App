@@ -1,0 +1,51 @@
+# Simple watch orientation cube
+# Screen faces -Z (forward), Top faces +Y (up)
+
+mtllib watch.mtl
+
+# Vertices for a unit cube centered at origin
+v -0.5 -0.5 -0.5
+v  0.5 -0.5 -0.5
+v  0.5  0.5 -0.5
+v -0.5  0.5 -0.5
+v -0.5 -0.5  0.5
+v  0.5 -0.5  0.5
+v  0.5  0.5  0.5
+v -0.5  0.5  0.5
+
+# Front face (SCREEN - Blue) - faces toward viewer (-Z)
+# Counter-clockwise winding for front face
+g Front_SCREEN
+usemtl Screen_Blue
+f 4 3 2 1
+f 1 2 3 4
+
+# Back face (Gray) - faces away (+Z)
+g Back
+usemtl Back_Gray
+f 5 6 7 8
+f 8 7 6 5
+
+# Top face (Green) - faces up (+Y)
+g Top_TOP
+usemtl Top_Green
+f 8 7 3 4
+f 4 3 7 8
+
+# Bottom face (Orange) - faces down (-Y)
+g Bottom
+usemtl Bottom_Orange
+f 1 2 6 5
+f 5 6 2 1
+
+# Right face (Red) - faces right (+X)
+g Right
+usemtl Right_Red
+f 2 3 7 6
+f 6 7 3 2
+
+# Left face (Yellow) - faces left (-X)
+g Left
+usemtl Left_Yellow
+f 5 8 4 1
+f 1 4 8 5

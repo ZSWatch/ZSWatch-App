@@ -1,0 +1,25 @@
+# Materials for orientation cube
+
+# Screen face (Blue) - the watch screen faces this direction
+newmtl Screen_Blue
+Kd 0.2 0.4 0.9
+
+# Back face (Gray)
+newmtl Back_Gray
+Kd 0.4 0.4 0.4
+
+# Top face (Green) - top of the watch
+newmtl Top_Green
+Kd 0.2 0.8 0.3
+
+# Bottom face (Orange)
+newmtl Bottom_Orange
+Kd 0.9 0.5 0.1
+
+# Right face (Red)
+newmtl Right_Red
+Kd 0.9 0.2 0.2
+
+# Left face (Yellow)
+newmtl Left_Yellow
+Kd 0.9 0.9 0.2
