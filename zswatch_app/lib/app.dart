@@ -8,6 +8,7 @@ import 'providers/foreground_service_providers.dart';
 import 'providers/gps_providers.dart';
 import 'providers/http_providers.dart';
 import 'providers/notification_providers.dart';
+import 'providers/watch_service_provider.dart';
 import 'ui/navigation/app_router.dart';
 
 /// Main application widget
@@ -50,6 +51,9 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       // Initialize foreground service manager to handle background connection (FR-089 to FR-092)
       // This subscribes to connection state changes and manages the Android foreground service
       ref.read(foregroundServiceNotifierProvider);
+      // Initialize watch info persistence to sync firmware version and lastConnectedAt to database
+      // This listens to watch info and connection state changes and persists them
+      ref.read(watchInfoPersistenceProvider);
     } catch (e) {
       debugPrint('BLE initialization error: $e');
     }

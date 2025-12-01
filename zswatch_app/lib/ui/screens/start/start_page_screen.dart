@@ -71,10 +71,8 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
       final watchService = ref.read(watchServiceProvider);
       await watchService.connectById(watch.id);
 
-      // Update last connected timestamp
-      unawaited(
-        db.WatchNotifier(ref.read(db.databaseProvider)).updateLastConnected(watch.id),
-      );
+      // Note: lastConnectedAt is now updated centrally by watchInfoPersistenceProvider
+      // when connection state becomes connected
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

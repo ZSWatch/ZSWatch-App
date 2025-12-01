@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/connection.dart';
 import '../data/models/connection_state.dart';
 import '../data/models/watch.dart';
+import '../data/repositories/watch_repository.dart';
 import '../services/watch_service.dart';
 import '../services/ble/ble_scanner.dart';
+import 'watch_providers.dart';
 
 /// Provider for the unified WatchService
 final watchServiceProvider = Provider<WatchService>((ref) {
@@ -79,6 +83,75 @@ final batteryLevelStreamProvider = StreamProvider<int>((ref) {
 final batteryLevelProvider = Provider<int?>((ref) {
   final asyncValue = ref.watch(batteryLevelStreamProvider);
   return asyncValue.valueOrNull;
+});
+
+/// Provider that syncs watch info changes to the database.
+/// 
+/// This provider listens to watch info stream and persists changes
+/// (firmware version, hardware version, battery level, lastConnectedAt)
+/// to the database when they change.
+final watchInfoPersistenceProvider = Provider<void>((ref) {
+  final db = ref.watch(databaseProvider);
+  final repository = WatchRepository(db);
+  
+  // Track last persisted values to avoid duplicate writes
+  String? lastPersistedFw;
+  String? lastPersistedHw;
+  
+  // Listen to watch info changes and persist to database
+  ref.listen(watchInfoStreamProvider, (previous, next) {
+    final watch = next.valueOrNull;
+    if (watch == null || watch.id.isEmpty) return;
+    
+    // Check if firmware or hardware version changed
+    final fwChanged = watch.firmwareVersion != null && 
+        watch.firmwareVersion != lastPersistedFw;
+    final hwChanged = watch.hardwareVersion != null && 
+        watch.hardwareVersion != lastPersistedHw;
+    
+    if (fwChanged || hwChanged) {
+      debugPrint('[WatchInfoPersistence] Persisting firmware/hw version: '
+          'fw=${watch.firmwareVersion}, hw=${watch.hardwareVersion}');
+      
+      if (watch.firmwareVersion != null) {
+        lastPersistedFw = watch.firmwareVersion;
+      }
+      if (watch.hardwareVersion != null) {
+        lastPersistedHw = watch.hardwareVersion;
+      }
+      
+      unawaited(repository.updateFirmwareVersion(
+        watch.id,
+        watch.firmwareVersion ?? '',
+        hardwareVersion: watch.hardwareVersion,
+      ));
+    }
+  });
+  
+  // Listen to connection state to update lastConnectedAt when connected
+  bool hasUpdatedLastConnected = false;
+  String lastConnectedWatchId = '';
+  
+  ref.listen(watchConnectionStreamProvider, (previous, next) {
+    final connection = next.valueOrNull;
+    if (connection == null) return;
+    
+    // Reset tracking when disconnected or connecting to different device
+    if (connection.state == WatchConnectionState.disconnected ||
+        connection.watchId != lastConnectedWatchId) {
+      hasUpdatedLastConnected = false;
+      lastConnectedWatchId = connection.watchId;
+    }
+    
+    // Update lastConnectedAt when connection becomes connected (once per connection)
+    if (connection.state == WatchConnectionState.connected && 
+        connection.watchId.isNotEmpty &&
+        !hasUpdatedLastConnected) {
+      hasUpdatedLastConnected = true;
+      debugPrint('[WatchInfoPersistence] Updating lastConnectedAt for ${connection.watchId}');
+      unawaited(repository.updateLastConnected(connection.watchId));
+    }
+  });
 });
 
 /// Notifier for watch operations
