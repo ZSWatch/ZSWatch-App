@@ -383,7 +383,8 @@ class WatchService {
       _isInitialConnection = false;
 
     } catch (e) {
-      // Only report error if we're still supposed to be connected
+      debugPrint('[Setup] Error during setup: $e');
+      // Only report error and trigger reconnect if we're still supposed to be connected
       // If device disconnected during setup, let the disconnect handler manage state
       if (_device != null && _device!.isConnected) {
         _updateConnection(Connection.error(
@@ -391,8 +392,16 @@ class WatchService {
           ConnectionErrorType.serviceDiscoveryFailed,
           details: e.toString(),
         ));
-        await disconnect();
-        rethrow;
+        // Disconnect the BLE device but DON'T call disconnect() which would set
+        // _isCancelled=true and prevent auto-reconnect. Instead, just disconnect
+        // the underlying device and let _handleDisconnect manage reconnection.
+        try {
+          await _device!.disconnect();
+        } catch (_) {
+          // Ignore disconnect errors
+        }
+        // Don't rethrow - we've handled the error by disconnecting and letting
+        // the auto-reconnect mechanism try again
       } else {
         debugPrint('[Setup] Error during setup but device disconnected - letting disconnect handler manage: $e');
         // Don't rethrow - the disconnect handler will manage reconnection
@@ -1016,7 +1025,8 @@ class WatchService {
                          currentConnection.state == WatchConnectionState.bonding ||
                          currentConnection.state == WatchConnectionState.discoveringServices ||
                          currentConnection.state == WatchConnectionState.negotiating ||
-                         currentConnection.state == WatchConnectionState.syncing;
+                         currentConnection.state == WatchConnectionState.syncing ||
+                         currentConnection.state == WatchConnectionState.error;
 
     if (wasConnected && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts) {
       _attemptReconnect(watchId, name);

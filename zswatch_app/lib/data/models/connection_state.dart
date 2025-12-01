@@ -186,9 +186,10 @@ extension ConnectionErrorTypeExtension on ConnectionErrorType {
       case ConnectionErrorType.unknown:
         return true; // Can retry
       case ConnectionErrorType.bondingFailed:
-      case ConnectionErrorType.serviceDiscoveryFailed:
       case ConnectionErrorType.maxReconnectionsReached:
         return false; // Likely needs device reset or re-pairing
+      case ConnectionErrorType.serviceDiscoveryFailed:
+        return true; // Can be a transient BLE issue, retry is worthwhile
     }
   }
 }
