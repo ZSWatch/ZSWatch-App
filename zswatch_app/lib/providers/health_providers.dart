@@ -653,11 +653,27 @@ class HeartRateHistoryState {
 /// Notifier for heart rate history state
 class HeartRateHistoryNotifier extends StateNotifier<HeartRateHistoryState> {
   final HealthRepository _healthRepository;
+  final HealthSyncService _healthSyncService;
   final Ref _ref;
+  
+  StreamSubscription<int?>? _hrSubscription;
+  bool _disposed = false;
 
-  HeartRateHistoryNotifier(this._healthRepository, this._ref) 
+  HeartRateHistoryNotifier(this._healthRepository, this._healthSyncService, this._ref) 
       : super(const HeartRateHistoryState()) {
+    _initialize();
+  }
+  
+  void _initialize() {
     loadData();
+    
+    // Listen to real-time HR updates (from activity messages or live streaming)
+    // and refresh data when new HR values arrive
+    _hrSubscription = _healthSyncService.heartRateStream.listen((hr) {
+      if (_disposed || hr == null) return;
+      // Reload data from database to include the new reading
+      loadData();
+    });
   }
 
   /// Load today's heart rate data
@@ -702,13 +718,21 @@ class HeartRateHistoryNotifier extends StateNotifier<HeartRateHistoryState> {
   Future<void> refresh() async {
     await loadData();
   }
+  
+  @override
+  void dispose() {
+    _disposed = true;
+    _hrSubscription?.cancel();
+    super.dispose();
+  }
 }
 
 /// Provider for heart rate history notifier
 final heartRateHistoryProvider = 
     StateNotifierProvider<HeartRateHistoryNotifier, HeartRateHistoryState>((ref) {
   final healthRepository = ref.watch(healthRepositoryProvider);
-  return HeartRateHistoryNotifier(healthRepository, ref);
+  final healthSyncService = ref.watch(healthSyncServiceProvider);
+  return HeartRateHistoryNotifier(healthRepository, healthSyncService, ref);
 });
 
 // ==================== Data Cleanup Provider ====================
