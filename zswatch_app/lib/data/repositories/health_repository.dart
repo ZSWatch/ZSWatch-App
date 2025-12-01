@@ -280,6 +280,55 @@ class HealthRepository {
     return breakdown;
   }
 
+  /// Calculate activity breakdown for a date range (week/month)
+  /// 
+  /// Returns a Map of activity state value to duration spent in that state,
+  /// aggregated across all days in the range.
+  Future<Map<int, Duration>> getActivityBreakdownForRange({
+    required String watchId,
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final samples = await getSamples(
+      watchId: watchId,
+      type: HealthType.activity,
+      from: from,
+      to: to,
+    );
+    
+    if (samples.isEmpty) {
+      return {};
+    }
+    
+    final breakdown = <int, Duration>{};
+    final now = DateTime.now();
+    final effectiveEnd = now.isBefore(to) ? now : to;
+    
+    // Sort by timestamp
+    final sortedSamples = List<HealthSample>.from(samples)
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    
+    for (int i = 0; i < sortedSamples.length; i++) {
+      final sample = sortedSamples[i];
+      final stateValue = sample.intValue;
+      
+      // Calculate duration until next sample or end of range
+      final DateTime nextTime;
+      if (i + 1 < sortedSamples.length) {
+        nextTime = sortedSamples[i + 1].timestamp;
+      } else {
+        nextTime = effectiveEnd;
+      }
+      
+      final duration = nextTime.difference(sample.timestamp);
+      if (duration.isNegative) continue;
+      
+      breakdown[stateValue] = (breakdown[stateValue] ?? Duration.zero) + duration;
+    }
+    
+    return breakdown;
+  }
+
   // ==================== Delete Operations ====================
 
   /// Delete old data (60-day retention policy)

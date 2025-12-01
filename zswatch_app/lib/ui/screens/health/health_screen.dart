@@ -63,6 +63,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with SingleTickerPr
         _ => StepsHistoryRange.day,
       };
       ref.read(stepsHistoryProvider.notifier).loadData(range);
+      ref.read(activityBreakdownProvider.notifier).loadData(range);
     }
   }
 
@@ -70,7 +71,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     final stepsHistory = ref.watch(stepsHistoryProvider);
     final hrHistory = ref.watch(heartRateHistoryProvider);
-    final activityBreakdown = ref.watch(activityBreakdownProvider);
+    final activityBreakdownState = ref.watch(activityBreakdownProvider);
     final isConnected = ref.watch(isWatchConnectedProvider);
 
     return Scaffold(
@@ -82,6 +83,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with SingleTickerPr
             onPressed: () {
               ref.read(stepsHistoryProvider.notifier).refresh();
               ref.read(heartRateHistoryProvider.notifier).refresh();
+              ref.read(activityBreakdownProvider.notifier).refresh();
             },
           ),
         ],
@@ -98,6 +100,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with SingleTickerPr
         onRefresh: () async {
           await ref.read(stepsHistoryProvider.notifier).refresh();
           await ref.read(heartRateHistoryProvider.notifier).refresh();
+          await ref.read(activityBreakdownProvider.notifier).refresh();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -107,7 +110,9 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with SingleTickerPr
             children: [
               // Activity breakdown card (pie chart)
               _ActivityBreakdownCard(
-                breakdown: activityBreakdown.valueOrNull ?? const ActivityBreakdown(),
+                breakdown: activityBreakdownState.breakdown,
+                range: activityBreakdownState.range,
+                isLoading: activityBreakdownState.isLoading,
               ),
 
               const SizedBox(height: AppTheme.spacingMd),
@@ -233,14 +238,24 @@ class _StepsSummaryCard extends StatelessWidget {
 
 class _ActivityBreakdownCard extends StatelessWidget {
   final ActivityBreakdown breakdown;
+  final StepsHistoryRange range;
+  final bool isLoading;
 
   const _ActivityBreakdownCard({
     required this.breakdown,
+    required this.range,
+    required this.isLoading,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasData = breakdown.totalDuration > Duration.zero;
+    
+    final rangeLabel = switch (range) {
+      StepsHistoryRange.day => "Today's",
+      StepsHistoryRange.week => 'This Week',
+      StepsHistoryRange.month => 'This Month',
+    };
     
     return Card(
       child: Padding(
@@ -253,11 +268,11 @@ class _ActivityBreakdownCard extends StatelessWidget {
                 const Icon(Icons.pie_chart, color: AppTheme.primaryColor),
                 const SizedBox(width: AppTheme.spacingSm),
                 Text(
-                  'Activity Breakdown',
+                  '$rangeLabel Activity',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const Spacer(),
-                if (breakdown.currentState != null)
+                if (breakdown.currentState != null && range == StepsHistoryRange.day)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppTheme.spacingSm,
@@ -292,7 +307,12 @@ class _ActivityBreakdownCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppTheme.spacingMd),
-            if (!hasData)
+            if (isLoading)
+              const SizedBox(
+                height: 150,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (!hasData)
               SizedBox(
                 height: 150,
                 child: Center(
@@ -306,7 +326,9 @@ class _ActivityBreakdownCard extends StatelessWidget {
                       ),
                       const SizedBox(height: AppTheme.spacingSm),
                       Text(
-                        'Waiting for activity data...',
+                        range == StepsHistoryRange.day 
+                            ? 'Waiting for activity data...'
+                            : 'No activity data for this period',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppTheme.textSecondary,
                         ),
@@ -588,28 +610,30 @@ class _HeartRateCard extends StatelessWidget {
               ),
               const SizedBox(height: AppTheme.spacingMd),
               if (latestHr == null && sampleCount == 0)
-                Column(
-                  children: [
-                    const Icon(
-                      Icons.heart_broken,
-                      size: 48,
-                      color: AppTheme.textSecondary,
-                    ),
-                    const SizedBox(height: AppTheme.spacingSm),
-                    Text(
-                      'No heart rate data today',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
-                    ),
-                    const SizedBox(height: AppTheme.spacingSm),
-                    Text(
-                      'Tap to start live monitoring',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.primaryColor,
-                          ),
-                    ),
-                  ],
+                Center(
+                  child: Column(
+                    children: [
+                      const Icon(
+                        Icons.heart_broken,
+                        size: 48,
+                        color: AppTheme.textSecondary,
+                      ),
+                      const SizedBox(height: AppTheme.spacingSm),
+                      Text(
+                        'No heart rate data today',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                      ),
+                      const SizedBox(height: AppTheme.spacingSm),
+                      Text(
+                        'Tap to start live monitoring',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.primaryColor,
+                            ),
+                      ),
+                    ],
+                  ),
                 )
               else
                 Row(

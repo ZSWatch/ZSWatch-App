@@ -188,10 +188,155 @@ final heartRateStreamingProvider =
 
 // ==================== Activity Breakdown Provider ====================
 
-/// Provider for real-time activity breakdown
-final activityBreakdownProvider = StreamProvider<ActivityBreakdown>((ref) {
+/// State class for activity breakdown with range support
+class ActivityBreakdownState {
+  final StepsHistoryRange range;
+  final ActivityBreakdown breakdown;
+  final bool isLoading;
+  final String? error;
+
+  const ActivityBreakdownState({
+    this.range = StepsHistoryRange.day,
+    this.breakdown = const ActivityBreakdown(),
+    this.isLoading = false,
+    this.error,
+  });
+
+  ActivityBreakdownState copyWith({
+    StepsHistoryRange? range,
+    ActivityBreakdown? breakdown,
+    bool? isLoading,
+    String? error,
+  }) {
+    return ActivityBreakdownState(
+      range: range ?? this.range,
+      breakdown: breakdown ?? this.breakdown,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
+  }
+}
+
+/// Notifier for activity breakdown state with range support
+class ActivityBreakdownNotifier extends StateNotifier<ActivityBreakdownState> {
+  final HealthRepository _healthRepository;
+  final HealthSyncService _healthSyncService;
+  final Ref _ref;
+  
+  StreamSubscription<ActivityBreakdown>? _activitySubscription;
+  bool _disposed = false;
+
+  ActivityBreakdownNotifier(this._healthRepository, this._healthSyncService, this._ref) 
+      : super(const ActivityBreakdownState()) {
+    _initialize();
+  }
+  
+  void _initialize() {
+    loadData(StepsHistoryRange.day);
+    
+    // Listen to real-time activity updates - only update when viewing today
+    _activitySubscription = _healthSyncService.activityBreakdownStream.listen((breakdown) {
+      if (_disposed) return;
+      // Only update with real-time data for day view
+      if (state.range == StepsHistoryRange.day) {
+        state = state.copyWith(breakdown: breakdown);
+      }
+    });
+  }
+
+  /// Load activity breakdown data for the specified range
+  Future<void> loadData(StepsHistoryRange range) async {
+    final watchId = _ref.read(currentWatchProvider)?.id;
+    if (watchId == null) return;
+
+    state = state.copyWith(range: range, isLoading: true);
+
+    try {
+      final now = DateTime.now();
+      final DateTime from;
+
+      switch (range) {
+        case StepsHistoryRange.day:
+          from = DateTime(now.year, now.month, now.day);
+          break;
+        case StepsHistoryRange.week:
+          from = now.subtract(const Duration(days: 7));
+          break;
+        case StepsHistoryRange.month:
+          from = now.subtract(const Duration(days: 30));
+          break;
+      }
+
+      // Get breakdown from database
+      final Map<int, Duration> breakdownMap;
+      if (range == StepsHistoryRange.day) {
+        breakdownMap = await _healthRepository.getActivityBreakdown(
+          watchId: watchId,
+          date: now,
+        );
+      } else {
+        breakdownMap = await _healthRepository.getActivityBreakdownForRange(
+          watchId: watchId,
+          from: from,
+          to: now,
+        );
+      }
+
+      // Convert int keys to ActivityState
+      final durations = <ActivityState, Duration>{};
+      for (final entry in breakdownMap.entries) {
+        final activityState = ActivityState.fromValue(entry.key);
+        durations[activityState] = entry.value;
+      }
+
+      // Get current state (only for day view)
+      ActivityState? currentState;
+      if (range == StepsHistoryRange.day) {
+        final todayActivity = await _healthRepository.getDailyActivity(
+          watchId: watchId,
+          date: now,
+        );
+        if (todayActivity.isNotEmpty) {
+          currentState = ActivityState.fromValue(todayActivity.last.intValue);
+        }
+      }
+
+      state = state.copyWith(
+        breakdown: ActivityBreakdown(
+          durations: durations,
+          currentState: currentState,
+          lastUpdate: now,
+        ),
+        isLoading: false,
+        error: null,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Refresh current data
+  Future<void> refresh() async {
+    await loadData(state.range);
+  }
+  
+  @override
+  void dispose() {
+    _disposed = true;
+    _activitySubscription?.cancel();
+    super.dispose();
+  }
+}
+
+/// Provider for activity breakdown notifier
+final activityBreakdownProvider = 
+    StateNotifierProvider<ActivityBreakdownNotifier, ActivityBreakdownState>((ref) {
+  final healthRepository = ref.watch(healthRepositoryProvider);
   final healthSyncService = ref.watch(healthSyncServiceProvider);
-  return healthSyncService.activityBreakdownStream;
+  return ActivityBreakdownNotifier(healthRepository, healthSyncService, ref);
 });
 
 // ==================== Health Summary State ====================
@@ -381,11 +526,14 @@ class StepsHistoryNotifier extends StateNotifier<StepsHistoryState> {
   void _initialize() {
     loadData(StepsHistoryRange.day);
     
-    // Listen to real-time step updates and update total
+    // Listen to real-time step updates - only update total when viewing today
     _stepsSubscription = _healthSyncService.stepsStream.listen((steps) {
       if (_disposed) return;
-      // Update total steps with the latest value from the watch
-      state = state.copyWith(totalSteps: steps);
+      // Only update total steps in real-time for day view
+      // For week/month views, we want to show the historical totals from database
+      if (state.range == StepsHistoryRange.day) {
+        state = state.copyWith(totalSteps: steps);
+      }
     });
   }
 
