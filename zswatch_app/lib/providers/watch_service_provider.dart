@@ -55,15 +55,31 @@ final watchInfoStreamProvider = StreamProvider<Watch?>((ref) {
   return service.watchInfoStream;
 });
 
-/// Provider for current watch info - uses stream to get reactive updates
+/// Provider for current watch info - merges live service data with database data
+/// 
+/// The service provides live updates (battery, firmware from protocol, etc.)
+/// The database provides persisted data (customName, etc.)
+/// This provider merges them to provide a complete Watch with all fields.
 final currentWatchProvider = Provider<Watch?>((ref) {
-  // Watch the stream to get reactive updates
+  // Watch the stream to get reactive updates from the service
   final asyncValue = ref.watch(watchInfoStreamProvider);
   // Also get the synchronous value directly from the service as fallback
   final service = ref.watch(watchServiceProvider);
   
-  // Prefer the stream value if available, otherwise use the service's current value
-  return asyncValue.valueOrNull ?? service.currentWatch;
+  // Get the service's watch info (has live updates)
+  final serviceWatch = asyncValue.valueOrNull ?? service.currentWatch;
+  if (serviceWatch == null) return null;
+  
+  // Get the database watch info (has customName and other persisted data)
+  final dbWatchAsync = ref.watch(watchByIdProvider(serviceWatch.id));
+  final dbWatch = dbWatchAsync.valueOrNull;
+  
+  // Merge: use service watch as base, overlay customName from database
+  if (dbWatch != null && dbWatch.customName != null) {
+    return serviceWatch.copyWith(customName: dbWatch.customName);
+  }
+  
+  return serviceWatch;
 });
 
 /// Provider for current watch (non-null when connected)

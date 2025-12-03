@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/watch.dart';
 import '../../../providers/auto_reconnect_provider.dart';
+import '../../../providers/health_providers.dart';
 import '../../../providers/watch_service_provider.dart';
-import '../../widgets/battery_ring.dart';
 
 /// Dashboard screen showing connected watch information
 ///
@@ -22,10 +23,14 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final watch = ref.watch(currentWatchProvider);
     final connection = ref.watch(watchConnectionProvider);
+    final healthSummary = ref.watch(healthSummaryProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(watch?.displayName ?? 'ZSWatch'),
+        title: SvgPicture.asset(
+          'assets/images/ZSWatch_Text.svg',
+          height: 24,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -47,42 +52,12 @@ class DashboardScreen extends ConsumerWidget {
 
                   const SizedBox(height: AppTheme.spacingMd),
 
-                  // Battery and info row
-                  Row(
-                    children: [
-                      // Battery card
-                      Expanded(
-                        child: _InfoCard(
-                          title: 'Battery',
-                          child: BatteryRing(
-                            level: watch?.batteryLevel ?? 0,
-                            size: 80,
-                            strokeWidth: 6,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppTheme.spacingMd),
-                      // Firmware card
-                      Expanded(
-                        child: _InfoCard(
-                          title: 'Firmware',
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.memory,
-                                size: 40,
-                                color: AppTheme.primaryColor.withValues(alpha: 0.8),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                watch?.shortFirmwareVersion ?? 'Unknown',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                  // Stats row - 4 compact cards
+                  _StatsRow(
+                    batteryLevel: watch?.batteryLevel,
+                    firmwareVersion: watch?.shortFirmwareVersion,
+                    todaySteps: healthSummary.todaySteps,
+                    latestHeartRate: healthSummary.latestHeartRate,
                   ),
 
                   const SizedBox(height: AppTheme.spacingMd),
@@ -221,6 +196,122 @@ class _InfoCard extends StatelessWidget {
   }
 }
 
+/// Compact stats row with 4 mini cards
+class _StatsRow extends StatelessWidget {
+  final int? batteryLevel;
+  final String? firmwareVersion;
+  final int todaySteps;
+  final int? latestHeartRate;
+
+  const _StatsRow({
+    this.batteryLevel,
+    this.firmwareVersion,
+    this.todaySteps = 0,
+    this.latestHeartRate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            icon: Icons.memory,
+            label: 'Firmware',
+            value: firmwareVersion ?? '--',
+            color: AppTheme.primaryColor,
+          ),
+        ),
+        const SizedBox(width: AppTheme.spacingSm),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.battery_std,
+            label: 'Battery',
+            value: batteryLevel != null ? '$batteryLevel%' : '--',
+            color: batteryLevel != null 
+                ? AppTheme.getBatteryColor(batteryLevel!)
+                : AppTheme.textSecondary,
+          ),
+        ),
+        const SizedBox(width: AppTheme.spacingSm),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.directions_walk,
+            label: 'Steps',
+            value: _formatSteps(todaySteps),
+            color: AppTheme.secondaryColor,
+          ),
+        ),
+        const SizedBox(width: AppTheme.spacingSm),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.favorite,
+            label: 'Heart Rate',
+            value: latestHeartRate != null ? '$latestHeartRate' : '--',
+            color: AppTheme.errorColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatSteps(int steps) {
+    if (steps >= 1000) {
+      return '${(steps / 1000).toStringAsFixed(1)}k';
+    }
+    return '$steps';
+  }
+}
+
+/// Compact stat card for the stats row
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _StatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacingSm,
+          vertical: AppTheme.spacingMd,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                    fontSize: 10,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DeviceInfoCard extends StatelessWidget {
   final Watch? watch;
 
@@ -239,8 +330,8 @@ class _DeviceInfoCard extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const Divider(),
-            _InfoRow(label: 'Name', value: watch?.name ?? 'Unknown'),
-            _InfoRow(label: 'Device ID', value: watch?.id ?? 'Unknown'),
+            _InfoRow(label: 'Name', value: watch?.displayName ?? 'Unknown'),
+            _InfoRow(label: 'Bluetooth MAC', value: watch?.id ?? 'Unknown'),
             _InfoRow(
               label: 'Hardware',
               value: watch?.hardwareVersion ?? 'Unknown',

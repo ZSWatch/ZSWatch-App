@@ -299,12 +299,16 @@ class _DiagnosticRow extends StatelessWidget {
                   color: AppTheme.textSecondary,
                 ),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'monospace',
-                ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontFamily: 'monospace',
+                  ),
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),

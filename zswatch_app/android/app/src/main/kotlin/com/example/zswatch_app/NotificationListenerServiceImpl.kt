@@ -186,10 +186,38 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         
         val notification = sbn.notification
         
+        // Skip system apps that typically generate noise
+        val systemBlacklist = setOf(
+            "android",
+            "com.android.systemui",
+            "com.android.providers.downloads",
+            "com.google.android.gms",  // Google Play Services
+            "com.google.android.gsf",  // Google Services Framework
+        )
+        if (systemBlacklist.contains(sbn.packageName)) {
+            Log.d(TAG, "Skipping system notification from ${sbn.packageName}")
+            return
+        }
+        
         // Skip media transport notifications (category set by the OS)
         val category = notification.category
         if (category == Notification.CATEGORY_TRANSPORT) {
             Log.d(TAG, "Skipping CATEGORY_TRANSPORT notification from ${sbn.packageName}")
+            return
+        }
+        
+        // Skip service/status/progress notifications (usually background processes)
+        if (category == Notification.CATEGORY_SERVICE ||
+            category == Notification.CATEGORY_STATUS ||
+            category == Notification.CATEGORY_PROGRESS) {
+            Log.d(TAG, "Skipping $category notification from ${sbn.packageName}")
+            return
+        }
+        
+        // Skip promotional notifications
+        if (category == Notification.CATEGORY_PROMO ||
+            category == Notification.CATEGORY_RECOMMENDATION) {
+            Log.d(TAG, "Skipping promo/recommendation notification from ${sbn.packageName}")
             return
         }
         
@@ -205,10 +233,45 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             return
         }
         
+        // Skip local-only notifications (not meant to be bridged to other devices)
+        // Exception: Some apps incorrectly mark notifications as local-only
+        // These exceptions are from Gadgetbridge's NotificationListener.java (~line 1029-1045)
+        val localOnlyExceptions = setOf(
+            "com.tencent.mm",           // WeChat
+            "org.telegram.messenger",   // Telegram
+            "com.microsoft.office.outlook",  // Outlook
+            "com.skype.raider",         // Skype
+        )
+        if ((notification.flags and Notification.FLAG_LOCAL_ONLY) != 0 &&
+            !localOnlyExceptions.contains(sbn.packageName)) {
+            Log.d(TAG, "Skipping local-only notification from ${sbn.packageName}")
+            return
+        }
+        
+        // Skip group summary notifications (they are duplicates of child notifications)
+        // Exception: Some apps only send group summaries, not individual notifications
+        // This whitelist is from Gadgetbridge's NotificationListener.java (~line 429-437)
+        val groupSummaryWhitelist = setOf(
+            "com.microsoft.office.lync15",  // Skype for Business
+            "com.skype.raider",             // Skype
+        )
+        if ((notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0 &&
+            !groupSummaryWhitelist.contains(sbn.packageName)) {
+            Log.d(TAG, "Skipping group summary notification from ${sbn.packageName}")
+            return
+        }
+        
         // Skip notifications with media session (reliable indicator of media player notification)
         val extras = notification.extras
         if (extras.containsKey(Notification.EXTRA_MEDIA_SESSION)) {
             Log.d(TAG, "Skipping notification with media session from ${sbn.packageName}")
+            return
+        }
+        
+        // Check legacy priority (works on all Android versions)
+        @Suppress("DEPRECATION")
+        if (notification.priority < Notification.PRIORITY_DEFAULT) {
+            Log.d(TAG, "Skipping low priority notification from ${sbn.packageName}, priority=${notification.priority}")
             return
         }
         

@@ -63,12 +63,16 @@ class ConnectionStatusPill extends ConsumerWidget {
               _buildStatusIcon(icon, color),
               SizedBox(width: compact ? 4 : 6),
             ],
-            Text(
-              text,
-              style: TextStyle(
-                color: color,
-                fontSize: compact ? 12 : 14,
-                fontWeight: FontWeight.w500,
+            Flexible(
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: color,
+                  fontSize: compact ? 12 : 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
           ],

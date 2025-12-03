@@ -201,13 +201,17 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ZSWatch'),
+        centerTitle: true,
+        title: SvgPicture.asset(
+          'assets/images/ZSWatch_Text.svg',
+          height: 24,
+        ),
         actions: [
-          const ConnectionStatusPill(
-            compact: true,
-            showIcon: true,
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => context.push('/settings'),
+            tooltip: 'Settings',
           ),
-          const SizedBox(width: 8),
         ],
       ),
       body: watchesAsync.when(
