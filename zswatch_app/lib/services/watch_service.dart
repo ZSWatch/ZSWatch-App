@@ -50,8 +50,9 @@ class WatchService {
 
   bool _autoReconnect = true;
   int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 3; // Reduced for faster disconnect detection
+  static const int _maxQuickReconnectAttempts = 3; // Quick retries for momentary disconnects
   bool _isSettingUp = false; // Prevent concurrent setup calls
+  bool _isInBackgroundReconnect = false; // Track if we're using OS-level autoConnect
   bool _isCancelled = false; // Track if user has cancelled the connection
   bool _isReconnecting = false; // Track if reconnect is in progress (timer scheduled or running)
   bool _isInitialConnection = false; // Track if this is the first connection attempt (show Connecting not Reconnecting)
@@ -156,6 +157,7 @@ class WatchService {
       _autoReconnect = true;
       _reconnectAttempts = 0;
       _isInitialConnection = true; // Mark as initial connection
+      _isInBackgroundReconnect = false;
     }
     // Note: Only reset _isCancelled for user-initiated connections, not internal reconnects
     // The public connect methods should reset this flag
@@ -217,10 +219,14 @@ class WatchService {
           _isInitiatingConnection = false;
           return;
         }
-        debugPrint('[WatchService:$hashCode] About to call device.connect(autoConnect: false)');
+        // Use shorter timeout for reconnect attempts to cycle through them faster
+        final timeout = isReconnectAttempt 
+            ? const Duration(seconds: 10) 
+            : BleConfig.connectionTimeout;
+        debugPrint('[WatchService:$hashCode] About to call device.connect(autoConnect: false, timeout: ${timeout.inSeconds}s)');
         await device.connect(
           license: License.free,
-          timeout: BleConfig.connectionTimeout,
+          timeout: timeout,
           autoConnect: false,
         );
         // Clear the initiating flag - we're now connected
@@ -378,9 +384,10 @@ class WatchService {
         state: WatchConnectionState.connected,
       ));
 
-      // Reset reconnect attempts and initial connection flag on successful setup
+      // Reset reconnect attempts and flags on successful setup
       _reconnectAttempts = 0;
       _isInitialConnection = false;
+      _isInBackgroundReconnect = false;
 
     } catch (e) {
       debugPrint('[Setup] Error during setup: $e');
@@ -943,10 +950,15 @@ class WatchService {
         // Clear the waiting/initiating flags - we're now connected
         _isWaitingForAutoConnect = false;
         _isInitiatingConnection = false;
-        // For autoConnect, we need to run setup when connection happens
-        // Check if we're in connecting state (waiting for autoConnect)
-        // Also check _autoReconnect - if false, user cancelled and we should disconnect
-        if (currentConnection.state == WatchConnectionState.connecting && !_isSettingUp) {
+        
+        // For autoConnect or background reconnect, we need to run setup when connection happens
+        // Check if we're in connecting/reconnecting state (waiting for connection)
+        final currentState = currentConnection.state;
+        final isWaitingForConnection = currentState == WatchConnectionState.connecting ||
+                                       currentState == WatchConnectionState.reconnecting;
+        
+        if (isWaitingForConnection && !_isSettingUp) {
+          // Also check _autoReconnect - if false, user cancelled and we should disconnect
           if (!_autoReconnect) {
             debugPrint('[WatchService] Connection arrived but cancelled - disconnecting');
             _device?.disconnect();
@@ -958,7 +970,7 @@ class WatchService {
             ));
             return;
           }
-          debugPrint('[WatchService] AutoConnect triggered - running setup');
+          debugPrint('[WatchService] AutoConnect/BackgroundReconnect triggered - running setup');
           _setupAfterConnect(watchId, name);
         }
         break;
@@ -975,7 +987,7 @@ class WatchService {
   }
 
   void _handleDisconnect(String watchId, String name) {
-    debugPrint('[WatchService:$hashCode] _handleDisconnect: _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect, _reconnectAttempts=$_reconnectAttempts, _isReconnecting=$_isReconnecting, _isSettingUp=$_isSettingUp, _isWaitingForAutoConnect=$_isWaitingForAutoConnect, _isInitiatingConnection=$_isInitiatingConnection');
+    debugPrint('[WatchService:$hashCode] _handleDisconnect: _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect, _reconnectAttempts=$_reconnectAttempts, _isReconnecting=$_isReconnecting, _isSettingUp=$_isSettingUp, _isWaitingForAutoConnect=$_isWaitingForAutoConnect, _isInitiatingConnection=$_isInitiatingConnection, _isInBackgroundReconnect=$_isInBackgroundReconnect');
     
     // If user has cancelled, don't attempt reconnection
     if (_isCancelled) {
@@ -983,12 +995,25 @@ class WatchService {
       _isReconnecting = false;
       _isWaitingForAutoConnect = false;
       _isInitiatingConnection = false;
+      _isInBackgroundReconnect = false;
       _updateConnection(Connection(
         watchId: watchId,
         watchName: name,
         state: WatchConnectionState.disconnected,
       ));
       _cleanup();
+      return;
+    }
+    
+    // If we're in background reconnect mode, the OS is handling reconnection
+    // Stay in reconnecting state and wait for the device to appear
+    // This check must come BEFORE the _isWaitingForAutoConnect check
+    if (_isInBackgroundReconnect) {
+      debugPrint('[WatchService:$hashCode] Disconnect during background reconnect - OS will keep trying');
+      // Keep the reconnecting state visible to user
+      _updateConnection(currentConnection.copyWith(
+        state: WatchConnectionState.reconnecting,
+      ));
       return;
     }
     
@@ -1028,8 +1053,13 @@ class WatchService {
                          currentConnection.state == WatchConnectionState.syncing ||
                          currentConnection.state == WatchConnectionState.error;
 
-    if (wasConnected && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts) {
+    if (wasConnected && _autoReconnect && _reconnectAttempts < _maxQuickReconnectAttempts) {
+      // First try quick reconnects for momentary disconnects
       _attemptReconnect(watchId, name);
+    } else if (wasConnected && _autoReconnect && !_isInBackgroundReconnect) {
+      // After quick retries fail, switch to background auto-connect mode
+      // This lets the OS handle reconnection when the device becomes available
+      _startBackgroundReconnect(watchId, name);
     } else {
       _updateConnection(Connection(
         watchId: watchId,
@@ -1038,6 +1068,91 @@ class WatchService {
       ));
       _cleanup();
     }
+  }
+  
+  /// Start background reconnection using periodic retries
+  /// 
+  /// This is used after quick reconnect attempts fail. Will keep retrying
+  /// with increasing delays until connected or cancelled.
+  void _startBackgroundReconnect(String watchId, String name) {
+    debugPrint('[WatchService:$hashCode] Starting background reconnect for $watchId');
+    
+    if (_isCancelled) {
+      debugPrint('[WatchService:$hashCode] Background reconnect skipped - cancelled by user');
+      return;
+    }
+    
+    // Clean up any existing state first
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    
+    _isInBackgroundReconnect = true;
+    _isReconnecting = false; // Clear quick reconnect flag - we're now in background mode
+    _isWaitingForAutoConnect = false;
+    _isInitiatingConnection = false;
+    
+    // Show reconnecting state to user
+    _updateConnection(Connection(
+      watchId: watchId,
+      watchName: name,
+      state: WatchConnectionState.reconnecting,
+      reconnectionCount: _reconnectAttempts,
+    ));
+    
+    // Start periodic reconnect attempts
+    _scheduleBackgroundReconnectAttempt(watchId, name);
+  }
+  
+  /// Schedule a single background reconnect attempt
+  void _scheduleBackgroundReconnectAttempt(String watchId, String name) {
+    if (_isCancelled || !_isInBackgroundReconnect) {
+      debugPrint('[WatchService:$hashCode] Background reconnect cancelled - stopping');
+      return;
+    }
+    
+    // Use exponential backoff with a cap: 5s, 10s, 15s, then stay at 15s
+    final attemptNumber = _reconnectAttempts - _maxQuickReconnectAttempts;
+    final delaySeconds = (5 + (attemptNumber * 5)).clamp(5, 15);
+    final delay = Duration(seconds: delaySeconds);
+    
+    debugPrint('[WatchService:$hashCode] Scheduling background reconnect in ${delay.inSeconds}s (attempt $attemptNumber)');
+    
+    _reconnectTimer = Timer(delay, () async {
+      if (_isCancelled || !_isInBackgroundReconnect) {
+        debugPrint('[WatchService:$hashCode] Background reconnect timer cancelled');
+        return;
+      }
+      
+      _reconnectAttempts++;
+      debugPrint('[WatchService:$hashCode] Background reconnect attempt $_reconnectAttempts');
+      
+      // Create fresh device instance
+      _device = BluetoothDevice.fromId(watchId);
+      
+      // Cancel any existing subscription and create a new one
+      await _connectionSubscription?.cancel();
+      _connectionSubscription = _device!.connectionState.listen(
+        (state) => _handleConnectionStateChange(state, watchId, name),
+      );
+      
+      try {
+        // Try to connect with a short timeout
+        await _device!.connect(
+          license: License.free,
+          timeout: const Duration(seconds: 10),
+          autoConnect: false,
+        );
+        // If we get here, connection succeeded - setup will handle the rest
+        debugPrint('[WatchService:$hashCode] Background reconnect connected!');
+        _isInBackgroundReconnect = false;
+      } catch (e) {
+        debugPrint('[WatchService:$hashCode] Background reconnect attempt failed: $e');
+        // Schedule next attempt if not cancelled
+        if (!_isCancelled && _isInBackgroundReconnect) {
+          _scheduleBackgroundReconnectAttempt(watchId, name);
+        }
+      }
+    });
   }
 
   void _attemptReconnect(String watchId, String name) {
@@ -1083,7 +1198,8 @@ class WatchService {
           _isReconnecting = false;  // Clear flag on successful connect start
         } catch (e) {
           debugPrint('[WatchService:$hashCode] Reconnect attempt $_reconnectAttempts failed: $e');
-          _isReconnecting = false;  // Clear flag to allow next attempt from disconnect handler
+          _isReconnecting = false;  // Clear flag to allow next attempt
+          _isInitiatingConnection = false; // Clear flag since connection attempt is done
           
           // Check if cancelled during the await - if so, don't continue reconnect logic
           if (_isCancelled) {
@@ -1092,12 +1208,14 @@ class WatchService {
             return;
           }
           
-          if (_reconnectAttempts >= _maxReconnectAttempts) {
-            _updateConnection(Connection.error(
-              watchId,
-              ConnectionErrorType.maxReconnectionsReached,
-            ));
-            _cleanup();
+          if (_reconnectAttempts >= _maxQuickReconnectAttempts) {
+            // Quick retries exhausted - switch to background reconnect
+            debugPrint('[WatchService:$hashCode] Quick retries exhausted - switching to background reconnect');
+            _startBackgroundReconnect(watchId, name);
+          } else {
+            // More quick attempts remaining - schedule next one
+            debugPrint('[WatchService:$hashCode] Scheduling next quick reconnect attempt');
+            _attemptReconnect(watchId, name);
           }
         }
       } else {
@@ -1115,6 +1233,7 @@ class WatchService {
     _isReconnecting = false; // Clear reconnecting flag
     _isWaitingForAutoConnect = false; // Clear waiting flag
     _isInitiatingConnection = false; // Clear initiating flag
+    _isInBackgroundReconnect = false; // Clear background reconnect flag
     _reconnectTimer?.cancel();
     
     // If we're in any connecting state, transition to disconnected
@@ -1148,6 +1267,7 @@ class WatchService {
   Future<void> disconnect() async {
     _autoReconnect = false;
     _isCancelled = true; // Mark as cancelled to ignore reconnection attempts
+    _isInBackgroundReconnect = false; // Clear background reconnect flag
     _reconnectTimer?.cancel();
 
     final device = _device;
@@ -1186,6 +1306,7 @@ class WatchService {
     _isInitialConnection = false;
     _isWaitingForAutoConnect = false;
     _isInitiatingConnection = false;
+    _isInBackgroundReconnect = false;
     _messageBuffer = ''; // Clear any incomplete messages
   }
 
