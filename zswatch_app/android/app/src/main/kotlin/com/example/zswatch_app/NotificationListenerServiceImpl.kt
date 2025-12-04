@@ -36,11 +36,24 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         // Callback for notification events (set by Flutter plugin)
         var notificationCallback: NotificationCallback? = null
         
-        // Fallback mapping for sbn.id == 0 (apps that use 0 as ID)
-        // We assign a unique positive ID above the 32-bit range to avoid clashes.
-        private var nextFallbackId = 0x8000_0000L // start at high positive 32-bit range (non-zero)
-        private val keyToFallbackId = mutableMapOf<String, Long>()
-        private val fallbackIdToOriginalId = mutableMapOf<Long, Int>()
+        // Unique ID generation: We generate our own IDs to avoid collisions across app restarts.
+        // The counter is persisted in SharedPreferences and starts from a random offset on first run
+        // to minimize chance of collision with watch's existing notifications.
+        private const val PREFS_NAME = "notification_service_prefs"
+        private const val PREF_NEXT_ID = "next_notification_id"
+        private var nextNotificationId: Long = 0
+        private var prefsInitialized = false
+        
+        // Map sbn.key -> our generated unique ID (for consistent ID during notification's lifetime)
+        private val keyToUniqueId = mutableMapOf<String, Long>()
+        
+        // Track which notifications were actually forwarded to Flutter
+        // (only these should trigger removal events)
+        private val forwardedNotificationKeys = mutableSetOf<String>()
+        
+        // Track notification content hashes to detect true updates vs re-posts
+        // Key: sbn.key, Value: hash of title+body
+        private val notificationContentHashes = mutableMapOf<String, Int>()
         
         // Check if service is running
         val isRunning: Boolean
@@ -65,20 +78,31 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         }
 
         /**
-         * Decode a previously encoded notification ID back to the original sbn.id.
-         * If the ID was in the normal (non-zero) range, we can derive it directly.
-         * If it was a fallback (zero case), we consult the mapping.
+         * Initialize the unique ID counter from SharedPreferences.
+         * On first run, starts from a random offset to avoid collision with existing watch notifications.
          */
-        fun decodeNotificationId(encodedId: Long): Int? {
-            // Check fallback first (zero-case)
-            fallbackIdToOriginalId[encodedId]?.let { return it }
-
-            // If within 32-bit range and non-zero, convert back (wraps negatives correctly)
-            if (encodedId in 1..0xFFFF_FFFFL) {
-                return encodedId.toInt()
+        @Synchronized
+        fun initializeIdCounter(context: android.content.Context) {
+            if (prefsInitialized) return
+            
+            val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+            if (!prefs.contains(PREF_NEXT_ID)) {
+                // First run: start from a random offset between 1M and 2M to avoid collision
+                // with any existing notifications on the watch
+                val randomOffset = (System.currentTimeMillis() % 1_000_000) + 1_000_000
+                prefs.edit().putLong(PREF_NEXT_ID, randomOffset).apply()
+                nextNotificationId = randomOffset
+            } else {
+                nextNotificationId = prefs.getLong(PREF_NEXT_ID, 1_000_000)
             }
-
-            return null
+            prefsInitialized = true
+            Log.d(TAG, "Initialized notification ID counter at: $nextNotificationId")
+        }
+        
+        @Synchronized
+        private fun saveNextId(context: android.content.Context) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+            prefs.edit().putLong(PREF_NEXT_ID, nextNotificationId).apply()
         }
         
         // Dismiss a notification by key
@@ -148,6 +172,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        initializeIdCounter(applicationContext)
         Log.d(TAG, "NotificationListenerService created")
     }
     
@@ -296,12 +321,32 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         
         val notificationData = extractNotificationData(sbn)
         
-        Log.d(TAG, "Notification posted: ${notificationData["appName"]} - ${notificationData["title"]}")
+        // Check if this is an update to an already-forwarded notification with identical content
+        // This prevents duplicate notifications when user taps a notification and the app re-posts it
+        val title = notificationData["title"] as? String ?: ""
+        val body = notificationData["body"] as? String ?: ""
+        val contentHash = (title + body).hashCode()
+        val previousHash = notificationContentHashes[sbn.key]
+        
+        val isAlreadyForwarded = forwardedNotificationKeys.contains(sbn.key)
+        val isSameContent = previousHash != null && previousHash == contentHash
+        
+        if (isAlreadyForwarded && isSameContent) {
+            Log.d(TAG, "Skipping duplicate notification (same content): ${notificationData["appName"]} - ${notificationData["title"]}")
+            return
+        }
+        
+        // Update content hash
+        notificationContentHashes[sbn.key] = contentHash
+        
+        Log.d(TAG, "Notification posted: ${notificationData["appName"]} - ${notificationData["title"]} (isUpdate=${isAlreadyForwarded})")
         
         if (notificationCallback == null) {
             Log.w(TAG, "Notification callback is null - Flutter not listening!")
         } else {
             Log.d(TAG, "Forwarding notification to Flutter via callback")
+            // Track that this notification was forwarded
+            forwardedNotificationKeys.add(sbn.key)
             notificationCallback?.onNotificationPosted(notificationData)
         }
     }
@@ -317,28 +362,40 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             return
         }
 
-        // Use the same encoded ID that was sent when posted
-        val encodedId = encodeNotificationId(sbn)
+        // Only send removal events for notifications that were actually forwarded
+        // This prevents phantom dismiss events for filtered notifications
+        if (!forwardedNotificationKeys.remove(sbn.key)) {
+            Log.d(TAG, "Skipping removal for non-forwarded notification: ${sbn.packageName}")
+            return
+        }
+
+        // Get the unique ID that was assigned when posted
+        val uniqueId = keyToUniqueId[sbn.key]
+        if (uniqueId == null) {
+            Log.w(TAG, "No unique ID found for removed notification: ${sbn.key}")
+            return
+        }
 
         val notificationData = mapOf(
-            "id" to encodedId,
+            "id" to uniqueId,
             "packageName" to sbn.packageName,
             "key" to sbn.key
         )
 
-        Log.d(TAG, "Notification removed: ${sbn.packageName} - $encodedId")
+        Log.d(TAG, "Notification removed: ${sbn.packageName} - $uniqueId")
 
         notificationCallback?.onNotificationRemoved(notificationData)
 
-        // Clean up mapping for this notification
-        clearFallbackId(sbn.key)
+        // Clean up mappings for this notification
+        clearUniqueId(sbn.key)
+        notificationContentHashes.remove(sbn.key)
     }
     
     private fun extractNotificationData(sbn: StatusBarNotification): Map<String, Any?> {
         val notification = sbn.notification
         val extras = notification.extras
 
-        val encodedId = encodeNotificationId(sbn)
+        val uniqueId = getOrCreateUniqueId(sbn)
         
         // Get app name
         val pm = packageManager
@@ -392,7 +449,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         val sender = conversationTitle ?: subText
         
         return mapOf(
-            "id" to encodedId,
+            "id" to uniqueId,
             "packageName" to sbn.packageName,
             "appName" to appName,
             "title" to title,
@@ -407,31 +464,33 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
     }
 
     /**
-     * Get (or create) a stable, positive, non-zero ID for a notification.
-     * - Non-zero IDs: return unsigned 32-bit representation (handles negatives).
-     * - Zero IDs: assign a unique fallback above the 32-bit range, stored per sbn.key.
+     * Get (or create) a unique ID for a notification.
+     * Always generates a new ID for notifications with new content.
+     * IDs are monotonically increasing and persist across app restarts.
+     * 
+     * Note: Unlike the previous implementation that reused IDs per sbn.key,
+     * we now generate a new ID for each notification event with new content.
+     * This matches Gadgetbridge's behavior and ensures messaging apps like
+     * Messenger get unique IDs for each new message, even when they update
+     * the same notification (same sbn.key) rather than creating new ones.
      */
     @Synchronized
-    private fun encodeNotificationId(sbn: StatusBarNotification): Long {
-        val rawId = sbn.id
-        val unsigned = rawId.toLong() and 0xFFFF_FFFFL
-        if (unsigned != 0L) {
-            return unsigned // covers normal and negative IDs
-        }
-
-        // Zero-case fallback
-        val key = sbn.key
-        keyToFallbackId[key]?.let { return it }
-
-        val fallbackId = nextFallbackId++
-        keyToFallbackId[key] = fallbackId
-        fallbackIdToOriginalId[fallbackId] = rawId
-        return fallbackId
+    private fun getOrCreateUniqueId(sbn: StatusBarNotification): Long {
+        // Always generate a new unique ID for each notification
+        // (content deduplication happens earlier in onNotificationPosted)
+        val uniqueId = nextNotificationId++
+        
+        // Store the mapping for dismiss sync
+        keyToUniqueId[sbn.key] = uniqueId
+        
+        // Persist the counter
+        saveNextId(applicationContext)
+        
+        return uniqueId
     }
 
     @Synchronized
-    private fun clearFallbackId(key: String) {
-        val fallbackId = keyToFallbackId.remove(key) ?: return
-        fallbackIdToOriginalId.remove(fallbackId)
+    private fun clearUniqueId(key: String) {
+        keyToUniqueId.remove(key)
     }
 }

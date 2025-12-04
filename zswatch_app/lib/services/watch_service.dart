@@ -58,6 +58,9 @@ class WatchService {
   bool _isInitialConnection = false; // Track if this is the first connection attempt (show Connecting not Reconnecting)
   bool _isWaitingForAutoConnect = false; // Track when waiting for autoConnect to establish connection
   bool _isInitiatingConnection = false; // Track when we're in the process of starting a connection (ignore initial disconnect)
+  bool _pendingReconnectAfterSetup = false; // Track if we need to trigger reconnect after setup completes
+  String? _pendingReconnectWatchId; // Watch ID for pending reconnect
+  String? _pendingReconnectWatchName; // Watch name for pending reconnect
 
   /// Stream of connection state changes
   Stream<Connection> get connectionStream => _connectionController.stream;
@@ -410,11 +413,37 @@ class WatchService {
         // Don't rethrow - we've handled the error by disconnecting and letting
         // the auto-reconnect mechanism try again
       } else {
-        debugPrint('[Setup] Error during setup but device disconnected - letting disconnect handler manage: $e');
-        // Don't rethrow - the disconnect handler will manage reconnection
+        debugPrint('[Setup] Error during setup but device disconnected - marking for reconnect after setup completes: $e');
+        // Device already disconnected - _handleDisconnect may have already been called
+        // and scheduled a timer that checked _isSettingUp (which was true).
+        // Mark that we need to trigger reconnect from the finally block.
+        if (_autoReconnect && !_isCancelled) {
+          _pendingReconnectAfterSetup = true;
+          _pendingReconnectWatchId = watchId;
+          _pendingReconnectWatchName = name;
+        }
       }
     } finally {
       _isSettingUp = false;
+      
+      // Check if we need to trigger reconnect (setup failed while device was already disconnected)
+      if (_pendingReconnectAfterSetup) {
+        _pendingReconnectAfterSetup = false;
+        final pendingWatchId = _pendingReconnectWatchId;
+        final pendingWatchName = _pendingReconnectWatchName;
+        _pendingReconnectWatchId = null;
+        _pendingReconnectWatchName = null;
+        
+        if (pendingWatchId != null && pendingWatchName != null && !_isCancelled && _autoReconnect) {
+          debugPrint('[Setup] Setup completed - triggering deferred reconnect for $pendingWatchId');
+          // Use a short delay to let any pending state settle
+          Timer(const Duration(milliseconds: 100), () {
+            if (!_isCancelled && _autoReconnect && !_isReconnecting && !_isSettingUp) {
+              _attemptReconnect(pendingWatchId, pendingWatchName);
+            }
+          });
+        }
+      }
     }
   }
 
@@ -458,6 +487,9 @@ class WatchService {
     _nusSubscription = rxChar.onValueReceived.listen(_handleNusData);
   }
 
+  // Tracks if we're currently inside a <BLELOG> section (may span multiple chunks)
+  bool _inBleLog = false;
+
   void _handleNusData(List<int> data) {
     try {
       final chunk = utf8.decode(data);
@@ -468,17 +500,63 @@ class WatchService {
       // Emit to raw data stream for log viewer (FR-035a)
       _rawIncomingDataController.add(chunk);
 
-      // Buffer data and process complete JSON messages
-      _messageBuffer += chunk;
+      // Filter out <BLELOG>...</BLELOG> sections before adding to message buffer.
+      // These firmware debug logs contain curly braces in hex dumps that confuse
+      // the JSON parser. They're still emitted to rawIncomingData for the log viewer.
+      final filteredChunk = _filterBleLogSections(chunk);
       
-      // Process all complete JSON messages in the buffer
-      _processMessageBuffer();
+      if (filteredChunk.isNotEmpty) {
+        // Buffer data and process complete JSON messages
+        _messageBuffer += filteredChunk;
+        
+        // Process all complete JSON messages in the buffer
+        _processMessageBuffer();
+      }
     } catch (e) {
       // Binary data that can't be decoded as UTF-8 - log raw bytes
       debugPrint('[BLE RX] Raw bytes: $data');
       // Still emit to raw stream for debugging
       _rawIncomingDataController.add('RAW: $data');
     }
+  }
+
+  /// Filter out <BLELOG>...</BLELOG> sections from incoming data.
+  /// These sections contain firmware debug logs that shouldn't be parsed as JSON.
+  /// Handles sections that span multiple BLE packets.
+  String _filterBleLogSections(String chunk) {
+    const bleLogStart = '<BLELOG>';
+    const bleLogEnd = '</BLELOG>';
+    
+    var result = StringBuffer();
+    var remaining = chunk;
+    
+    while (remaining.isNotEmpty) {
+      if (_inBleLog) {
+        // We're inside a BLELOG section - look for the end tag
+        final endIndex = remaining.indexOf(bleLogEnd);
+        if (endIndex == -1) {
+          // End tag not found in this chunk - discard everything
+          break;
+        }
+        // Found end tag - skip past it and continue processing
+        remaining = remaining.substring(endIndex + bleLogEnd.length);
+        _inBleLog = false;
+      } else {
+        // Look for start of a BLELOG section
+        final startIndex = remaining.indexOf(bleLogStart);
+        if (startIndex == -1) {
+          // No BLELOG section in remaining data - keep it all
+          result.write(remaining);
+          break;
+        }
+        // Found start tag - keep everything before it
+        result.write(remaining.substring(0, startIndex));
+        remaining = remaining.substring(startIndex + bleLogStart.length);
+        _inBleLog = true;
+      }
+    }
+    
+    return result.toString();
   }
 
   /// Process the message buffer to extract complete JSON messages.
@@ -1032,16 +1110,16 @@ class WatchService {
     }
     
     // If setup is in progress, it will detect the disconnect via _shouldContinueSetup()
-    // and exit gracefully. Wait for setup to complete before attempting reconnect.
+    // and exit gracefully. The setup's finally block will trigger reconnect if needed.
+    // We just mark the pending reconnect info so setup knows what to reconnect to.
     if (_isSettingUp) {
-      debugPrint('[WatchService:$hashCode] Setup in progress - delaying reconnect until setup completes');
-      // Schedule a check after a short delay to allow setup to finish
-      Timer(const Duration(milliseconds: 500), () {
-        if (!_isSettingUp && !_isReconnecting && _autoReconnect && !_isCancelled) {
-          debugPrint('[WatchService:$hashCode] Setup completed - now attempting reconnect');
-          _attemptReconnect(watchId, name);
-        }
-      });
+      debugPrint('[WatchService:$hashCode] Setup in progress - setup will handle reconnect when it completes');
+      // Mark pending reconnect - setup's finally block will check this
+      if (_autoReconnect && !_isCancelled) {
+        _pendingReconnectAfterSetup = true;
+        _pendingReconnectWatchId = watchId;
+        _pendingReconnectWatchName = name;
+      }
       return;
     }
 
@@ -1307,7 +1385,11 @@ class WatchService {
     _isWaitingForAutoConnect = false;
     _isInitiatingConnection = false;
     _isInBackgroundReconnect = false;
+    _pendingReconnectAfterSetup = false;
+    _pendingReconnectWatchId = null;
+    _pendingReconnectWatchName = null;
     _messageBuffer = ''; // Clear any incomplete messages
+    _inBleLog = false; // Clear BLELOG tracking state
   }
 
   void _updateConnection(Connection connection) {
