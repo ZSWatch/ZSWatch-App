@@ -8,6 +8,7 @@ import 'providers/foreground_service_providers.dart';
 import 'providers/gps_providers.dart';
 import 'providers/http_providers.dart';
 import 'providers/notification_providers.dart';
+import 'providers/permission_providers.dart';
 import 'providers/watch_service_provider.dart';
 import 'ui/navigation/app_router.dart';
 
@@ -33,6 +34,10 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
 
   Future<void> _initializeBle() async {
     try {
+      // Initialize permission notifier first to check/track permission state
+      // This also sets up the lifecycle observer to re-check on app resume
+      ref.read(permissionNotifierProvider);
+      
       await ref.read(bleNotifierProvider.notifier).initialize();
       // Initialize notification forwarding so it works even when the
       // notification settings screen hasn't been opened yet

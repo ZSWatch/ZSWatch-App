@@ -3,14 +3,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../providers/foreground_service_providers.dart';
-import '../../../providers/gps_providers.dart';
+import '../../../providers/permission_providers.dart';
 import '../../../providers/settings_providers.dart';
+import '../onboarding/permission_onboarding_screen.dart';
 
 /// Settings screen for app configuration
 ///
@@ -52,10 +51,12 @@ class SettingsScreen extends ConsumerWidget {
               onChanged: (value) async {
                 if (value && Platform.isAndroid) {
                   // Check notification permission before enabling
-                  final status = await Permission.notification.status;
-                  if (!status.isGranted) {
+                  final permState = ref.read(permissionNotifierProvider);
+                  if (!permState.status.isNotificationGranted) {
                     // Request notification permission
-                    final result = await Permission.notification.request();
+                    final result = await ref
+                        .read(permissionNotifierProvider.notifier)
+                        .requestNotificationPermission();
                     if (!result.isGranted && context.mounted) {
                       // Show warning that feature won't work properly
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -65,8 +66,6 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                       );
                     }
-                    // Refresh the permission provider
-                    ref.invalidate(notificationPermissionProvider);
                   }
                 }
                 ref.read(backgroundConnectionEnabledProvider.notifier).setEnabled(value);
@@ -78,12 +77,12 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ),
-          
-          // Android-only: Battery optimization warning
-          if (Platform.isAndroid) ...[
-            _BatteryOptimizationTile(),
-            _NotificationPermissionTile(),
-          ],
+
+          const Divider(height: 32),
+
+          // Permissions Section (consolidated)
+          _SectionHeader(title: 'Permissions'),
+          _PermissionsSummaryTile(),
 
           const Divider(height: 32),
 
@@ -100,12 +99,6 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ),
-
-          const Divider(height: 32),
-
-          // GPS / Location Settings
-          _SectionHeader(title: 'Location'),
-          _GpsPermissionTile(),
 
           const Divider(height: 32),
 
@@ -335,369 +328,145 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// Provider for GPS permission status
-final _gpsPermissionProvider = FutureProvider<LocationPermission>((ref) async {
-  return Geolocator.checkPermission();
-});
-
-/// GPS permission settings tile
-class _GpsPermissionTile extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final permissionAsync = ref.watch(_gpsPermissionProvider);
-
-    return permissionAsync.when(
-      data: (permission) {
-        final isGranted = permission == LocationPermission.always ||
-            permission == LocationPermission.whileInUse;
-        final statusText = _getPermissionStatusText(permission);
-        final statusColor = isGranted ? AppTheme.successColor : AppTheme.warningColor;
-
-        return _SettingsTile(
-          leading: Icon(
-            isGranted ? Icons.location_on : Icons.location_off,
-            color: statusColor,
-          ),
-          title: 'Watch GPS Requests',
-          subtitle: statusText,
-          trailing: TextButton(
-            onPressed: () async {
-              if (permission == LocationPermission.deniedForever) {
-                // Open app settings
-                await ref.read(gpsNotifierProvider.notifier).openAppSettings();
-              } else if (!isGranted) {
-                // Request permission
-                await Geolocator.requestPermission();
-              } else {
-                // Already granted - open settings to revoke if desired
-                await ref.read(gpsNotifierProvider.notifier).openAppSettings();
-              }
-              // Refresh permission status
-              ref.invalidate(_gpsPermissionProvider);
-            },
-            child: Text(isGranted ? 'Settings' : 'Enable'),
-          ),
-          onTap: () => _showGpsInfoDialog(context, permission),
-        );
-      },
-      loading: () => _SettingsTile(
-        leading: const Icon(Icons.location_searching, color: AppTheme.textSecondary),
-        title: 'Watch GPS Requests',
-        subtitle: 'Checking permission...',
-      ),
-      error: (_, __) => _SettingsTile(
-        leading: const Icon(Icons.location_off, color: AppTheme.errorColor),
-        title: 'Watch GPS Requests',
-        subtitle: 'Unable to check permission',
-      ),
-    );
-  }
-
-  String _getPermissionStatusText(LocationPermission permission) {
-    switch (permission) {
-      case LocationPermission.always:
-        return 'Allowed (always)';
-      case LocationPermission.whileInUse:
-        return 'Allowed (while using app)';
-      case LocationPermission.denied:
-        return 'Not allowed - tap to enable';
-      case LocationPermission.deniedForever:
-        return 'Denied - tap to open settings';
-      case LocationPermission.unableToDetermine:
-        return 'Unable to determine';
-    }
-  }
-
-  void _showGpsInfoDialog(BuildContext context, LocationPermission permission) {
-    final isGranted = permission == LocationPermission.always ||
-        permission == LocationPermission.whileInUse;
-
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Watch GPS Requests'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'When enabled, your watch can request GPS location from your phone '
-              'for features like weather (location-based forecasts) and fitness tracking.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Icon(
-                  isGranted ? Icons.check_circle : Icons.cancel,
-                  color: isGranted ? AppTheme.successColor : AppTheme.warningColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Status: ${_getPermissionStatusText(permission)}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
-            ),
-            if (!isGranted) ...[
-              const SizedBox(height: 16),
-              Text(
-                'To enable, tap "Enable" or go to your phone\'s Settings > Apps > ZSWatch > Permissions > Location.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Battery optimization settings tile (Android only)
+/// Consolidated permissions summary tile
 /// 
-/// Shows whether battery optimization is disabled for the app, which is
-/// important for reliable background BLE connections.
-class _BatteryOptimizationTile extends ConsumerWidget {
+/// Shows an overview of permission status and allows users to manage all permissions
+class _PermissionsSummaryTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final batteryOptAsync = ref.watch(batteryOptimizationNotifierProvider);
+    final permState = ref.watch(permissionNotifierProvider);
+    final status = permState.status;
+    final missingCount = status.missingPermissions.length;
+    
+    // Calculate overall status
+    final allGranted = status.hasAllPermissions;
+    final hasCritical = status.hasCriticalPermissions;
+    
+    Color statusColor;
+    IconData statusIcon;
+    String statusText;
+    
+    if (allGranted) {
+      statusColor = AppTheme.successColor;
+      statusIcon = Icons.check_circle;
+      statusText = 'All permissions granted';
+    } else if (hasCritical) {
+      statusColor = AppTheme.warningColor;
+      statusIcon = Icons.warning_amber;
+      statusText = '$missingCount optional permission${missingCount > 1 ? 's' : ''} missing';
+    } else {
+      statusColor = AppTheme.errorColor;
+      statusIcon = Icons.error;
+      statusText = 'Required permissions missing';
+    }
 
-    return batteryOptAsync.when(
-      data: (isDisabled) {
-        final statusText = isDisabled
-            ? 'Unrestricted (recommended)'
-            : 'Optimized - may affect connection';
-        final statusColor = isDisabled ? AppTheme.successColor : AppTheme.warningColor;
-
-        return _SettingsTile(
-          leading: Icon(
-            isDisabled ? Icons.battery_full : Icons.battery_alert,
-            color: statusColor,
-          ),
-          title: 'Battery Optimization',
+    return Column(
+      children: [
+        _SettingsTile(
+          leading: Icon(statusIcon, color: statusColor),
+          title: 'App Permissions',
           subtitle: statusText,
-          trailing: isDisabled
-              ? const Icon(Icons.check_circle, color: AppTheme.successColor, size: 20)
-              : TextButton(
-                  onPressed: () {
-                    ref.read(batteryOptimizationNotifierProvider.notifier).openSettings();
-                  },
-                  child: const Text('Configure'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _openPermissionsScreen(context),
+        ),
+        
+        // Show quick status for each permission
+        if (!allGranted) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMd),
+            child: Column(
+              children: [
+                // Bluetooth
+                _QuickPermissionRow(
+                  icon: Icons.bluetooth,
+                  label: 'Bluetooth',
+                  isGranted: status.bluetoothGranted,
                 ),
-          onTap: () => _showBatteryOptimizationDialog(context, ref, isDisabled),
-        );
-      },
-      loading: () => _SettingsTile(
-        leading: const Icon(Icons.battery_unknown, color: AppTheme.textSecondary),
-        title: 'Battery Optimization',
-        subtitle: 'Checking...',
-      ),
-      error: (_, __) => _SettingsTile(
-        leading: const Icon(Icons.battery_unknown, color: AppTheme.errorColor),
-        title: 'Battery Optimization',
-        subtitle: 'Unable to check status',
-      ),
+                
+                // Notifications (Android only)
+                if (Platform.isAndroid)
+                  _QuickPermissionRow(
+                    icon: Icons.notifications,
+                    label: 'Notifications',
+                    isGranted: status.isNotificationGranted,
+                  ),
+                
+                // Battery Optimization (Android only)
+                if (Platform.isAndroid)
+                  _QuickPermissionRow(
+                    icon: Icons.battery_full,
+                    label: 'Battery Optimization',
+                    isGranted: status.batteryOptimizationDisabled,
+                  ),
+                
+                // Location
+                _QuickPermissionRow(
+                  icon: Icons.location_on,
+                  label: 'Location',
+                  isGranted: status.isLocationGranted,
+                ),
+                
+                // Notification Listener (Android only)
+                if (Platform.isAndroid)
+                  _QuickPermissionRow(
+                    icon: Icons.notifications_active,
+                    label: 'Notification Access',
+                    isGranted: status.notificationListenerEnabled,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 
-  void _showBatteryOptimizationDialog(BuildContext context, WidgetRef ref, bool isDisabled) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Battery Optimization'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Android battery optimization can restrict background activity, '
-              'which may cause the watch connection to drop when the app is in '
-              'the background.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Icon(
-                  isDisabled ? Icons.check_circle : Icons.warning,
-                  color: isDisabled ? AppTheme.successColor : AppTheme.warningColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    isDisabled
-                        ? 'Battery optimization is disabled (good!)'
-                        : 'Battery optimization is enabled',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-            if (!isDisabled) ...[
-              const SizedBox(height: 16),
-              Text(
-                'For the most reliable connection, disable battery optimization '
-                'for ZSWatch in your phone\'s settings.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-              ),
-            ],
-          ],
+  void _openPermissionsScreen(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => const PermissionOnboardingScreen(
+          isInitialOnboarding: false,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-          if (!isDisabled)
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                ref.read(batteryOptimizationNotifierProvider.notifier).openSettings();
-              },
-              child: const Text('Open Settings'),
-            ),
-        ],
       ),
     );
   }
 }
 
-/// Provider for notification permission status
-final notificationPermissionProvider = FutureProvider<PermissionStatus>((ref) async {
-  return Permission.notification.status;
-});
+/// Quick permission status row
+class _QuickPermissionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isGranted;
 
-/// Tile that shows notification permission status (Android only)
-class _NotificationPermissionTile extends ConsumerWidget {
+  const _QuickPermissionRow({
+    required this.icon,
+    required this.label,
+    required this.isGranted,
+  });
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final permissionStatus = ref.watch(notificationPermissionProvider);
+  Widget build(BuildContext context) {
+    final color = isGranted ? AppTheme.successColor : AppTheme.warningColor;
     
-    return permissionStatus.when(
-      data: (status) {
-        final isGranted = status.isGranted;
-        return _SettingsTile(
-          leading: Icon(
-            isGranted ? Icons.notifications_active : Icons.notifications_off,
-            color: isGranted ? AppTheme.successColor : AppTheme.errorColor,
-          ),
-          title: 'Notification Permission',
-          subtitle: isGranted 
-              ? 'Notifications are enabled'
-              : 'Required for persistent connection indicator',
-          onTap: () => _showNotificationPermissionDialog(context, ref, status),
-          trailing: isGranted
-              ? const Icon(Icons.check_circle, color: AppTheme.successColor, size: 20)
-              : const Icon(Icons.warning, color: AppTheme.errorColor, size: 20),
-        );
-      },
-      loading: () => _SettingsTile(
-        leading: const Icon(Icons.notifications, color: AppTheme.textSecondary),
-        title: 'Notification Permission',
-        subtitle: 'Checking...',
-      ),
-      error: (_, __) => _SettingsTile(
-        leading: const Icon(Icons.notifications_off, color: AppTheme.errorColor),
-        title: 'Notification Permission',
-        subtitle: 'Unable to check status',
-      ),
-    );
-  }
-
-  void _showNotificationPermissionDialog(BuildContext context, WidgetRef ref, PermissionStatus status) {
-    final isGranted = status.isGranted;
-    final isPermanentlyDenied = status.isPermanentlyDenied;
-    
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Notification Permission'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'The notification permission is required to show the persistent '
-              'connection indicator when the app is in the background.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Icon(
-                  isGranted ? Icons.check_circle : Icons.warning,
-                  color: isGranted ? AppTheme.successColor : AppTheme.errorColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    isGranted
-                        ? 'Notification permission is granted'
-                        : isPermanentlyDenied
-                            ? 'Notification permission was denied'
-                            : 'Notification permission is not granted',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: AppTheme.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
                   ),
-                ),
-              ],
             ),
-            if (!isGranted) ...[
-              const SizedBox(height: 16),
-              Text(
-                isPermanentlyDenied
-                    ? 'Please open Settings and enable notifications for ZSWatch.'
-                    : 'Please grant the notification permission to use persistent connection.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
           ),
-          if (!isGranted)
-            TextButton(
-              onPressed: () async {
-                Navigator.of(context).pop();
-                if (isPermanentlyDenied) {
-                  // Open app settings
-                  await openAppSettings();
-                } else {
-                  // Request permission
-                  final result = await Permission.notification.request();
-                  if (result.isGranted) {
-                    // Refresh the provider
-                    ref.invalidate(notificationPermissionProvider);
-                  }
-                }
-                // Refresh the provider after returning from settings
-                ref.invalidate(notificationPermissionProvider);
-              },
-              child: Text(isPermanentlyDenied ? 'Open Settings' : 'Request Permission'),
-            ),
+          Icon(
+            isGranted ? Icons.check_circle : Icons.cancel,
+            size: 16,
+            color: color,
+          ),
         ],
       ),
     );

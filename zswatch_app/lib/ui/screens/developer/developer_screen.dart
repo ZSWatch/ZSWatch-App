@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/developer_providers.dart';
+import '../../../providers/permission_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../widgets/developer/music_debug_section.dart';
 import '../../widgets/developer/notification_debug_section.dart';
@@ -424,14 +425,14 @@ class _QuickActionTile extends StatelessWidget {
 }
 
 /// Collapsible debug tools section
-class _DebugToolsSection extends StatefulWidget {
+class _DebugToolsSection extends ConsumerStatefulWidget {
   const _DebugToolsSection();
 
   @override
-  State<_DebugToolsSection> createState() => _DebugToolsSectionState();
+  ConsumerState<_DebugToolsSection> createState() => _DebugToolsSectionState();
 }
 
-class _DebugToolsSectionState extends State<_DebugToolsSection> {
+class _DebugToolsSectionState extends ConsumerState<_DebugToolsSection> {
   bool _isExpanded = false;
 
   @override
@@ -452,9 +453,9 @@ class _DebugToolsSectionState extends State<_DebugToolsSection> {
                 color: AppTheme.textSecondary,
               ),
         ),
-        children: const [
+        children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(
+            padding: const EdgeInsets.fromLTRB(
               AppTheme.spacingMd,
               0,
               AppTheme.spacingMd,
@@ -462,9 +463,29 @@ class _DebugToolsSectionState extends State<_DebugToolsSection> {
             ),
             child: Column(
               children: [
-                NotificationDebugSection(),
-                SizedBox(height: AppTheme.spacingMd),
-                MusicDebugSection(),
+                const NotificationDebugSection(),
+                const SizedBox(height: AppTheme.spacingMd),
+                const MusicDebugSection(),
+                const SizedBox(height: AppTheme.spacingMd),
+                // Reset permission onboarding button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await ref.read(permissionNotifierProvider.notifier).resetOnboarding();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Permission onboarding reset. Go to home to see it.'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.restart_alt),
+                    label: const Text('Reset Permission Onboarding'),
+                  ),
+                ),
               ],
             ),
           ),

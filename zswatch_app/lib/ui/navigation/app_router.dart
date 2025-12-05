@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../data/models/connection_state.dart';
 import '../../providers/auto_reconnect_provider.dart';
 import '../../providers/ble_providers.dart';
+import '../../providers/permission_providers.dart';
 import '../../providers/watch_service_provider.dart';
 import '../screens/analytics/analytics_screen.dart';
 import '../screens/connection/scan_screen.dart';
@@ -18,6 +19,7 @@ import '../screens/firmware/firmware_update_screen.dart';
 import '../screens/health/health_screen.dart';
 import '../screens/health/heart_rate_screen.dart';
 import '../screens/notifications/notification_settings_screen.dart';
+import '../screens/onboarding/permission_onboarding_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/start/start_page_screen.dart';
 
@@ -177,15 +179,27 @@ class AppRouter {
   );
 }
 
-/// Home screen - entry point that shows start page or dashboard based on connection
+/// Home screen - entry point that shows permission onboarding, start page or dashboard based on state
 class _HomeScreen extends ConsumerWidget {
   const _HomeScreen();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final permissionState = ref.watch(permissionNotifierProvider);
     final connection = ref.watch(watchConnectionProvider);
     final isConnected = connection.state == WatchConnectionState.connected;
     final isConnecting = connection.state.isConnectingOrReconnecting;
+
+    // Show permission onboarding if critical permissions missing and not completed
+    if (permissionState.shouldShowOnboarding) {
+      return PermissionOnboardingScreen(
+        isInitialOnboarding: true,
+        onComplete: () {
+          // Trigger rebuild by invalidating the provider
+          ref.invalidate(permissionNotifierProvider);
+        },
+      );
+    }
 
     // If connected, show dashboard
     if (isConnected) {

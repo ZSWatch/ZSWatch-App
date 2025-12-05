@@ -317,16 +317,44 @@ class MainActivity : FlutterActivity() {
                     result.success(isIgnoring)
                 }
                 "requestDisableBatteryOptimization" -> {
-                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
+                    try {
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:$packageName")
+                        }
+                        if (intent.resolveActivity(packageManager) != null) {
+                            startActivity(intent)
+                            result.success(true)
+                        } else {
+                            android.util.Log.e("MainActivity", "No activity to handle ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")
+                            // Fallback to general battery optimization settings
+                            val fallbackIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            startActivity(fallbackIntent)
+                            result.success(true)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainActivity", "Failed to request battery optimization exemption", e)
+                        result.error("BATTERY_OPT_ERROR", e.localizedMessage, null)
                     }
-                    startActivity(intent)
-                    result.success(true)
                 }
                 "openBatteryOptimizationSettings" -> {
-                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                    startActivity(intent)
-                    result.success(true)
+                    try {
+                        val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                        if (intent.resolveActivity(packageManager) != null) {
+                            startActivity(intent)
+                            result.success(true)
+                        } else {
+                            android.util.Log.e("MainActivity", "No activity to handle ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS")
+                            // Fallback to app detail settings
+                            val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:$packageName")
+                            }
+                            startActivity(fallbackIntent)
+                            result.success(true)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainActivity", "Failed to open battery optimization settings", e)
+                        result.error("BATTERY_OPT_SETTINGS_ERROR", e.localizedMessage, null)
+                    }
                 }
                 "setDisconnectCallback" -> {
                     // Store callback ID to invoke later
