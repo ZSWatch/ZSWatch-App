@@ -50,6 +50,11 @@
 	<string>ZSWatch needs Bluetooth to communicate with your smartwatch for syncing data, notifications, and firmware updates.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>ZSWatch needs Bluetooth to communicate with your smartwatch.</string>
+	<!-- Location Permissions (for GPS relay to watch) -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ZSWatch needs location access to provide GPS data to your smartwatch for weather and fitness features.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>ZSWatch needs location access to provide GPS data to your smartwatch, even when the app is in the background.</string>
 	<!-- Background Modes for BLE -->
 	<key>UIBackgroundModes</key>
 	<array>
