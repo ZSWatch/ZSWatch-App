@@ -1129,29 +1129,29 @@
 
 ### Permission Onboarding Screen
 
-- [ ] T151 [US1] Create PermissionOnboardingScreen in lib/ui/screens/onboarding/permission_onboarding_screen.dart
-- [ ] T152 [P] Create permission state model in lib/data/models/permission_state.dart (tracks granted/denied for each permission)
-- [ ] T153 [P] Create permission providers in lib/providers/permission_providers.dart (centralized permission state management)
-- [ ] T154 [US1] Implement permission request flow for Bluetooth (BLUETOOTH_SCAN, BLUETOOTH_CONNECT) on Android
-- [ ] T155 [US1] Implement permission request flow for Notification Listener Service (Android) with explanation
-- [ ] T156 [US1] Implement permission request flow for POST_NOTIFICATIONS (Android 13+) for foreground service notification
-- [ ] T157 [US1] Implement permission request flow for Location (for GPS relay feature) with explanation
-- [ ] T158 [US1] Implement permission request flow for Battery Optimization exemption with explanation
-- [ ] T159 [US1] Show first-launch onboarding flow before navigating to main app
-- [ ] T160 [US1] Persist onboarding completion state in SharedPreferences
+- [X] T151 [US1] Create PermissionOnboardingScreen in lib/ui/screens/onboarding/permission_onboarding_screen.dart
+- [X] T152 [P] Create permission state model in lib/data/models/permission_state.dart (tracks granted/denied for each permission)
+- [X] T153 [P] Create permission providers in lib/providers/permission_providers.dart (centralized permission state management)
+- [X] T154 [US1] Implement permission request flow for Bluetooth (BLUETOOTH_SCAN, BLUETOOTH_CONNECT) on Android
+- [X] T155 [US1] Implement permission request flow for Notification Listener Service (Android) with explanation
+- [X] T156 [US1] Implement permission request flow for POST_NOTIFICATIONS (Android 13+) for foreground service notification
+- [X] T157 [US1] Implement permission request flow for Location (for GPS relay feature) with explanation
+- [X] T158 [US1] Implement permission request flow for Battery Optimization exemption with explanation
+- [X] T159 [US1] Show first-launch onboarding flow before navigating to main app
+- [X] T160 [US1] Persist onboarding completion state in SharedPreferences
 
 ### Permission Status Indicators
 
-- [ ] T161 [P] Create PermissionStatusBanner widget in lib/ui/widgets/permission_status_banner.dart
-- [ ] T162 [US1] Show permission denied banner on Settings screen with link to system settings
-- [ ] T163 [US3] Show notification permission banner on Notifications screen if not granted
-- [ ] T164 [US1] Show location permission banner on GPS-related screens if not granted
-- [ ] T165 [P] Add "Re-request permissions" option in Settings screen
+- [X] T161 [P] Create PermissionStatusBanner widget in lib/ui/widgets/permission_status_banner.dart
+- [X] T162 [US1] Show permission denied banner on Settings screen with link to system settings
+- [X] T163 [US3] Show notification permission banner on Notifications screen if not granted
+- [X] T164 [US1] Show location permission banner on GPS-related screens if not granted
+- [X] T165 [P] Add "Re-request permissions" option in Settings screen
 
 ### Permission Re-check on Resume
 
-- [ ] T166 [US1] Re-check permission status when app resumes from background (user may have changed in system settings)
-- [ ] T167 [US1] Update permission providers automatically when returning from system settings
+- [X] T166 [US1] Re-check permission status when app resumes from background (user may have changed in system settings)
+- [X] T167 [US1] Update permission providers automatically when returning from system settings
 
 **Checkpoint**: Users are guided through permissions on first launch; denied permissions are clearly indicated with paths to re-enable
 
@@ -1161,16 +1161,15 @@
 
 **Purpose**: Final improvements affecting multiple user stories
 
-- [ ] T138 [P] Add error handling and user-friendly error messages throughout
+- [X] T138 [P] Add error handling and user-friendly error messages throughout
 - [ ] T139 [P] Add loading states and empty states to all screens
 - [ ] T140 Implement data retention cleanup scheduler (60-day purge)
 - [ ] T141 Add app state restoration after background/kill
 - [ ] T142 [P] Add micro-animations (fade transitions, button feedback)
 - [ ] T143 Performance tuning for real-time charts (target 10Hz)
-- [ ] T144 Verify all success criteria (SC-001 through SC-014)
-- [ ] T145 Run quickstart.md validation scenarios
-- [ ] T146 [P] Create README.md with setup and usage instructions
-
+- [X] T144 Verify all success criteria (SC-001 through SC-014)
+- [X] T145 Run quickstart.md validation scenarios
+- [X] T146 [P] Create README.md with setup and usage instructions containing both Android and iOS setup
 ---
 
 ## Dependencies & Execution Order
