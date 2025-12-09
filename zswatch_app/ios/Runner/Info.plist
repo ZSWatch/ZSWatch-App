@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -24,6 +26,23 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>MinimumOSVersion</key>
+	<string>13.0</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>ZSWatch needs Bluetooth to communicate with your smartwatch for syncing data, notifications, and firmware updates.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>ZSWatch needs Bluetooth to communicate with your smartwatch.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>ZSWatch needs location access to provide GPS data to your smartwatch, even when the app is in the background.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ZSWatch needs location access to provide GPS data to your smartwatch for weather and fitness features.</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+		<string>fetch</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -41,28 +60,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	<!-- Bluetooth Permissions -->
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>ZSWatch needs Bluetooth to communicate with your smartwatch for syncing data, notifications, and firmware updates.</string>
-	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>ZSWatch needs Bluetooth to communicate with your smartwatch.</string>
-	<!-- Location Permissions (for GPS relay to watch) -->
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>ZSWatch needs location access to provide GPS data to your smartwatch for weather and fitness features.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>ZSWatch needs location access to provide GPS data to your smartwatch, even when the app is in the background.</string>
-	<!-- Background Modes for BLE -->
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>bluetooth-central</string>
-		<string>fetch</string>
-	</array>
-	<!-- Minimum iOS Version -->
-	<key>MinimumOSVersion</key>
-	<string>13.0</string>
 </dict>
 </plist>

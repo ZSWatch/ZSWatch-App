@@ -27,10 +27,7 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: SvgPicture.asset(
-          'assets/images/ZSWatch_Text.svg',
-          height: 24,
-        ),
+        title: SvgPicture.asset('assets/images/ZSWatch_Text.svg', height: 24),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -39,55 +36,57 @@ class DashboardScreen extends ConsumerWidget {
         ],
       ),
       body: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppTheme.spacingMd),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Connection status card
-                  _ConnectionStatusCard(
-                    isConnected: connection.isConnected,
-                    rssi: connection.rssi,
-                    mtu: connection.mtu,
-                  ),
-
-                  const SizedBox(height: AppTheme.spacingMd),
-
-                  // Stats row - 4 compact cards
-                  _StatsRow(
-                    batteryLevel: watch?.batteryLevel,
-                    firmwareVersion: watch?.shortFirmwareVersion,
-                    todaySteps: healthSummary.todaySteps,
-                    latestHeartRate: healthSummary.latestHeartRate,
-                  ),
-
-                  const SizedBox(height: AppTheme.spacingMd),
-
-                  // Device info card
-                  _DeviceInfoCard(watch: watch),
-
-                  const SizedBox(height: AppTheme.spacingLg),
-
-                  // Quick actions
-                  _QuickActionsSection(
-                    onFirmwareUpdate: () => context.push('/firmware'),
-                    onDisconnect: () async {
-                      // Suppress auto-reconnect when user manually disconnects
-                      ref.read(autoReconnectNotifierProvider.notifier).suppressForSession();
-                      final notifier = ref.read(watchNotifierProvider.notifier);
-                      await notifier.disconnect();
-                      if (context.mounted) {
-                        context.go('/');
-                      }
-                    },
-                  ),
-
-                  const SizedBox(height: AppTheme.spacingMd),
-
-                  // Feature shortcuts
-                  _FeatureShortcuts(),
-                ],
-              ),
+        padding: const EdgeInsets.all(AppTheme.spacingMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Connection status card
+            _ConnectionStatusCard(
+              isConnected: connection.isConnected,
+              rssi: connection.rssi,
+              mtu: connection.mtu,
             ),
+
+            const SizedBox(height: AppTheme.spacingMd),
+
+            // Stats row - 4 compact cards
+            _StatsRow(
+              batteryLevel: watch?.batteryLevel,
+              firmwareVersion: watch?.shortFirmwareVersion,
+              todaySteps: healthSummary.todaySteps,
+              latestHeartRate: healthSummary.latestHeartRate,
+            ),
+
+            const SizedBox(height: AppTheme.spacingMd),
+
+            // Device info card
+            _DeviceInfoCard(watch: watch),
+
+            const SizedBox(height: AppTheme.spacingLg),
+
+            // Quick actions
+            _QuickActionsSection(
+              onFirmwareUpdate: () => context.push('/firmware'),
+              onDisconnect: () async {
+                // Suppress auto-reconnect when user manually disconnects
+                ref
+                    .read(autoReconnectNotifierProvider.notifier)
+                    .suppressForSession();
+                final notifier = ref.read(watchNotifierProvider.notifier);
+                await notifier.disconnect();
+                if (context.mounted) {
+                  context.go('/');
+                }
+              },
+            ),
+
+            const SizedBox(height: AppTheme.spacingMd),
+
+            // Feature shortcuts
+            _FeatureShortcuts(),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -97,11 +96,7 @@ class _ConnectionStatusCard extends StatelessWidget {
   final int? rssi;
   final int? mtu;
 
-  const _ConnectionStatusCard({
-    required this.isConnected,
-    this.rssi,
-    this.mtu,
-  });
+  const _ConnectionStatusCard({required this.isConnected, this.rssi, this.mtu});
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +110,9 @@ class _ConnectionStatusCard extends StatelessWidget {
               height: 12,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isConnected ? AppTheme.successColor : AppTheme.errorColor,
+                color: isConnected
+                    ? AppTheme.successColor
+                    : AppTheme.errorColor,
                 boxShadow: isConnected
                     ? [
                         BoxShadow(
@@ -135,10 +132,10 @@ class _ConnectionStatusCard extends StatelessWidget {
                   Text(
                     isConnected ? 'Connected' : 'Disconnected',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: isConnected
-                              ? AppTheme.successColor
-                              : AppTheme.errorColor,
-                        ),
+                      color: isConnected
+                          ? AppTheme.successColor
+                          : AppTheme.errorColor,
+                    ),
                   ),
                   if (isConnected && (rssi != null || mtu != null))
                     Text(
@@ -147,8 +144,8 @@ class _ConnectionStatusCard extends StatelessWidget {
                         if (mtu != null) 'MTU: $mtu',
                       ].join(' • '),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                 ],
               ),
@@ -169,10 +166,7 @@ class _InfoCard extends StatelessWidget {
   final String title;
   final Widget child;
 
-  const _InfoCard({
-    required this.title,
-    required this.child,
-  });
+  const _InfoCard({required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -183,9 +177,9 @@ class _InfoCard extends StatelessWidget {
           children: [
             Text(
               title,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppTheme.textSecondary),
             ),
             const SizedBox(height: AppTheme.spacingSm),
             child,
@@ -228,7 +222,7 @@ class _StatsRow extends StatelessWidget {
             icon: Icons.battery_std,
             label: 'Battery',
             value: batteryLevel != null ? '$batteryLevel%' : '--',
-            color: batteryLevel != null 
+            color: batteryLevel != null
                 ? AppTheme.getBatteryColor(batteryLevel!)
                 : AppTheme.textSecondary,
           ),
@@ -292,18 +286,18 @@ class _StatCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               value,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                    fontSize: 10,
-                  ),
+                color: AppTheme.textSecondary,
+                fontSize: 10,
+              ),
             ),
           ],
         ),
@@ -331,7 +325,12 @@ class _DeviceInfoCard extends StatelessWidget {
             ),
             const Divider(),
             _InfoRow(label: 'Name', value: watch?.displayName ?? 'Unknown'),
-            _InfoRow(label: 'Bluetooth MAC', value: watch?.id ?? 'Unknown'),
+            _InfoRow(
+              label: 'Bluetooth MAC',
+              value: watch?.id != null
+                  ? _truncateDeviceId(watch!.id)
+                  : 'Unknown',
+            ),
             _InfoRow(
               label: 'Hardware',
               value: watch?.hardwareVersion ?? 'Unknown',
@@ -351,6 +350,15 @@ class _DeviceInfoCard extends StatelessWidget {
   String _formatDateTime(DateTime dt) {
     return '${dt.day}/${dt.month}/${dt.year} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
   }
+
+  /// Truncate device ID for display (iOS UUIDs are very long)
+  String _truncateDeviceId(String id) {
+    // On iOS, device IDs are UUIDs like "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+    // On Android, they're MAC addresses like "XX:XX:XX:XX:XX:XX"
+    // Truncate to max 20 characters and add ellipsis if longer
+    if (id.length <= 20) return id;
+    return '${id.substring(0, 17)}...';
+  }
 }
 
 class _InfoRow extends StatelessWidget {
@@ -368,14 +376,11 @@ class _InfoRow extends StatelessWidget {
         children: [
           Text(
             label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
           ),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          Text(value, style: Theme.of(context).textTheme.bodyMedium),
         ],
       ),
     );
@@ -396,10 +401,7 @@ class _QuickActionsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Quick Actions',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Quick Actions', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppTheme.spacingSm),
         Row(
           children: [
@@ -411,7 +413,10 @@ class _QuickActionsSection extends StatelessWidget {
                   icon: const Icon(Icons.system_update, size: 18),
                   label: const Text('Update Firmware'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ),
@@ -426,7 +431,10 @@ class _QuickActionsSection extends StatelessWidget {
                   label: const Text('Disconnect'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.errorColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ),
@@ -444,10 +452,7 @@ class _FeatureShortcuts extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Features',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Features', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppTheme.spacingSm),
         GridView.count(
           crossAxisCount: 3,
@@ -515,11 +520,7 @@ class _FeatureTile extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 32,
-                color: AppTheme.primaryColor,
-              ),
+              Icon(icon, size: 32, color: AppTheme.primaryColor),
               const SizedBox(height: 4),
               Text(
                 label,
@@ -533,4 +534,3 @@ class _FeatureTile extends StatelessWidget {
     );
   }
 }
-

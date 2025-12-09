@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -273,7 +274,14 @@ class BleServiceImpl implements BleService {
       throw StateError('Not connected to a device');
     }
 
-    final mtu = await _connectedDevice!.requestMtu(requestedMtu);
+    // requestMtu is Android-only - iOS negotiates MTU automatically
+    int mtu;
+    if (Platform.isAndroid) {
+      mtu = await _connectedDevice!.requestMtu(requestedMtu);
+    } else {
+      // On iOS, return a reasonable default MTU (iOS typically negotiates 185-512)
+      mtu = 185;
+    }
 
     _updateConnectionState(
       _currentConnection?.copyWith(mtu: mtu),

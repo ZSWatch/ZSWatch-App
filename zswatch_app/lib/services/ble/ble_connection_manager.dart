@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -180,10 +181,18 @@ class BleConnectionManager {
     }
   }
 
-  /// Negotiate MTU for optimal throughput
+  /// Negotiate MTU for optimal throughput (Android only - iOS negotiates automatically)
   Future<int> negotiateMtu() async {
     if (_connectedDevice == null) {
       throw StateError('Not connected');
+    }
+
+    // requestMtu is Android-only - iOS negotiates MTU automatically
+    if (!Platform.isAndroid) {
+      // On iOS, return a reasonable default MTU (iOS typically negotiates 185-512)
+      const iosMtu = 185;
+      _updateConnection(_currentConnection.copyWith(mtu: iosMtu));
+      return iosMtu;
     }
 
     final mtu = await _connectedDevice!.requestMtu(BleConfig.preferredMtu);
@@ -222,6 +231,8 @@ class BleConnectionManager {
   }
 
   Future<void> _ensureBonding(String watchId) async {
+    // Bonding APIs are Android-only - iOS handles bonding automatically
+    if (!Platform.isAndroid) return;
     if (_connectedDevice == null) return;
 
     try {

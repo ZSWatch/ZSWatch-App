@@ -193,10 +193,7 @@ The following permissions are already configured in `ios/Runner/Info.plist`:
 ```
 
 #### Install CocoaPods Dependencies
-```bash
-cd ios
-pod install
-cd ..
+-
 ```
 
 #### Build iOS

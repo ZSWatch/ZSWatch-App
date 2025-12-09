@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -292,20 +293,22 @@ class WatchService {
     _isSettingUp = true;
 
     try {
-      // Bonding
-      _updateConnection(currentConnection.copyWith(
-        state: WatchConnectionState.bonding,
-      ));
+      // Bonding (Android only - iOS handles bonding automatically)
+      if (Platform.isAndroid) {
+        _updateConnection(currentConnection.copyWith(
+          state: WatchConnectionState.bonding,
+        ));
 
-      // Re-check device in case user cancelled during state updates
-      if (!_shouldContinueSetup()) return;
-
-      final bondState = await _device!.bondState.first;
-      if (!_shouldContinueSetup()) return;
-      
-      if (bondState != BluetoothBondState.bonded) {
-        await _device!.createBond();
+        // Re-check device in case user cancelled during state updates
         if (!_shouldContinueSetup()) return;
+
+        final bondState = await _device!.bondState.first;
+        if (!_shouldContinueSetup()) return;
+        
+        if (bondState != BluetoothBondState.bonded) {
+          await _device!.createBond();
+          if (!_shouldContinueSetup()) return;
+        }
       }
 
       // Discover services
@@ -316,13 +319,19 @@ class WatchService {
       if (!_shouldContinueSetup()) return;
       _services = await _device!.discoverServices();
 
-      // Negotiate MTU
-      _updateConnection(currentConnection.copyWith(
-        state: WatchConnectionState.negotiating,
-      ));
+      // Negotiate MTU (Android only - iOS negotiates automatically)
+      int mtu;
+      if (Platform.isAndroid) {
+        _updateConnection(currentConnection.copyWith(
+          state: WatchConnectionState.negotiating,
+        ));
 
-      if (!_shouldContinueSetup()) return;
-      final mtu = await _device!.requestMtu(BleConfig.preferredMtu);
+        if (!_shouldContinueSetup()) return;
+        mtu = await _device!.requestMtu(BleConfig.preferredMtu);
+      } else {
+        // On iOS, MTU is negotiated automatically (typically 185-512)
+        mtu = 185;
+      }
 
       // Note: We don't request connection priority here.
       // The watch manages connection intervals based on its current needs

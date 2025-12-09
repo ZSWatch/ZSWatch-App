@@ -89,7 +89,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
   Future<void> _connectToDevice(ScannedWatch device) async {
     setState(() => _isConnecting = true);
-    
+
     try {
       // Use the new WatchNotifier
       final notifier = ref.read(watchNotifierProvider.notifier);
@@ -97,12 +97,14 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
       // Save this watch to the database
       final db = ref.read(databaseProvider);
-      await db.upsertWatch(WatchesCompanion(
-        id: Value(device.id),
-        name: Value(device.displayName),
-        createdAt: Value(DateTime.now()),
-        lastConnectedAt: Value(DateTime.now()),
-      ));
+      await db.upsertWatch(
+        WatchesCompanion(
+          id: Value(device.id),
+          name: Value(device.displayName),
+          createdAt: Value(DateTime.now()),
+          lastConnectedAt: Value(DateTime.now()),
+        ),
+      );
 
       // Invalidate providers to refresh
       ref.invalidate(knownWatchIdsProvider);
@@ -148,10 +150,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           onPressed: () => context.go('/'),
         ),
         actions: const [
-          ConnectionStatusPill(
-            compact: true,
-            showIcon: true,
-          ),
+          ConnectionStatusPill(compact: true, showIcon: true),
           SizedBox(width: 8),
         ],
       ),
@@ -167,18 +166,16 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               ),
             )
           : _isInitializing
-              ? const Center(child: CircularProgressIndicator())
-              : !_hasPermissions
-                  ? _buildPermissionRequest()
-                  : !isBluetoothOn
-                      ? _buildBluetoothOffMessage()
-                      : _buildScanContent(scannedDevices, isScanning, connectionState),
+          ? const Center(child: CircularProgressIndicator())
+          : !_hasPermissions
+          ? _buildPermissionRequest()
+          : !isBluetoothOn
+          ? _buildBluetoothOffMessage()
+          : _buildScanContent(scannedDevices, isScanning, connectionState),
       floatingActionButton: _hasPermissions && isBluetoothOn && !_isConnecting
           ? FloatingActionButton.extended(
               onPressed: isScanning ? _stopScan : _startScan,
-              icon: Icon(
-                isScanning ? Icons.stop : Icons.search,
-              ),
+              icon: Icon(isScanning ? Icons.stop : Icons.search),
               label: Text(isScanning ? 'Stop' : 'Scan'),
             )
           : null,
@@ -206,9 +203,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             const SizedBox(height: AppTheme.spacingMd),
             Text(
               'ZSWatch needs Bluetooth permission to discover and connect to your watch.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppTheme.spacingLg),
@@ -252,9 +249,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             const SizedBox(height: AppTheme.spacingMd),
             Text(
               'Please turn on Bluetooth to scan for your ZSWatch.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppTheme.spacingLg),
@@ -281,9 +278,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       children: [
         // Scanning indicator
         if (isScanning)
-          const LinearProgressIndicator(
-            backgroundColor: AppTheme.surfaceColor,
-          ),
+          const LinearProgressIndicator(backgroundColor: AppTheme.surfaceColor),
 
         // Instructions
         Padding(
@@ -292,9 +287,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             isScanning
                 ? 'Searching for ZSWatch devices nearby...'
                 : 'Tap Scan to search for your watch',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
           ),
         ),
 
@@ -334,17 +329,17 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
           const SizedBox(height: AppTheme.spacingMd),
           Text(
             isScanning ? 'Looking for devices...' : 'No devices found',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: AppTheme.textSecondary),
           ),
           if (!isScanning) ...[
             const SizedBox(height: AppTheme.spacingSm),
             Text(
               'Make sure your ZSWatch is on and nearby',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textDisabled,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textDisabled),
             ),
           ],
         ],
@@ -380,16 +375,13 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
               color: AppTheme.errorColor,
             ),
             const SizedBox(height: AppTheme.spacingMd),
-            Text(
-              'Scan Error',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text('Scan Error', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: AppTheme.spacingSm),
             Text(
               error,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
@@ -404,10 +396,7 @@ class _DeviceListTile extends StatelessWidget {
   final ScannedWatch device;
   final VoidCallback onTap;
 
-  const _DeviceListTile({
-    required this.device,
-    required this.onTap,
-  });
+  const _DeviceListTile({required this.device, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -458,14 +447,13 @@ class _DeviceListTile extends StatelessWidget {
       subtitle: Text(
         _getSubtitleText(),
         style: TextStyle(
-          color: device.isConnected ? AppTheme.successColor : AppTheme.textSecondary,
+          color: device.isConnected
+              ? AppTheme.successColor
+              : AppTheme.textSecondary,
           fontSize: 12,
         ),
       ),
-      trailing: const Icon(
-        Icons.chevron_right,
-        color: AppTheme.textSecondary,
-      ),
+      trailing: const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
       onTap: onTap,
     );
   }
@@ -480,11 +468,7 @@ class _DeviceListTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
       ),
       child: device.isConnected
-          ? Icon(
-              Icons.bluetooth_connected,
-              color: color,
-              size: 24,
-            )
+          ? Icon(Icons.bluetooth_connected, color: color, size: 24)
           : SvgPicture.asset(
               'assets/images/ZSWatch_Logo.svg',
               width: 24,
@@ -501,23 +485,33 @@ class _DeviceListTile extends StatelessWidget {
     return AppTheme.errorColor;
   }
 
+  /// Truncate device ID for display (iOS UUIDs are very long)
+  String _truncateDeviceId(String id) {
+    // On iOS, device IDs are UUIDs like "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+    // On Android, they're MAC addresses like "XX:XX:XX:XX:XX:XX"
+    // Truncate to max 20 characters and add ellipsis if longer
+    if (id.length <= 20) return id;
+    return '${id.substring(0, 17)}...';
+  }
+
   String _getSubtitleText() {
+    final truncatedId = _truncateDeviceId(device.id);
+
     if (device.isConnected) {
-      return 'Already connected • ${device.id}';
+      return 'Already connected • $truncatedId';
     }
-    
+
     if (device.isAdvertising) {
       // Device is actively advertising - show signal strength
       final savedText = device.isBonded ? 'Saved • ' : '';
-      return '$savedText${device.rssi} dBm • ${device.id}';
+      return '$savedText${device.rssi} dBm • $truncatedId';
     }
-    
+
     if (device.isBonded) {
       // Saved but not advertising - out of range
-      return 'Saved • Out of range • ${device.id}';
+      return 'Saved • Out of range • $truncatedId';
     }
-    
-    return '${device.rssi} dBm • ${device.id}';
+
+    return '${device.rssi} dBm • $truncatedId';
   }
 }
-
