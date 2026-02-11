@@ -41,6 +41,8 @@
 	<!-- Photo Library Permission (required by file picker library) -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>ZSWatch needs access to select firmware files from your photo library for watch updates.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ZSWatch needs access to save images to your photo library.</string>
 	<!-- UI Configuration -->
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
