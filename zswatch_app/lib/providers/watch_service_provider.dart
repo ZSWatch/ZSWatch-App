@@ -101,6 +101,17 @@ final batteryLevelProvider = Provider<int?>((ref) {
   return asyncValue.valueOrNull;
 });
 
+/// Provider for whether the connected watch has the SMP service available
+/// (required for DFU firmware updates and filesystem uploads).
+/// Re-evaluated whenever connection state changes.
+final hasSmpServiceProvider = Provider<bool>((ref) {
+  // Watch connection state to re-evaluate when connection changes
+  final isConnected = ref.watch(isWatchConnectedProvider);
+  if (!isConnected) return false;
+  final service = ref.watch(watchServiceProvider);
+  return service.hasSmpService;
+});
+
 /// Provider that syncs watch info changes to the database.
 /// 
 /// This provider listens to watch info stream and persists changes

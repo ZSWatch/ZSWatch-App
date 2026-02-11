@@ -96,6 +96,7 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
     final watch = ref.watch(currentWatchProvider);
     final isConnected = ref.watch(isWatchConnectedProvider);
     final fsUploadState = ref.watch(filesystemUploadStateProvider);
+    final hasSmp = ref.watch(hasSmpServiceProvider);
 
     // Manage wakelock based on DFU/upload state
     final isDfuInProgress = dfuState.status.isInProgress || 
@@ -144,6 +145,10 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                       _ConnectionWarningCard(
                         onReconnect: () => context.go('/scan'),
                       ),
+
+                    // SMP service not available warning
+                    if (isConnected && !hasSmp)
+                      const _SmpWarningCard(),
 
                     // Firmware selection sections (shown when idle)
                     if (dfuState.status == DfuStatus.idle &&
@@ -248,6 +253,7 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                       dfuState: dfuState,
                       operationState: operationState,
                       isConnected: isConnected,
+                      hasSmpService: hasSmp,
                       onStartFirmware: () =>
                           ref.read(dfuNotifierProvider.notifier).startUpdate(),
                       onStartFilesystem: () =>
@@ -394,6 +400,102 @@ class _ConnectionWarningCard extends StatelessWidget {
             TextButton(
               onPressed: onReconnect,
               child: const Text('Connect'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SmpWarningCard extends ConsumerStatefulWidget {
+  const _SmpWarningCard();
+
+  @override
+  ConsumerState<_SmpWarningCard> createState() => _SmpWarningCardState();
+}
+
+class _SmpWarningCardState extends ConsumerState<_SmpWarningCard> {
+  bool _isChecking = false;
+  bool _recheckFailed = false;
+
+  Future<void> _recheck() async {
+    setState(() {
+      _isChecking = true;
+      _recheckFailed = false;
+    });
+    try {
+      final service = ref.read(watchServiceProvider);
+      final found = await service.rediscoverServices();
+      if (mounted) {
+        if (found) {
+          // Force the provider to re-evaluate with updated services
+          ref.invalidate(hasSmpServiceProvider);
+        } else {
+          setState(() => _recheckFailed = true);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: AppTheme.warningColor.withValues(alpha: 0.1),
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.warning_amber, color: AppTheme.warningColor),
+                const SizedBox(width: AppTheme.spacingSm),
+                Expanded(
+                  child: Text(
+                    'Update Mode Not Enabled',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: AppTheme.warningColor,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spacingSm),
+            Text(
+              'The SMP service is not available on this watch. '
+              'To enable firmware updates:\n'
+              '1. On the watch, go to Apps → Update\n'
+              '2. Set USB and/or BLE to ON\n'
+              '3. Tap "Re-check" below',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (_recheckFailed) ...[
+              const SizedBox(height: AppTheme.spacingSm),
+              Text(
+                'SMP still not detected. Try disconnecting and reconnecting '
+                'after enabling update mode on the watch.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.errorColor,
+                    ),
+              ),
+            ],
+            const SizedBox(height: AppTheme.spacingSm),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _isChecking ? null : _recheck,
+                icon: _isChecking
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh, size: 18),
+                label: Text(_isChecking ? 'Checking...' : 'Re-check'),
+              ),
             ),
           ],
         ),
@@ -1427,6 +1529,7 @@ class _ActionButtons extends ConsumerWidget {
   final DfuState dfuState;
   final DfuOperationState operationState;
   final bool isConnected;
+  final bool hasSmpService;
   final VoidCallback onStartFirmware;
   final VoidCallback onStartFilesystem;
   final VoidCallback onStartBoth;
@@ -1437,6 +1540,7 @@ class _ActionButtons extends ConsumerWidget {
     required this.dfuState,
     required this.operationState,
     required this.isConnected,
+    required this.hasSmpService,
     required this.onStartFirmware,
     required this.onStartFilesystem,
     required this.onStartBoth,
@@ -1594,7 +1698,7 @@ class _ActionButtons extends ConsumerWidget {
         // Start Both button (shown when both are available)
         if (operationState.hasBoth) ...[
           FilledButton.icon(
-            onPressed: operationState.canStartBoth && isConnected ? onStartBoth : null,
+            onPressed: operationState.canStartBoth && isConnected && hasSmpService ? onStartBoth : null,
             icon: const Icon(Icons.playlist_play),
             label: const Text('Start Both (FS + FW)'),
             style: FilledButton.styleFrom(
@@ -1627,7 +1731,7 @@ class _ActionButtons extends ConsumerWidget {
             // Firmware Update button
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: operationState.canStartFirmwareUpdate && isConnected
+                onPressed: operationState.canStartFirmwareUpdate && isConnected && hasSmpService
                     ? onStartFirmware
                     : null,
                 icon: const Icon(Icons.system_update, size: 18),
@@ -1641,7 +1745,7 @@ class _ActionButtons extends ConsumerWidget {
             // Filesystem Upload button
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: operationState.canStartFilesystemUpload && isConnected
+                onPressed: operationState.canStartFilesystemUpload && isConnected && hasSmpService
                     ? onStartFilesystem
                     : null,
                 icon: const Icon(Icons.storage, size: 18),

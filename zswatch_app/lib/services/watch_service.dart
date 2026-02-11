@@ -100,6 +100,27 @@ class WatchService {
   /// Discovered BLE services (for sensor GATT service initialization)
   List<BluetoothService>? get services => _services;
 
+  /// Whether the connected device has the MCUmgr/SMP service available
+  /// (required for DFU and filesystem uploads)
+  bool get hasSmpService => _findService(_guid(McumgrUuids.service)) != null;
+
+  /// Re-discover BLE services on the connected device.
+  /// Useful if the user enables SMP on the watch while already connected.
+  /// Returns true if SMP service is found after re-discovery.
+  Future<bool> rediscoverServices() async {
+    if (_device == null || !isConnected) return false;
+    debugPrint('[WatchService] Re-discovering services...');
+    try {
+      _services = await _device!.discoverServices();
+      final hasSmp = hasSmpService;
+      debugPrint('[WatchService] Re-discovery complete. SMP available: $hasSmp');
+      return hasSmp;
+    } catch (e) {
+      debugPrint('[WatchService] Re-discovery failed: $e');
+      return false;
+    }
+  }
+
   /// Connect to a scanned device
   Future<void> connect(ScannedWatch scannedDevice, {bool autoConnect = false}) async {
     debugPrint('[WatchService] connect() called: autoConnect=$autoConnect, _isCancelled=$_isCancelled');

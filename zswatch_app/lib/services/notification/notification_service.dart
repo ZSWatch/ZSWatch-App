@@ -16,8 +16,8 @@ import '../../data/models/notification.dart';
 /// - Not applicable - ANCS handles notifications directly between iOS and watch
 /// - This service provides a no-op implementation
 class NotificationService {
-  static const _methodChannel = MethodChannel('com.example.zswatch_app/notifications');
-  static const _eventChannel = EventChannel('com.example.zswatch_app/notification_events');
+  static const _methodChannel = MethodChannel('dev.zswatch.app/notifications');
+  static const _eventChannel = EventChannel('dev.zswatch.app/notification_events');
 
   final _notificationPostedController = StreamController<PhoneNotification>.broadcast();
   final _notificationRemovedController = StreamController<int>.broadcast();

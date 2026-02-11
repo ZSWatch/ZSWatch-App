@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../data/models/connection_state.dart';
 import '../../providers/auto_reconnect_provider.dart';
 import '../../providers/ble_providers.dart';
+import '../../providers/foreground_service_providers.dart';
 import '../../providers/permission_providers.dart';
 import '../../providers/watch_service_provider.dart';
 import '../screens/analytics/analytics_screen.dart';
@@ -244,6 +245,8 @@ class _HomeScreen extends ConsumerWidget {
                 const SizedBox(height: 32),
                 OutlinedButton(
                   onPressed: () {
+                    // Mark as user-initiated disconnect so foreground service stops
+                    ref.read(foregroundServiceNotifierProvider.notifier).markUserDisconnect();
                     // Cancel auto-reconnect and suppress for session
                     ref.read(autoReconnectNotifierProvider.notifier).cancel();
                     // Also cancel any pending connection on WatchService

@@ -1,4 +1,4 @@
-package com.example.zswatch_app
+package dev.zswatch.app
 
 import android.content.ComponentName
 import android.content.Context
@@ -26,11 +26,11 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     
     companion object {
-        private const val NOTIFICATION_CHANNEL = "com.example.zswatch_app/notifications"
-        private const val NOTIFICATION_EVENTS_CHANNEL = "com.example.zswatch_app/notification_events"
-        private const val MEDIA_CHANNEL = "com.example.zswatch_app/media"
-        private const val MEDIA_EVENTS_CHANNEL = "com.example.zswatch_app/media_events"
-        private const val FOREGROUND_SERVICE_CHANNEL = "com.example.zswatch_app/foreground_service"
+        private const val NOTIFICATION_CHANNEL = "dev.zswatch.app/notifications"
+        private const val NOTIFICATION_EVENTS_CHANNEL = "dev.zswatch.app/notification_events"
+        private const val MEDIA_CHANNEL = "dev.zswatch.app/media"
+        private const val MEDIA_EVENTS_CHANNEL = "dev.zswatch.app/media_events"
+        private const val FOREGROUND_SERVICE_CHANNEL = "dev.zswatch.app/foreground_service"
     }
     
     private var mediaBridge: MediaSessionBridge? = null

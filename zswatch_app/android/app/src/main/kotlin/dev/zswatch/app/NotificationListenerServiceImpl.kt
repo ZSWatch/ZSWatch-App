@@ -1,4 +1,4 @@
-package com.example.zswatch_app
+package dev.zswatch.app
 
 import android.app.Notification
 import android.content.ComponentName
@@ -54,6 +54,62 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         // Track notification content hashes to detect true updates vs re-posts
         // Key: sbn.key, Value: hash of title+body
         private val notificationContentHashes = mutableMapOf<String, Int>()
+        
+        // Burst prevention: Track when last notification was sent per source (System.nanoTime())
+        // Prevents rapid-fire notifications from same app within timeout period
+        private val notificationBurstPrevention = mutableMapOf<String, Long>()
+        
+        // Old repeat prevention: Track notification.when timestamp per source
+        // Prevents re-posts of old notifications (e.g., when user interacts with notification)
+        private val notificationOldRepeatPrevention = mutableMapOf<String, Long>()
+        
+        // Burst prevention timeout in nanoseconds (default 0 = disabled)
+        // Can be made configurable via settings
+        private const val BURST_PREVENTION_TIMEOUT_NS = 0L  // Set to e.g. 1_000_000_000L for 1 second
+        
+        // === App lists from Gadgetbridge NotificationListener.java ===
+        
+        // SMS apps - notifications from these are handled separately (usually by system SMS handling)
+        // From Gadgetbridge ~line 1165-1175
+        private val SMS_APPS = setOf(
+            "com.moez.QKSMS",
+            "com.android.mms",
+            "com.sonyericsson.conversations",
+            "com.android.messaging",
+            "org.smssecure.smssecure",
+            "org.fossify.messages",
+            "com.goodwy.smsmessenger",
+            "com.simplemobiletools.smsmessenger",
+            "dev.octoshrimpy.quik"
+        )
+        
+        // Phone/dialer apps - call notifications, not regular notifications
+        // From Gadgetbridge ~line 140-147
+        private val PHONE_CALL_APPS = setOf(
+            "com.android.dialer",
+            "com.android.incallui",
+            "com.asus.asusincallui",
+            "com.google.android.dialer",
+            "com.samsung.android.incallui",
+            "org.fossify.phone"
+        )
+        
+        // Apps that send group summaries that should be forwarded
+        // From Gadgetbridge ~line 130-134
+        private val GROUP_SUMMARY_WHITELIST = setOf(
+            "com.microsoft.office.lync15",  // Skype for Business
+            "com.skype.raider",             // Skype
+            "mikado.bizcalpro"              // Business Calendar Pro
+        )
+        
+        // Apps incorrectly marked as local-only that should still be forwarded
+        // From Gadgetbridge ~line 1229-1245
+        private val LOCAL_ONLY_WHITELIST = setOf(
+            "com.tencent.mm",                    // WeChat
+            "org.telegram.messenger",            // Telegram
+            "com.microsoft.office.outlook",      // Outlook
+            "com.skype.raider"                   // Skype
+        )
         
         // Check if service is running
         val isRunning: Boolean
@@ -260,28 +316,18 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         
         // Skip local-only notifications (not meant to be bridged to other devices)
         // Exception: Some apps incorrectly mark notifications as local-only
-        // These exceptions are from Gadgetbridge's NotificationListener.java (~line 1029-1045)
-        val localOnlyExceptions = setOf(
-            "com.tencent.mm",           // WeChat
-            "org.telegram.messenger",   // Telegram
-            "com.microsoft.office.outlook",  // Outlook
-            "com.skype.raider",         // Skype
-        )
+        // These exceptions are from Gadgetbridge's NotificationListener.java (~line 1229-1245)
         if ((notification.flags and Notification.FLAG_LOCAL_ONLY) != 0 &&
-            !localOnlyExceptions.contains(sbn.packageName)) {
+            !LOCAL_ONLY_WHITELIST.contains(sbn.packageName)) {
             Log.d(TAG, "Skipping local-only notification from ${sbn.packageName}")
             return
         }
         
         // Skip group summary notifications (they are duplicates of child notifications)
         // Exception: Some apps only send group summaries, not individual notifications
-        // This whitelist is from Gadgetbridge's NotificationListener.java (~line 429-437)
-        val groupSummaryWhitelist = setOf(
-            "com.microsoft.office.lync15",  // Skype for Business
-            "com.skype.raider",             // Skype
-        )
+        // This whitelist is from Gadgetbridge's NotificationListener.java (~line 130-134)
         if ((notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0 &&
-            !groupSummaryWhitelist.contains(sbn.packageName)) {
+            !GROUP_SUMMARY_WHITELIST.contains(sbn.packageName)) {
             Log.d(TAG, "Skipping group summary notification from ${sbn.packageName}")
             return
         }
@@ -319,6 +365,47 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             }
         }
         
+        // === Gadgetbridge-style duplicate prevention ===
+        
+        // Skip SMS app notifications (handled by system SMS bridge)
+        // From Gadgetbridge ~line 1165-1175
+        if (SMS_APPS.contains(sbn.packageName)) {
+            Log.d(TAG, "Skipping SMS app notification from ${sbn.packageName}")
+            return
+        }
+        
+        // Skip phone/dialer app notifications (call notifications, not regular notifications)
+        // From Gadgetbridge ~line 140-147
+        if (PHONE_CALL_APPS.contains(sbn.packageName)) {
+            Log.d(TAG, "Skipping phone/dialer app notification from ${sbn.packageName}")
+            return
+        }
+        
+        // Old repeat prevention: Skip notifications with older/same timestamp than last forwarded
+        // This prevents re-posts of old notifications (e.g., Messenger updating same notification)
+        // From Gadgetbridge ~line 412-425
+        val notificationWhen = notification.`when`
+        val previousWhen = notificationOldRepeatPrevention[sbn.packageName]
+        if (previousWhen != null && notificationWhen > 0 && notificationWhen <= previousWhen) {
+            Log.d(TAG, "Skipping old/repeat notification from ${sbn.packageName}, when=$notificationWhen <= previous=$previousWhen")
+            return
+        }
+        
+        // Burst prevention: Skip notifications that come too frequently from same source
+        // From Gadgetbridge ~line 427-445
+        if (BURST_PREVENTION_TIMEOUT_NS > 0) {
+            val curTime = System.nanoTime()
+            val lastBurstTime = notificationBurstPrevention[sbn.packageName]
+            if (lastBurstTime != null) {
+                val diff = curTime - lastBurstTime
+                if (diff < BURST_PREVENTION_TIMEOUT_NS) {
+                    Log.d(TAG, "Skipping burst notification from ${sbn.packageName}, ${diff / 1_000_000}ms since last")
+                    return
+                }
+            }
+            notificationBurstPrevention[sbn.packageName] = curTime
+        }
+        
         val notificationData = extractNotificationData(sbn)
         
         // Check if this is an update to an already-forwarded notification with identical content
@@ -347,6 +434,17 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             Log.d(TAG, "Forwarding notification to Flutter via callback")
             // Track that this notification was forwarded
             forwardedNotificationKeys.add(sbn.key)
+            
+            // Update old repeat prevention timestamp after successful forward
+            // From Gadgetbridge ~line 596-604
+            // Only track if notification.when is valid (>0) and not in the future
+            val notificationWhen = notification.`when`
+            if (notificationWhen > 0 && notificationWhen <= System.currentTimeMillis() + 30_000L) {
+                notificationOldRepeatPrevention[sbn.packageName] = notificationWhen
+            } else {
+                Log.d(TAG, "Not tracking notification.when for ${sbn.packageName}: when=$notificationWhen (invalid or future)")
+            }
+            
             notificationCallback?.onNotificationPosted(notificationData)
         }
     }

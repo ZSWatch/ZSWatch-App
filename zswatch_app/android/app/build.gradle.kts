@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.zswatch_app"
+    namespace = "dev.zswatch.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

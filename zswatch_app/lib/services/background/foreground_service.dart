@@ -26,7 +26,7 @@ enum ForegroundConnectionState {
 /// On iOS, background BLE is handled natively via CoreBluetooth background modes
 /// configured in Info.plist (UIBackgroundModes: bluetooth-central)
 class ForegroundService {
-  static const _channel = MethodChannel('com.example.zswatch_app/foreground_service');
+  static const _channel = MethodChannel('dev.zswatch.app/foreground_service');
 
   static ForegroundService? _instance;
   static ForegroundService get instance => _instance ??= ForegroundService._();

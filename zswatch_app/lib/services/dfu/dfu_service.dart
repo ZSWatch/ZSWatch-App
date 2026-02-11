@@ -11,6 +11,7 @@ import 'package:rxdart/rxdart.dart';
 
 import '../../data/models/dfu_state.dart';
 import '../../data/models/firmware_image.dart' as app;
+import 'smp_not_available_exception.dart';
 
 /// Service for performing DFU (Device Firmware Update) operations
 ///
@@ -87,7 +88,12 @@ class DfuService {
         } catch (_) {}
         // Retry after small delay
         await Future<void>.delayed(const Duration(milliseconds: 500));
-        _updateManager = await DeviceUpdateManager.getInstance(device.remoteId.str);
+        try {
+          _updateManager = await DeviceUpdateManager.getInstance(device.remoteId.str);
+        } catch (e2) {
+          // If we still can't get a manager, SMP is likely not available
+          throw SmpNotAvailableException(e2);
+        }
       }
       _log('Update manager initialized for device ${device.remoteId.str}');
 

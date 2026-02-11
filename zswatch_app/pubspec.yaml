@@ -19,11 +19,10 @@ dependencies:
   flutter_blue_plus: ^2.0.2
 
   # Firmware Updates (MCUmgr/SMP)
-  # Using fork: git@github.com:ZSWatch/Flutter-nRF-Connect-Device-Manager.git
+  # Fork: https://github.com/ZSWatch/Flutter-nRF-Connect-Device-Manager
+  # Included as a git submodule in ../Flutter-nRF-Connect-Device-Manager
   mcumgr_flutter:
-    git:
-      url: git@github.com:ZSWatch/Flutter-nRF-Connect-Device-Manager.git
-      ref: master
+    path: ../Flutter-nRF-Connect-Device-Manager
 
   # State Management
   flutter_riverpod: ^2.6.1

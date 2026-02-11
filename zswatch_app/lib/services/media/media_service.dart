@@ -75,8 +75,8 @@ class MediaMetadata {
 /// - Not applicable - AMS handles media control directly between iOS and watch
 /// - This service provides a no-op implementation
 class MediaService {
-  static const _methodChannel = MethodChannel('com.example.zswatch_app/media');
-  static const _eventChannel = EventChannel('com.example.zswatch_app/media_events');
+  static const _methodChannel = MethodChannel('dev.zswatch.app/media');
+  static const _eventChannel = EventChannel('dev.zswatch.app/media_events');
 
   final _playbackStateController = StreamController<MediaPlaybackState>.broadcast();
   final _metadataController = StreamController<MediaMetadata>.broadcast();

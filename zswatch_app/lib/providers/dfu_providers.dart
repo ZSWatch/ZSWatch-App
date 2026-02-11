@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../data/models/dfu_state.dart';
@@ -278,6 +280,24 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
         deviceId: deviceId,
         image: fsImage,
       );
+
+      // Wait for filesystem upload to complete before restarting
+      await fsService.stateStream.firstWhere(
+        (s) => s.status.isTerminal,
+      );
+
+      if (fsService.currentState.status == FilesystemUploadStatus.completed) {
+        // Restart the watch so the new filesystem resources take effect
+        debugPrint('[DfuNotifier] FS upload complete, restarting watch...');
+        try {
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+          await OsManager.reset(deviceId);
+          debugPrint('[DfuNotifier] Watch restart command sent');
+        } catch (e) {
+          debugPrint('[DfuNotifier] Failed to restart watch after FS upload: $e');
+          // Don't fail the overall operation — the upload itself succeeded
+        }
+      }
 
       state = state.copyWith(isFilesystemUploading: false);
 

@@ -1,4 +1,4 @@
-package com.example.zswatch_app
+package dev.zswatch.app
 
 import android.content.ComponentName
 import android.content.Context

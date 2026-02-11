@@ -94,6 +94,9 @@ class AppDatabase extends _$AppDatabase {
           .go();
       await (delete(batteryReadings)..where((b) => b.watchId.equals(watchId)))
           .go();
+      await (delete(connectionEvents)
+            ..where((c) => c.watchId.equals(watchId)))
+          .go();
       await (delete(watches)..where((w) => w.id.equals(watchId))).go();
     });
   }

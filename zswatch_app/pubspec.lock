@@ -667,11 +667,9 @@ packages:
   mcumgr_flutter:
     dependency: "direct main"
     description:
-      path: "."
-      ref: master
-      resolved-ref: "8a00091a0cff3db7943a3284c41bc2935bbdb3d9"
-      url: "git@github.com:ZSWatch/Flutter-nRF-Connect-Device-Manager.git"
-    source: git
+      path: "../Flutter-nRF-Connect-Device-Manager"
+      relative: true
+    source: path
     version: "0.6.1"
   meta:
     dependency: transitive

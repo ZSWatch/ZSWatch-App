@@ -1,10 +1,21 @@
 # ZSWatch Companion App
 
-A cross-platform Flutter companion app for [ZSWatch](https://github.com/jakkra/ZSWatch) smartwatch, providing BLE communication, firmware updates, health data visualization, notification forwarding, and developer tools.
+A cross-platform Flutter companion app for [ZSWatch](https://github.com/ZSWatch/ZSWatch) smartwatch, providing BLE communication, firmware updates, health data visualization, notification forwarding, and developer tools.
 
 <p align="center">
-  <img src="assets/images/ZSWatch_Logo_Round.svg" width="150" alt="ZSWatch Logo">
+  <img src="assets/images/ZSWatch_logo_with_text.png" width="200" alt="ZSWatch Logo">
 </p>
+
+> **⚠️ Experimental / Work in Progress** — This app is under active development. Features may be incomplete, and APIs may change.
+
+## Demo
+
+<div>
+  <a href="https://vimeo.com/1143868178">
+    <img src="https://vumbnail.com/1143868178.jpg" width="500" alt="ZSWatch App Demo">
+  </a>
+  <p><a href="https://vimeo.com/1143868178">▶ Watch the demo on Vimeo</a></p>
+</div>
 
 ## Features
 
@@ -79,8 +90,12 @@ All checkmarks should be green for your target platform(s).
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/jakkra/ZSWatch-App.git
+# Clone with submodules (includes MCUmgr fork)
+git clone --recurse-submodules https://github.com/ZSWatch/ZSWatch-App.git
 cd ZSWatch-App
+
+# If already cloned without submodules:
+# git submodule update --init
 ```
 
 ### 2. Install Dependencies
@@ -406,19 +421,20 @@ See `pubspec.yaml` for complete list.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](../LICENSE) file for details.
 
 ---
 
 ## Related Projects
 
-- [ZSWatch Firmware](https://github.com/jakkra/ZSWatch) - The smartwatch firmware
-- [mcumgr_flutter](https://github.com/NordicSemiconductor/Flutter-nRF-Connect-Device-Manager) - MCUmgr Flutter plugin
+- [ZSWatch Firmware](https://github.com/ZSWatch/ZSWatch) — The smartwatch firmware
+- [ZSWatch Docs](https://zswatch.dev) — Documentation and getting started guides
+- [mcumgr_flutter fork](https://github.com/ZSWatch/Flutter-nRF-Connect-Device-Manager) — MCUmgr Flutter plugin for DFU
 
 ---
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/jakkra/ZSWatch-App/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/jakkra/ZSWatch/discussions)
+- **Issues**: [GitHub Issues](https://github.com/ZSWatch/ZSWatch-App/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ZSWatch/ZSWatch/discussions)
 - **Discord**: [ZSWatch Discord](https://discord.gg/8XfNBmDfbY)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/watch.dart';
@@ -16,6 +17,50 @@ import '../../../providers/watch_service_provider.dart';
 /// - Battery level with visual indicator
 /// - Firmware version
 /// - Quick actions (disconnect, settings, etc.)
+
+Future<void> _restartWatch(BuildContext context, WidgetRef ref) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Restart Watch'),
+      content: const Text('Are you sure you want to restart the watch?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Restart'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  final connection = ref.read(watchConnectionProvider);
+  final deviceId = connection.watchId;
+  if (deviceId.isEmpty) return;
+
+  try {
+    await OsManager.reset(deviceId);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Restart command sent to watch')),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to restart watch: $e'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+}
+
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -78,6 +123,9 @@ class DashboardScreen extends ConsumerWidget {
                   context.go('/');
                 }
               },
+              onRestartWatch: ref.watch(hasSmpServiceProvider)
+                  ? () => _restartWatch(context, ref)
+                  : null,
             ),
 
             const SizedBox(height: AppTheme.spacingMd),
@@ -390,10 +438,12 @@ class _InfoRow extends StatelessWidget {
 class _QuickActionsSection extends StatelessWidget {
   final VoidCallback onFirmwareUpdate;
   final VoidCallback onDisconnect;
+  final VoidCallback? onRestartWatch;
 
   const _QuickActionsSection({
     required this.onFirmwareUpdate,
     required this.onDisconnect,
+    this.onRestartWatch,
   });
 
   @override
@@ -441,6 +491,23 @@ class _QuickActionsSection extends StatelessWidget {
             ),
           ],
         ),
+        if (onRestartWatch != null) ...[
+          const SizedBox(height: AppTheme.spacingSm),
+          SizedBox(
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: onRestartWatch,
+              icon: const Icon(Icons.restart_alt, size: 18),
+              label: const Text('Restart Watch'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

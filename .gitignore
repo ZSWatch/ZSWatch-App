@@ -1,4 +1,24 @@
+# Local development directories (not part of this repo - clone separately)
 ZSWatch-Firmware
-Flutter-nRF-Connect-Device-Manager
-.github/
+
+# Reference materials (kept locally, not needed for compilation)
+Gadgetbridge
 gadgetbridge_api.txt
+
+# Development notes
+Issues:.md
+
+# IDE and editor directories
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db

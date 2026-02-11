@@ -6,6 +6,7 @@ import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../../data/models/filesystem_image.dart';
+import 'smp_not_available_exception.dart';
 
 /// Service for uploading filesystem images to the watch via MCUmgr
 /// 
@@ -70,7 +71,11 @@ class FilesystemUploadService {
       ));
 
       // Get FsManager instance
-      _fsManager = FsManager(deviceId);
+      try {
+        _fsManager = FsManager(deviceId);
+      } catch (e) {
+        throw SmpNotAvailableException(e);
+      }
       _log('FsManager initialized for device $deviceId');
 
       // Subscribe to upload callbacks

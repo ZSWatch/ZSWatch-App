@@ -1,0 +1,3 @@
+[submodule "Flutter-nRF-Connect-Device-Manager"]
+	path = Flutter-nRF-Connect-Device-Manager
+	url = https://github.com/ZSWatch/Flutter-nRF-Connect-Device-Manager.git

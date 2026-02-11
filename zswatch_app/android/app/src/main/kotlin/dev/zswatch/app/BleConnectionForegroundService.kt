@@ -1,4 +1,4 @@
-package com.example.zswatch_app
+package dev.zswatch.app
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -33,10 +33,10 @@ class BleConnectionForegroundService : Service() {
         const val CHANNEL_NAME = "Watch Connection"
         const val NOTIFICATION_ID = 1001
 
-        const val ACTION_START = "com.example.zswatch_app.START_FOREGROUND"
-        const val ACTION_STOP = "com.example.zswatch_app.STOP_FOREGROUND"
-        const val ACTION_UPDATE = "com.example.zswatch_app.UPDATE_NOTIFICATION"
-        const val ACTION_DISCONNECT = "com.example.zswatch_app.DISCONNECT"
+        const val ACTION_START = "dev.zswatch.app.START_FOREGROUND"
+        const val ACTION_STOP = "dev.zswatch.app.STOP_FOREGROUND"
+        const val ACTION_UPDATE = "dev.zswatch.app.UPDATE_NOTIFICATION"
+        const val ACTION_DISCONNECT = "dev.zswatch.app.DISCONNECT"
 
         const val EXTRA_WATCH_NAME = "watch_name"
         const val EXTRA_CONNECTION_STATE = "connection_state"
