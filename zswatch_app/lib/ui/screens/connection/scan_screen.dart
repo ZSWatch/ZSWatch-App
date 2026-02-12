@@ -48,24 +48,44 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     });
 
     try {
+      // First check if we have permissions
+      final notifier = ref.read(bleNotifierProvider.notifier);
+      final hasPerms = await notifier.checkPermissions();
+      
+      if (!hasPerms) {
+        // Don't have permissions
+        if (mounted) {
+          setState(() {
+            _hasPermissions = false;
+            _isInitializing = false;
+          });
+        }
+        return;
+      }
+
       // Load known watch IDs from database
       final knownIds = await ref.read(knownWatchIdsProvider.future);
       final scanner = ref.read(ble.bleScannerProvider);
       scanner.setKnownWatchIds(knownIds);
 
-      // Just try to start scanning - flutter_blue_plus will trigger permission dialogs
+      // Start scanning
       await _startScan();
-      _hasPermissions = true;
+      
+      if (mounted) {
+        setState(() {
+          _hasPermissions = true;
+          _isInitializing = false;
+        });
+      }
     } catch (e) {
-      // Permission denied or other error
-      _hasPermissions = false;
-      debugPrint('Permission/scan error: $e');
-    }
-
-    if (mounted) {
-      setState(() {
-        _isInitializing = false;
-      });
+      // Scan error (not necessarily permissions)
+      debugPrint('[ScanScreen] Scan error: $e');
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+          // Don't change _hasPermissions here - might be other error
+        });
+      }
     }
   }
 
@@ -83,7 +103,18 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final notifier = ref.read(bleNotifierProvider.notifier);
     final granted = await notifier.requestPermissions();
     if (granted) {
-      unawaited(_initAndScan());
+      // _initAndScan will update _hasPermissions state
+      await _initAndScan();
+    } else {
+      // Permission denied - show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bluetooth permission is required to scan for devices'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
     }
   }
 
