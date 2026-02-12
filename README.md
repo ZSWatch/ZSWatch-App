@@ -23,7 +23,7 @@
 
 <div>
   <a href="https://vimeo.com/1143868178">
-    <img src="https://vimeo-thumbnails.p.rapidapi.com/1143868178" width="600" alt="ZSWatch App Demo Video">
+    <img src="https://vumbnail.com/1143868178.jpg" width="500" alt="ZSWatch App Demo">
   </a>
   <p><a href="https://vimeo.com/1143868178">▶ Watch the demo on Vimeo</a></p>
 </div>
