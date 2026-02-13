@@ -165,12 +165,47 @@ The `NotificationListenerService` is pre-configured for forwarding phone notific
 # Debug build
 flutter run
 
-# Release APK
+# Release APK (uses debug signing by default)
 flutter build apk --release
 
-# App Bundle (for Play Store)
+# App Bundle (uses debug signing by default)
 flutter build appbundle --release
 ```
+
+#### Play Store Release Signing
+
+To build a properly signed release for Play Store distribution, you need a signing keystore and key.properties file.
+
+**1. Generate Upload Keystore** (one-time setup)
+```bash
+keytool -genkey -v -keystore upload-keystore.jks -storetype JKS \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+```
+Follow the prompts to set passwords and certificate details. Store this keystore securely - you'll need it for all future releases.
+
+**2. Create key.properties File**
+
+Create `zswatch_app/android/key.properties`:
+```properties
+storePassword=<your-store-password>
+keyPassword=<your-key-password>
+keyAlias=upload
+storeFile=../upload-keystore.jks
+```
+The `storeFile` path is relative to `android/app/`. Place `upload-keystore.jks` in the `zswatch_app/android/` directory.
+
+> **⚠️ Important**: Never commit `key.properties` or the `.jks` keystore to version control. Both files are already in `.gitignore`.
+
+**3. Build Signed Release**
+```bash
+# Signed App Bundle for Play Store
+flutter build appbundle --release
+
+# Signed APK for direct distribution
+flutter build apk --release
+```
+
+The build system automatically detects `key.properties` and uses release signing when present.
 
 ---
 
