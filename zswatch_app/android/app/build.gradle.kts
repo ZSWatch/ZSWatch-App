@@ -53,7 +53,7 @@ val hasReleaseKeystore = releaseKeystoreConfig != null
 
 android {
     namespace = "dev.zswatch.app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -69,7 +69,7 @@ android {
         applicationId = "com.zswatch.app"
         // minSdk 21 required for BLE reliability (flutter_blue_plus requirement)
         minSdk = flutter.minSdkVersion
-        targetSdk = 34
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
