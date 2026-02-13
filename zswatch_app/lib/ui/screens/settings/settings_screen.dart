@@ -6,7 +6,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../../core/theme/app_theme.dart';
+import '../../../providers/demo_mode_provider.dart';
 import '../../../providers/permission_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../onboarding/permission_onboarding_screen.dart';
@@ -20,7 +23,7 @@ class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   // TODO: Update these URLs to point to the correct repositories
-  static const String _appGithubUrl = 'https://github.com/ZSWatch/ZSWatch';  // <-- Change to app repo
+  static const String _appGithubUrl = 'https://github.com/ZSWatch/ZSWatch-App';  // <-- Change to app repo
   static const String _firmwareGithubUrl = 'https://github.com/ZSWatch/ZSWatch';  // <-- Change to firmware repo
   static const String _appVersion = '1.0.0';
   static const String _buildNumber = '1';
@@ -134,6 +137,30 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'Open source licenses',
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showLicensesPage(context),
+          ),
+
+          const Divider(height: 32),
+
+          // Demo Mode (for app store reviewers without hardware)
+          _SectionHeader(title: 'Developer'),
+          _SettingsTile(
+            leading: Icon(
+              Icons.science,
+              color: ref.watch(demoModeProvider)
+                  ? AppTheme.primaryColor
+                  : AppTheme.textSecondary,
+            ),
+            title: 'Demo Mode',
+            subtitle: 'Simulate a connected watch without hardware',
+            trailing: Switch(
+              value: ref.watch(demoModeProvider),
+              onChanged: (value) {
+                ref.read(demoModeProvider.notifier).state = value;
+                if (value) {
+                  context.go('/');
+                }
+              },
+            ),
           ),
 
           const SizedBox(height: 32),

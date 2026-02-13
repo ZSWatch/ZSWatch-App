@@ -214,12 +214,18 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
           ),
         ],
       ),
-      body: watchesAsync.when(
-        data: (watches) => watches.isEmpty
-            ? _buildEmptyState()
-            : _buildWatchList(watches),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _buildErrorState(error.toString()),
+      body: Column(
+        children: [
+          Expanded(
+            child: watchesAsync.when(
+              data: (watches) => watches.isEmpty
+                  ? _buildEmptyState()
+                  : _buildWatchList(watches),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => _buildErrorState(error.toString()),
+            ),
+          ),
+        ],
       ),
       // Add new watch FAB
       floatingActionButton: FloatingActionButton.extended(

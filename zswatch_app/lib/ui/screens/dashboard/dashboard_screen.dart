@@ -7,6 +7,7 @@ import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/watch.dart';
 import '../../../providers/auto_reconnect_provider.dart';
+import '../../../providers/demo_mode_provider.dart';
 import '../../../providers/health_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 
@@ -113,6 +114,12 @@ class DashboardScreen extends ConsumerWidget {
             _QuickActionsSection(
               onFirmwareUpdate: () => context.push('/firmware'),
               onDisconnect: () async {
+                // In demo mode, just turn off the flag
+                if (ref.read(demoModeProvider)) {
+                  ref.read(demoModeProvider.notifier).state = false;
+                  if (context.mounted) context.go('/');
+                  return;
+                }
                 // Suppress auto-reconnect when user manually disconnects
                 ref
                     .read(autoReconnectNotifierProvider.notifier)
