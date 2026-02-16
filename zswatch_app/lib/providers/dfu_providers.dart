@@ -146,9 +146,9 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 
   /// Download firmware from a GitHub Actions artifact
   Future<void> downloadArtifact(WorkflowRun run, WorkflowArtifact artifact) async {
-    print('[DfuNotifier] downloadArtifact called');
-    print('[DfuNotifier] Run: ${run.id}, Branch: ${run.branch}, SHA: ${run.shortSha}');
-    print('[DfuNotifier] Artifact: ${artifact.name}, ID: ${artifact.id}, Size: ${artifact.sizeInBytes}');
+    debugPrint('[DfuNotifier] downloadArtifact called');
+    debugPrint('[DfuNotifier] Run: ${run.id}, Branch: ${run.branch}, SHA: ${run.shortSha}');
+    debugPrint('[DfuNotifier] Artifact: ${artifact.name}, ID: ${artifact.id}, Size: ${artifact.sizeInBytes}');
     
     state = state.copyWith(
       selectedWorkflowRun: run,
@@ -158,13 +158,14 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     );
 
     try {
-      final image = await _firmwareManager.downloadArtifact(run, artifact);
+      final result = await _firmwareManager.downloadArtifact(run, artifact);
       state = state.copyWith(
-        downloadedImage: image,
+        downloadedImage: result.firmwareImage,
+        filesystemImage: result.filesystemImage,
         isDownloading: false,
       );
     } catch (e) {
-      print('[DfuNotifier] downloadArtifact error: $e');
+      debugPrint('[DfuNotifier] downloadArtifact error: $e');
       state = state.copyWith(
         isDownloading: false,
         error: e.toString(),
@@ -185,9 +186,10 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     );
 
     try {
-      final image = await _firmwareManager.loadLocalFile(filePath);
+      final result = await _firmwareManager.loadLocalFile(filePath);
       state = state.copyWith(
-        downloadedImage: image,
+        downloadedImage: result.firmwareImage,
+        filesystemImage: result.filesystemImage,
         isDownloading: false,
       );
     } catch (e) {

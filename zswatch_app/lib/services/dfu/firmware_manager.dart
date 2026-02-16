@@ -260,7 +260,7 @@ class FirmwareManager {
   /// Uses the same URL format as the website:
   /// https://github.com/{owner}/{repo}/actions/runs/{runId}/artifacts/{artifactId}
   /// This triggers GitHub's download mechanism which works for public repos.
-  Future<FirmwareImage> downloadArtifact(WorkflowRun run, WorkflowArtifact artifact) async {
+  Future<ReleaseExtractionResult> downloadArtifact(WorkflowRun run, WorkflowArtifact artifact) async {
     print('[FirmwareManager] downloadArtifact called');
     print('[FirmwareManager] Artifact: ${artifact.name}, ID: ${artifact.id}');
     print('[FirmwareManager] Run ID: ${run.id}, Branch: ${run.branch}');
@@ -389,13 +389,40 @@ class FirmwareManager {
         throw FirmwareDownloadException('Failed to download after following redirects');
       }
 
-      return await _downloadFromStream(
+      final image = await _downloadFromStream(
         response.stream,
         artifact.name,
         artifact.sizeInBytes,
         run.branch,
         run.shortSha,
       );
+
+      // Check if the downloaded zip is a release-style archive
+      if (image.filePath.toLowerCase().endsWith('.zip')) {
+        try {
+          final file = File(image.filePath);
+          final bytes = await file.readAsBytes();
+          final archive = ZipDecoder().decodeBytes(bytes);
+
+          if (_isReleaseArchive(archive)) {
+            _log('CI artifact is a release archive, extracting...');
+            final result = await _extractReleaseArchive(
+              file,
+              run.shortSha,
+              run.branch,
+            );
+            // Clean up the outer zip
+            try {
+              await file.delete();
+            } catch (_) {}
+            return result;
+          }
+        } catch (e) {
+          _log('Could not inspect artifact zip contents: $e');
+        }
+      }
+
+      return ReleaseExtractionResult(firmwareImage: image);
     } catch (e) {
       _updateProgress(DownloadProgress(0, 0, DownloadStatus.failed, error: e.toString()));
       _log('Download error: $e');
@@ -532,10 +559,12 @@ class FirmwareManager {
   }
 
   /// Extract dfu_application.zip and optionally lvgl_resources_raw.bin from an outer release zip
+  ///
+  /// [version] and [tagName] may be null when extracting local files or CI artifacts.
   Future<ReleaseExtractionResult> _extractReleaseArchive(
     File outerZipFile,
-    String version,
-    String tagName,
+    String? version,
+    String? tagName,
   ) async {
     final bytes = await outerZipFile.readAsBytes();
     final archive = ZipDecoder().decodeBytes(bytes);
@@ -560,14 +589,20 @@ class FirmwareManager {
 
         _log('Extracted dfu_application.zip: $dfuZipPath');
 
-        firmwareImage = FirmwareImage.fromGitHub(
-          name: 'dfu_application.zip',
-          version: version,
-          filePath: dfuZipPath,
-          size: file.size,
-          sourceUrl: outerZipFile.path,
-          branch: tagName,
-        );
+        firmwareImage = version != null
+            ? FirmwareImage.fromGitHub(
+                name: 'dfu_application.zip',
+                version: version,
+                filePath: dfuZipPath,
+                size: file.size,
+                sourceUrl: outerZipFile.path,
+                branch: tagName ?? '',
+              )
+            : FirmwareImage.fromLocalFile(
+                name: 'dfu_application.zip',
+                filePath: dfuZipPath,
+                size: file.size,
+              );
       }
 
       // Check for filesystem image
@@ -752,8 +787,28 @@ class FirmwareManager {
     return entries;
   }
 
+  /// Check if a zip file is a release-style archive (contains dfu_application.zip inside)
+  ///
+  /// Release archives (e.g. watchdk@1_nrf5340_cpuapp_debug.zip) contain both
+  /// dfu_application.zip and optionally lvgl_resources_raw.bin.
+  bool _isReleaseArchive(Archive archive) {
+    for (final file in archive) {
+      if (!file.isFile) continue;
+      final baseName = path.basename(file.name).toLowerCase();
+      if (baseName.endsWith('dfu_application.zip')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Load a local firmware file (from file picker)
-  Future<FirmwareImage> loadLocalFile(String filePath) async {
+  ///
+  /// If the file is a release-style archive (contains dfu_application.zip),
+  /// it is extracted the same way as a GitHub release download, returning
+  /// a [ReleaseExtractionResult] with both firmware and filesystem images.
+  /// Otherwise returns a result with just the firmware image.
+  Future<ReleaseExtractionResult> loadLocalFile(String filePath) async {
     _log('Loading local file: $filePath');
 
     final file = File(filePath);
@@ -772,11 +827,29 @@ class FirmwareManager {
       );
     }
 
-    return FirmwareImage.fromLocalFile(
+    // For zip files, check if it's a release-style archive
+    if (lower.endsWith('.zip')) {
+      try {
+        final bytes = await file.readAsBytes();
+        final archive = ZipDecoder().decodeBytes(bytes);
+
+        if (_isReleaseArchive(archive)) {
+          _log('Detected release archive, extracting...');
+          return _extractReleaseArchive(file, null, null);
+        }
+      } catch (e) {
+        _log('Could not inspect zip contents: $e');
+        // Fall through to treat as a plain firmware zip
+      }
+    }
+
+    // Plain .bin or simple dfu_application.zip
+    final image = FirmwareImage.fromLocalFile(
       name: name,
       filePath: filePath,
       size: size,
     );
+    return ReleaseExtractionResult(firmwareImage: image);
   }
 
   /// Prepare firmware for upload (extract if needed, validate)
