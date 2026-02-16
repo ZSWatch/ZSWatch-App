@@ -24,10 +24,12 @@ final permissionServiceProvider = Provider<PermissionService>((ref) {
 });
 
 /// Provider for all permission statuses
-/// 
+///
 /// This provider checks all permissions and returns the combined status.
 /// Use ref.invalidate() to refresh after requesting permissions.
-final permissionsStatusProvider = FutureProvider<AppPermissionsStatus>((ref) async {
+final permissionsStatusProvider = FutureProvider<AppPermissionsStatus>((
+  ref,
+) async {
   final service = ref.watch(permissionServiceProvider);
   return service.checkAllPermissions();
 });
@@ -70,13 +72,14 @@ class PermissionState {
 }
 
 /// Notifier that manages permission state and lifecycle
-/// 
+///
 /// This notifier:
 /// - Checks permissions on app startup
 /// - Re-checks permissions when app resumes from background
 /// - Provides methods to request individual permissions
 /// - Tracks onboarding completion state
-class PermissionNotifier extends StateNotifier<PermissionState> with WidgetsBindingObserver {
+class PermissionNotifier extends StateNotifier<PermissionState>
+    with WidgetsBindingObserver {
   final PermissionService _service;
   Timer? _debounceTimer;
 
@@ -110,15 +113,17 @@ class PermissionNotifier extends StateNotifier<PermissionState> with WidgetsBind
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     // Re-check permissions when app resumes from background
     // User may have changed permissions in system settings
     if (state == AppLifecycleState.resumed) {
-      debugPrint('[PermissionNotifier] App resumed, re-checking permissions...');
+      debugPrint(
+        '[PermissionNotifier] App resumed, re-checking permissions...',
+      );
       // Debounce to avoid multiple rapid checks
       _debounceTimer?.cancel();
-      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-        _checkAllPermissions();
+      _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+        await _checkAllPermissions();
       });
     }
   }
@@ -157,9 +162,13 @@ class PermissionNotifier extends StateNotifier<PermissionState> with WidgetsBind
 
   /// Request battery optimization exemption
   Future<void> requestBatteryOptimizationExemption() async {
-    debugPrint('[PermissionNotifier] requestBatteryOptimizationExemption called');
+    debugPrint(
+      '[PermissionNotifier] requestBatteryOptimizationExemption called',
+    );
     final result = await _service.requestBatteryOptimizationExemption();
-    debugPrint('[PermissionNotifier] requestBatteryOptimizationExemption result: $result');
+    debugPrint(
+      '[PermissionNotifier] requestBatteryOptimizationExemption result: $result',
+    );
     // Re-check after a delay
     await Future<void>.delayed(const Duration(seconds: 1));
     await _checkAllPermissions();
@@ -205,9 +214,9 @@ class PermissionNotifier extends StateNotifier<PermissionState> with WidgetsBind
 /// Provider for the permission notifier
 final permissionNotifierProvider =
     StateNotifierProvider<PermissionNotifier, PermissionState>((ref) {
-  final service = ref.watch(permissionServiceProvider);
-  return PermissionNotifier(service);
-});
+      final service = ref.watch(permissionServiceProvider);
+      return PermissionNotifier(service);
+    });
 
 /// Provider for checking if Bluetooth permission is granted
 final isBluetoothPermissionGrantedProvider = Provider<bool>((ref) {

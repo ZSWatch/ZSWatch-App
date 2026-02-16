@@ -9,7 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../providers/permission_providers.dart';
 
 /// Screen for requesting all permissions on first launch
-/// 
+///
 /// This screen guides the user through granting all necessary permissions
 /// with clear explanations for each one. It's shown when:
 /// - First launch of the app
@@ -18,7 +18,7 @@ import '../../../providers/permission_providers.dart';
 class PermissionOnboardingScreen extends ConsumerStatefulWidget {
   /// Whether this is shown as part of initial onboarding (vs settings access)
   final bool isInitialOnboarding;
-  
+
   /// Callback when onboarding is completed
   final VoidCallback? onComplete;
 
@@ -45,9 +45,7 @@ class _PermissionOnboardingScreenState
     return Scaffold(
       appBar: widget.isInitialOnboarding
           ? null
-          : AppBar(
-              title: const Text('Permissions'),
-            ),
+          : AppBar(title: const Text('Permissions')),
       body: SafeArea(
         child: _isRequesting
             ? const Center(child: CircularProgressIndicator())
@@ -66,8 +64,8 @@ class _PermissionOnboardingScreenState
                       Text(
                         'To get the best experience, please grant the following permissions.',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
                       const SizedBox(height: AppTheme.spacingXl),
                     ],
@@ -79,7 +77,7 @@ class _PermissionOnboardingScreenState
                       color: AppTheme.errorColor,
                     ),
                     const SizedBox(height: AppTheme.spacingSm),
-                    
+
                     // Bluetooth Permission
                     _PermissionCard(
                       icon: Icons.bluetooth,
@@ -147,7 +145,9 @@ class _PermissionOnboardingScreenState
                       description:
                           'Enables the watch to request GPS location from your phone for weather forecasts and fitness tracking.',
                       isGranted: status.isLocationGranted,
-                      statusText: _getLocationStatusText(status.locationPermission),
+                      statusText: _getLocationStatusText(
+                        status.locationPermission,
+                      ),
                       onRequest: _requestLocationPermission,
                     ),
                     const SizedBox(height: AppTheme.spacingMd),
@@ -188,8 +188,8 @@ class _PermissionOnboardingScreenState
                       Text(
                         'Please grant the required Bluetooth permission to continue.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.errorColor,
-                            ),
+                          color: AppTheme.errorColor,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -220,7 +220,16 @@ class _PermissionOnboardingScreenState
   Future<void> _requestBluetoothPermission() async {
     setState(() => _isRequesting = true);
     try {
-      await ref.read(permissionNotifierProvider.notifier).requestBluetoothPermission();
+      final granted = await ref
+          .read(permissionNotifierProvider.notifier)
+          .requestBluetoothPermission();
+      if (!granted && mounted) {
+        // On iOS, the method may have opened Settings — force a refresh
+        // when the user returns (handled by lifecycle observer). Clear the
+        // spinner so the user sees the current state while in the app.
+        setState(() => _isRequesting = false);
+        return;
+      }
     } finally {
       if (mounted) {
         setState(() => _isRequesting = false);
@@ -231,7 +240,9 @@ class _PermissionOnboardingScreenState
   Future<void> _requestNotificationPermission() async {
     setState(() => _isRequesting = true);
     try {
-      await ref.read(permissionNotifierProvider.notifier).requestNotificationPermission();
+      await ref
+          .read(permissionNotifierProvider.notifier)
+          .requestNotificationPermission();
     } finally {
       if (mounted) {
         setState(() => _isRequesting = false);
@@ -241,16 +252,18 @@ class _PermissionOnboardingScreenState
 
   Future<void> _requestLocationPermission() async {
     final status = ref.read(permissionNotifierProvider).status;
-    
+
     if (status.locationPermission == LocationPermission.deniedForever) {
       // Need to open settings
       await openAppSettings();
       return;
     }
-    
+
     setState(() => _isRequesting = true);
     try {
-      await ref.read(permissionNotifierProvider.notifier).requestLocationPermission();
+      await ref
+          .read(permissionNotifierProvider.notifier)
+          .requestLocationPermission();
     } finally {
       if (mounted) {
         setState(() => _isRequesting = false);
@@ -263,15 +276,23 @@ class _PermissionOnboardingScreenState
     try {
       // Use openBatteryOptimizationSettings instead of requestExemption
       // because some OEMs (OnePlus, Xiaomi, etc.) block the direct request dialog
-      await ref.read(permissionNotifierProvider.notifier).openBatteryOptimizationSettings();
-      debugPrint('[PermissionOnboarding] openBatteryOptimizationSettings completed');
+      await ref
+          .read(permissionNotifierProvider.notifier)
+          .openBatteryOptimizationSettings();
+      debugPrint(
+        '[PermissionOnboarding] openBatteryOptimizationSettings completed',
+      );
     } catch (e) {
-      debugPrint('[PermissionOnboarding] Error opening battery optimization settings: $e');
+      debugPrint(
+        '[PermissionOnboarding] Error opening battery optimization settings: $e',
+      );
     }
   }
 
   Future<void> _openNotificationListenerSettings() async {
-    await ref.read(permissionNotifierProvider.notifier).openNotificationListenerSettings();
+    await ref
+        .read(permissionNotifierProvider.notifier)
+        .openNotificationListenerSettings();
   }
 
   Future<void> _completeOnboarding() async {
@@ -301,9 +322,9 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
+            color: color,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );
@@ -346,8 +367,8 @@ class _PermissionCard extends StatelessWidget {
           color: isGranted
               ? AppTheme.successColor.withValues(alpha: 0.3)
               : (isCritical
-                  ? AppTheme.errorColor.withValues(alpha: 0.3)
-                  : Colors.transparent),
+                    ? AppTheme.errorColor.withValues(alpha: 0.3)
+                    : Colors.transparent),
         ),
       ),
       padding: const EdgeInsets.all(AppTheme.spacingMd),
@@ -372,8 +393,8 @@ class _PermissionCard extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Row(
                       children: [
@@ -385,10 +406,9 @@ class _PermissionCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           statusText ?? (isGranted ? 'Granted' : 'Not granted'),
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: statusColor,
-                                  ),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: statusColor),
                         ),
                       ],
                     ),
@@ -408,9 +428,9 @@ class _PermissionCard extends StatelessWidget {
           const SizedBox(height: AppTheme.spacingSm),
           Text(
             description,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
           ),
         ],
       ),
