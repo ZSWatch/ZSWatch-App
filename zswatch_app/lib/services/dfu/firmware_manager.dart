@@ -28,6 +28,56 @@ class FirmwareManager {
   /// Artifact name filters to match ZSWatch firmware artifacts
   static const List<String> _artifactFilters = ['watchdk@1', '@5'];
 
+  /// Whether to use the rotated firmware variant (dfu_application_rotated.zip)
+  bool useRotatedFirmware = false;
+
+  /// Extract the board prefix from a hardware version string.
+  ///
+  /// The watch reports hardware as e.g. `watchdk@1/nrf5340/cpuapp`.
+  /// The board prefix is `watchdk@1` — the part before the first `/`.
+  /// This matches the prefix used in release asset and CI artifact names
+  /// (e.g. `watchdk@1_nrf5340_cpuapp_debug.zip`).
+  ///
+  /// Returns null if [hardwareVersion] is null or empty.
+  static String? boardPrefixFromHardwareVersion(String? hardwareVersion) {
+    if (hardwareVersion == null || hardwareVersion.isEmpty) return null;
+    final slashIndex = hardwareVersion.indexOf('/');
+    if (slashIndex == -1) return hardwareVersion;
+    return hardwareVersion.substring(0, slashIndex);
+  }
+
+  /// Check whether a release asset name is compatible with the given board prefix.
+  ///
+  /// If [boardPrefix] is null the asset is always considered compatible.
+  static bool isAssetCompatible(String assetName, String? boardPrefix) {
+    if (boardPrefix == null) return true;
+    return assetName.contains(boardPrefix);
+  }
+
+  /// Filter release assets to keep only those compatible with [boardPrefix].
+  ///
+  /// If [boardPrefix] is null or no assets match, returns all assets unfiltered.
+  static List<ReleaseAsset> filterCompatibleAssets(
+    List<ReleaseAsset> assets,
+    String? boardPrefix,
+  ) {
+    if (boardPrefix == null) return assets;
+    final compatible = assets.where((a) => isAssetCompatible(a.name, boardPrefix)).toList();
+    return compatible.isNotEmpty ? compatible : assets;
+  }
+
+  /// Filter workflow artifacts to keep only those compatible with [boardPrefix].
+  ///
+  /// If [boardPrefix] is null or no artifacts match, returns all artifacts unfiltered.
+  static List<WorkflowArtifact> filterCompatibleArtifacts(
+    List<WorkflowArtifact> artifacts,
+    String? boardPrefix,
+  ) {
+    if (boardPrefix == null) return artifacts;
+    final compatible = artifacts.where((a) => a.name.contains(boardPrefix)).toList();
+    return compatible.isNotEmpty ? compatible : artifacts;
+  }
+
   final _downloadProgressController = BehaviorSubject<DownloadProgress>.seeded(
     const DownloadProgress(0, 0, DownloadStatus.idle),
   );
@@ -561,6 +611,7 @@ class FirmwareManager {
   /// Extract dfu_application.zip and optionally lvgl_resources_raw.bin from an outer release zip
   ///
   /// [version] and [tagName] may be null when extracting local files or CI artifacts.
+  /// When [useRotatedFirmware] is true, uses dfu_application_rotated.zip instead.
   Future<ReleaseExtractionResult> _extractReleaseArchive(
     File outerZipFile,
     String? version,
@@ -571,25 +622,28 @@ class FirmwareManager {
 
     final downloadDir = await _getDownloadDirectory();
 
-    FirmwareImage? firmwareImage;
+    FirmwareImage? standardFirmwareImage;
+    FirmwareImage? rotatedFirmwareImage;
     FilesystemImage? filesystemImage;
 
-    // Look for dfu_application.zip and lvgl_resources_raw.bin in the archive
+    _log('Extracting firmware variants (rotated preferred: $useRotatedFirmware)');
+
+    // Extract both DFU variants (if present) and filesystem image
     for (final file in archive) {
       if (!file.isFile) continue;
 
       final fileName = file.name.toLowerCase();
       final baseName = path.basename(fileName);
 
-      // Check for DFU application zip
-      if (baseName.endsWith('dfu_application.zip')) {
+      // Standard DFU firmware
+      if (baseName == 'dfu_application.zip') {
         final dfuZipPath = path.join(downloadDir.path, 'dfu_application.zip');
         final dfuZipFile = File(dfuZipPath);
         await dfuZipFile.writeAsBytes(file.content as List<int>);
 
         _log('Extracted dfu_application.zip: $dfuZipPath');
 
-        firmwareImage = version != null
+        standardFirmwareImage = version != null
             ? FirmwareImage.fromGitHub(
                 name: 'dfu_application.zip',
                 version: version,
@@ -601,6 +655,30 @@ class FirmwareManager {
             : FirmwareImage.fromLocalFile(
                 name: 'dfu_application.zip',
                 filePath: dfuZipPath,
+                size: file.size,
+              );
+      }
+
+      // Rotated DFU firmware
+      if (baseName == 'dfu_application_rotated.zip') {
+        final rotatedZipPath = path.join(downloadDir.path, 'dfu_application_rotated.zip');
+        final rotatedZipFile = File(rotatedZipPath);
+        await rotatedZipFile.writeAsBytes(file.content as List<int>);
+
+        _log('Extracted dfu_application_rotated.zip: $rotatedZipPath');
+
+        rotatedFirmwareImage = version != null
+            ? FirmwareImage.fromGitHub(
+                name: 'dfu_application_rotated.zip',
+                version: version,
+                filePath: rotatedZipPath,
+                size: file.size,
+                sourceUrl: outerZipFile.path,
+                branch: tagName ?? '',
+              )
+            : FirmwareImage.fromLocalFile(
+                name: 'dfu_application_rotated.zip',
+                filePath: rotatedZipPath,
                 size: file.size,
               );
       }
@@ -622,10 +700,22 @@ class FirmwareManager {
       }
     }
 
+    final firmwareImage = useRotatedFirmware
+        ? (rotatedFirmwareImage ?? standardFirmwareImage)
+        : (standardFirmwareImage ?? rotatedFirmwareImage);
+
     if (firmwareImage == null) {
       throw FirmwareDownloadException(
-        'No dfu_application.zip found in release archive',
+        'No DFU firmware zip found in release archive',
       );
+    }
+
+    if (standardFirmwareImage != null && rotatedFirmwareImage != null) {
+      _log('Release contains standard and rotated DFU variants');
+    } else if (rotatedFirmwareImage != null) {
+      _log('Release contains rotated DFU variant only');
+    } else {
+      _log('Release contains standard DFU variant only');
     }
 
     if (filesystemImage != null) {
@@ -795,7 +885,8 @@ class FirmwareManager {
     for (final file in archive) {
       if (!file.isFile) continue;
       final baseName = path.basename(file.name).toLowerCase();
-      if (baseName.endsWith('dfu_application.zip')) {
+      if (baseName == 'dfu_application.zip' ||
+          baseName == 'dfu_application_rotated.zip') {
         return true;
       }
     }
@@ -854,19 +945,68 @@ class FirmwareManager {
 
   /// Prepare firmware for upload (extract if needed, validate)
   Future<List<FirmwareImage>> prepareFirmware(FirmwareImage image) async {
-    _log('Preparing firmware: ${image.name}');
+    final selectedImage = await _selectPreferredDfuVariant(image);
+    _log('Preparing firmware: ${selectedImage.name}');
 
-    if (image.isCombined) {
-      return await extractZip(image);
+    if (selectedImage.isCombined) {
+      return await extractZip(selectedImage);
     }
 
     // Validate single file
-    final file = File(image.filePath);
+    final file = File(selectedImage.filePath);
     if (!await file.exists()) {
-      throw FirmwareDownloadException('File not found: ${image.filePath}');
+      throw FirmwareDownloadException('File not found: ${selectedImage.filePath}');
     }
 
-    return [image];
+    return [selectedImage];
+  }
+
+  /// Select standard/rotated DFU variant based on [useRotatedFirmware].
+  ///
+  /// If the opposite variant is already selected and the preferred sibling file
+  /// exists in the same directory, this switches to the preferred variant.
+  Future<FirmwareImage> _selectPreferredDfuVariant(FirmwareImage image) async {
+    final lowerName = path.basename(image.name).toLowerCase();
+    final isStandard = lowerName == 'dfu_application.zip';
+    final isRotated = lowerName == 'dfu_application_rotated.zip';
+
+    if (!isStandard && !isRotated) {
+      return image;
+    }
+
+    final imageDir = path.dirname(image.filePath);
+    final standardPath = path.join(imageDir, 'dfu_application.zip');
+    final rotatedPath = path.join(imageDir, 'dfu_application_rotated.zip');
+
+    if (useRotatedFirmware && !isRotated) {
+      final rotatedFile = File(rotatedPath);
+      if (await rotatedFile.exists()) {
+        final size = await rotatedFile.length();
+        _log('Using rotated DFU variant for upload');
+        return image.copyWith(
+          name: 'dfu_application_rotated.zip',
+          filePath: rotatedPath,
+          size: size,
+        );
+      }
+      _log('Rotated DFU variant requested but not found, using standard');
+    }
+
+    if (!useRotatedFirmware && !isStandard) {
+      final standardFile = File(standardPath);
+      if (await standardFile.exists()) {
+        final size = await standardFile.length();
+        _log('Using standard DFU variant for upload');
+        return image.copyWith(
+          name: 'dfu_application.zip',
+          filePath: standardPath,
+          size: size,
+        );
+      }
+      _log('Standard DFU variant requested but not found, using rotated');
+    }
+
+    return image;
   }
 
   /// Clean up downloaded/extracted files

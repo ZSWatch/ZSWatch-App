@@ -36,10 +36,12 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
   bool _showLogs = false;
   final List<String> _logs = [];
   bool _wakelockEnabled = false;
+  bool _rotatedMode = false;
 
   @override
   void initState() {
     super.initState();
+    _rotatedMode = ref.read(firmwareManagerProvider).useRotatedFirmware;
     
     // Reset state when entering the screen to clear any stale state
     // Use addPostFrameCallback to ensure ref is ready
@@ -155,6 +157,9 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                         !operationState.isDownloading) ...[
                       // GitHub releases
                       _ReleasesSection(
+                        boardPrefix: FirmwareManager.boardPrefixFromHardwareVersion(
+                          watch?.hardwareVersion,
+                        ),
                         onAssetSelected: (release, asset) {
                           ref
                               .read(dfuNotifierProvider.notifier)
@@ -166,6 +171,9 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
 
                       // CI Builds (GitHub Actions)
                       _CIBuildsSection(
+                        boardPrefix: FirmwareManager.boardPrefixFromHardwareVersion(
+                          watch?.hardwareVersion,
+                        ),
                         onOpenInBrowser: (run, artifact) async {
                           final url = ref
                               .read(dfuNotifierProvider.notifier)
@@ -230,6 +238,39 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                           onClear: () =>
                               ref.read(dfuNotifierProvider.notifier).reset(),
                         ),
+
+                      const SizedBox(height: AppTheme.spacingSm),
+
+                      // Rotated firmware option (subtle)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppTheme.spacingSm,
+                            vertical: AppTheme.spacingSm / 2,
+                          ),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: _rotatedMode,
+                                visualDensity: VisualDensity.compact,
+                                onChanged: (value) {
+                                  final enabled = value ?? false;
+                                  setState(() => _rotatedMode = enabled);
+                                  ref.read(firmwareManagerProvider).useRotatedFirmware = enabled;
+                                },
+                              ),
+                              Expanded(
+                                child: Text(
+                                  'Use rotated display firmware',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
 
                     // Progress/status card (shown during download or upload)
@@ -833,8 +874,9 @@ class _SelectedFirmwareCard extends StatelessWidget {
 
 class _ReleasesSection extends ConsumerWidget {
   final void Function(GitHubRelease, ReleaseAsset) onAssetSelected;
+  final String? boardPrefix;
 
-  const _ReleasesSection({required this.onAssetSelected});
+  const _ReleasesSection({required this.onAssetSelected, this.boardPrefix});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -894,6 +936,7 @@ class _ReleasesSection extends ConsumerWidget {
                   .take(5)
                   .map((release) => _ReleaseCard(
                         release: release,
+                        boardPrefix: boardPrefix,
                         onAssetSelected: (asset) => onAssetSelected(release, asset),
                       ))
                   .toList(),
@@ -929,12 +972,22 @@ class _ReleasesSection extends ConsumerWidget {
 
 class _ReleaseCard extends StatelessWidget {
   final GitHubRelease release;
+  final String? boardPrefix;
   final void Function(ReleaseAsset) onAssetSelected;
 
-  const _ReleaseCard({required this.release, required this.onAssetSelected});
+  const _ReleaseCard({
+    required this.release,
+    required this.onAssetSelected,
+    this.boardPrefix,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final compatibleAssets = FirmwareManager.filterCompatibleAssets(
+      release.assets,
+      boardPrefix,
+    );
+
     return Card(
       margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
       child: ListTile(
@@ -945,15 +998,22 @@ class _ReleaseCard extends StatelessWidget {
         ),
         title: Text(release.name),
         subtitle: Text(
-          '${release.version} • ${release.assets.length} builds • ${release.formattedDate}',
+          '${release.version} • ${compatibleAssets.length} builds • ${release.formattedDate}',
         ),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => _showAssetSelectionDialog(context),
+        onTap: () {
+          // If exactly one compatible asset, download it directly
+          if (boardPrefix != null && compatibleAssets.length == 1) {
+            onAssetSelected(compatibleAssets.first);
+          } else {
+            _showAssetSelectionDialog(context, compatibleAssets);
+          }
+        },
       ),
     );
   }
 
-  void _showAssetSelectionDialog(BuildContext context) {
+  void _showAssetSelectionDialog(BuildContext context, List<ReleaseAsset> assetsToShow) {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -971,13 +1031,19 @@ class _ReleaseCard extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: AppTheme.spacingMd),
-              const Text(
-                'Choose the build matching your hardware:',
-                style: TextStyle(fontWeight: FontWeight.w500),
+              Text(
+                boardPrefix != null
+                    ? 'Showing builds for $boardPrefix:'
+                    : 'Choose the build matching your hardware:',
+                style: const TextStyle(fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: AppTheme.spacingSm),
-              ...release.assets.map((asset) => _AssetTile(
+              ...assetsToShow.map((asset) => _AssetTile(
                     asset: asset,
+                    isCompatible: FirmwareManager.isAssetCompatible(
+                      asset.name,
+                      boardPrefix,
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       onAssetSelected(asset);
@@ -987,6 +1053,15 @@ class _ReleaseCard extends StatelessWidget {
           ),
         ),
         actions: [
+          // Allow showing all assets if filtering is active
+          if (boardPrefix != null && assetsToShow.length != release.assets.length)
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _showAssetSelectionDialog(context, release.assets);
+              },
+              child: const Text('Show All'),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
@@ -1000,8 +1075,13 @@ class _ReleaseCard extends StatelessWidget {
 class _AssetTile extends StatelessWidget {
   final ReleaseAsset asset;
   final VoidCallback onTap;
+  final bool isCompatible;
 
-  const _AssetTile({required this.asset, required this.onTap});
+  const _AssetTile({
+    required this.asset,
+    required this.onTap,
+    this.isCompatible = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1009,10 +1089,16 @@ class _AssetTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
       child: ListTile(
         dense: true,
-        leading: const Icon(Icons.folder_zip, color: AppTheme.primaryColor),
+        leading: Icon(
+          Icons.folder_zip,
+          color: isCompatible ? AppTheme.primaryColor : AppTheme.textSecondary,
+        ),
         title: Text(
           asset.displayName,
-          style: const TextStyle(fontSize: 13),
+          style: TextStyle(
+            fontSize: 13,
+            color: isCompatible ? null : AppTheme.textSecondary,
+          ),
         ),
         subtitle: Text(
           asset.formattedSize,
@@ -1028,8 +1114,12 @@ class _AssetTile extends StatelessWidget {
 /// CI Builds section showing GitHub Actions workflow runs
 class _CIBuildsSection extends ConsumerStatefulWidget {
   final void Function(WorkflowRun, WorkflowArtifact) onOpenInBrowser;
+  final String? boardPrefix;
 
-  const _CIBuildsSection({required this.onOpenInBrowser});
+  const _CIBuildsSection({
+    required this.onOpenInBrowser,
+    this.boardPrefix,
+  });
 
   @override
   ConsumerState<_CIBuildsSection> createState() => _CIBuildsSectionState();
@@ -1193,6 +1283,7 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
                       // Runs for this branch
                       ...branchRuns.map((run) => _WorkflowRunTile(
                             run: run,
+                            boardPrefix: widget.boardPrefix,
                             isExpanded: _expandedBranches['${branch}_${run.id}'] ?? false,
                             onToggle: () {
                               setState(() {
@@ -1251,6 +1342,7 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
 /// Individual workflow run tile with expandable artifacts
 class _WorkflowRunTile extends StatelessWidget {
   final WorkflowRun run;
+  final String? boardPrefix;
   final bool isExpanded;
   final VoidCallback onToggle;
   final void Function(WorkflowArtifact) onOpenInBrowser;
@@ -1260,10 +1352,15 @@ class _WorkflowRunTile extends StatelessWidget {
     required this.isExpanded,
     required this.onToggle,
     required this.onOpenInBrowser,
+    this.boardPrefix,
   });
 
   @override
   Widget build(BuildContext context) {
+    final filteredArtifacts = FirmwareManager.filterCompatibleArtifacts(
+      run.artifacts,
+      boardPrefix,
+    );
     return Column(
       children: [
         // Run header (clickable)
@@ -1288,7 +1385,7 @@ class _WorkflowRunTile extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            '${run.artifacts.length} artifact${run.artifacts.length != 1 ? 's' : ''}',
+                            '${filteredArtifacts.length} artifact${filteredArtifacts.length != 1 ? 's' : ''}',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   color: AppTheme.textSecondary,
                                 ),
@@ -1338,7 +1435,7 @@ class _WorkflowRunTile extends StatelessWidget {
               bottom: AppTheme.spacingSm,
             ),
             child: Column(
-              children: run.artifacts.map((artifact) {
+              children: filteredArtifacts.map((artifact) {
                 return Container(
                   margin: const EdgeInsets.only(top: 4),
                   padding: const EdgeInsets.symmetric(
@@ -1442,7 +1539,7 @@ class _LocalFileSection extends StatelessWidget {
         ),
         const SizedBox(height: AppTheme.spacingSm),
         Text(
-          'Select a dfu_application.zip file downloaded from GitHub Actions.',
+          'Select a firmware package .zip, e.g. watchdk@1_nrf5340_cpuapp_debug.zip.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: AppTheme.textSecondary,
               ),
