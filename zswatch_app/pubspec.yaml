@@ -84,3 +84,10 @@ flutter:
   assets:
     - assets/images/
     - assets/models/
+    - assets/llext_apps/battery_ext/
+    - assets/llext_apps/about_ext/
+    - assets/llext_apps/qr_code_ext/
+    - assets/llext_apps/weather_ext/
+    - assets/llext_apps/compass_ext/
+    - assets/llext_apps/trivia_ext/
+    - assets/llext_apps/calculator_ext/

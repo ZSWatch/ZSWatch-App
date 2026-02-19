@@ -1036,6 +1036,62 @@ class WatchService {
   /// Disable log streaming from watch
   Future<void> disableLogStreaming() => setLogStreaming(false);
 
+  // ==================== LLEXT App Management ====================
+
+  /// Prepare/create an LLEXT app directory on the watch filesystem.
+  ///
+  /// Sends `{"t":"llext","op":"mkdir","id":<appId>}` via Gadgetbridge.
+  /// The watch creates `/lvgl_lfs/apps/<appId>` if it does not already exist.
+  Future<void> llextMkdir(String appId) async {
+    await _sendGb({'t': 'llext', 'op': 'mkdir', 'id': appId});
+  }
+
+  /// Remove an LLEXT app from the watch filesystem.
+  ///
+  /// Sends `{"t":"llext","op":"rm","id":<appId>}` via Gadgetbridge.
+  /// The watch unlinks `/lvgl_lfs/apps/<appId>/app.llext` and the directory.
+  Future<void> llextRemove(String appId) async {
+    await _sendGb({'t': 'llext', 'op': 'rm', 'id': appId});
+  }
+
+  /// Hot-load an LLEXT app on the watch (no reboot required).
+  ///
+  /// Sends `{"t":"llext","op":"load","id":<appId>}` via Gadgetbridge.
+  /// The watch loads the app from `/lvgl_lfs/apps/<appId>/app.llext`,
+  /// registers it with the app manager, and shows a popup notification.
+  Future<void> llextLoad(String appId) async {
+    await _sendGb({'t': 'llext', 'op': 'load', 'id': appId});
+  }
+
+  // ==================== SMP (MCUmgr) Management ====================
+
+  /// Enable MCUmgr/SMP on the watch via Gadgetbridge.
+  ///
+  /// Sends `{"t":"smp","status":true}`. The watch enables SMP BLE transport,
+  /// switches to fast advertising/short connection interval, and starts
+  /// a 3-minute auto-disable timer.
+  Future<void> enableSmp() async {
+    await _sendGb({'t': 'smp', 'status': true});
+  }
+
+  /// Disable MCUmgr/SMP on the watch via Gadgetbridge.
+  ///
+  /// Sends `{"t":"smp","status":false}`. The watch disables SMP and restores
+  /// default BLE parameters.
+  Future<void> disableSmp() async {
+    await _sendGb({'t': 'smp', 'status': false});
+  }
+
+  // ==================== Watch Reset ====================
+
+  /// Request the watch to perform a cold reboot.
+  ///
+  /// Sends `{"t":"reset"}` via Gadgetbridge. The watch will reboot
+  /// after a short delay (to ACK the BLE packet).
+  Future<void> resetWatch() async {
+    await _sendGb({'t': 'reset'});
+  }
+
   void _handleConnectionStateChange(
     BluetoothConnectionState state,
     String watchId,

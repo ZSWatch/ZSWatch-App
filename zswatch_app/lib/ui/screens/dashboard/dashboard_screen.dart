@@ -536,6 +536,11 @@ class _FeatureShortcuts extends StatelessWidget {
           crossAxisSpacing: AppTheme.spacingSm,
           children: [
             _FeatureTile(
+              icon: Icons.extension,
+              label: 'Apps',
+              onTap: () => context.push('/apps'),
+            ),
+            _FeatureTile(
               icon: Icons.favorite,
               label: 'Health',
               onTap: () => context.push('/health'),

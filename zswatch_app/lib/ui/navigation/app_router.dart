@@ -9,6 +9,7 @@ import '../../providers/ble_providers.dart';
 import '../../providers/foreground_service_providers.dart';
 import '../../providers/permission_providers.dart';
 import '../../providers/watch_service_provider.dart';
+import '../screens/apps/apps_screen.dart';
 import '../screens/analytics/analytics_screen.dart';
 import '../screens/connection/scan_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
@@ -38,6 +39,7 @@ abstract final class AppRoutes {
 
   // Feature routes
   static const String firmware = '/firmware';
+  static const String apps = '/apps';
   static const String health = '/health';
   static const String heartRate = '/health/heart-rate';
   static const String notifications = '/notifications';
@@ -108,6 +110,13 @@ class AppRouter {
         path: AppRoutes.firmware,
         name: 'firmware',
         builder: (context, state) => const FirmwareUpdateScreen(),
+      ),
+
+      // LLEXT Apps management
+      GoRoute(
+        path: AppRoutes.apps,
+        name: 'apps',
+        builder: (context, state) => const AppsScreen(),
       ),
 
       // Health routes
