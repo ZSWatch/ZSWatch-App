@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/voice_memo/transcription_engine.dart';
+
 /// Keys for SharedPreferences
 abstract final class SettingsKeys {
   static const String developerModeEnabled = 'developer_mode_enabled';
@@ -13,6 +15,7 @@ abstract final class SettingsKeys {
   static const String onboardingCompleted = 'onboarding_completed';
   static const String keepScreenOnDuringDfu = 'keep_screen_on_during_dfu';
   static const String backgroundConnectionEnabled = 'background_connection_enabled';
+  static const String transcriptionEngineType = 'transcription_engine_type';
 }
 
 /// Provider for SharedPreferences instance
@@ -278,4 +281,38 @@ final settingsManagerProvider = Provider<SettingsManager?>((ref) {
   if (prefsValue == null) return null;
   return SettingsManager(prefsValue);
 });
+
+// ---------------------------------------------------------------------------
+// Transcription engine type
+// ---------------------------------------------------------------------------
+
+/// Which offline Whisper engine variant to use for voice memo transcription.
+/// Persisted in SharedPreferences.
+final transcriptionEngineTypeProvider =
+    StateNotifierProvider<TranscriptionEngineTypeNotifier, TranscriptionEngineType>(
+  (ref) {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    return TranscriptionEngineTypeNotifier(prefs.valueOrNull);
+  },
+);
+
+class TranscriptionEngineTypeNotifier
+    extends StateNotifier<TranscriptionEngineType> {
+  final SharedPreferences? _prefs;
+
+  TranscriptionEngineTypeNotifier(this._prefs)
+      : super(_parseType(_prefs?.getString(SettingsKeys.transcriptionEngineType)));
+
+  static TranscriptionEngineType _parseType(String? value) {
+    if (value == TranscriptionEngineType.kbWhisperBase.name) {
+      return TranscriptionEngineType.kbWhisperBase;
+    }
+    return TranscriptionEngineType.whisperTinyEn;
+  }
+
+  void setType(TranscriptionEngineType type) {
+    state = type;
+    _prefs?.setString(SettingsKeys.transcriptionEngineType, type.name);
+  }
+}
 

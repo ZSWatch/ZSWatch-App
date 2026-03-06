@@ -54,7 +54,7 @@ val hasReleaseKeystore = releaseKeystoreConfig != null
 android {
     namespace = "dev.zswatch.app"
     compileSdk = 36
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "29.0.13113456" // Required by whisper_ggml_plus (highest NDK among all plugins)
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -2457,6 +2457,784 @@ class ConnectionEventsCompanion extends UpdateCompanion<ConnectionEventEntity> {
   }
 }
 
+class $VoiceMemosTable extends VoiceMemos
+    with TableInfo<$VoiceMemosTable, VoiceMemoEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $VoiceMemosTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _filenameMeta = const VerificationMeta(
+    'filename',
+  );
+  @override
+  late final GeneratedColumn<String> filename = GeneratedColumn<String>(
+    'filename',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _timestampUtcMeta = const VerificationMeta(
+    'timestampUtc',
+  );
+  @override
+  late final GeneratedColumn<int> timestampUtc = GeneratedColumn<int>(
+    'timestamp_utc',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _durationMsMeta = const VerificationMeta(
+    'durationMs',
+  );
+  @override
+  late final GeneratedColumn<int> durationMs = GeneratedColumn<int>(
+    'duration_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sizeBytesMeta = const VerificationMeta(
+    'sizeBytes',
+  );
+  @override
+  late final GeneratedColumn<int> sizeBytes = GeneratedColumn<int>(
+    'size_bytes',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _localFilePathMeta = const VerificationMeta(
+    'localFilePath',
+  );
+  @override
+  late final GeneratedColumn<String> localFilePath = GeneratedColumn<String>(
+    'local_file_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _transcriptionMeta = const VerificationMeta(
+    'transcription',
+  );
+  @override
+  late final GeneratedColumn<String> transcription = GeneratedColumn<String>(
+    'transcription',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _syncedFromWatchMeta = const VerificationMeta(
+    'syncedFromWatch',
+  );
+  @override
+  late final GeneratedColumn<bool> syncedFromWatch = GeneratedColumn<bool>(
+    'synced_from_watch',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("synced_from_watch" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _deletedOnWatchMeta = const VerificationMeta(
+    'deletedOnWatch',
+  );
+  @override
+  late final GeneratedColumn<bool> deletedOnWatch = GeneratedColumn<bool>(
+    'deleted_on_watch',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("deleted_on_watch" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _downloadedAtMeta = const VerificationMeta(
+    'downloadedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> downloadedAt = GeneratedColumn<DateTime>(
+    'downloaded_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _transcribedAtMeta = const VerificationMeta(
+    'transcribedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> transcribedAt =
+      GeneratedColumn<DateTime>(
+        'transcribed_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _convertedFilePathMeta = const VerificationMeta(
+    'convertedFilePath',
+  );
+  @override
+  late final GeneratedColumn<String> convertedFilePath =
+      GeneratedColumn<String>(
+        'converted_file_path',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    filename,
+    timestampUtc,
+    durationMs,
+    sizeBytes,
+    localFilePath,
+    transcription,
+    syncedFromWatch,
+    deletedOnWatch,
+    downloadedAt,
+    transcribedAt,
+    convertedFilePath,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'voice_memos';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<VoiceMemoEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('filename')) {
+      context.handle(
+        _filenameMeta,
+        filename.isAcceptableOrUnknown(data['filename']!, _filenameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_filenameMeta);
+    }
+    if (data.containsKey('timestamp_utc')) {
+      context.handle(
+        _timestampUtcMeta,
+        timestampUtc.isAcceptableOrUnknown(
+          data['timestamp_utc']!,
+          _timestampUtcMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_timestampUtcMeta);
+    }
+    if (data.containsKey('duration_ms')) {
+      context.handle(
+        _durationMsMeta,
+        durationMs.isAcceptableOrUnknown(data['duration_ms']!, _durationMsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_durationMsMeta);
+    }
+    if (data.containsKey('size_bytes')) {
+      context.handle(
+        _sizeBytesMeta,
+        sizeBytes.isAcceptableOrUnknown(data['size_bytes']!, _sizeBytesMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sizeBytesMeta);
+    }
+    if (data.containsKey('local_file_path')) {
+      context.handle(
+        _localFilePathMeta,
+        localFilePath.isAcceptableOrUnknown(
+          data['local_file_path']!,
+          _localFilePathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('transcription')) {
+      context.handle(
+        _transcriptionMeta,
+        transcription.isAcceptableOrUnknown(
+          data['transcription']!,
+          _transcriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('synced_from_watch')) {
+      context.handle(
+        _syncedFromWatchMeta,
+        syncedFromWatch.isAcceptableOrUnknown(
+          data['synced_from_watch']!,
+          _syncedFromWatchMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_on_watch')) {
+      context.handle(
+        _deletedOnWatchMeta,
+        deletedOnWatch.isAcceptableOrUnknown(
+          data['deleted_on_watch']!,
+          _deletedOnWatchMeta,
+        ),
+      );
+    }
+    if (data.containsKey('downloaded_at')) {
+      context.handle(
+        _downloadedAtMeta,
+        downloadedAt.isAcceptableOrUnknown(
+          data['downloaded_at']!,
+          _downloadedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('transcribed_at')) {
+      context.handle(
+        _transcribedAtMeta,
+        transcribedAt.isAcceptableOrUnknown(
+          data['transcribed_at']!,
+          _transcribedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('converted_file_path')) {
+      context.handle(
+        _convertedFilePathMeta,
+        convertedFilePath.isAcceptableOrUnknown(
+          data['converted_file_path']!,
+          _convertedFilePathMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  VoiceMemoEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return VoiceMemoEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      filename: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}filename'],
+      )!,
+      timestampUtc: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}timestamp_utc'],
+      )!,
+      durationMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_ms'],
+      )!,
+      sizeBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}size_bytes'],
+      )!,
+      localFilePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_file_path'],
+      ),
+      transcription: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}transcription'],
+      ),
+      syncedFromWatch: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}synced_from_watch'],
+      )!,
+      deletedOnWatch: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}deleted_on_watch'],
+      )!,
+      downloadedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}downloaded_at'],
+      ),
+      transcribedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}transcribed_at'],
+      ),
+      convertedFilePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}converted_file_path'],
+      ),
+    );
+  }
+
+  @override
+  $VoiceMemosTable createAlias(String alias) {
+    return $VoiceMemosTable(attachedDatabase, alias);
+  }
+}
+
+class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
+  /// Auto-incrementing row identifier
+  final int id;
+
+  /// Original filename on the watch (e.g., "20260304_143022")
+  final String filename;
+
+  /// Recording timestamp as Unix epoch seconds (UTC)
+  final int timestampUtc;
+
+  /// Recording duration in milliseconds
+  final int durationMs;
+
+  /// File size in bytes (Opus-encoded .zsw_opus)
+  final int sizeBytes;
+
+  /// Local file path after download (null = not yet downloaded)
+  final String? localFilePath;
+
+  /// Transcription text (null = not yet transcribed)
+  final String? transcription;
+
+  /// Whether the file has been synced (downloaded) from the watch
+  final bool syncedFromWatch;
+
+  /// Whether the file has been deleted on the watch after sync
+  final bool deletedOnWatch;
+
+  /// When the file was downloaded to the phone
+  final DateTime? downloadedAt;
+
+  /// When the transcription was completed
+  final DateTime? transcribedAt;
+
+  /// Path to converted audio file (WAV/Ogg) for playback/transcription
+  final String? convertedFilePath;
+  const VoiceMemoEntity({
+    required this.id,
+    required this.filename,
+    required this.timestampUtc,
+    required this.durationMs,
+    required this.sizeBytes,
+    this.localFilePath,
+    this.transcription,
+    required this.syncedFromWatch,
+    required this.deletedOnWatch,
+    this.downloadedAt,
+    this.transcribedAt,
+    this.convertedFilePath,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['filename'] = Variable<String>(filename);
+    map['timestamp_utc'] = Variable<int>(timestampUtc);
+    map['duration_ms'] = Variable<int>(durationMs);
+    map['size_bytes'] = Variable<int>(sizeBytes);
+    if (!nullToAbsent || localFilePath != null) {
+      map['local_file_path'] = Variable<String>(localFilePath);
+    }
+    if (!nullToAbsent || transcription != null) {
+      map['transcription'] = Variable<String>(transcription);
+    }
+    map['synced_from_watch'] = Variable<bool>(syncedFromWatch);
+    map['deleted_on_watch'] = Variable<bool>(deletedOnWatch);
+    if (!nullToAbsent || downloadedAt != null) {
+      map['downloaded_at'] = Variable<DateTime>(downloadedAt);
+    }
+    if (!nullToAbsent || transcribedAt != null) {
+      map['transcribed_at'] = Variable<DateTime>(transcribedAt);
+    }
+    if (!nullToAbsent || convertedFilePath != null) {
+      map['converted_file_path'] = Variable<String>(convertedFilePath);
+    }
+    return map;
+  }
+
+  VoiceMemosCompanion toCompanion(bool nullToAbsent) {
+    return VoiceMemosCompanion(
+      id: Value(id),
+      filename: Value(filename),
+      timestampUtc: Value(timestampUtc),
+      durationMs: Value(durationMs),
+      sizeBytes: Value(sizeBytes),
+      localFilePath: localFilePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(localFilePath),
+      transcription: transcription == null && nullToAbsent
+          ? const Value.absent()
+          : Value(transcription),
+      syncedFromWatch: Value(syncedFromWatch),
+      deletedOnWatch: Value(deletedOnWatch),
+      downloadedAt: downloadedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(downloadedAt),
+      transcribedAt: transcribedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(transcribedAt),
+      convertedFilePath: convertedFilePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(convertedFilePath),
+    );
+  }
+
+  factory VoiceMemoEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return VoiceMemoEntity(
+      id: serializer.fromJson<int>(json['id']),
+      filename: serializer.fromJson<String>(json['filename']),
+      timestampUtc: serializer.fromJson<int>(json['timestampUtc']),
+      durationMs: serializer.fromJson<int>(json['durationMs']),
+      sizeBytes: serializer.fromJson<int>(json['sizeBytes']),
+      localFilePath: serializer.fromJson<String?>(json['localFilePath']),
+      transcription: serializer.fromJson<String?>(json['transcription']),
+      syncedFromWatch: serializer.fromJson<bool>(json['syncedFromWatch']),
+      deletedOnWatch: serializer.fromJson<bool>(json['deletedOnWatch']),
+      downloadedAt: serializer.fromJson<DateTime?>(json['downloadedAt']),
+      transcribedAt: serializer.fromJson<DateTime?>(json['transcribedAt']),
+      convertedFilePath: serializer.fromJson<String?>(
+        json['convertedFilePath'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'filename': serializer.toJson<String>(filename),
+      'timestampUtc': serializer.toJson<int>(timestampUtc),
+      'durationMs': serializer.toJson<int>(durationMs),
+      'sizeBytes': serializer.toJson<int>(sizeBytes),
+      'localFilePath': serializer.toJson<String?>(localFilePath),
+      'transcription': serializer.toJson<String?>(transcription),
+      'syncedFromWatch': serializer.toJson<bool>(syncedFromWatch),
+      'deletedOnWatch': serializer.toJson<bool>(deletedOnWatch),
+      'downloadedAt': serializer.toJson<DateTime?>(downloadedAt),
+      'transcribedAt': serializer.toJson<DateTime?>(transcribedAt),
+      'convertedFilePath': serializer.toJson<String?>(convertedFilePath),
+    };
+  }
+
+  VoiceMemoEntity copyWith({
+    int? id,
+    String? filename,
+    int? timestampUtc,
+    int? durationMs,
+    int? sizeBytes,
+    Value<String?> localFilePath = const Value.absent(),
+    Value<String?> transcription = const Value.absent(),
+    bool? syncedFromWatch,
+    bool? deletedOnWatch,
+    Value<DateTime?> downloadedAt = const Value.absent(),
+    Value<DateTime?> transcribedAt = const Value.absent(),
+    Value<String?> convertedFilePath = const Value.absent(),
+  }) => VoiceMemoEntity(
+    id: id ?? this.id,
+    filename: filename ?? this.filename,
+    timestampUtc: timestampUtc ?? this.timestampUtc,
+    durationMs: durationMs ?? this.durationMs,
+    sizeBytes: sizeBytes ?? this.sizeBytes,
+    localFilePath: localFilePath.present
+        ? localFilePath.value
+        : this.localFilePath,
+    transcription: transcription.present
+        ? transcription.value
+        : this.transcription,
+    syncedFromWatch: syncedFromWatch ?? this.syncedFromWatch,
+    deletedOnWatch: deletedOnWatch ?? this.deletedOnWatch,
+    downloadedAt: downloadedAt.present ? downloadedAt.value : this.downloadedAt,
+    transcribedAt: transcribedAt.present
+        ? transcribedAt.value
+        : this.transcribedAt,
+    convertedFilePath: convertedFilePath.present
+        ? convertedFilePath.value
+        : this.convertedFilePath,
+  );
+  VoiceMemoEntity copyWithCompanion(VoiceMemosCompanion data) {
+    return VoiceMemoEntity(
+      id: data.id.present ? data.id.value : this.id,
+      filename: data.filename.present ? data.filename.value : this.filename,
+      timestampUtc: data.timestampUtc.present
+          ? data.timestampUtc.value
+          : this.timestampUtc,
+      durationMs: data.durationMs.present
+          ? data.durationMs.value
+          : this.durationMs,
+      sizeBytes: data.sizeBytes.present ? data.sizeBytes.value : this.sizeBytes,
+      localFilePath: data.localFilePath.present
+          ? data.localFilePath.value
+          : this.localFilePath,
+      transcription: data.transcription.present
+          ? data.transcription.value
+          : this.transcription,
+      syncedFromWatch: data.syncedFromWatch.present
+          ? data.syncedFromWatch.value
+          : this.syncedFromWatch,
+      deletedOnWatch: data.deletedOnWatch.present
+          ? data.deletedOnWatch.value
+          : this.deletedOnWatch,
+      downloadedAt: data.downloadedAt.present
+          ? data.downloadedAt.value
+          : this.downloadedAt,
+      transcribedAt: data.transcribedAt.present
+          ? data.transcribedAt.value
+          : this.transcribedAt,
+      convertedFilePath: data.convertedFilePath.present
+          ? data.convertedFilePath.value
+          : this.convertedFilePath,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VoiceMemoEntity(')
+          ..write('id: $id, ')
+          ..write('filename: $filename, ')
+          ..write('timestampUtc: $timestampUtc, ')
+          ..write('durationMs: $durationMs, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('localFilePath: $localFilePath, ')
+          ..write('transcription: $transcription, ')
+          ..write('syncedFromWatch: $syncedFromWatch, ')
+          ..write('deletedOnWatch: $deletedOnWatch, ')
+          ..write('downloadedAt: $downloadedAt, ')
+          ..write('transcribedAt: $transcribedAt, ')
+          ..write('convertedFilePath: $convertedFilePath')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    filename,
+    timestampUtc,
+    durationMs,
+    sizeBytes,
+    localFilePath,
+    transcription,
+    syncedFromWatch,
+    deletedOnWatch,
+    downloadedAt,
+    transcribedAt,
+    convertedFilePath,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is VoiceMemoEntity &&
+          other.id == this.id &&
+          other.filename == this.filename &&
+          other.timestampUtc == this.timestampUtc &&
+          other.durationMs == this.durationMs &&
+          other.sizeBytes == this.sizeBytes &&
+          other.localFilePath == this.localFilePath &&
+          other.transcription == this.transcription &&
+          other.syncedFromWatch == this.syncedFromWatch &&
+          other.deletedOnWatch == this.deletedOnWatch &&
+          other.downloadedAt == this.downloadedAt &&
+          other.transcribedAt == this.transcribedAt &&
+          other.convertedFilePath == this.convertedFilePath);
+}
+
+class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
+  final Value<int> id;
+  final Value<String> filename;
+  final Value<int> timestampUtc;
+  final Value<int> durationMs;
+  final Value<int> sizeBytes;
+  final Value<String?> localFilePath;
+  final Value<String?> transcription;
+  final Value<bool> syncedFromWatch;
+  final Value<bool> deletedOnWatch;
+  final Value<DateTime?> downloadedAt;
+  final Value<DateTime?> transcribedAt;
+  final Value<String?> convertedFilePath;
+  const VoiceMemosCompanion({
+    this.id = const Value.absent(),
+    this.filename = const Value.absent(),
+    this.timestampUtc = const Value.absent(),
+    this.durationMs = const Value.absent(),
+    this.sizeBytes = const Value.absent(),
+    this.localFilePath = const Value.absent(),
+    this.transcription = const Value.absent(),
+    this.syncedFromWatch = const Value.absent(),
+    this.deletedOnWatch = const Value.absent(),
+    this.downloadedAt = const Value.absent(),
+    this.transcribedAt = const Value.absent(),
+    this.convertedFilePath = const Value.absent(),
+  });
+  VoiceMemosCompanion.insert({
+    this.id = const Value.absent(),
+    required String filename,
+    required int timestampUtc,
+    required int durationMs,
+    required int sizeBytes,
+    this.localFilePath = const Value.absent(),
+    this.transcription = const Value.absent(),
+    this.syncedFromWatch = const Value.absent(),
+    this.deletedOnWatch = const Value.absent(),
+    this.downloadedAt = const Value.absent(),
+    this.transcribedAt = const Value.absent(),
+    this.convertedFilePath = const Value.absent(),
+  }) : filename = Value(filename),
+       timestampUtc = Value(timestampUtc),
+       durationMs = Value(durationMs),
+       sizeBytes = Value(sizeBytes);
+  static Insertable<VoiceMemoEntity> custom({
+    Expression<int>? id,
+    Expression<String>? filename,
+    Expression<int>? timestampUtc,
+    Expression<int>? durationMs,
+    Expression<int>? sizeBytes,
+    Expression<String>? localFilePath,
+    Expression<String>? transcription,
+    Expression<bool>? syncedFromWatch,
+    Expression<bool>? deletedOnWatch,
+    Expression<DateTime>? downloadedAt,
+    Expression<DateTime>? transcribedAt,
+    Expression<String>? convertedFilePath,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (filename != null) 'filename': filename,
+      if (timestampUtc != null) 'timestamp_utc': timestampUtc,
+      if (durationMs != null) 'duration_ms': durationMs,
+      if (sizeBytes != null) 'size_bytes': sizeBytes,
+      if (localFilePath != null) 'local_file_path': localFilePath,
+      if (transcription != null) 'transcription': transcription,
+      if (syncedFromWatch != null) 'synced_from_watch': syncedFromWatch,
+      if (deletedOnWatch != null) 'deleted_on_watch': deletedOnWatch,
+      if (downloadedAt != null) 'downloaded_at': downloadedAt,
+      if (transcribedAt != null) 'transcribed_at': transcribedAt,
+      if (convertedFilePath != null) 'converted_file_path': convertedFilePath,
+    });
+  }
+
+  VoiceMemosCompanion copyWith({
+    Value<int>? id,
+    Value<String>? filename,
+    Value<int>? timestampUtc,
+    Value<int>? durationMs,
+    Value<int>? sizeBytes,
+    Value<String?>? localFilePath,
+    Value<String?>? transcription,
+    Value<bool>? syncedFromWatch,
+    Value<bool>? deletedOnWatch,
+    Value<DateTime?>? downloadedAt,
+    Value<DateTime?>? transcribedAt,
+    Value<String?>? convertedFilePath,
+  }) {
+    return VoiceMemosCompanion(
+      id: id ?? this.id,
+      filename: filename ?? this.filename,
+      timestampUtc: timestampUtc ?? this.timestampUtc,
+      durationMs: durationMs ?? this.durationMs,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      localFilePath: localFilePath ?? this.localFilePath,
+      transcription: transcription ?? this.transcription,
+      syncedFromWatch: syncedFromWatch ?? this.syncedFromWatch,
+      deletedOnWatch: deletedOnWatch ?? this.deletedOnWatch,
+      downloadedAt: downloadedAt ?? this.downloadedAt,
+      transcribedAt: transcribedAt ?? this.transcribedAt,
+      convertedFilePath: convertedFilePath ?? this.convertedFilePath,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (filename.present) {
+      map['filename'] = Variable<String>(filename.value);
+    }
+    if (timestampUtc.present) {
+      map['timestamp_utc'] = Variable<int>(timestampUtc.value);
+    }
+    if (durationMs.present) {
+      map['duration_ms'] = Variable<int>(durationMs.value);
+    }
+    if (sizeBytes.present) {
+      map['size_bytes'] = Variable<int>(sizeBytes.value);
+    }
+    if (localFilePath.present) {
+      map['local_file_path'] = Variable<String>(localFilePath.value);
+    }
+    if (transcription.present) {
+      map['transcription'] = Variable<String>(transcription.value);
+    }
+    if (syncedFromWatch.present) {
+      map['synced_from_watch'] = Variable<bool>(syncedFromWatch.value);
+    }
+    if (deletedOnWatch.present) {
+      map['deleted_on_watch'] = Variable<bool>(deletedOnWatch.value);
+    }
+    if (downloadedAt.present) {
+      map['downloaded_at'] = Variable<DateTime>(downloadedAt.value);
+    }
+    if (transcribedAt.present) {
+      map['transcribed_at'] = Variable<DateTime>(transcribedAt.value);
+    }
+    if (convertedFilePath.present) {
+      map['converted_file_path'] = Variable<String>(convertedFilePath.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VoiceMemosCompanion(')
+          ..write('id: $id, ')
+          ..write('filename: $filename, ')
+          ..write('timestampUtc: $timestampUtc, ')
+          ..write('durationMs: $durationMs, ')
+          ..write('sizeBytes: $sizeBytes, ')
+          ..write('localFilePath: $localFilePath, ')
+          ..write('transcription: $transcription, ')
+          ..write('syncedFromWatch: $syncedFromWatch, ')
+          ..write('deletedOnWatch: $deletedOnWatch, ')
+          ..write('downloadedAt: $downloadedAt, ')
+          ..write('transcribedAt: $transcribedAt, ')
+          ..write('convertedFilePath: $convertedFilePath')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2469,6 +3247,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ConnectionEventsTable connectionEvents = $ConnectionEventsTable(
     this,
   );
+  late final $VoiceMemosTable voiceMemos = $VoiceMemosTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2479,6 +3258,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     batteryReadings,
     commLogEntries,
     connectionEvents,
+    voiceMemos,
   ];
 }
 
@@ -4386,6 +5166,351 @@ typedef $$ConnectionEventsTableProcessedTableManager =
       ConnectionEventEntity,
       PrefetchHooks Function({bool watchId})
     >;
+typedef $$VoiceMemosTableCreateCompanionBuilder =
+    VoiceMemosCompanion Function({
+      Value<int> id,
+      required String filename,
+      required int timestampUtc,
+      required int durationMs,
+      required int sizeBytes,
+      Value<String?> localFilePath,
+      Value<String?> transcription,
+      Value<bool> syncedFromWatch,
+      Value<bool> deletedOnWatch,
+      Value<DateTime?> downloadedAt,
+      Value<DateTime?> transcribedAt,
+      Value<String?> convertedFilePath,
+    });
+typedef $$VoiceMemosTableUpdateCompanionBuilder =
+    VoiceMemosCompanion Function({
+      Value<int> id,
+      Value<String> filename,
+      Value<int> timestampUtc,
+      Value<int> durationMs,
+      Value<int> sizeBytes,
+      Value<String?> localFilePath,
+      Value<String?> transcription,
+      Value<bool> syncedFromWatch,
+      Value<bool> deletedOnWatch,
+      Value<DateTime?> downloadedAt,
+      Value<DateTime?> transcribedAt,
+      Value<String?> convertedFilePath,
+    });
+
+class $$VoiceMemosTableFilterComposer
+    extends Composer<_$AppDatabase, $VoiceMemosTable> {
+  $$VoiceMemosTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get filename => $composableBuilder(
+    column: $table.filename,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get timestampUtc => $composableBuilder(
+    column: $table.timestampUtc,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sizeBytes => $composableBuilder(
+    column: $table.sizeBytes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get localFilePath => $composableBuilder(
+    column: $table.localFilePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get transcription => $composableBuilder(
+    column: $table.transcription,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get syncedFromWatch => $composableBuilder(
+    column: $table.syncedFromWatch,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get deletedOnWatch => $composableBuilder(
+    column: $table.deletedOnWatch,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get downloadedAt => $composableBuilder(
+    column: $table.downloadedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get transcribedAt => $composableBuilder(
+    column: $table.transcribedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get convertedFilePath => $composableBuilder(
+    column: $table.convertedFilePath,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$VoiceMemosTableOrderingComposer
+    extends Composer<_$AppDatabase, $VoiceMemosTable> {
+  $$VoiceMemosTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get filename => $composableBuilder(
+    column: $table.filename,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get timestampUtc => $composableBuilder(
+    column: $table.timestampUtc,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sizeBytes => $composableBuilder(
+    column: $table.sizeBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get localFilePath => $composableBuilder(
+    column: $table.localFilePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get transcription => $composableBuilder(
+    column: $table.transcription,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get syncedFromWatch => $composableBuilder(
+    column: $table.syncedFromWatch,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get deletedOnWatch => $composableBuilder(
+    column: $table.deletedOnWatch,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get downloadedAt => $composableBuilder(
+    column: $table.downloadedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get transcribedAt => $composableBuilder(
+    column: $table.transcribedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get convertedFilePath => $composableBuilder(
+    column: $table.convertedFilePath,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$VoiceMemosTableAnnotationComposer
+    extends Composer<_$AppDatabase, $VoiceMemosTable> {
+  $$VoiceMemosTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get filename =>
+      $composableBuilder(column: $table.filename, builder: (column) => column);
+
+  GeneratedColumn<int> get timestampUtc => $composableBuilder(
+    column: $table.timestampUtc,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationMs => $composableBuilder(
+    column: $table.durationMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sizeBytes =>
+      $composableBuilder(column: $table.sizeBytes, builder: (column) => column);
+
+  GeneratedColumn<String> get localFilePath => $composableBuilder(
+    column: $table.localFilePath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get transcription => $composableBuilder(
+    column: $table.transcription,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get syncedFromWatch => $composableBuilder(
+    column: $table.syncedFromWatch,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get deletedOnWatch => $composableBuilder(
+    column: $table.deletedOnWatch,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get downloadedAt => $composableBuilder(
+    column: $table.downloadedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get transcribedAt => $composableBuilder(
+    column: $table.transcribedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get convertedFilePath => $composableBuilder(
+    column: $table.convertedFilePath,
+    builder: (column) => column,
+  );
+}
+
+class $$VoiceMemosTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $VoiceMemosTable,
+          VoiceMemoEntity,
+          $$VoiceMemosTableFilterComposer,
+          $$VoiceMemosTableOrderingComposer,
+          $$VoiceMemosTableAnnotationComposer,
+          $$VoiceMemosTableCreateCompanionBuilder,
+          $$VoiceMemosTableUpdateCompanionBuilder,
+          (
+            VoiceMemoEntity,
+            BaseReferences<_$AppDatabase, $VoiceMemosTable, VoiceMemoEntity>,
+          ),
+          VoiceMemoEntity,
+          PrefetchHooks Function()
+        > {
+  $$VoiceMemosTableTableManager(_$AppDatabase db, $VoiceMemosTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$VoiceMemosTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$VoiceMemosTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$VoiceMemosTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> filename = const Value.absent(),
+                Value<int> timestampUtc = const Value.absent(),
+                Value<int> durationMs = const Value.absent(),
+                Value<int> sizeBytes = const Value.absent(),
+                Value<String?> localFilePath = const Value.absent(),
+                Value<String?> transcription = const Value.absent(),
+                Value<bool> syncedFromWatch = const Value.absent(),
+                Value<bool> deletedOnWatch = const Value.absent(),
+                Value<DateTime?> downloadedAt = const Value.absent(),
+                Value<DateTime?> transcribedAt = const Value.absent(),
+                Value<String?> convertedFilePath = const Value.absent(),
+              }) => VoiceMemosCompanion(
+                id: id,
+                filename: filename,
+                timestampUtc: timestampUtc,
+                durationMs: durationMs,
+                sizeBytes: sizeBytes,
+                localFilePath: localFilePath,
+                transcription: transcription,
+                syncedFromWatch: syncedFromWatch,
+                deletedOnWatch: deletedOnWatch,
+                downloadedAt: downloadedAt,
+                transcribedAt: transcribedAt,
+                convertedFilePath: convertedFilePath,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String filename,
+                required int timestampUtc,
+                required int durationMs,
+                required int sizeBytes,
+                Value<String?> localFilePath = const Value.absent(),
+                Value<String?> transcription = const Value.absent(),
+                Value<bool> syncedFromWatch = const Value.absent(),
+                Value<bool> deletedOnWatch = const Value.absent(),
+                Value<DateTime?> downloadedAt = const Value.absent(),
+                Value<DateTime?> transcribedAt = const Value.absent(),
+                Value<String?> convertedFilePath = const Value.absent(),
+              }) => VoiceMemosCompanion.insert(
+                id: id,
+                filename: filename,
+                timestampUtc: timestampUtc,
+                durationMs: durationMs,
+                sizeBytes: sizeBytes,
+                localFilePath: localFilePath,
+                transcription: transcription,
+                syncedFromWatch: syncedFromWatch,
+                deletedOnWatch: deletedOnWatch,
+                downloadedAt: downloadedAt,
+                transcribedAt: transcribedAt,
+                convertedFilePath: convertedFilePath,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$VoiceMemosTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $VoiceMemosTable,
+      VoiceMemoEntity,
+      $$VoiceMemosTableFilterComposer,
+      $$VoiceMemosTableOrderingComposer,
+      $$VoiceMemosTableAnnotationComposer,
+      $$VoiceMemosTableCreateCompanionBuilder,
+      $$VoiceMemosTableUpdateCompanionBuilder,
+      (
+        VoiceMemoEntity,
+        BaseReferences<_$AppDatabase, $VoiceMemosTable, VoiceMemoEntity>,
+      ),
+      VoiceMemoEntity,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4400,4 +5525,6 @@ class $AppDatabaseManager {
       $$CommLogEntriesTableTableManager(_db, _db.commLogEntries);
   $$ConnectionEventsTableTableManager get connectionEvents =>
       $$ConnectionEventsTableTableManager(_db, _db.connectionEvents);
+  $$VoiceMemosTableTableManager get voiceMemos =>
+      $$VoiceMemosTableTableManager(_db, _db.voiceMemos);
 }

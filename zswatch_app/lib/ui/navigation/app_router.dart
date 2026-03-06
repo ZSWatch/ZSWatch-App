@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/connection_state.dart';
+import '../../data/models/voice_memo.dart';
 import '../../providers/auto_reconnect_provider.dart';
 import '../../providers/ble_providers.dart';
 import '../../providers/foreground_service_providers.dart';
@@ -23,6 +24,7 @@ import '../screens/notifications/notification_settings_screen.dart';
 import '../screens/onboarding/permission_onboarding_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/start/start_page_screen.dart';
+import '../screens/voice_memos/voice_memos_screen.dart';
 
 /// Route names for the app
 abstract final class AppRoutes {
@@ -52,6 +54,8 @@ abstract final class AppRoutes {
 
   // Voice routes (placeholder)
   static const String voiceMemos = '/voice-memos';
+
+  static String voiceMemoDetail(int id) => '$voiceMemos/$id';
 }
 
 /// App router configuration using go_router
@@ -168,12 +172,32 @@ class AppRouter {
         ],
       ),
 
-      // Voice memos (placeholder)
+      // Voice memos
       GoRoute(
         path: AppRoutes.voiceMemos,
         name: 'voice-memos',
-        builder: (context, state) =>
-            const _PlaceholderScreen(title: 'Voice Memos'),
+        builder: (context, state) => const VoiceMemosScreen(),
+        routes: [
+          GoRoute(
+            path: ':memoId',
+            name: 'voice-memo-detail',
+            builder: (context, state) {
+              final id = int.tryParse(state.pathParameters['memoId'] ?? '');
+              if (id == null) {
+                return const _PlaceholderScreen(title: 'Voice Note Not Found');
+              }
+
+              final initialMemo = state.extra is VoiceMemo
+                  ? state.extra! as VoiceMemo
+                  : null;
+
+              return VoiceMemoDetailScreen(
+                memoId: id,
+                initialMemo: initialMemo,
+              );
+            },
+          ),
+        ],
       ),
     ],
     errorBuilder: (context, state) => _ErrorScreen(error: state.error),
