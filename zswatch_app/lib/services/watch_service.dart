@@ -231,7 +231,7 @@ class WatchService {
           timeout: const Duration(seconds: 0),
           mtu: null, // autoConnect is incompatible with mtu
           autoConnect: true,
-        ).catchError((e) {
+        ).catchError((Object e) {
           // Ignore errors for autoConnect - connection state listener handles everything
           debugPrint('[WatchService] AutoConnect error (ignored): $e');
           _isWaitingForAutoConnect = false;
@@ -550,14 +550,14 @@ class WatchService {
     }
   }
 
-  /// Filter out <BLELOG>...</BLELOG> sections from incoming data.
+  /// Filter out `BLELOG` wrapper sections from incoming data.
   /// These sections contain firmware debug logs that shouldn't be parsed as JSON.
   /// Handles sections that span multiple BLE packets.
   String _filterBleLogSections(String chunk) {
     const bleLogStart = '<BLELOG>';
     const bleLogEnd = '</BLELOG>';
     
-    var result = StringBuffer();
+    final result = StringBuffer();
     var remaining = chunk;
     
     while (remaining.isNotEmpty) {
@@ -759,6 +759,12 @@ class WatchService {
           _updateConnection(currentConnection.copyWith(isCharging: isCharging));
         }
         break;
+
+      case 'voice_memo':
+        // Voice memo metadata — routed to listeners via incomingMessages stream.
+        // VoiceMemoSyncService handles 'new' and 'list_result' actions.
+        debugPrint('[WatchService] Voice memo message: ${message['action']}');
+        break;
     }
   }
 
@@ -857,7 +863,7 @@ class WatchService {
       
       // Small delay between chunks to allow BLE stack to process
       if (end < bytes.length) {
-        await Future.delayed(const Duration(milliseconds: 10));
+        await Future<void>.delayed(const Duration(milliseconds: 10));
       }
       
       offset = end;
@@ -1036,6 +1042,49 @@ class WatchService {
   /// Disable log streaming from watch
   Future<void> disableLogStreaming() => setLogStreaming(false);
 
+  /// Send a voice memo command to the watch
+  ///
+  /// Actions:
+  /// - "list": Request recording list → watch responds with "list_result"
+  /// - "delete": Delete a recording → requires extraData: {"filename": "..."}
+  Future<void> sendVoiceMemoCommand(String action,
+      {Map<String, dynamic>? extraData}) async {
+    final data = <String, dynamic>{
+      't': 'voice_memo',
+      'action': action,
+    };
+    if (extraData != null) {
+      data.addAll(extraData);
+    }
+    await _sendGb(data);
+  }
+
+  // ==================== SMP (MCUmgr) Management ====================
+
+  /// Enable MCUmgr/SMP on the watch via Gadgetbridge.
+  ///
+  /// Sends `{"t":"smp","status":true}`. The watch registers the SMP BLE
+  /// transport, switches to fast advertising/short connection interval, and
+  /// starts a 3-minute auto-disable timer.
+  ///
+  /// After calling this, wait ~2 seconds then call [rediscoverServices] so
+  /// Android picks up the newly-registered SMP GATT service.
+  Future<void> enableSmp() => _sendGb({'t': 'smp', 'status': true});
+
+  /// Disable MCUmgr/SMP on the watch via Gadgetbridge.
+  ///
+  /// Sends `{"t":"smp","status":false}`. The watch unregisters SMP and
+  /// restores default BLE parameters.
+  Future<void> disableSmp() => _sendGb({'t': 'smp', 'status': false});
+
+  // ==================== Watch Reset ====================
+
+  /// Request the watch to perform a cold reboot.
+  ///
+  /// Sends `{"t":"reset"}` via Gadgetbridge. The watch reboots after a short
+  /// delay to allow the BLE ACK to be sent first.
+  Future<void> resetWatch() => _sendGb({'t': 'reset'});
+
   void _handleConnectionStateChange(
     BluetoothConnectionState state,
     String watchId,
@@ -1096,7 +1145,7 @@ class WatchService {
 
   void _handleDisconnect(String watchId, String name) {
     debugPrint('[WatchService:$hashCode] _handleDisconnect: _isCancelled=$_isCancelled, _autoReconnect=$_autoReconnect, _reconnectAttempts=$_reconnectAttempts, _isReconnecting=$_isReconnecting, _isSettingUp=$_isSettingUp, _isWaitingForAutoConnect=$_isWaitingForAutoConnect, _isInitiatingConnection=$_isInitiatingConnection, _isInBackgroundReconnect=$_isInBackgroundReconnect');
-    
+
     // If user has cancelled, don't attempt reconnection
     if (_isCancelled) {
       debugPrint('[WatchService:$hashCode] Disconnect ignored - cancelled by user');

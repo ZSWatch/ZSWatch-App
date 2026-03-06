@@ -9,6 +9,7 @@ import 'tables/battery_readings_table.dart';
 import 'tables/comm_log_entries_table.dart';
 import 'tables/connection_events_table.dart';
 import 'tables/health_samples_table.dart';
+import 'tables/voice_memos_table.dart';
 import 'tables/watches_table.dart';
 
 part 'app_database.g.dart';
@@ -22,14 +23,14 @@ part 'app_database.g.dart';
 /// - CommLogEntries: BLE communication logs for debugging
 /// - ConnectionEvents: Connection/disconnection events for analytics
 @DriftDatabase(
-  tables: [Watches, HealthSamples, BatteryReadings, CommLogEntries, ConnectionEvents],
+  tables: [Watches, HealthSamples, BatteryReadings, CommLogEntries, ConnectionEvents, VoiceMemos],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   /// Database schema version - increment when making schema changes
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -46,6 +47,10 @@ class AppDatabase extends _$AppDatabase {
         if (from < 3) {
           // Add connection events table for analytics (US9)
           await m.createTable(connectionEvents);
+        }
+        if (from < 4) {
+          // Add voice memos table for voice recording sync
+          await m.createTable(voiceMemos);
         }
       },
     );
@@ -303,6 +308,117 @@ class AppDatabase extends _$AppDatabase {
           ..orderBy([(e) => OrderingTerm.desc(e.timestamp)])
           ..limit(limit))
         .watch();
+  }
+
+  // ==================== Voice Memo Operations ====================
+
+  /// Get all voice memos, newest first
+  Future<List<VoiceMemoEntity>> getAllVoiceMemos() {
+    return (select(voiceMemos)
+          ..orderBy([(v) => OrderingTerm.desc(v.timestampUtc)]))
+        .get();
+  }
+
+  /// Watch all voice memos (reactive stream), newest first
+  Stream<List<VoiceMemoEntity>> watchAllVoiceMemos() {
+    return (select(voiceMemos)
+          ..orderBy([(v) => OrderingTerm.desc(v.timestampUtc)]))
+        .watch();
+  }
+
+  /// Get voice memo by filename
+  Future<VoiceMemoEntity?> getVoiceMemoByFilename(String filename) async {
+    final rows = await (select(voiceMemos)
+          ..where((v) => v.filename.equals(filename)))
+        .get();
+    if (rows.length > 1) {
+      // Clean up stale duplicates (can occur from race conditions on double
+      // BLE notification delivery). Keep the first row, delete the rest.
+      for (final extra in rows.skip(1)) {
+        await (delete(voiceMemos)..where((v) => v.id.equals(extra.id))).go();
+      }
+    }
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// Get voice memos not yet downloaded
+  Future<List<VoiceMemoEntity>> getUndownloadedVoiceMemos() {
+    return (select(voiceMemos)
+          ..where((v) => v.syncedFromWatch.equals(false))
+          ..orderBy([(v) => OrderingTerm.asc(v.timestampUtc)]))
+        .get();
+  }
+
+  /// Get voice memos that are synced but not yet transcribed
+  Future<List<VoiceMemoEntity>> getUntranscribedVoiceMemos() {
+    return (select(voiceMemos)
+          ..where((v) =>
+              v.syncedFromWatch.equals(true) & v.transcription.isNull())
+          ..orderBy([(v) => OrderingTerm.asc(v.timestampUtc)]))
+        .get();
+  }
+
+  /// Insert or update a voice memo (upsert by filename)
+  Future<void> upsertVoiceMemo(VoiceMemosCompanion memo) async {
+    // getVoiceMemoByFilename also deduplicates if stale duplicates exist.
+    final existing = await getVoiceMemoByFilename(memo.filename.value);
+    if (existing != null) {
+      await (update(voiceMemos)
+            ..where((v) => v.filename.equals(memo.filename.value)))
+          .write(memo);
+    } else {
+      await into(voiceMemos).insert(memo);
+    }
+  }
+
+  /// Mark a voice memo as downloaded
+  Future<void> updateVoiceMemoDownloaded({
+    required String filename,
+    required String localFilePath,
+  }) {
+    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
+        .write(VoiceMemosCompanion(
+      syncedFromWatch: const Value(true),
+      localFilePath: Value(localFilePath),
+      downloadedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Mark a voice memo as deleted on the watch
+  Future<void> updateVoiceMemoDeletedOnWatch(String filename) {
+    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
+        .write(const VoiceMemosCompanion(
+      deletedOnWatch: Value(true),
+    ));
+  }
+
+  /// Update transcription for a voice memo
+  Future<void> updateVoiceMemoTranscription({
+    required String filename,
+    required String transcription,
+  }) {
+    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
+        .write(VoiceMemosCompanion(
+      transcription: Value(transcription),
+      transcribedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Update converted file path for a voice memo
+  Future<void> updateVoiceMemoConvertedPath({
+    required String filename,
+    required String convertedFilePath,
+  }) {
+    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
+        .write(VoiceMemosCompanion(
+      convertedFilePath: Value(convertedFilePath),
+    ));
+  }
+
+  /// Delete a voice memo by filename
+  Future<int> deleteVoiceMemo(String filename) {
+    return (delete(voiceMemos)..where((v) => v.filename.equals(filename)))
+        .go();
   }
 
   // ==================== Data Retention ====================
