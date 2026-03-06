@@ -9,6 +9,7 @@ import 'providers/gps_providers.dart';
 import 'providers/http_providers.dart';
 import 'providers/notification_providers.dart';
 import 'providers/permission_providers.dart';
+import 'providers/voice_memo_providers.dart';
 import 'providers/watch_service_provider.dart';
 import 'ui/navigation/app_router.dart';
 
@@ -59,6 +60,9 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       // Initialize watch info persistence to sync firmware version and lastConnectedAt to database
       // This listens to watch info and connection state changes and persists them
       ref.read(watchInfoPersistenceProvider);
+      // Initialize voice memo sync service to handle recording sync from watch
+      // This subscribes to watch messages for new recording notifications
+      ref.read(voiceMemoSyncServiceProvider);
     } catch (e) {
       debugPrint('BLE initialization error: $e');
     }

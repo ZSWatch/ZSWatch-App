@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:whisper_ggml_plus_ffmpeg/whisper_ggml_plus_ffmpeg.dart';
 
 import 'app.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Register Whisper FFmpeg converter for Ogg/Opus → WAV transcription support
+  WhisperFFmpegConverter.register();
 
   // Set preferred orientations (portrait only for mobile)
   await SystemChrome.setPreferredOrientations([

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../providers/demo_mode_provider.dart';
 import '../../../providers/permission_providers.dart';
 import '../../../providers/settings_providers.dart';
+import '../../../providers/voice_memo_providers.dart';
+import '../../../services/voice_memo/transcription_engine.dart';
 import '../onboarding/permission_onboarding_screen.dart';
 
 /// Settings screen for app configuration
@@ -102,6 +105,12 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ),
+
+          const Divider(height: 32),
+
+          // Voice Memos / Transcription Settings
+          _SectionHeader(title: 'Voice Memos'),
+          _TranscriptionModelsSection(),
 
           const Divider(height: 32),
 
@@ -350,6 +359,407 @@ class _InfoRow extends StatelessWidget {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TranscriptionModelsSection extends ConsumerWidget {
+  const _TranscriptionModelsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedType = ref.watch(transcriptionEngineTypeProvider);
+    final actionsState = ref.watch(voiceMemoActionsProvider);
+    final isBusy = actionsState.isLoading;
+
+    return Column(
+      children: [
+        for (final info in TranscriptionModelCatalog.all)
+          _TranscriptionModelTile(
+            info: info,
+            isSelected: selectedType == info.type,
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppTheme.spacingMd,
+            AppTheme.spacingSm,
+            AppTheme.spacingMd,
+            0,
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: isBusy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              label: Text(isBusy
+                  ? 'Re-transcribing...'
+                  : 'Re-transcribe all with selected model'),
+              onPressed: isBusy
+                  ? null
+                  : () async {
+                      final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Re-transcribe all memos?'),
+                              content: const Text(
+                                'This will overwrite existing transcriptions '
+                                'using the currently selected language/model.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  child: const Text('Re-transcribe'),
+                                ),
+                              ],
+                            ),
+                          ) ??
+                          false;
+
+                      if (!confirmed || !context.mounted) return;
+
+                      try {
+                        final count = await ref
+                            .read(voiceMemoActionsProvider.notifier)
+                            .retranscribeAll();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                count == 0
+                                    ? 'No downloaded memos to re-transcribe'
+                                    : 'Started re-transcribing $count memos',
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Re-transcription failed: $e'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppTheme.spacingMd,
+            AppTheme.spacingSm,
+            AppTheme.spacingMd,
+            0,
+          ),
+          child: Text(
+            'Use this after changing the language/model to regenerate old transcriptions.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TranscriptionModelTile extends ConsumerStatefulWidget {
+  final TranscriptionModelInfo info;
+  final bool isSelected;
+
+  const _TranscriptionModelTile({
+    required this.info,
+    required this.isSelected,
+  });
+
+  @override
+  ConsumerState<_TranscriptionModelTile> createState() =>
+      _TranscriptionModelTileState();
+}
+
+class _TranscriptionModelTileState extends ConsumerState<_TranscriptionModelTile> {
+  bool _isDownloading = false;
+  double _downloadProgress = 0;
+
+  void _selectModel(WidgetRef ref) {
+    ref
+        .read(transcriptionEngineTypeProvider.notifier)
+        .setType(widget.info.type);
+    ref.invalidate(transcriptionConfiguredProvider);
+  }
+
+  static String _formatBytes(int bytes) {
+    const kb = 1024;
+    const mb = kb * 1024;
+    if (bytes >= mb) {
+      return '${(bytes / mb).toStringAsFixed(1)} MB';
+    }
+    if (bytes >= kb) {
+      return '${(bytes / kb).toStringAsFixed(1)} KB';
+    }
+    return '$bytes B';
+  }
+
+  Future<void> _downloadModel(BuildContext context, WidgetRef ref) async {
+    final engine = createTranscriptionEngine(widget.info.type);
+    StreamSubscription<TranscriptionEngineState>? sub;
+
+    try {
+      if (mounted) {
+        setState(() {
+          _isDownloading = true;
+          _downloadProgress = 0;
+        });
+      }
+
+      sub = engine.stateStream.listen((state) {
+        if (!mounted) return;
+        if (state.status == TranscriptionEngineStatus.downloading) {
+          setState(() {
+            _isDownloading = true;
+            _downloadProgress = state.downloadProgress;
+          });
+        }
+      });
+
+      await engine.initialize();
+
+      final downloaded = await engine.isAvailable();
+      if (!downloaded) {
+        throw Exception('Model file not found after download');
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Downloaded ${widget.info.name}')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e')),
+        );
+      }
+    } finally {
+      await sub?.cancel();
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _downloadProgress = 0;
+        });
+      }
+
+      engine.dispose();
+      ref.invalidate(transcriptionModelStatusProvider(widget.info.type));
+      ref.invalidate(transcriptionConfiguredProvider);
+      ref.invalidate(transcriptionEngineProvider);
+      ref.invalidate(transcriptionEngineStateProvider);
+    }
+  }
+
+  Future<void> _deleteModel(BuildContext context, WidgetRef ref) async {
+      final shouldDelete = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete model?'),
+            content: Text('Delete ${widget.info.name} from local storage?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!shouldDelete) return;
+
+    final engine = createTranscriptionEngine(widget.info.type);
+    try {
+      await engine.deleteModel();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Deleted ${widget.info.name}')),
+        );
+      }
+    } finally {
+      engine.dispose();
+      ref.invalidate(transcriptionModelStatusProvider(widget.info.type));
+      ref.invalidate(transcriptionConfiguredProvider);
+      ref.invalidate(transcriptionEngineProvider);
+      ref.invalidate(transcriptionEngineStateProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final statusAsync = ref.watch(transcriptionModelStatusProvider(widget.info.type));
+
+    return statusAsync.when(
+      data: (status) {
+        final downloadedSize = status.localSizeBytes != null
+            ? _formatBytes(status.localSizeBytes!)
+            : 'Not downloaded';
+
+        return Column(
+          children: [
+            ListTile(
+              onTap: () => _selectModel(ref),
+              leading: Icon(
+                Icons.memory,
+                color: widget.isSelected ? AppTheme.primaryColor : AppTheme.textSecondary,
+              ),
+              title: Text(widget.info.name),
+              subtitle: Text(
+                'Language: ${widget.info.language.toUpperCase()}\n'
+                'Size: ${_formatBytes(widget.info.expectedSizeBytes)}\n'
+                'Local: $downloadedSize',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+              ),
+              isThreeLine: true,
+              trailing: Checkbox(
+                value: widget.isSelected,
+                onChanged: (_) => _selectModel(ref),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMd),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppTheme.spacingSm),
+                decoration: BoxDecoration(
+                  color: Colors.black12,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Source URL',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      widget.info.sourceUrl,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_isDownloading)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMd),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: AppTheme.spacingSm),
+                    LinearProgressIndicator(
+                      value: _downloadProgress > 0 ? _downloadProgress : null,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _downloadProgress > 0
+                          ? 'Downloading... ${(_downloadProgress * 100).toStringAsFixed(0)}%'
+                          : 'Downloading...',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: AppTheme.spacingSm),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMd),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (!status.downloaded)
+                    TextButton.icon(
+                      onPressed: _isDownloading
+                          ? null
+                          : () => _downloadModel(context, ref),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        minimumSize: const Size(48, 32),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      ),
+                      icon: _isDownloading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.download, size: 16),
+                      label: Text(_isDownloading ? 'Downloading' : 'Download'),
+                    )
+                  else
+                    TextButton.icon(
+                      onPressed: _isDownloading
+                          ? null
+                          : () => _deleteModel(context, ref),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        minimumSize: const Size(48, 32),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      ),
+                      icon: const Icon(Icons.delete_outline, size: 16),
+                      label: const Text('Delete'),
+                    ),
+                  TextButton.icon(
+                    onPressed: () => launchUrl(
+                      Uri.parse(widget.info.sourceUrl),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      minimumSize: const Size(48, 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                    icon: const Icon(Icons.open_in_new, size: 16),
+                    label: const Text('Open source'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingSm),
+          ],
+        );
+      },
+      loading: () => const ListTile(
+        leading: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        title: Text('Loading model info...'),
+      ),
+      error: (e, _) => ListTile(
+        leading: const Icon(Icons.error, color: AppTheme.errorColor),
+        title: Text(widget.info.name),
+        subtitle: Text('Error loading model status: $e'),
       ),
     );
   }
