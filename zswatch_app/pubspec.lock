@@ -177,6 +177,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.2"
+  code_assets:
+    dependency: transitive
+    description:
+      name: code_assets
+      sha256: "83ccdaa064c980b5596c35dd64a8d3ecc68620174ab9b90b6343b753aa721687"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   code_builder:
     dependency: transitive
     description:
@@ -345,6 +353,15 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.69.2"
+  fllama:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: main
+      resolved-ref: "13a73d0666bd5e8b5d1c05decdc8dea6a1179331"
+      url: "https://github.com/Telosnex/fllama"
+    source: git
+    version: "0.0.1"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -576,6 +593,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.2"
+  hooks:
+    dependency: transitive
+    description:
+      name: hooks
+      sha256: e79ed1e8e1929bc6ecb6ec85f0cb519c887aa5b423705ded0d0f2d9226def388
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.2"
+  html_unescape:
+    dependency: transitive
+    description:
+      name: html_unescape
+      sha256: "15362d7a18f19d7b742ef8dcb811f5fd2a2df98db9f80ea393c075189e0b61e3"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.0"
   http:
     dependency: "direct main"
     description:
@@ -616,6 +649,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.5"
+  jinja:
+    dependency: transitive
+    description:
+      name: jinja
+      sha256: "67485c43c8551688669a81b4e01fe94f6126578ba8c194908d00f254f23f9b8b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.6.5"
   js:
     dependency: transitive
     description:
@@ -743,6 +784,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.4.6"
+  native_toolchain_c:
+    dependency: transitive
+    description:
+      name: native_toolchain_c
+      sha256: "92b2ca62c8bd2b8d2f267cdfccf9bfbdb7322f778f8f91b3ce5b5cda23a3899f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.17.5"
+  objective_c:
+    dependency: transitive
+    description:
+      name: objective_c
+      sha256: "100a1c87616ab6ed41ec263b083c0ef3261ee6cd1dc3b0f35f8ddfa4f996fe52"
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.3.0"
   package_config:
     dependency: transitive
     description:
@@ -1172,6 +1229,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.7"
+  textwrap:
+    dependency: transitive
+    description:
+      name: textwrap
+      sha256: "7e79503c220a9c772d370075e0d4117204546ed4c6479ab1c9ee4d4c27add606"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   timing:
     dependency: transitive
     description:

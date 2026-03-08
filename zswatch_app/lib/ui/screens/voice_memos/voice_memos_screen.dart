@@ -8,9 +8,13 @@ import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../data/models/extracted_action.dart';
 import '../../../data/models/voice_memo.dart';
+import '../../../providers/ai_providers.dart';
+import '../../../providers/settings_providers.dart';
 import '../../../providers/voice_memo_providers.dart';
 import '../../../providers/watch_service_provider.dart';
+import '../../../services/ai/voice_note_ai_pipeline.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../../services/voice_memo/voice_memo_sync_service.dart';
 import '../../navigation/app_router.dart';
@@ -299,6 +303,10 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
                       sideBySide: showSideBySide,
                     ),
                     const SizedBox(height: 12),
+                    _AISummarySection(memo: effectiveMemo),
+                    const SizedBox(height: 12),
+                    _ExtractedActionsSection(memo: effectiveMemo),
+                    const SizedBox(height: 12),
                     _SectionCard(
                       title: 'Transcript',
                       trailing: IconButton(
@@ -485,6 +493,1044 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
   }
 }
 
+class _AISummarySection extends ConsumerWidget {
+  final VoiceMemo memo;
+
+  const _AISummarySection({required this.memo});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final aiEnabled = ref.watch(localAiEnabledProvider);
+    final modelDownloadedAsync = ref.watch(llmModelDownloadedProvider);
+
+    if (!aiEnabled) {
+      return const SizedBox.shrink();
+    }
+
+    return modelDownloadedAsync.when(
+      data: (modelDownloaded) {
+        if (!modelDownloaded) {
+          return const SizedBox.shrink();
+        }
+
+        final hasSummary = memo.summary != null && memo.summary!.isNotEmpty;
+        final hasCategory = memo.aiCategory != null;
+        final isProcessing = memo.isAiProcessing;
+        final hasFailed = memo.aiProcessingStatus == VoiceNoteProcessingStatus.failed;
+
+        if (!hasSummary && !hasCategory && !isProcessing && !hasFailed) {
+          return _SectionCard(
+            title: 'AI Analysis',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Get AI-powered insights including summary, category, and extracted actions.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  style: _compactOutlinedButtonStyle(),
+                  onPressed: memo.transcription?.trim().isEmpty == true
+                      ? null
+                      : () => ref
+                          .read(aiActionsProvider.notifier)
+                          .processVoiceMemo(memo.filename),
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('Process with AI'),
+                ),
+                if (memo.transcription?.trim().isEmpty == true)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Transcribe the audio first before AI processing.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }
+
+        return _SectionCard(
+          title: 'AI Summary',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (isProcessing)
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _showAiDebugDialog(context, ref),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: AppTheme.spacingSm),
+                        Text(
+                          'Processing with AI...',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppTheme.textSecondary,
+                                  ),
+                        ),
+                        const Spacer(),
+                        const Icon(
+                          Icons.bug_report_outlined,
+                          size: 16,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (hasFailed)
+                Text(
+                  'AI processing failed. Please try again.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.errorColor,
+                      ),
+                )
+              else ...[
+                if (hasCategory)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _CategoryBadge(category: memo.aiCategory!),
+                  ),
+                if (hasSummary)
+                  SelectableText(
+                    memo.summary!,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          height: 1.45,
+                        ),
+                  ),
+              ],
+              if (!isProcessing && (hasSummary || hasCategory))
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Wrap(
+                    spacing: AppTheme.spacingSm,
+                    children: [
+                      OutlinedButton.icon(
+                        style: _compactOutlinedButtonStyle(),
+                        onPressed: () => ref
+                            .read(aiActionsProvider.notifier)
+                            .processVoiceMemo(memo.filename),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Re-process'),
+                      ),
+                      OutlinedButton.icon(
+                        style: _compactOutlinedButtonStyle(),
+                        onPressed: () => _showAiDebugDialog(context, ref),
+                        icon: const Icon(Icons.bug_report_outlined),
+                        label: const Text('Debug'),
+                      ),
+                    ],
+                  ),
+                ),
+              if (hasSummary && memo.aiModel != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Model: ${memo.aiModel}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+
+  void _showAiDebugDialog(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.elevatedSurfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => _AiDebugSheet(
+          memo: memo,
+          scrollController: scrollController,
+        ),
+      ),
+    );
+  }
+}
+
+class _AiDebugSheet extends ConsumerWidget {
+  final VoiceMemo memo;
+  final ScrollController scrollController;
+
+  const _AiDebugSheet({
+    required this.memo,
+    required this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final streamValue = ref.watch(aiProcessingDebugInfoProvider).valueOrNull;
+    // Show live stream data only when it's for THIS memo
+    final liveInfo = (streamValue != null &&
+            streamValue.filename == memo.filename)
+        ? streamValue
+        : null;
+    // For completed results, look up per-file cache
+    final storedInfo = ref
+        .read(voiceNoteAiPipelineProvider)
+        .getDebugInfoForFile(memo.filename);
+    // Prefer live (in-progress or just-completed) over stored
+    final debugInfo = liveInfo ?? storedInfo;
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        // Handle bar
+        Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 8),
+          child: Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.textSecondary.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              const Icon(Icons.bug_report_outlined, size: 20),
+              const SizedBox(width: 8),
+              Text('AI Debug Info', style: theme.textTheme.titleMedium),
+              const Spacer(),
+              if (debugInfo != null && !debugInfo.isComplete)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ),
+        const Divider(),
+        Expanded(
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(16),
+            children: [
+              if (debugInfo == null) ...[
+                _debugNote(
+                  context,
+                  'No debug data available for the latest run. '
+                  'Re-process this memo to see debug info.',
+                ),
+                const SizedBox(height: 16),
+                _debugInfoFromMemo(context),
+              ] else if (!debugInfo.isComplete) ...[
+                // --- Live / in-progress view ---
+                _livePhaseHeader(context, debugInfo),
+                const SizedBox(height: 12),
+                if (debugInfo.originalTranscription != null) ...[
+                  _debugBlock(
+                    context,
+                    title: 'Original Transcription',
+                    content: debugInfo.originalTranscription!,
+                    icon: Icons.mic,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                // Only show the partial-response block once tokens are flowing
+                if (debugInfo.currentPhase != 'loading')
+                  _debugBlock(
+                    context,
+                    title: '${_phaseLabel(debugInfo.currentPhase)} (live)',
+                    content: debugInfo.partialResponse.isEmpty
+                        ? '...'
+                        : debugInfo.partialResponse,
+                    icon: debugInfo.currentPhase == 'correcting'
+                        ? Icons.auto_fix_high
+                        : Icons.code,
+                    mono: debugInfo.currentPhase == 'classifying',
+                  ),
+              ] else ...[
+                // --- Completed view ---
+                _metricsRow(context, debugInfo),
+                const SizedBox(height: 16),
+                if (debugInfo.originalTranscription != null &&
+                    debugInfo.correctedTranscription != null &&
+                    debugInfo.correctedTranscription !=
+                        debugInfo.originalTranscription) ...[
+                  _transcriptionDiffBlock(
+                    context,
+                    original: debugInfo.originalTranscription!,
+                    corrected: debugInfo.correctedTranscription!,
+                  ),
+                  const SizedBox(height: 12),
+                ] else if (debugInfo.originalTranscription != null) ...[
+                  _debugBlock(
+                    context,
+                    title: 'Transcription',
+                    content: debugInfo.originalTranscription!,
+                    icon: Icons.mic,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (debugInfo.rawLlmResponse != null) ...[
+                  _debugBlock(
+                    context,
+                    title: 'Raw LLM Response',
+                    content: debugInfo.rawLlmResponse!,
+                    icon: Icons.code,
+                    mono: true,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (debugInfo.parsedJson != null) ...[
+                  _debugBlock(
+                    context,
+                    title: 'Parsed JSON',
+                    content: debugInfo.parsedJson!,
+                    icon: Icons.data_object,
+                    mono: true,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _resultRow(context, debugInfo),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _phaseLabel(String? phase) {
+    switch (phase) {
+      case 'correcting':
+        return 'Correction Output';
+      case 'classifying':
+        return 'Classify Output';
+      default:
+        return 'Output';
+    }
+  }
+
+  Widget _livePhaseHeader(BuildContext context, AiProcessingDebugInfo info) {
+    final theme = Theme.of(context);
+    final phaseText = switch (info.currentPhase) {
+      'loading' => 'Loading model...',
+      'correcting' => 'Correcting transcription...',
+      'classifying' => 'Classifying & summarizing...',
+      _ => 'Processing...',
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            info.modelName,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                phaseText,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              _metricChip(
+                context,
+                'Tokens',
+                '${info.liveTokenCount}',
+                Icons.token,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _debugNote(BuildContext context, String text) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.textSecondary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, size: 16, color: AppTheme.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _debugInfoFromMemo(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (memo.aiModel != null)
+          _kvRow(context, 'Model', memo.aiModel!),
+        if (memo.summary != null)
+          _kvRow(context, 'Summary', memo.summary!),
+        if (memo.aiCategory != null)
+          _kvRow(context, 'Category', memo.aiCategory!.name),
+        if (memo.transcription != null) ...[
+          const SizedBox(height: 12),
+          Text('Transcription', style: theme.textTheme.labelMedium),
+          const SizedBox(height: 4),
+          SelectableText(
+            memo.transcription!,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _metricsRow(BuildContext context, AiProcessingDebugInfo info) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            info.modelName,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
+            children: [
+              if (info.correctionTime != null)
+                _metricChip(
+                  context,
+                  'Correction',
+                  '${info.correctionTime!.inMilliseconds}ms',
+                  Icons.timer_outlined,
+                ),
+              if (info.correctionTokensPerSec != null)
+                _metricChip(
+                  context,
+                  'Correction tok/s',
+                  info.correctionTokensPerSec!.toStringAsFixed(1),
+                  Icons.speed,
+                ),
+              if (info.correctionTokens != null)
+                _metricChip(
+                  context,
+                  'Correction tokens',
+                  '${info.correctionTokens}',
+                  Icons.token,
+                ),
+              if (info.classifyTime != null)
+                _metricChip(
+                  context,
+                  'Classify',
+                  '${info.classifyTime!.inMilliseconds}ms',
+                  Icons.timer_outlined,
+                ),
+              if (info.classifyTokensPerSec != null)
+                _metricChip(
+                  context,
+                  'Classify tok/s',
+                  info.classifyTokensPerSec!.toStringAsFixed(1),
+                  Icons.speed,
+                ),
+              if (info.classifyTokens != null)
+                _metricChip(
+                  context,
+                  'Classify tokens',
+                  '${info.classifyTokens}',
+                  Icons.token,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _metricChip(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: AppTheme.textSecondary),
+        const SizedBox(width: 4),
+        Text(
+          '$label: ',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.textSecondary,
+                fontSize: 11,
+              ),
+        ),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+              ),
+        ),
+      ],
+    );
+  }
+
+  Widget _debugBlock(
+    BuildContext context, {
+    required String title,
+    required String content,
+    required IconData icon,
+    bool mono = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 16, color: AppTheme.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.copy, size: 16),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: content));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Copied $title'),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppTheme.textSecondary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppTheme.textSecondary.withValues(alpha: 0.12),
+            ),
+          ),
+          child: SelectableText(
+            content,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontFamily: mono ? 'monospace' : null,
+                  fontSize: mono ? 11 : null,
+                  height: 1.5,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build a diff view showing words removed (from original) in red and words
+  /// added (in corrected) in green. Uses a simple longest-common-subsequence
+  /// approach on whitespace-split word arrays.
+  Widget _transcriptionDiffBlock(
+    BuildContext context, {
+    required String original,
+    required String corrected,
+  }) {
+    final origWords = original.split(RegExp(r'\s+'));
+    final corrWords = corrected.split(RegExp(r'\s+'));
+    final spans = _computeWordDiffSpans(origWords, corrWords, context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.compare_arrows, size: 16, color: AppTheme.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              'Transcription Diff',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+            ),
+            const Spacer(),
+            _diffLegendChip(context, 'removed', const Color(0x40EF5350)),
+            const SizedBox(width: 6),
+            _diffLegendChip(context, 'added', const Color(0x4066BB6A)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppTheme.textSecondary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppTheme.textSecondary.withValues(alpha: 0.12),
+            ),
+          ),
+          child: Text.rich(
+            TextSpan(children: spans),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.6),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _diffLegendChip(BuildContext context, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
+      ),
+    );
+  }
+
+  /// Compute word-level diff spans using LCS (longest common subsequence).
+  List<TextSpan> _computeWordDiffSpans(
+    List<String> origWords,
+    List<String> corrWords,
+    BuildContext context,
+  ) {
+    final n = origWords.length;
+    final m = corrWords.length;
+
+    // Build LCS table
+    final dp = List.generate(n + 1, (_) => List.filled(m + 1, 0));
+    for (var i = 1; i <= n; i++) {
+      for (var j = 1; j <= m; j++) {
+        if (origWords[i - 1].toLowerCase() == corrWords[j - 1].toLowerCase()) {
+          dp[i][j] = dp[i - 1][j - 1] + 1;
+        } else {
+          dp[i][j] = dp[i - 1][j] > dp[i][j - 1]
+              ? dp[i - 1][j]
+              : dp[i][j - 1];
+        }
+      }
+    }
+
+    // Backtrack to produce diff operations
+    final ops = <_DiffOp>[];
+    var i = n;
+    var j = m;
+    while (i > 0 || j > 0) {
+      if (i > 0 &&
+          j > 0 &&
+          origWords[i - 1].toLowerCase() == corrWords[j - 1].toLowerCase()) {
+        ops.add(_DiffOp.equal(corrWords[j - 1]));
+        i--;
+        j--;
+      } else if (j > 0 && (i == 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+        ops.add(_DiffOp.insert(corrWords[j - 1]));
+        j--;
+      } else {
+        ops.add(_DiffOp.delete(origWords[i - 1]));
+        i--;
+      }
+    }
+    ops.reversed; // reversed is lazy, need toList
+    final orderedOps = ops.reversed.toList();
+
+    // Convert to TextSpans
+    final spans = <TextSpan>[];
+    for (final op in orderedOps) {
+      if (spans.isNotEmpty) {
+        spans.add(const TextSpan(text: ' '));
+      }
+      switch (op.type) {
+        case _DiffType.equal:
+          spans.add(TextSpan(text: op.word));
+          break;
+        case _DiffType.delete:
+          spans.add(TextSpan(
+            text: op.word,
+            style: const TextStyle(
+              backgroundColor: Color(0x40EF5350),
+              decoration: TextDecoration.lineThrough,
+              decorationColor: Color(0xFFEF5350),
+            ),
+          ));
+          break;
+        case _DiffType.insert:
+          spans.add(TextSpan(
+            text: op.word,
+            style: const TextStyle(
+              backgroundColor: Color(0x4066BB6A),
+              fontWeight: FontWeight.w600,
+            ),
+          ));
+          break;
+      }
+    }
+    return spans;
+  }
+
+  Widget _resultRow(BuildContext context, AiProcessingDebugInfo info) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.check_circle_outline, size: 16, color: AppTheme.textSecondary),
+            const SizedBox(width: 6),
+            Text(
+              'Parsed Result',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (info.category != null) _kvRow(context, 'Category', info.category!),
+        if (info.summary != null) _kvRow(context, 'Summary', info.summary!),
+        _kvRow(context, 'Actions', '${info.actionCount}'),
+        _kvRow(
+          context,
+          'Processed',
+          DateFormat('HH:mm:ss.SSS').format(info.timestamp),
+        ),
+      ],
+    );
+  }
+
+  Widget _kvRow(BuildContext context, String key, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              key,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+            ),
+          ),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExtractedActionsSection extends ConsumerStatefulWidget {
+  final VoiceMemo memo;
+
+  const _ExtractedActionsSection({required this.memo});
+
+  @override
+  ConsumerState<_ExtractedActionsSection> createState() =>
+      _ExtractedActionsSectionState();
+}
+
+class _ExtractedActionsSectionState
+    extends ConsumerState<_ExtractedActionsSection> {
+  bool _isExpanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final aiEnabled = ref.watch(localAiEnabledProvider);
+
+    if (!aiEnabled) {
+      return const SizedBox.shrink();
+    }
+
+    final actionsAsync = ref.watch(
+      extractedActionsForMemoProvider(widget.memo.id),
+    );
+
+    return actionsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (actions) {
+        if (actions.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return _SectionCard(
+          title: 'Extracted Actions',
+          trailing: IconButton(
+            tooltip: _isExpanded ? 'Collapse' : 'Expand',
+            visualDensity: VisualDensity.compact,
+            constraints: const BoxConstraints.tightFor(
+              width: 32,
+              height: 32,
+            ),
+            onPressed: () => setState(() => _isExpanded = !_isExpanded),
+            icon: Icon(
+              _isExpanded ? Icons.expand_less : Icons.expand_more,
+            ),
+          ),
+          child: _isExpanded
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < actions.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 10),
+                      _ActionItem(action: actions[i]),
+                    ],
+                  ],
+                )
+              : Text(
+                  '${actions.length} action${actions.length == 1 ? '' : 's'}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _ActionItem extends StatelessWidget {
+  final ExtractedAction action;
+
+  const _ActionItem({required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(top: 2),
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: _actionTypeColor(action.actionType).withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+          ),
+          child: Icon(
+            _actionTypeIcon(action.actionType),
+            size: 16,
+            color: _actionTypeColor(action.actionType),
+          ),
+        ),
+        const SizedBox(width: AppTheme.spacingSm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                action.title,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              if (action.dueDate != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Due: ${DateFormat.yMMMd().format(action.dueDate!)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                ),
+              ],
+              if (action.location != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  action.location!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  IconData _actionTypeIcon(ExtractedActionType type) {
+    return switch (type) {
+      ExtractedActionType.task => Icons.check_box_outlined,
+      ExtractedActionType.reminder => Icons.alarm,
+      ExtractedActionType.calendarEvent => Icons.calendar_today,
+    };
+  }
+
+  Color _actionTypeColor(ExtractedActionType type) {
+    return switch (type) {
+      ExtractedActionType.task => AppTheme.primaryColor,
+      ExtractedActionType.reminder => AppTheme.warningColor,
+      ExtractedActionType.calendarEvent => AppTheme.infoColor,
+    };
+  }
+}
+
+class _CategoryBadge extends StatelessWidget {
+  final VoiceNoteCategory category;
+
+  const _CategoryBadge({required this.category});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: _categoryColor(category).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _categoryIcon(category),
+            size: 16,
+            color: _categoryColor(category),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            _categoryLabel(category),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: _categoryColor(category),
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _categoryIcon(VoiceNoteCategory category) {
+    return switch (category) {
+      VoiceNoteCategory.idea => Icons.lightbulb_outline,
+      VoiceNoteCategory.task => Icons.check_box_outlined,
+      VoiceNoteCategory.reminder => Icons.alarm,
+      VoiceNoteCategory.meeting => Icons.people_outline,
+      VoiceNoteCategory.note => Icons.note_outlined,
+    };
+  }
+
+  Color _categoryColor(VoiceNoteCategory category) {
+    return switch (category) {
+      VoiceNoteCategory.idea => const Color(0xFFFFA726),
+      VoiceNoteCategory.task => AppTheme.primaryColor,
+      VoiceNoteCategory.reminder => AppTheme.warningColor,
+      VoiceNoteCategory.meeting => const Color(0xFF26A69A),
+      VoiceNoteCategory.note => AppTheme.textSecondary,
+    };
+  }
+
+  String _categoryLabel(VoiceNoteCategory category) {
+    return switch (category) {
+      VoiceNoteCategory.idea => 'Idea',
+      VoiceNoteCategory.task => 'Task',
+      VoiceNoteCategory.reminder => 'Reminder',
+      VoiceNoteCategory.meeting => 'Meeting',
+      VoiceNoteCategory.note => 'Note',
+    };
+  }
+}
+
 class _SyncProgressBar extends StatelessWidget {
   final VoiceMemoSyncState state;
 
@@ -656,6 +1702,7 @@ class _VoiceNoteCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final previewText = _memoPreviewText(memo);
     final canPlay = _hasLocalAudio(memo);
+    final isProcessing = memo.isAiProcessing;
 
     return Dismissible(
       key: ValueKey('voice-note-${memo.id}'),
@@ -686,6 +1733,15 @@ class _VoiceNoteCard extends ConsumerWidget {
               children: [
                 Row(
                   children: [
+                    if (memo.aiCategory != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: AppTheme.spacingSm),
+                        child: Icon(
+                          _categoryIcon(memo.aiCategory!),
+                          size: 20,
+                          color: _categoryColor(memo.aiCategory!),
+                        ),
+                      ),
                     Expanded(
                       child: Text(
                         _timelineTimestampLabel(memo.timestampUtc.toLocal()),
@@ -707,23 +1763,55 @@ class _VoiceNoteCard extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         height: 1.35,
-                        color: memo.transcription?.trim().isNotEmpty == true
+                        color: memo.summary != null ||
+                                memo.transcription?.trim().isNotEmpty == true
                             ? AppTheme.textPrimary
                             : AppTheme.textSecondary,
                       ),
                 ),
                 const SizedBox(height: AppTheme.spacingSm),
-                Text(
-                  'Tap to view full note',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                ),
-                const SizedBox(height: AppTheme.spacingMd),
                 Wrap(
                   spacing: AppTheme.spacingSm,
                   runSpacing: AppTheme.spacingSm,
                   children: [
+                    if (memo.aiCategory != null)
+                      _MetaChip(
+                        icon: _categoryIcon(memo.aiCategory!),
+                        label: _categoryLabel(memo.aiCategory!),
+                        color: _categoryColor(memo.aiCategory!),
+                      ),
+                    if (isProcessing)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusXLarge),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 10,
+                              height: 10,
+                              child: CircularProgressIndicator(strokeWidth: 1.5),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Processing',
+                              style:
+                                  Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: AppTheme.primaryColor,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 10.5,
+                                      ),
+                            ),
+                          ],
+                        ),
+                      ),
                     _MetaChip(
                       icon: _syncStatusIcon(memo.syncStatus),
                       label: _syncStatusLabel(memo),
@@ -774,6 +1862,36 @@ class _VoiceNoteCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  IconData _categoryIcon(VoiceNoteCategory category) {
+    return switch (category) {
+      VoiceNoteCategory.idea => Icons.lightbulb_outline,
+      VoiceNoteCategory.task => Icons.check_box_outlined,
+      VoiceNoteCategory.reminder => Icons.alarm,
+      VoiceNoteCategory.meeting => Icons.people_outline,
+      VoiceNoteCategory.note => Icons.note_outlined,
+    };
+  }
+
+  Color _categoryColor(VoiceNoteCategory category) {
+    return switch (category) {
+      VoiceNoteCategory.idea => const Color(0xFFFFA726),
+      VoiceNoteCategory.task => AppTheme.primaryColor,
+      VoiceNoteCategory.reminder => AppTheme.warningColor,
+      VoiceNoteCategory.meeting => const Color(0xFF26A69A),
+      VoiceNoteCategory.note => AppTheme.textSecondary,
+    };
+  }
+
+  String _categoryLabel(VoiceNoteCategory category) {
+    return switch (category) {
+      VoiceNoteCategory.idea => 'Idea',
+      VoiceNoteCategory.task => 'Task',
+      VoiceNoteCategory.reminder => 'Reminder',
+      VoiceNoteCategory.meeting => 'Meeting',
+      VoiceNoteCategory.note => 'Note',
+    };
   }
 }
 
@@ -1443,6 +2561,7 @@ bool _matchesQuery(VoiceMemo memo, String query) {
   final haystack = <String>[
     memo.filename,
     memo.transcription ?? '',
+    memo.summary ?? '',
     _dayGroupLabel(local),
     _timelineTimestampLabel(local),
     DateFormat.yMMMMd().format(local),
@@ -1453,9 +2572,15 @@ bool _matchesQuery(VoiceMemo memo, String query) {
 }
 
 String _memoPreviewText(VoiceMemo memo) {
+  final aiSummary = memo.summary?.trim();
+  if (aiSummary != null && aiSummary.isNotEmpty) {
+    return aiSummary;
+  }
+
   final transcript = memo.transcription?.trim();
   if (transcript != null && transcript.isNotEmpty) {
-    return transcript;
+    final lines = transcript.split('\n');
+    return lines.first;
   }
 
   if (memo.syncedFromWatch) {
@@ -1566,4 +2691,20 @@ ButtonStyle _compactFilledButtonStyle() {
     minimumSize: const Size(0, 34),
     textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Word-level diff helpers
+// ---------------------------------------------------------------------------
+
+enum _DiffType { equal, delete, insert }
+
+class _DiffOp {
+  final _DiffType type;
+  final String word;
+
+  const _DiffOp._(this.type, this.word);
+  factory _DiffOp.equal(String word) => _DiffOp._(_DiffType.equal, word);
+  factory _DiffOp.delete(String word) => _DiffOp._(_DiffType.delete, word);
+  factory _DiffOp.insert(String word) => _DiffOp._(_DiffType.insert, word);
 }

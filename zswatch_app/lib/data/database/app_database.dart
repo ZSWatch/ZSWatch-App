@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'tables/battery_readings_table.dart';
 import 'tables/comm_log_entries_table.dart';
 import 'tables/connection_events_table.dart';
+import 'tables/extracted_actions_table.dart';
 import 'tables/health_samples_table.dart';
 import 'tables/voice_memos_table.dart';
 import 'tables/watches_table.dart';
@@ -23,14 +24,14 @@ part 'app_database.g.dart';
 /// - CommLogEntries: BLE communication logs for debugging
 /// - ConnectionEvents: Connection/disconnection events for analytics
 @DriftDatabase(
-  tables: [Watches, HealthSamples, BatteryReadings, CommLogEntries, ConnectionEvents, VoiceMemos],
+  tables: [Watches, HealthSamples, BatteryReadings, CommLogEntries, ConnectionEvents, VoiceMemos, ExtractedActions],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   /// Database schema version - increment when making schema changes
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -51,6 +52,18 @@ class AppDatabase extends _$AppDatabase {
         if (from < 4) {
           // Add voice memos table for voice recording sync
           await m.createTable(voiceMemos);
+        }
+        if (from < 5) {
+          // Add AI-enhanced voice notes fields and extracted actions table
+          await m.createTable(extractedActions);
+          await m.addColumn(voiceMemos, voiceMemos.summary);
+          await m.addColumn(voiceMemos, voiceMemos.category);
+          await m.addColumn(voiceMemos, voiceMemos.processingStatus);
+          await m.addColumn(voiceMemos, voiceMemos.aiModel);
+          await m.addColumn(voiceMemos, voiceMemos.aiProcessedAt);
+          await m.addColumn(voiceMemos, voiceMemos.taskCreated);
+          await m.addColumn(voiceMemos, voiceMemos.calendarEventCreated);
+          await m.addColumn(voiceMemos, voiceMemos.actionReviewState);
         }
       },
     );
@@ -358,6 +371,18 @@ class AppDatabase extends _$AppDatabase {
         .get();
   }
 
+  /// Get voice memos that are transcribed but not yet AI-processed
+  Future<List<VoiceMemoEntity>> getUnprocessedVoiceMemos() {
+    return (select(voiceMemos)
+          ..where((v) =>
+              v.transcription.isNotNull() &
+              v.summary.isNull() &
+              (v.processingStatus.isNull() |
+                  v.processingStatus.equals('failed')))
+          ..orderBy([(v) => OrderingTerm.asc(v.timestampUtc)]))
+        .get();
+  }
+
   /// Insert or update a voice memo (upsert by filename)
   Future<void> upsertVoiceMemo(VoiceMemosCompanion memo) async {
     // getVoiceMemoByFilename also deduplicates if stale duplicates exist.
@@ -415,10 +440,112 @@ class AppDatabase extends _$AppDatabase {
     ));
   }
 
+  /// Update AI processing results for a voice memo
+  Future<void> updateVoiceMemoAiResults({
+    required String filename,
+    required String summary,
+    required String category,
+    required String aiModel,
+  }) {
+    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
+        .write(VoiceMemosCompanion(
+      summary: Value(summary),
+      category: Value(category),
+      processingStatus: const Value('ready'),
+      aiModel: Value(aiModel),
+      aiProcessedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Update AI processing status
+  Future<void> updateVoiceMemoProcessingStatus({
+    required String filename,
+    required String status,
+  }) {
+    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
+        .write(VoiceMemosCompanion(
+      processingStatus: Value(status),
+    ));
+  }
+
+  /// Mark task created for a voice memo
+  Future<void> updateVoiceMemoTaskCreated(String filename) {
+    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
+        .write(const VoiceMemosCompanion(
+      taskCreated: Value(true),
+    ));
+  }
+
+  /// Mark calendar event created for a voice memo
+  Future<void> updateVoiceMemoCalendarEventCreated(String filename) {
+    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
+        .write(const VoiceMemosCompanion(
+      calendarEventCreated: Value(true),
+    ));
+  }
+
   /// Delete a voice memo by filename
   Future<int> deleteVoiceMemo(String filename) {
     return (delete(voiceMemos)..where((v) => v.filename.equals(filename)))
         .go();
+  }
+
+  // ==================== Extracted Action Operations ====================
+
+  /// Get all extracted actions for a voice memo
+  Future<List<ExtractedActionEntity>> getActionsForMemo(int memoId) {
+    return (select(extractedActions)
+          ..where((a) => a.memoId.equals(memoId))
+          ..orderBy([(a) => OrderingTerm.asc(a.id)]))
+        .get();
+  }
+
+  /// Watch extracted actions for a voice memo (reactive stream)
+  Stream<List<ExtractedActionEntity>> watchActionsForMemo(int memoId) {
+    return (select(extractedActions)
+          ..where((a) => a.memoId.equals(memoId))
+          ..orderBy([(a) => OrderingTerm.asc(a.id)]))
+        .watch();
+  }
+
+  /// Insert an extracted action
+  Future<int> insertExtractedAction(ExtractedActionsCompanion action) {
+    return into(extractedActions).insert(action);
+  }
+
+  /// Update an extracted action as created
+  Future<void> markExtractedActionCreated({
+    required int actionId,
+    String? platformTargetId,
+  }) {
+    return (update(extractedActions)..where((a) => a.id.equals(actionId)))
+        .write(ExtractedActionsCompanion(
+      created: const Value(true),
+      platformTargetId: Value(platformTargetId),
+      createdAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// Dismiss an extracted action
+  Future<void> dismissExtractedAction(int actionId) {
+    return (update(extractedActions)..where((a) => a.id.equals(actionId)))
+        .write(const ExtractedActionsCompanion(
+      dismissed: Value(true),
+    ));
+  }
+
+  /// Delete all extracted actions for a memo
+  Future<int> deleteActionsForMemo(int memoId) {
+    return (delete(extractedActions)..where((a) => a.memoId.equals(memoId)))
+        .go();
+  }
+
+  /// Get all pending (not created, not dismissed) extracted actions
+  Future<List<ExtractedActionEntity>> getPendingActions() {
+    return (select(extractedActions)
+          ..where(
+              (a) => a.created.equals(false) & a.dismissed.equals(false)))
+        .get();
   }
 
   // ==================== Data Retention ====================

@@ -239,8 +239,10 @@ class BleServiceImpl implements BleService {
         _reconnectionCount < BleConfig.maxReconnectionAttempts) {
       try {
         await _connectedDevice!.connect(
+          license: License.free,
           timeout: BleConfig.connectionTimeout,
           autoConnect: true,
+          mtu: null,
         );
       } catch (_) {
         // Will be handled by connection state listener

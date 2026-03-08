@@ -18,6 +18,36 @@ enum VoiceMemoSyncStatus {
   transcribed,
 }
 
+/// AI processing status for a voice memo
+enum VoiceNoteProcessingStatus {
+  /// Not yet processed by AI
+  pending,
+
+  /// AI is summarizing the transcript
+  summarizing,
+
+  /// AI is categorizing the note
+  categorizing,
+
+  /// AI is extracting actions
+  extractingActions,
+
+  /// AI processing completed successfully
+  ready,
+
+  /// AI processing failed
+  failed,
+}
+
+/// Category assigned by AI to a voice note
+enum VoiceNoteCategory {
+  idea,
+  task,
+  reminder,
+  meeting,
+  note,
+}
+
 /// Domain model for a voice memo recording
 class VoiceMemo extends Equatable {
   final int id;
@@ -33,6 +63,16 @@ class VoiceMemo extends Equatable {
   final DateTime? transcribedAt;
   final String? convertedFilePath;
 
+  // AI-enhanced fields
+  final String? summary;
+  final String? category;
+  final String? processingStatus;
+  final String? aiModel;
+  final DateTime? aiProcessedAt;
+  final bool taskCreated;
+  final bool calendarEventCreated;
+  final String? actionReviewState;
+
   const VoiceMemo({
     required this.id,
     required this.filename,
@@ -46,6 +86,14 @@ class VoiceMemo extends Equatable {
     this.downloadedAt,
     this.transcribedAt,
     this.convertedFilePath,
+    this.summary,
+    this.category,
+    this.processingStatus,
+    this.aiModel,
+    this.aiProcessedAt,
+    this.taskCreated = false,
+    this.calendarEventCreated = false,
+    this.actionReviewState,
   });
 
   /// Computed sync status based on field values
@@ -55,6 +103,58 @@ class VoiceMemo extends Equatable {
       return VoiceMemoSyncStatus.synced;
     }
     return VoiceMemoSyncStatus.onWatchOnly;
+  }
+
+  /// Parsed AI processing status
+  VoiceNoteProcessingStatus get aiProcessingStatus {
+    if (processingStatus == null) return VoiceNoteProcessingStatus.pending;
+    switch (processingStatus) {
+      case 'summarizing':
+        return VoiceNoteProcessingStatus.summarizing;
+      case 'categorizing':
+        return VoiceNoteProcessingStatus.categorizing;
+      case 'extractingActions':
+        return VoiceNoteProcessingStatus.extractingActions;
+      case 'ready':
+        return VoiceNoteProcessingStatus.ready;
+      case 'failed':
+        return VoiceNoteProcessingStatus.failed;
+      default:
+        return VoiceNoteProcessingStatus.pending;
+    }
+  }
+
+  /// Convenience alias used by UI code
+  VoiceNoteCategory? get aiCategory => categoryEnum;
+
+  /// Parsed category enum
+  VoiceNoteCategory? get categoryEnum {
+    if (category == null) return null;
+    switch (category) {
+      case 'idea':
+        return VoiceNoteCategory.idea;
+      case 'task':
+        return VoiceNoteCategory.task;
+      case 'reminder':
+        return VoiceNoteCategory.reminder;
+      case 'meeting':
+        return VoiceNoteCategory.meeting;
+      case 'note':
+        return VoiceNoteCategory.note;
+      default:
+        return VoiceNoteCategory.note;
+    }
+  }
+
+  /// Whether AI has processed this memo
+  bool get isAiProcessed => summary != null && processingStatus == 'ready';
+
+  /// Whether AI is currently processing this memo
+  bool get isAiProcessing {
+    final s = processingStatus;
+    return s == 'summarizing' ||
+        s == 'categorizing' ||
+        s == 'extractingActions';
   }
 
   /// Duration formatted as MM:SS
@@ -100,6 +200,14 @@ class VoiceMemo extends Equatable {
     DateTime? downloadedAt,
     DateTime? transcribedAt,
     String? convertedFilePath,
+    String? summary,
+    String? category,
+    String? processingStatus,
+    String? aiModel,
+    DateTime? aiProcessedAt,
+    bool? taskCreated,
+    bool? calendarEventCreated,
+    String? actionReviewState,
   }) {
     return VoiceMemo(
       id: id ?? this.id,
@@ -114,6 +222,14 @@ class VoiceMemo extends Equatable {
       downloadedAt: downloadedAt ?? this.downloadedAt,
       transcribedAt: transcribedAt ?? this.transcribedAt,
       convertedFilePath: convertedFilePath ?? this.convertedFilePath,
+      summary: summary ?? this.summary,
+      category: category ?? this.category,
+      processingStatus: processingStatus ?? this.processingStatus,
+      aiModel: aiModel ?? this.aiModel,
+      aiProcessedAt: aiProcessedAt ?? this.aiProcessedAt,
+      taskCreated: taskCreated ?? this.taskCreated,
+      calendarEventCreated: calendarEventCreated ?? this.calendarEventCreated,
+      actionReviewState: actionReviewState ?? this.actionReviewState,
     );
   }
 
@@ -131,5 +247,13 @@ class VoiceMemo extends Equatable {
         downloadedAt,
         transcribedAt,
         convertedFilePath,
+        summary,
+        category,
+        processingStatus,
+        aiModel,
+        aiProcessedAt,
+        taskCreated,
+        calendarEventCreated,
+        actionReviewState,
       ];
 }
