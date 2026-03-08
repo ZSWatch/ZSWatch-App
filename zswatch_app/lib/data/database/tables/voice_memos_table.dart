@@ -48,4 +48,36 @@ class VoiceMemos extends Table {
   /// Path to converted audio file (WAV/Ogg) for playback/transcription
   TextColumn get convertedFilePath =>
       text().nullable().named('converted_file_path')();
+
+  // ==================== AI-Enhanced Fields ====================
+
+  /// AI-generated summary of the voice note
+  TextColumn get summary => text().nullable()();
+
+  /// AI-assigned category: 'idea', 'task', 'reminder', 'meeting', 'note'
+  TextColumn get category => text().nullable()();
+
+  /// Current AI processing status: 'pending', 'summarizing', 'categorizing',
+  /// 'extractingActions', 'ready', 'failed'
+  TextColumn get processingStatus =>
+      text().nullable().named('processing_status')();
+
+  /// Which AI model was used for processing
+  TextColumn get aiModel => text().nullable().named('ai_model')();
+
+  /// When AI processing completed
+  DateTimeColumn get aiProcessedAt =>
+      dateTime().nullable().named('ai_processed_at')();
+
+  /// Whether a task has been created from this memo's suggestions
+  BoolColumn get taskCreated =>
+      boolean().withDefault(const Constant(false)).named('task_created')();
+
+  /// Whether a calendar event has been created from this memo's suggestions
+  BoolColumn get calendarEventCreated =>
+      boolean().withDefault(const Constant(false)).named('calendar_event_created')();
+
+  /// Review state for extracted actions: 'pending', 'reviewed', 'dismissed'
+  TextColumn get actionReviewState =>
+      text().nullable().named('action_review_state')();
 }

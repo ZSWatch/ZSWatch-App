@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/voice_memo.dart';
 import '../data/repositories/voice_memo_repository.dart';
+import '../services/ai/voice_note_ai_pipeline.dart';
 import '../services/voice_memo/transcription_engine.dart';
 import '../services/voice_memo/voice_memo_sync_service.dart';
+import 'ai_providers.dart';
 import 'settings_providers.dart';
 import 'watch_providers.dart';
 import 'watch_service_provider.dart';
@@ -87,27 +89,41 @@ final voiceMemoSyncServiceProvider = Provider<VoiceMemoSyncService>((ref) {
     repository: repository,
   );
 
-  // Wire up auto-transcription after sync completes
+  // Wire up auto-transcription (and optionally AI processing) after sync
   final engine = ref.watch(transcriptionEngineProvider);
+  final aiEnabled = ref.read(localAiEnabledProvider);
+  final autoProcess = ref.read(autoProcessVoiceNotesProvider);
+  VoiceNoteAiPipeline? pipeline;
+  if (aiEnabled && autoProcess) {
+    pipeline = ref.read(voiceNoteAiPipelineProvider);
+  }
   service.onSyncCompleted = (downloadedCount) {
     debugPrint(
         '[VoiceMemoProviders] Sync completed ($downloadedCount new). '
         'Starting auto-transcription.');
-    _autoTranscribe(repository, engine);
+    _autoTranscribeAndProcess(repository, engine, pipeline);
   };
 
   ref.onDispose(() => service.dispose());
   return service;
 });
 
-/// Auto-transcribe all untranscribed memos after sync
-Future<void> _autoTranscribe(
+/// Auto-transcribe all untranscribed memos after sync, then optionally
+/// run the AI pipeline on newly transcribed memos.
+Future<void> _autoTranscribeAndProcess(
   VoiceMemoRepository repository,
   TranscriptionEngine engine,
+  VoiceNoteAiPipeline? pipeline,
 ) async {
   try {
     final untranscribed = await repository.getUntranscribedMemos();
-    if (untranscribed.isEmpty) return;
+    if (untranscribed.isEmpty) {
+      // Even if nothing new to transcribe, there may be unprocessed memos
+      if (pipeline != null) {
+        await pipeline.processAllUnprocessed();
+      }
+      return;
+    }
 
     debugPrint(
         '[VoiceMemoProviders] Auto-transcribing ${untranscribed.length} memos');
@@ -129,8 +145,14 @@ Future<void> _autoTranscribe(
             '[VoiceMemoProviders] Failed to transcribe ${memo.filename}: $e');
       }
     }
+
+    // After transcription, run AI processing on all unprocessed memos
+    if (pipeline != null) {
+      debugPrint('[VoiceMemoProviders] Starting auto AI processing');
+      await pipeline.processAllUnprocessed();
+    }
   } catch (e) {
-    debugPrint('[VoiceMemoProviders] Auto-transcription error: $e');
+    debugPrint('[VoiceMemoProviders] Auto-transcription/processing error: $e');
   }
 }
 

@@ -16,6 +16,9 @@ abstract final class SettingsKeys {
   static const String keepScreenOnDuringDfu = 'keep_screen_on_during_dfu';
   static const String backgroundConnectionEnabled = 'background_connection_enabled';
   static const String transcriptionEngineType = 'transcription_engine_type';
+  static const String localAiEnabled = 'local_ai_enabled';
+  static const String autoProcessVoiceNotes = 'auto_process_voice_notes';
+  static const String selectedAiModelId = 'selected_ai_model_id';
 }
 
 /// Provider for SharedPreferences instance
@@ -313,6 +316,80 @@ class TranscriptionEngineTypeNotifier
   void setType(TranscriptionEngineType type) {
     state = type;
     _prefs?.setString(SettingsKeys.transcriptionEngineType, type.name);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Local AI settings
+// ---------------------------------------------------------------------------
+
+/// Whether local AI processing of voice notes is enabled
+final localAiEnabledProvider =
+    StateNotifierProvider<LocalAiEnabledNotifier, bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return LocalAiEnabledNotifier(prefs.valueOrNull);
+});
+
+class LocalAiEnabledNotifier extends StateNotifier<bool> {
+  final SharedPreferences? _prefs;
+
+  LocalAiEnabledNotifier(this._prefs)
+      : super(_prefs?.getBool(SettingsKeys.localAiEnabled) ?? false);
+
+  void toggle() {
+    state = !state;
+    _prefs?.setBool(SettingsKeys.localAiEnabled, state);
+  }
+
+  void setEnabled(bool enabled) {
+    state = enabled;
+    _prefs?.setBool(SettingsKeys.localAiEnabled, enabled);
+  }
+}
+
+/// Whether voice notes should be automatically AI-processed after transcription
+final autoProcessVoiceNotesProvider =
+    StateNotifierProvider<AutoProcessVoiceNotesNotifier, bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return AutoProcessVoiceNotesNotifier(prefs.valueOrNull);
+});
+
+class AutoProcessVoiceNotesNotifier extends StateNotifier<bool> {
+  final SharedPreferences? _prefs;
+
+  AutoProcessVoiceNotesNotifier(this._prefs)
+      : super(_prefs?.getBool(SettingsKeys.autoProcessVoiceNotes) ?? true);
+
+  void toggle() {
+    state = !state;
+    _prefs?.setBool(SettingsKeys.autoProcessVoiceNotes, state);
+  }
+
+  void setEnabled(bool enabled) {
+    state = enabled;
+    _prefs?.setBool(SettingsKeys.autoProcessVoiceNotes, enabled);
+  }
+}
+
+/// Currently selected local AI model id.
+final selectedAiModelIdProvider =
+    StateNotifierProvider<SelectedAiModelIdNotifier, String>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return SelectedAiModelIdNotifier(prefs.valueOrNull);
+});
+
+class SelectedAiModelIdNotifier extends StateNotifier<String> {
+  final SharedPreferences? _prefs;
+
+  SelectedAiModelIdNotifier(this._prefs)
+      : super(
+          _prefs?.getString(SettingsKeys.selectedAiModelId) ??
+              'qwen25_1_5b_q4_k_m',
+        );
+
+  void setModelId(String modelId) {
+    state = modelId;
+    _prefs?.setString(SettingsKeys.selectedAiModelId, modelId);
   }
 }
 

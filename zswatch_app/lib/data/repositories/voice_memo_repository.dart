@@ -112,6 +112,38 @@ class VoiceMemoRepository {
     );
   }
 
+  /// Update AI processing results
+  Future<void> updateAiResults({
+    required String filename,
+    required String summary,
+    required String category,
+    required String aiModel,
+  }) async {
+    await _db.updateVoiceMemoAiResults(
+      filename: filename,
+      summary: summary,
+      category: category,
+      aiModel: aiModel,
+    );
+  }
+
+  /// Update AI processing status
+  Future<void> updateProcessingStatus({
+    required String filename,
+    required String status,
+  }) async {
+    await _db.updateVoiceMemoProcessingStatus(
+      filename: filename,
+      status: status,
+    );
+  }
+
+  /// Get memos that are transcribed but not yet AI-processed
+  Future<List<VoiceMemo>> getUnprocessedMemos() async {
+    final entities = await _db.getUnprocessedVoiceMemos();
+    return entities.map(_entityToModel).toList();
+  }
+
   /// Delete a voice memo by filename (deletes local files and DB entry)
   Future<void> deleteMemo(String filename) async {
     // Get the memo first so we can clean up local files
@@ -163,6 +195,14 @@ class VoiceMemoRepository {
       downloadedAt: entity.downloadedAt,
       transcribedAt: entity.transcribedAt,
       convertedFilePath: entity.convertedFilePath,
+      summary: entity.summary,
+      category: entity.category,
+      processingStatus: entity.processingStatus,
+      aiModel: entity.aiModel,
+      aiProcessedAt: entity.aiProcessedAt,
+      taskCreated: entity.taskCreated,
+      calendarEventCreated: entity.calendarEventCreated,
+      actionReviewState: entity.actionReviewState,
     );
   }
 }

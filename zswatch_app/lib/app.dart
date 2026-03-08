@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,6 +11,7 @@ import 'providers/gps_providers.dart';
 import 'providers/http_providers.dart';
 import 'providers/notification_providers.dart';
 import 'providers/permission_providers.dart';
+import 'providers/ai_providers.dart';
 import 'providers/voice_memo_providers.dart';
 import 'providers/watch_service_provider.dart';
 import 'ui/navigation/app_router.dart';
@@ -63,6 +66,10 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       // Initialize voice memo sync service to handle recording sync from watch
       // This subscribes to watch messages for new recording notifications
       ref.read(voiceMemoSyncServiceProvider);
+
+      // [DEV] Run AI pipeline self-test on startup to validate model / inference
+      // TODO: Remove before release — this is a development-time smoke test
+      unawaited(runAiStartupTest(ref));
     } catch (e) {
       debugPrint('BLE initialization error: $e');
     }

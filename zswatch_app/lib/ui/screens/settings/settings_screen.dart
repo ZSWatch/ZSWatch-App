@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -10,10 +11,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../providers/ai_providers.dart';
 import '../../../providers/demo_mode_provider.dart';
 import '../../../providers/permission_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/voice_memo_providers.dart';
+import '../../../services/ai/llm_service.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../onboarding/permission_onboarding_screen.dart';
 
@@ -111,6 +114,12 @@ class SettingsScreen extends ConsumerWidget {
           // Voice Memos / Transcription Settings
           _SectionHeader(title: 'Voice Memos'),
           _TranscriptionModelsSection(),
+
+          const Divider(height: 32),
+
+          // AI Processing Section
+          _SectionHeader(title: 'AI Processing'),
+          _AiProcessingSection(),
 
           const Divider(height: 32),
 
@@ -905,6 +914,575 @@ class _QuickPermissionRow extends StatelessWidget {
             color: color,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// AI Processing section
+class _AiProcessingSection extends ConsumerWidget {
+  const _AiProcessingSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final localAiEnabled = ref.watch(localAiEnabledProvider);
+    final autoProcessEnabled = ref.watch(autoProcessVoiceNotesProvider);
+    final aiActionsState = ref.watch(aiActionsProvider);
+    final isBusy = aiActionsState.isLoading;
+
+    return Column(
+      children: [
+        // Local AI Processing toggle
+        _SettingsTile(
+          leading: Icon(
+            Icons.auto_awesome,
+            color: localAiEnabled ? AppTheme.primaryColor : AppTheme.textSecondary,
+          ),
+          title: 'Local AI Processing',
+          subtitle: 'Enable AI processing of voice notes',
+          trailing: Switch(
+            value: localAiEnabled,
+            onChanged: (value) {
+              ref.read(localAiEnabledProvider.notifier).setEnabled(value);
+            },
+          ),
+        ),
+
+        // Auto-process after transcription toggle
+        Opacity(
+          opacity: localAiEnabled ? 1.0 : 0.5,
+          child: _SettingsTile(
+            leading: Icon(
+              Icons.autorenew,
+              color: autoProcessEnabled && localAiEnabled
+                  ? AppTheme.primaryColor
+                  : AppTheme.textSecondary,
+            ),
+            title: 'Auto-process after transcription',
+            subtitle: localAiEnabled
+                ? 'Automatically process voice notes after transcription'
+                : 'Enable Local AI Processing first',
+            trailing: Switch(
+              value: autoProcessEnabled,
+              onChanged: localAiEnabled
+                  ? (value) {
+                      ref
+                          .read(autoProcessVoiceNotesProvider.notifier)
+                          .setEnabled(value);
+                    }
+                  : null,
+            ),
+          ),
+        ),
+
+        // LLM Model tile
+        const _LlmModelTile(),
+
+        // Process all unprocessed button
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppTheme.spacingMd,
+            AppTheme.spacingSm,
+            AppTheme.spacingMd,
+            0,
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: isBusy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_awesome),
+              label: Text(isBusy
+                  ? 'Processing...'
+                  : 'Process all unprocessed'),
+              onPressed: isBusy || !localAiEnabled
+                  ? null
+                  : () async {
+                      final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Process all unprocessed memos?'),
+                              content: const Text(
+                                'This will process all voice memos that have not yet been processed with AI.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  child: const Text('Process'),
+                                ),
+                              ],
+                            ),
+                          ) ??
+                          false;
+
+                      if (!confirmed || !context.mounted) return;
+
+                      try {
+                        await ref
+                            .read(aiActionsProvider.notifier)
+                            .processAllUnprocessed();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Started processing unprocessed memos'),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Processing failed: $e'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppTheme.spacingMd,
+            AppTheme.spacingSm,
+            AppTheme.spacingMd,
+            0,
+          ),
+          child: Text(
+            'Process voice memos with AI to extract tasks, summaries, and more.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// LLM Model tile showing download status
+class _LlmModelTile extends ConsumerStatefulWidget {
+  const _LlmModelTile();
+
+  @override
+  ConsumerState<_LlmModelTile> createState() => _LlmModelTileState();
+}
+
+class _LlmModelTileState extends ConsumerState<_LlmModelTile> {
+  static String _formatBytes(int bytes) {
+    const kb = 1024;
+    const mb = kb * 1024;
+    const gb = mb * 1024;
+    if (bytes >= gb) {
+      return '${(bytes / gb).toStringAsFixed(2)} GB';
+    }
+    if (bytes >= mb) {
+      return '${(bytes / mb).toStringAsFixed(1)} MB';
+    }
+    if (bytes >= kb) {
+      return '${(bytes / kb).toStringAsFixed(1)} KB';
+    }
+    return '$bytes B';
+  }
+
+  void _refreshModelProviders() {
+    ref.invalidate(llmAvailableModelsProvider);
+    ref.invalidate(selectedLlmModelInfoProvider);
+    ref.invalidate(llmModelDownloadedProvider);
+    ref.invalidate(llmModelSizeProvider);
+    ref.invalidate(llmServiceStateProvider);
+  }
+
+  Future<void> _downloadModel(BuildContext context) async {
+    final llmService = ref.read(llmServiceProvider);
+
+    try {
+      await llmService.downloadModel();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Model downloaded successfully')),
+        );
+      }
+
+      _refreshModelProviders();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteModel(BuildContext context) async {
+    final selectedModel = await ref.read(selectedLlmModelInfoProvider.future);
+    final shouldDelete = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete model?'),
+            content: Text(
+              selectedModel.userProvided
+                  ? 'Delete this imported model from local storage?'
+                  : 'Delete the selected model from local storage?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!shouldDelete) return;
+
+    final llmService = ref.read(llmServiceProvider);
+
+    try {
+      await llmService.deleteModel();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Model deleted')),
+        );
+      }
+
+      _refreshModelProviders();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Delete failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _importModel(BuildContext context) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        dialogTitle: 'Select a GGUF model file',
+      );
+
+      final path = result?.files.single.path;
+      if (path == null) {
+        return;
+      }
+
+      if (!path.toLowerCase().endsWith('.gguf')) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Only .gguf model files can be imported'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final llmService = ref.read(llmServiceProvider);
+      final imported = await llmService.importModel(path);
+      ref.read(selectedAiModelIdProvider.notifier).setModelId(imported.id);
+      _refreshModelProviders();
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Imported ${imported.filename}')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Import failed: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedModelId = ref.watch(selectedAiModelIdProvider);
+    final availableModelsAsync = ref.watch(llmAvailableModelsProvider);
+    final selectedModelAsync = ref.watch(selectedLlmModelInfoProvider);
+    final isDownloadedAsync = ref.watch(llmModelDownloadedProvider);
+    final modelSizeAsync = ref.watch(llmModelSizeProvider);
+    final serviceStateAsync = ref.watch(llmServiceStateProvider);
+
+    return selectedModelAsync.when(
+      data: (selectedModel) {
+        return isDownloadedAsync.when(
+          data: (isDownloaded) {
+        final localSize = modelSizeAsync.when(
+          data: (size) => size != null ? _formatBytes(size) : null,
+          loading: () => null,
+          error: (_, __) => null,
+        );
+
+        final isDownloading = serviceStateAsync.when(
+          data: (state) => state.status == LlmServiceStatus.downloading,
+          loading: () => false,
+          error: (_, __) => false,
+        );
+
+        final downloadProgress = serviceStateAsync.when(
+          data: (state) => state.downloadProgress,
+          loading: () => 0.0,
+          error: (_, __) => 0.0,
+        );
+
+        final canDownload = selectedModel.isDownloadable && !selectedModel.userProvided;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- Active model status banner ---
+            Container(
+              margin: const EdgeInsets.fromLTRB(
+                AppTheme.spacingMd,
+                AppTheme.spacingSm,
+                AppTheme.spacingMd,
+                0,
+              ),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDownloaded
+                    ? AppTheme.successColor.withValues(alpha: 0.08)
+                    : AppTheme.warningColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                border: Border.all(
+                  color: isDownloaded
+                      ? AppTheme.successColor.withValues(alpha: 0.3)
+                      : AppTheme.warningColor.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isDownloaded ? Icons.check_circle : Icons.warning_amber,
+                    size: 20,
+                    color: isDownloaded
+                        ? AppTheme.successColor
+                        : AppTheme.warningColor,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isDownloaded ? 'Active model' : 'Model not downloaded',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: isDownloaded
+                                    ? AppTheme.successColor
+                                    : AppTheme.warningColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          selectedModel.displayName,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        if (localSize != null)
+                          Text(
+                            localSize,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // --- Model selector dropdown ---
+            availableModelsAsync.when(
+              data: (models) => Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.spacingMd,
+                  12,
+                  AppTheme.spacingMd,
+                  0,
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: models.any((m) => m.id == selectedModelId)
+                      ? selectedModelId
+                      : models.isNotEmpty
+                          ? models.first.id
+                          : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Change model',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                  ),
+                  items: models
+                      .map(
+                        (model) => DropdownMenuItem<String>(
+                          value: model.id,
+                          child: Text(
+                            model.displayName,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: isDownloading
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          ref
+                              .read(selectedAiModelIdProvider.notifier)
+                              .setModelId(value);
+                          _refreshModelProviders();
+                        },
+                ),
+              ),
+              loading: () => const Padding(
+                padding: EdgeInsets.all(AppTheme.spacingMd),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.all(AppTheme.spacingMd),
+                child: Text('Error loading models: $e',
+                    style: const TextStyle(color: AppTheme.errorColor)),
+              ),
+            ),
+
+            // --- Download progress ---
+            if (isDownloading)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.spacingMd,
+                  12,
+                  AppTheme.spacingMd,
+                  0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LinearProgressIndicator(
+                      value: downloadProgress > 0 ? downloadProgress : null,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      downloadProgress > 0
+                          ? 'Downloading... ${(downloadProgress * 100).toStringAsFixed(0)}%'
+                          : 'Starting download...',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // --- Action buttons ---
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.spacingMd,
+                12,
+                AppTheme.spacingMd,
+                AppTheme.spacingSm,
+              ),
+              child: Row(
+                children: [
+                  // Primary action: Download or Delete for the selected model
+                  if (isDownloaded)
+                    OutlinedButton.icon(
+                      onPressed: isDownloading
+                          ? null
+                          : () => _deleteModel(context),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: const Text('Delete'),
+                    )
+                  else if (canDownload)
+                    FilledButton.icon(
+                      onPressed: isDownloading
+                          ? null
+                          : () => _downloadModel(context),
+                      icon: isDownloading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.download, size: 18),
+                      label: Text(
+                          isDownloading ? 'Downloading...' : 'Download'),
+                    ),
+                  const SizedBox(width: AppTheme.spacingSm),
+                  // Secondary action: Import a custom GGUF
+                  OutlinedButton.icon(
+                    onPressed: isDownloading
+                        ? null
+                        : () => _importModel(context),
+                    icon: const Icon(Icons.upload_file, size: 18),
+                    label: const Text('Import .gguf'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+          },
+          loading: () => const ListTile(
+            leading: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            title: Text('Loading model status...'),
+          ),
+          error: (e, _) => ListTile(
+            leading: const Icon(Icons.error, color: AppTheme.errorColor),
+            title: Text(selectedModel.displayName),
+            subtitle: Text('Error loading model status: $e'),
+          ),
+        );
+      },
+      loading: () => const ListTile(
+        leading: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        title: Text('Loading model info...'),
+      ),
+      error: (e, _) => ListTile(
+        leading: const Icon(Icons.error, color: AppTheme.errorColor),
+        title: const Text('AI model'),
+        subtitle: Text('Error loading model status: $e'),
       ),
     );
   }
