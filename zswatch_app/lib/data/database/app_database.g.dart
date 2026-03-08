@@ -2607,6 +2607,103 @@ class $VoiceMemosTable extends VoiceMemos
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _summaryMeta = const VerificationMeta(
+    'summary',
+  );
+  @override
+  late final GeneratedColumn<String> summary = GeneratedColumn<String>(
+    'summary',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _processingStatusMeta = const VerificationMeta(
+    'processingStatus',
+  );
+  @override
+  late final GeneratedColumn<String> processingStatus = GeneratedColumn<String>(
+    'processing_status',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _aiModelMeta = const VerificationMeta(
+    'aiModel',
+  );
+  @override
+  late final GeneratedColumn<String> aiModel = GeneratedColumn<String>(
+    'ai_model',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _aiProcessedAtMeta = const VerificationMeta(
+    'aiProcessedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> aiProcessedAt =
+      GeneratedColumn<DateTime>(
+        'ai_processed_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _taskCreatedMeta = const VerificationMeta(
+    'taskCreated',
+  );
+  @override
+  late final GeneratedColumn<bool> taskCreated = GeneratedColumn<bool>(
+    'task_created',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("task_created" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _calendarEventCreatedMeta =
+      const VerificationMeta('calendarEventCreated');
+  @override
+  late final GeneratedColumn<bool> calendarEventCreated = GeneratedColumn<bool>(
+    'calendar_event_created',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("calendar_event_created" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _actionReviewStateMeta = const VerificationMeta(
+    'actionReviewState',
+  );
+  @override
+  late final GeneratedColumn<String> actionReviewState =
+      GeneratedColumn<String>(
+        'action_review_state',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2621,6 +2718,14 @@ class $VoiceMemosTable extends VoiceMemos
     downloadedAt,
     transcribedAt,
     convertedFilePath,
+    summary,
+    category,
+    processingStatus,
+    aiModel,
+    aiProcessedAt,
+    taskCreated,
+    calendarEventCreated,
+    actionReviewState,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2735,6 +2840,69 @@ class $VoiceMemosTable extends VoiceMemos
         ),
       );
     }
+    if (data.containsKey('summary')) {
+      context.handle(
+        _summaryMeta,
+        summary.isAcceptableOrUnknown(data['summary']!, _summaryMeta),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('processing_status')) {
+      context.handle(
+        _processingStatusMeta,
+        processingStatus.isAcceptableOrUnknown(
+          data['processing_status']!,
+          _processingStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ai_model')) {
+      context.handle(
+        _aiModelMeta,
+        aiModel.isAcceptableOrUnknown(data['ai_model']!, _aiModelMeta),
+      );
+    }
+    if (data.containsKey('ai_processed_at')) {
+      context.handle(
+        _aiProcessedAtMeta,
+        aiProcessedAt.isAcceptableOrUnknown(
+          data['ai_processed_at']!,
+          _aiProcessedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('task_created')) {
+      context.handle(
+        _taskCreatedMeta,
+        taskCreated.isAcceptableOrUnknown(
+          data['task_created']!,
+          _taskCreatedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('calendar_event_created')) {
+      context.handle(
+        _calendarEventCreatedMeta,
+        calendarEventCreated.isAcceptableOrUnknown(
+          data['calendar_event_created']!,
+          _calendarEventCreatedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('action_review_state')) {
+      context.handle(
+        _actionReviewStateMeta,
+        actionReviewState.isAcceptableOrUnknown(
+          data['action_review_state']!,
+          _actionReviewStateMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2792,6 +2960,38 @@ class $VoiceMemosTable extends VoiceMemos
         DriftSqlType.string,
         data['${effectivePrefix}converted_file_path'],
       ),
+      summary: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}summary'],
+      ),
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      ),
+      processingStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}processing_status'],
+      ),
+      aiModel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ai_model'],
+      ),
+      aiProcessedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}ai_processed_at'],
+      ),
+      taskCreated: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}task_created'],
+      )!,
+      calendarEventCreated: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}calendar_event_created'],
+      )!,
+      actionReviewState: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}action_review_state'],
+      ),
     );
   }
 
@@ -2837,6 +3037,31 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
 
   /// Path to converted audio file (WAV/Ogg) for playback/transcription
   final String? convertedFilePath;
+
+  /// AI-generated summary of the voice note
+  final String? summary;
+
+  /// AI-assigned category: 'idea', 'task', 'reminder', 'meeting', 'note'
+  final String? category;
+
+  /// Current AI processing status: 'pending', 'summarizing', 'categorizing',
+  /// 'extractingActions', 'ready', 'failed'
+  final String? processingStatus;
+
+  /// Which AI model was used for processing
+  final String? aiModel;
+
+  /// When AI processing completed
+  final DateTime? aiProcessedAt;
+
+  /// Whether a task has been created from this memo's suggestions
+  final bool taskCreated;
+
+  /// Whether a calendar event has been created from this memo's suggestions
+  final bool calendarEventCreated;
+
+  /// Review state for extracted actions: 'pending', 'reviewed', 'dismissed'
+  final String? actionReviewState;
   const VoiceMemoEntity({
     required this.id,
     required this.filename,
@@ -2850,6 +3075,14 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
     this.downloadedAt,
     this.transcribedAt,
     this.convertedFilePath,
+    this.summary,
+    this.category,
+    this.processingStatus,
+    this.aiModel,
+    this.aiProcessedAt,
+    required this.taskCreated,
+    required this.calendarEventCreated,
+    this.actionReviewState,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2875,6 +3108,26 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
     }
     if (!nullToAbsent || convertedFilePath != null) {
       map['converted_file_path'] = Variable<String>(convertedFilePath);
+    }
+    if (!nullToAbsent || summary != null) {
+      map['summary'] = Variable<String>(summary);
+    }
+    if (!nullToAbsent || category != null) {
+      map['category'] = Variable<String>(category);
+    }
+    if (!nullToAbsent || processingStatus != null) {
+      map['processing_status'] = Variable<String>(processingStatus);
+    }
+    if (!nullToAbsent || aiModel != null) {
+      map['ai_model'] = Variable<String>(aiModel);
+    }
+    if (!nullToAbsent || aiProcessedAt != null) {
+      map['ai_processed_at'] = Variable<DateTime>(aiProcessedAt);
+    }
+    map['task_created'] = Variable<bool>(taskCreated);
+    map['calendar_event_created'] = Variable<bool>(calendarEventCreated);
+    if (!nullToAbsent || actionReviewState != null) {
+      map['action_review_state'] = Variable<String>(actionReviewState);
     }
     return map;
   }
@@ -2903,6 +3156,26 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
       convertedFilePath: convertedFilePath == null && nullToAbsent
           ? const Value.absent()
           : Value(convertedFilePath),
+      summary: summary == null && nullToAbsent
+          ? const Value.absent()
+          : Value(summary),
+      category: category == null && nullToAbsent
+          ? const Value.absent()
+          : Value(category),
+      processingStatus: processingStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(processingStatus),
+      aiModel: aiModel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(aiModel),
+      aiProcessedAt: aiProcessedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(aiProcessedAt),
+      taskCreated: Value(taskCreated),
+      calendarEventCreated: Value(calendarEventCreated),
+      actionReviewState: actionReviewState == null && nullToAbsent
+          ? const Value.absent()
+          : Value(actionReviewState),
     );
   }
 
@@ -2926,6 +3199,18 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
       convertedFilePath: serializer.fromJson<String?>(
         json['convertedFilePath'],
       ),
+      summary: serializer.fromJson<String?>(json['summary']),
+      category: serializer.fromJson<String?>(json['category']),
+      processingStatus: serializer.fromJson<String?>(json['processingStatus']),
+      aiModel: serializer.fromJson<String?>(json['aiModel']),
+      aiProcessedAt: serializer.fromJson<DateTime?>(json['aiProcessedAt']),
+      taskCreated: serializer.fromJson<bool>(json['taskCreated']),
+      calendarEventCreated: serializer.fromJson<bool>(
+        json['calendarEventCreated'],
+      ),
+      actionReviewState: serializer.fromJson<String?>(
+        json['actionReviewState'],
+      ),
     );
   }
   @override
@@ -2944,6 +3229,14 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
       'downloadedAt': serializer.toJson<DateTime?>(downloadedAt),
       'transcribedAt': serializer.toJson<DateTime?>(transcribedAt),
       'convertedFilePath': serializer.toJson<String?>(convertedFilePath),
+      'summary': serializer.toJson<String?>(summary),
+      'category': serializer.toJson<String?>(category),
+      'processingStatus': serializer.toJson<String?>(processingStatus),
+      'aiModel': serializer.toJson<String?>(aiModel),
+      'aiProcessedAt': serializer.toJson<DateTime?>(aiProcessedAt),
+      'taskCreated': serializer.toJson<bool>(taskCreated),
+      'calendarEventCreated': serializer.toJson<bool>(calendarEventCreated),
+      'actionReviewState': serializer.toJson<String?>(actionReviewState),
     };
   }
 
@@ -2960,6 +3253,14 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
     Value<DateTime?> downloadedAt = const Value.absent(),
     Value<DateTime?> transcribedAt = const Value.absent(),
     Value<String?> convertedFilePath = const Value.absent(),
+    Value<String?> summary = const Value.absent(),
+    Value<String?> category = const Value.absent(),
+    Value<String?> processingStatus = const Value.absent(),
+    Value<String?> aiModel = const Value.absent(),
+    Value<DateTime?> aiProcessedAt = const Value.absent(),
+    bool? taskCreated,
+    bool? calendarEventCreated,
+    Value<String?> actionReviewState = const Value.absent(),
   }) => VoiceMemoEntity(
     id: id ?? this.id,
     filename: filename ?? this.filename,
@@ -2981,6 +3282,20 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
     convertedFilePath: convertedFilePath.present
         ? convertedFilePath.value
         : this.convertedFilePath,
+    summary: summary.present ? summary.value : this.summary,
+    category: category.present ? category.value : this.category,
+    processingStatus: processingStatus.present
+        ? processingStatus.value
+        : this.processingStatus,
+    aiModel: aiModel.present ? aiModel.value : this.aiModel,
+    aiProcessedAt: aiProcessedAt.present
+        ? aiProcessedAt.value
+        : this.aiProcessedAt,
+    taskCreated: taskCreated ?? this.taskCreated,
+    calendarEventCreated: calendarEventCreated ?? this.calendarEventCreated,
+    actionReviewState: actionReviewState.present
+        ? actionReviewState.value
+        : this.actionReviewState,
   );
   VoiceMemoEntity copyWithCompanion(VoiceMemosCompanion data) {
     return VoiceMemoEntity(
@@ -3014,6 +3329,24 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
       convertedFilePath: data.convertedFilePath.present
           ? data.convertedFilePath.value
           : this.convertedFilePath,
+      summary: data.summary.present ? data.summary.value : this.summary,
+      category: data.category.present ? data.category.value : this.category,
+      processingStatus: data.processingStatus.present
+          ? data.processingStatus.value
+          : this.processingStatus,
+      aiModel: data.aiModel.present ? data.aiModel.value : this.aiModel,
+      aiProcessedAt: data.aiProcessedAt.present
+          ? data.aiProcessedAt.value
+          : this.aiProcessedAt,
+      taskCreated: data.taskCreated.present
+          ? data.taskCreated.value
+          : this.taskCreated,
+      calendarEventCreated: data.calendarEventCreated.present
+          ? data.calendarEventCreated.value
+          : this.calendarEventCreated,
+      actionReviewState: data.actionReviewState.present
+          ? data.actionReviewState.value
+          : this.actionReviewState,
     );
   }
 
@@ -3031,7 +3364,15 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
           ..write('deletedOnWatch: $deletedOnWatch, ')
           ..write('downloadedAt: $downloadedAt, ')
           ..write('transcribedAt: $transcribedAt, ')
-          ..write('convertedFilePath: $convertedFilePath')
+          ..write('convertedFilePath: $convertedFilePath, ')
+          ..write('summary: $summary, ')
+          ..write('category: $category, ')
+          ..write('processingStatus: $processingStatus, ')
+          ..write('aiModel: $aiModel, ')
+          ..write('aiProcessedAt: $aiProcessedAt, ')
+          ..write('taskCreated: $taskCreated, ')
+          ..write('calendarEventCreated: $calendarEventCreated, ')
+          ..write('actionReviewState: $actionReviewState')
           ..write(')'))
         .toString();
   }
@@ -3050,6 +3391,14 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
     downloadedAt,
     transcribedAt,
     convertedFilePath,
+    summary,
+    category,
+    processingStatus,
+    aiModel,
+    aiProcessedAt,
+    taskCreated,
+    calendarEventCreated,
+    actionReviewState,
   );
   @override
   bool operator ==(Object other) =>
@@ -3066,7 +3415,15 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
           other.deletedOnWatch == this.deletedOnWatch &&
           other.downloadedAt == this.downloadedAt &&
           other.transcribedAt == this.transcribedAt &&
-          other.convertedFilePath == this.convertedFilePath);
+          other.convertedFilePath == this.convertedFilePath &&
+          other.summary == this.summary &&
+          other.category == this.category &&
+          other.processingStatus == this.processingStatus &&
+          other.aiModel == this.aiModel &&
+          other.aiProcessedAt == this.aiProcessedAt &&
+          other.taskCreated == this.taskCreated &&
+          other.calendarEventCreated == this.calendarEventCreated &&
+          other.actionReviewState == this.actionReviewState);
 }
 
 class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
@@ -3082,6 +3439,14 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
   final Value<DateTime?> downloadedAt;
   final Value<DateTime?> transcribedAt;
   final Value<String?> convertedFilePath;
+  final Value<String?> summary;
+  final Value<String?> category;
+  final Value<String?> processingStatus;
+  final Value<String?> aiModel;
+  final Value<DateTime?> aiProcessedAt;
+  final Value<bool> taskCreated;
+  final Value<bool> calendarEventCreated;
+  final Value<String?> actionReviewState;
   const VoiceMemosCompanion({
     this.id = const Value.absent(),
     this.filename = const Value.absent(),
@@ -3095,6 +3460,14 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
     this.downloadedAt = const Value.absent(),
     this.transcribedAt = const Value.absent(),
     this.convertedFilePath = const Value.absent(),
+    this.summary = const Value.absent(),
+    this.category = const Value.absent(),
+    this.processingStatus = const Value.absent(),
+    this.aiModel = const Value.absent(),
+    this.aiProcessedAt = const Value.absent(),
+    this.taskCreated = const Value.absent(),
+    this.calendarEventCreated = const Value.absent(),
+    this.actionReviewState = const Value.absent(),
   });
   VoiceMemosCompanion.insert({
     this.id = const Value.absent(),
@@ -3109,6 +3482,14 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
     this.downloadedAt = const Value.absent(),
     this.transcribedAt = const Value.absent(),
     this.convertedFilePath = const Value.absent(),
+    this.summary = const Value.absent(),
+    this.category = const Value.absent(),
+    this.processingStatus = const Value.absent(),
+    this.aiModel = const Value.absent(),
+    this.aiProcessedAt = const Value.absent(),
+    this.taskCreated = const Value.absent(),
+    this.calendarEventCreated = const Value.absent(),
+    this.actionReviewState = const Value.absent(),
   }) : filename = Value(filename),
        timestampUtc = Value(timestampUtc),
        durationMs = Value(durationMs),
@@ -3126,6 +3507,14 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
     Expression<DateTime>? downloadedAt,
     Expression<DateTime>? transcribedAt,
     Expression<String>? convertedFilePath,
+    Expression<String>? summary,
+    Expression<String>? category,
+    Expression<String>? processingStatus,
+    Expression<String>? aiModel,
+    Expression<DateTime>? aiProcessedAt,
+    Expression<bool>? taskCreated,
+    Expression<bool>? calendarEventCreated,
+    Expression<String>? actionReviewState,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3140,6 +3529,15 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
       if (downloadedAt != null) 'downloaded_at': downloadedAt,
       if (transcribedAt != null) 'transcribed_at': transcribedAt,
       if (convertedFilePath != null) 'converted_file_path': convertedFilePath,
+      if (summary != null) 'summary': summary,
+      if (category != null) 'category': category,
+      if (processingStatus != null) 'processing_status': processingStatus,
+      if (aiModel != null) 'ai_model': aiModel,
+      if (aiProcessedAt != null) 'ai_processed_at': aiProcessedAt,
+      if (taskCreated != null) 'task_created': taskCreated,
+      if (calendarEventCreated != null)
+        'calendar_event_created': calendarEventCreated,
+      if (actionReviewState != null) 'action_review_state': actionReviewState,
     });
   }
 
@@ -3156,6 +3554,14 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
     Value<DateTime?>? downloadedAt,
     Value<DateTime?>? transcribedAt,
     Value<String?>? convertedFilePath,
+    Value<String?>? summary,
+    Value<String?>? category,
+    Value<String?>? processingStatus,
+    Value<String?>? aiModel,
+    Value<DateTime?>? aiProcessedAt,
+    Value<bool>? taskCreated,
+    Value<bool>? calendarEventCreated,
+    Value<String?>? actionReviewState,
   }) {
     return VoiceMemosCompanion(
       id: id ?? this.id,
@@ -3170,6 +3576,14 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
       downloadedAt: downloadedAt ?? this.downloadedAt,
       transcribedAt: transcribedAt ?? this.transcribedAt,
       convertedFilePath: convertedFilePath ?? this.convertedFilePath,
+      summary: summary ?? this.summary,
+      category: category ?? this.category,
+      processingStatus: processingStatus ?? this.processingStatus,
+      aiModel: aiModel ?? this.aiModel,
+      aiProcessedAt: aiProcessedAt ?? this.aiProcessedAt,
+      taskCreated: taskCreated ?? this.taskCreated,
+      calendarEventCreated: calendarEventCreated ?? this.calendarEventCreated,
+      actionReviewState: actionReviewState ?? this.actionReviewState,
     );
   }
 
@@ -3212,6 +3626,32 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
     if (convertedFilePath.present) {
       map['converted_file_path'] = Variable<String>(convertedFilePath.value);
     }
+    if (summary.present) {
+      map['summary'] = Variable<String>(summary.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (processingStatus.present) {
+      map['processing_status'] = Variable<String>(processingStatus.value);
+    }
+    if (aiModel.present) {
+      map['ai_model'] = Variable<String>(aiModel.value);
+    }
+    if (aiProcessedAt.present) {
+      map['ai_processed_at'] = Variable<DateTime>(aiProcessedAt.value);
+    }
+    if (taskCreated.present) {
+      map['task_created'] = Variable<bool>(taskCreated.value);
+    }
+    if (calendarEventCreated.present) {
+      map['calendar_event_created'] = Variable<bool>(
+        calendarEventCreated.value,
+      );
+    }
+    if (actionReviewState.present) {
+      map['action_review_state'] = Variable<String>(actionReviewState.value);
+    }
     return map;
   }
 
@@ -3229,7 +3669,853 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
           ..write('deletedOnWatch: $deletedOnWatch, ')
           ..write('downloadedAt: $downloadedAt, ')
           ..write('transcribedAt: $transcribedAt, ')
-          ..write('convertedFilePath: $convertedFilePath')
+          ..write('convertedFilePath: $convertedFilePath, ')
+          ..write('summary: $summary, ')
+          ..write('category: $category, ')
+          ..write('processingStatus: $processingStatus, ')
+          ..write('aiModel: $aiModel, ')
+          ..write('aiProcessedAt: $aiProcessedAt, ')
+          ..write('taskCreated: $taskCreated, ')
+          ..write('calendarEventCreated: $calendarEventCreated, ')
+          ..write('actionReviewState: $actionReviewState')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ExtractedActionsTable extends ExtractedActions
+    with TableInfo<$ExtractedActionsTable, ExtractedActionEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ExtractedActionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _memoIdMeta = const VerificationMeta('memoId');
+  @override
+  late final GeneratedColumn<int> memoId = GeneratedColumn<int>(
+    'memo_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _actionTypeMeta = const VerificationMeta(
+    'actionType',
+  );
+  @override
+  late final GeneratedColumn<String> actionType = GeneratedColumn<String>(
+    'action_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _startTimeMeta = const VerificationMeta(
+    'startTime',
+  );
+  @override
+  late final GeneratedColumn<DateTime> startTime = GeneratedColumn<DateTime>(
+    'start_time',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _endTimeMeta = const VerificationMeta(
+    'endTime',
+  );
+  @override
+  late final GeneratedColumn<DateTime> endTime = GeneratedColumn<DateTime>(
+    'end_time',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dueDateMeta = const VerificationMeta(
+    'dueDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> dueDate = GeneratedColumn<DateTime>(
+    'due_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _locationMeta = const VerificationMeta(
+    'location',
+  );
+  @override
+  late final GeneratedColumn<String> location = GeneratedColumn<String>(
+    'location',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _reminderMinutesMeta = const VerificationMeta(
+    'reminderMinutes',
+  );
+  @override
+  late final GeneratedColumn<int> reminderMinutes = GeneratedColumn<int>(
+    'reminder_minutes',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdMeta = const VerificationMeta(
+    'created',
+  );
+  @override
+  late final GeneratedColumn<bool> created = GeneratedColumn<bool>(
+    'created',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("created" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _dismissedMeta = const VerificationMeta(
+    'dismissed',
+  );
+  @override
+  late final GeneratedColumn<bool> dismissed = GeneratedColumn<bool>(
+    'dismissed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dismissed" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _platformTargetIdMeta = const VerificationMeta(
+    'platformTargetId',
+  );
+  @override
+  late final GeneratedColumn<String> platformTargetId = GeneratedColumn<String>(
+    'platform_target_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    memoId,
+    actionType,
+    title,
+    notes,
+    startTime,
+    endTime,
+    dueDate,
+    location,
+    reminderMinutes,
+    created,
+    dismissed,
+    platformTargetId,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'extracted_actions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ExtractedActionEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('memo_id')) {
+      context.handle(
+        _memoIdMeta,
+        memoId.isAcceptableOrUnknown(data['memo_id']!, _memoIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_memoIdMeta);
+    }
+    if (data.containsKey('action_type')) {
+      context.handle(
+        _actionTypeMeta,
+        actionType.isAcceptableOrUnknown(data['action_type']!, _actionTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_actionTypeMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('start_time')) {
+      context.handle(
+        _startTimeMeta,
+        startTime.isAcceptableOrUnknown(data['start_time']!, _startTimeMeta),
+      );
+    }
+    if (data.containsKey('end_time')) {
+      context.handle(
+        _endTimeMeta,
+        endTime.isAcceptableOrUnknown(data['end_time']!, _endTimeMeta),
+      );
+    }
+    if (data.containsKey('due_date')) {
+      context.handle(
+        _dueDateMeta,
+        dueDate.isAcceptableOrUnknown(data['due_date']!, _dueDateMeta),
+      );
+    }
+    if (data.containsKey('location')) {
+      context.handle(
+        _locationMeta,
+        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
+      );
+    }
+    if (data.containsKey('reminder_minutes')) {
+      context.handle(
+        _reminderMinutesMeta,
+        reminderMinutes.isAcceptableOrUnknown(
+          data['reminder_minutes']!,
+          _reminderMinutesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created')) {
+      context.handle(
+        _createdMeta,
+        created.isAcceptableOrUnknown(data['created']!, _createdMeta),
+      );
+    }
+    if (data.containsKey('dismissed')) {
+      context.handle(
+        _dismissedMeta,
+        dismissed.isAcceptableOrUnknown(data['dismissed']!, _dismissedMeta),
+      );
+    }
+    if (data.containsKey('platform_target_id')) {
+      context.handle(
+        _platformTargetIdMeta,
+        platformTargetId.isAcceptableOrUnknown(
+          data['platform_target_id']!,
+          _platformTargetIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ExtractedActionEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ExtractedActionEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      memoId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}memo_id'],
+      )!,
+      actionType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}action_type'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      startTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}start_time'],
+      ),
+      endTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}end_time'],
+      ),
+      dueDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}due_date'],
+      ),
+      location: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location'],
+      ),
+      reminderMinutes: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reminder_minutes'],
+      ),
+      created: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}created'],
+      )!,
+      dismissed: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dismissed'],
+      )!,
+      platformTargetId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}platform_target_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      ),
+    );
+  }
+
+  @override
+  $ExtractedActionsTable createAlias(String alias) {
+    return $ExtractedActionsTable(attachedDatabase, alias);
+  }
+}
+
+class ExtractedActionEntity extends DataClass
+    implements Insertable<ExtractedActionEntity> {
+  /// Auto-incrementing row identifier
+  final int id;
+
+  /// Foreign key to the parent voice memo
+  final int memoId;
+
+  /// Action type: 'task', 'calendar_event', 'reminder'
+  final String actionType;
+
+  /// AI-generated title for the action
+  final String title;
+
+  /// Optional notes / body text
+  final String? notes;
+
+  /// Suggested start time (for calendar events)
+  final DateTime? startTime;
+
+  /// Suggested end time (for calendar events)
+  final DateTime? endTime;
+
+  /// Suggested due date (for tasks / reminders)
+  final DateTime? dueDate;
+
+  /// Optional location
+  final String? location;
+
+  /// Reminder offset in minutes before the event
+  final int? reminderMinutes;
+
+  /// Whether this action has been created in the OS (calendar / reminders)
+  final bool created;
+
+  /// Whether the user dismissed this suggestion
+  final bool dismissed;
+
+  /// Platform-specific ID after creation (e.g. calendar event ID)
+  final String? platformTargetId;
+
+  /// When this action was created in the OS
+  final DateTime? createdAt;
+  const ExtractedActionEntity({
+    required this.id,
+    required this.memoId,
+    required this.actionType,
+    required this.title,
+    this.notes,
+    this.startTime,
+    this.endTime,
+    this.dueDate,
+    this.location,
+    this.reminderMinutes,
+    required this.created,
+    required this.dismissed,
+    this.platformTargetId,
+    this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['memo_id'] = Variable<int>(memoId);
+    map['action_type'] = Variable<String>(actionType);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || startTime != null) {
+      map['start_time'] = Variable<DateTime>(startTime);
+    }
+    if (!nullToAbsent || endTime != null) {
+      map['end_time'] = Variable<DateTime>(endTime);
+    }
+    if (!nullToAbsent || dueDate != null) {
+      map['due_date'] = Variable<DateTime>(dueDate);
+    }
+    if (!nullToAbsent || location != null) {
+      map['location'] = Variable<String>(location);
+    }
+    if (!nullToAbsent || reminderMinutes != null) {
+      map['reminder_minutes'] = Variable<int>(reminderMinutes);
+    }
+    map['created'] = Variable<bool>(created);
+    map['dismissed'] = Variable<bool>(dismissed);
+    if (!nullToAbsent || platformTargetId != null) {
+      map['platform_target_id'] = Variable<String>(platformTargetId);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    return map;
+  }
+
+  ExtractedActionsCompanion toCompanion(bool nullToAbsent) {
+    return ExtractedActionsCompanion(
+      id: Value(id),
+      memoId: Value(memoId),
+      actionType: Value(actionType),
+      title: Value(title),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      startTime: startTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startTime),
+      endTime: endTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endTime),
+      dueDate: dueDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dueDate),
+      location: location == null && nullToAbsent
+          ? const Value.absent()
+          : Value(location),
+      reminderMinutes: reminderMinutes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderMinutes),
+      created: Value(created),
+      dismissed: Value(dismissed),
+      platformTargetId: platformTargetId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(platformTargetId),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+    );
+  }
+
+  factory ExtractedActionEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ExtractedActionEntity(
+      id: serializer.fromJson<int>(json['id']),
+      memoId: serializer.fromJson<int>(json['memoId']),
+      actionType: serializer.fromJson<String>(json['actionType']),
+      title: serializer.fromJson<String>(json['title']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      startTime: serializer.fromJson<DateTime?>(json['startTime']),
+      endTime: serializer.fromJson<DateTime?>(json['endTime']),
+      dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
+      location: serializer.fromJson<String?>(json['location']),
+      reminderMinutes: serializer.fromJson<int?>(json['reminderMinutes']),
+      created: serializer.fromJson<bool>(json['created']),
+      dismissed: serializer.fromJson<bool>(json['dismissed']),
+      platformTargetId: serializer.fromJson<String?>(json['platformTargetId']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'memoId': serializer.toJson<int>(memoId),
+      'actionType': serializer.toJson<String>(actionType),
+      'title': serializer.toJson<String>(title),
+      'notes': serializer.toJson<String?>(notes),
+      'startTime': serializer.toJson<DateTime?>(startTime),
+      'endTime': serializer.toJson<DateTime?>(endTime),
+      'dueDate': serializer.toJson<DateTime?>(dueDate),
+      'location': serializer.toJson<String?>(location),
+      'reminderMinutes': serializer.toJson<int?>(reminderMinutes),
+      'created': serializer.toJson<bool>(created),
+      'dismissed': serializer.toJson<bool>(dismissed),
+      'platformTargetId': serializer.toJson<String?>(platformTargetId),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+    };
+  }
+
+  ExtractedActionEntity copyWith({
+    int? id,
+    int? memoId,
+    String? actionType,
+    String? title,
+    Value<String?> notes = const Value.absent(),
+    Value<DateTime?> startTime = const Value.absent(),
+    Value<DateTime?> endTime = const Value.absent(),
+    Value<DateTime?> dueDate = const Value.absent(),
+    Value<String?> location = const Value.absent(),
+    Value<int?> reminderMinutes = const Value.absent(),
+    bool? created,
+    bool? dismissed,
+    Value<String?> platformTargetId = const Value.absent(),
+    Value<DateTime?> createdAt = const Value.absent(),
+  }) => ExtractedActionEntity(
+    id: id ?? this.id,
+    memoId: memoId ?? this.memoId,
+    actionType: actionType ?? this.actionType,
+    title: title ?? this.title,
+    notes: notes.present ? notes.value : this.notes,
+    startTime: startTime.present ? startTime.value : this.startTime,
+    endTime: endTime.present ? endTime.value : this.endTime,
+    dueDate: dueDate.present ? dueDate.value : this.dueDate,
+    location: location.present ? location.value : this.location,
+    reminderMinutes: reminderMinutes.present
+        ? reminderMinutes.value
+        : this.reminderMinutes,
+    created: created ?? this.created,
+    dismissed: dismissed ?? this.dismissed,
+    platformTargetId: platformTargetId.present
+        ? platformTargetId.value
+        : this.platformTargetId,
+    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+  );
+  ExtractedActionEntity copyWithCompanion(ExtractedActionsCompanion data) {
+    return ExtractedActionEntity(
+      id: data.id.present ? data.id.value : this.id,
+      memoId: data.memoId.present ? data.memoId.value : this.memoId,
+      actionType: data.actionType.present
+          ? data.actionType.value
+          : this.actionType,
+      title: data.title.present ? data.title.value : this.title,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      startTime: data.startTime.present ? data.startTime.value : this.startTime,
+      endTime: data.endTime.present ? data.endTime.value : this.endTime,
+      dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
+      location: data.location.present ? data.location.value : this.location,
+      reminderMinutes: data.reminderMinutes.present
+          ? data.reminderMinutes.value
+          : this.reminderMinutes,
+      created: data.created.present ? data.created.value : this.created,
+      dismissed: data.dismissed.present ? data.dismissed.value : this.dismissed,
+      platformTargetId: data.platformTargetId.present
+          ? data.platformTargetId.value
+          : this.platformTargetId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExtractedActionEntity(')
+          ..write('id: $id, ')
+          ..write('memoId: $memoId, ')
+          ..write('actionType: $actionType, ')
+          ..write('title: $title, ')
+          ..write('notes: $notes, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('location: $location, ')
+          ..write('reminderMinutes: $reminderMinutes, ')
+          ..write('created: $created, ')
+          ..write('dismissed: $dismissed, ')
+          ..write('platformTargetId: $platformTargetId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    memoId,
+    actionType,
+    title,
+    notes,
+    startTime,
+    endTime,
+    dueDate,
+    location,
+    reminderMinutes,
+    created,
+    dismissed,
+    platformTargetId,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ExtractedActionEntity &&
+          other.id == this.id &&
+          other.memoId == this.memoId &&
+          other.actionType == this.actionType &&
+          other.title == this.title &&
+          other.notes == this.notes &&
+          other.startTime == this.startTime &&
+          other.endTime == this.endTime &&
+          other.dueDate == this.dueDate &&
+          other.location == this.location &&
+          other.reminderMinutes == this.reminderMinutes &&
+          other.created == this.created &&
+          other.dismissed == this.dismissed &&
+          other.platformTargetId == this.platformTargetId &&
+          other.createdAt == this.createdAt);
+}
+
+class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
+  final Value<int> id;
+  final Value<int> memoId;
+  final Value<String> actionType;
+  final Value<String> title;
+  final Value<String?> notes;
+  final Value<DateTime?> startTime;
+  final Value<DateTime?> endTime;
+  final Value<DateTime?> dueDate;
+  final Value<String?> location;
+  final Value<int?> reminderMinutes;
+  final Value<bool> created;
+  final Value<bool> dismissed;
+  final Value<String?> platformTargetId;
+  final Value<DateTime?> createdAt;
+  const ExtractedActionsCompanion({
+    this.id = const Value.absent(),
+    this.memoId = const Value.absent(),
+    this.actionType = const Value.absent(),
+    this.title = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.startTime = const Value.absent(),
+    this.endTime = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.location = const Value.absent(),
+    this.reminderMinutes = const Value.absent(),
+    this.created = const Value.absent(),
+    this.dismissed = const Value.absent(),
+    this.platformTargetId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  ExtractedActionsCompanion.insert({
+    this.id = const Value.absent(),
+    required int memoId,
+    required String actionType,
+    required String title,
+    this.notes = const Value.absent(),
+    this.startTime = const Value.absent(),
+    this.endTime = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.location = const Value.absent(),
+    this.reminderMinutes = const Value.absent(),
+    this.created = const Value.absent(),
+    this.dismissed = const Value.absent(),
+    this.platformTargetId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  }) : memoId = Value(memoId),
+       actionType = Value(actionType),
+       title = Value(title);
+  static Insertable<ExtractedActionEntity> custom({
+    Expression<int>? id,
+    Expression<int>? memoId,
+    Expression<String>? actionType,
+    Expression<String>? title,
+    Expression<String>? notes,
+    Expression<DateTime>? startTime,
+    Expression<DateTime>? endTime,
+    Expression<DateTime>? dueDate,
+    Expression<String>? location,
+    Expression<int>? reminderMinutes,
+    Expression<bool>? created,
+    Expression<bool>? dismissed,
+    Expression<String>? platformTargetId,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (memoId != null) 'memo_id': memoId,
+      if (actionType != null) 'action_type': actionType,
+      if (title != null) 'title': title,
+      if (notes != null) 'notes': notes,
+      if (startTime != null) 'start_time': startTime,
+      if (endTime != null) 'end_time': endTime,
+      if (dueDate != null) 'due_date': dueDate,
+      if (location != null) 'location': location,
+      if (reminderMinutes != null) 'reminder_minutes': reminderMinutes,
+      if (created != null) 'created': created,
+      if (dismissed != null) 'dismissed': dismissed,
+      if (platformTargetId != null) 'platform_target_id': platformTargetId,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  ExtractedActionsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? memoId,
+    Value<String>? actionType,
+    Value<String>? title,
+    Value<String?>? notes,
+    Value<DateTime?>? startTime,
+    Value<DateTime?>? endTime,
+    Value<DateTime?>? dueDate,
+    Value<String?>? location,
+    Value<int?>? reminderMinutes,
+    Value<bool>? created,
+    Value<bool>? dismissed,
+    Value<String?>? platformTargetId,
+    Value<DateTime?>? createdAt,
+  }) {
+    return ExtractedActionsCompanion(
+      id: id ?? this.id,
+      memoId: memoId ?? this.memoId,
+      actionType: actionType ?? this.actionType,
+      title: title ?? this.title,
+      notes: notes ?? this.notes,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      dueDate: dueDate ?? this.dueDate,
+      location: location ?? this.location,
+      reminderMinutes: reminderMinutes ?? this.reminderMinutes,
+      created: created ?? this.created,
+      dismissed: dismissed ?? this.dismissed,
+      platformTargetId: platformTargetId ?? this.platformTargetId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (memoId.present) {
+      map['memo_id'] = Variable<int>(memoId.value);
+    }
+    if (actionType.present) {
+      map['action_type'] = Variable<String>(actionType.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (startTime.present) {
+      map['start_time'] = Variable<DateTime>(startTime.value);
+    }
+    if (endTime.present) {
+      map['end_time'] = Variable<DateTime>(endTime.value);
+    }
+    if (dueDate.present) {
+      map['due_date'] = Variable<DateTime>(dueDate.value);
+    }
+    if (location.present) {
+      map['location'] = Variable<String>(location.value);
+    }
+    if (reminderMinutes.present) {
+      map['reminder_minutes'] = Variable<int>(reminderMinutes.value);
+    }
+    if (created.present) {
+      map['created'] = Variable<bool>(created.value);
+    }
+    if (dismissed.present) {
+      map['dismissed'] = Variable<bool>(dismissed.value);
+    }
+    if (platformTargetId.present) {
+      map['platform_target_id'] = Variable<String>(platformTargetId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExtractedActionsCompanion(')
+          ..write('id: $id, ')
+          ..write('memoId: $memoId, ')
+          ..write('actionType: $actionType, ')
+          ..write('title: $title, ')
+          ..write('notes: $notes, ')
+          ..write('startTime: $startTime, ')
+          ..write('endTime: $endTime, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('location: $location, ')
+          ..write('reminderMinutes: $reminderMinutes, ')
+          ..write('created: $created, ')
+          ..write('dismissed: $dismissed, ')
+          ..write('platformTargetId: $platformTargetId, ')
+          ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
@@ -3248,6 +4534,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $VoiceMemosTable voiceMemos = $VoiceMemosTable(this);
+  late final $ExtractedActionsTable extractedActions = $ExtractedActionsTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3259,6 +4548,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     commLogEntries,
     connectionEvents,
     voiceMemos,
+    extractedActions,
   ];
 }
 
@@ -5180,6 +6470,14 @@ typedef $$VoiceMemosTableCreateCompanionBuilder =
       Value<DateTime?> downloadedAt,
       Value<DateTime?> transcribedAt,
       Value<String?> convertedFilePath,
+      Value<String?> summary,
+      Value<String?> category,
+      Value<String?> processingStatus,
+      Value<String?> aiModel,
+      Value<DateTime?> aiProcessedAt,
+      Value<bool> taskCreated,
+      Value<bool> calendarEventCreated,
+      Value<String?> actionReviewState,
     });
 typedef $$VoiceMemosTableUpdateCompanionBuilder =
     VoiceMemosCompanion Function({
@@ -5195,6 +6493,14 @@ typedef $$VoiceMemosTableUpdateCompanionBuilder =
       Value<DateTime?> downloadedAt,
       Value<DateTime?> transcribedAt,
       Value<String?> convertedFilePath,
+      Value<String?> summary,
+      Value<String?> category,
+      Value<String?> processingStatus,
+      Value<String?> aiModel,
+      Value<DateTime?> aiProcessedAt,
+      Value<bool> taskCreated,
+      Value<bool> calendarEventCreated,
+      Value<String?> actionReviewState,
     });
 
 class $$VoiceMemosTableFilterComposer
@@ -5263,6 +6569,46 @@ class $$VoiceMemosTableFilterComposer
 
   ColumnFilters<String> get convertedFilePath => $composableBuilder(
     column: $table.convertedFilePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get processingStatus => $composableBuilder(
+    column: $table.processingStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get aiModel => $composableBuilder(
+    column: $table.aiModel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get aiProcessedAt => $composableBuilder(
+    column: $table.aiProcessedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get taskCreated => $composableBuilder(
+    column: $table.taskCreated,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get calendarEventCreated => $composableBuilder(
+    column: $table.calendarEventCreated,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get actionReviewState => $composableBuilder(
+    column: $table.actionReviewState,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5335,6 +6681,46 @@ class $$VoiceMemosTableOrderingComposer
     column: $table.convertedFilePath,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get summary => $composableBuilder(
+    column: $table.summary,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get processingStatus => $composableBuilder(
+    column: $table.processingStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get aiModel => $composableBuilder(
+    column: $table.aiModel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get aiProcessedAt => $composableBuilder(
+    column: $table.aiProcessedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get taskCreated => $composableBuilder(
+    column: $table.taskCreated,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get calendarEventCreated => $composableBuilder(
+    column: $table.calendarEventCreated,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get actionReviewState => $composableBuilder(
+    column: $table.actionReviewState,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$VoiceMemosTableAnnotationComposer
@@ -5399,6 +6785,40 @@ class $$VoiceMemosTableAnnotationComposer
     column: $table.convertedFilePath,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get summary =>
+      $composableBuilder(column: $table.summary, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get processingStatus => $composableBuilder(
+    column: $table.processingStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get aiModel =>
+      $composableBuilder(column: $table.aiModel, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get aiProcessedAt => $composableBuilder(
+    column: $table.aiProcessedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get taskCreated => $composableBuilder(
+    column: $table.taskCreated,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get calendarEventCreated => $composableBuilder(
+    column: $table.calendarEventCreated,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get actionReviewState => $composableBuilder(
+    column: $table.actionReviewState,
+    builder: (column) => column,
+  );
 }
 
 class $$VoiceMemosTableTableManager
@@ -5444,6 +6864,14 @@ class $$VoiceMemosTableTableManager
                 Value<DateTime?> downloadedAt = const Value.absent(),
                 Value<DateTime?> transcribedAt = const Value.absent(),
                 Value<String?> convertedFilePath = const Value.absent(),
+                Value<String?> summary = const Value.absent(),
+                Value<String?> category = const Value.absent(),
+                Value<String?> processingStatus = const Value.absent(),
+                Value<String?> aiModel = const Value.absent(),
+                Value<DateTime?> aiProcessedAt = const Value.absent(),
+                Value<bool> taskCreated = const Value.absent(),
+                Value<bool> calendarEventCreated = const Value.absent(),
+                Value<String?> actionReviewState = const Value.absent(),
               }) => VoiceMemosCompanion(
                 id: id,
                 filename: filename,
@@ -5457,6 +6885,14 @@ class $$VoiceMemosTableTableManager
                 downloadedAt: downloadedAt,
                 transcribedAt: transcribedAt,
                 convertedFilePath: convertedFilePath,
+                summary: summary,
+                category: category,
+                processingStatus: processingStatus,
+                aiModel: aiModel,
+                aiProcessedAt: aiProcessedAt,
+                taskCreated: taskCreated,
+                calendarEventCreated: calendarEventCreated,
+                actionReviewState: actionReviewState,
               ),
           createCompanionCallback:
               ({
@@ -5472,6 +6908,14 @@ class $$VoiceMemosTableTableManager
                 Value<DateTime?> downloadedAt = const Value.absent(),
                 Value<DateTime?> transcribedAt = const Value.absent(),
                 Value<String?> convertedFilePath = const Value.absent(),
+                Value<String?> summary = const Value.absent(),
+                Value<String?> category = const Value.absent(),
+                Value<String?> processingStatus = const Value.absent(),
+                Value<String?> aiModel = const Value.absent(),
+                Value<DateTime?> aiProcessedAt = const Value.absent(),
+                Value<bool> taskCreated = const Value.absent(),
+                Value<bool> calendarEventCreated = const Value.absent(),
+                Value<String?> actionReviewState = const Value.absent(),
               }) => VoiceMemosCompanion.insert(
                 id: id,
                 filename: filename,
@@ -5485,6 +6929,14 @@ class $$VoiceMemosTableTableManager
                 downloadedAt: downloadedAt,
                 transcribedAt: transcribedAt,
                 convertedFilePath: convertedFilePath,
+                summary: summary,
+                category: category,
+                processingStatus: processingStatus,
+                aiModel: aiModel,
+                aiProcessedAt: aiProcessedAt,
+                taskCreated: taskCreated,
+                calendarEventCreated: calendarEventCreated,
+                actionReviewState: actionReviewState,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -5511,6 +6963,387 @@ typedef $$VoiceMemosTableProcessedTableManager =
       VoiceMemoEntity,
       PrefetchHooks Function()
     >;
+typedef $$ExtractedActionsTableCreateCompanionBuilder =
+    ExtractedActionsCompanion Function({
+      Value<int> id,
+      required int memoId,
+      required String actionType,
+      required String title,
+      Value<String?> notes,
+      Value<DateTime?> startTime,
+      Value<DateTime?> endTime,
+      Value<DateTime?> dueDate,
+      Value<String?> location,
+      Value<int?> reminderMinutes,
+      Value<bool> created,
+      Value<bool> dismissed,
+      Value<String?> platformTargetId,
+      Value<DateTime?> createdAt,
+    });
+typedef $$ExtractedActionsTableUpdateCompanionBuilder =
+    ExtractedActionsCompanion Function({
+      Value<int> id,
+      Value<int> memoId,
+      Value<String> actionType,
+      Value<String> title,
+      Value<String?> notes,
+      Value<DateTime?> startTime,
+      Value<DateTime?> endTime,
+      Value<DateTime?> dueDate,
+      Value<String?> location,
+      Value<int?> reminderMinutes,
+      Value<bool> created,
+      Value<bool> dismissed,
+      Value<String?> platformTargetId,
+      Value<DateTime?> createdAt,
+    });
+
+class $$ExtractedActionsTableFilterComposer
+    extends Composer<_$AppDatabase, $ExtractedActionsTable> {
+  $$ExtractedActionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get memoId => $composableBuilder(
+    column: $table.memoId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get actionType => $composableBuilder(
+    column: $table.actionType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reminderMinutes => $composableBuilder(
+    column: $table.reminderMinutes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get created => $composableBuilder(
+    column: $table.created,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get dismissed => $composableBuilder(
+    column: $table.dismissed,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get platformTargetId => $composableBuilder(
+    column: $table.platformTargetId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ExtractedActionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ExtractedActionsTable> {
+  $$ExtractedActionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get memoId => $composableBuilder(
+    column: $table.memoId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get actionType => $composableBuilder(
+    column: $table.actionType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get startTime => $composableBuilder(
+    column: $table.startTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get endTime => $composableBuilder(
+    column: $table.endTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get location => $composableBuilder(
+    column: $table.location,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reminderMinutes => $composableBuilder(
+    column: $table.reminderMinutes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get created => $composableBuilder(
+    column: $table.created,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get dismissed => $composableBuilder(
+    column: $table.dismissed,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get platformTargetId => $composableBuilder(
+    column: $table.platformTargetId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ExtractedActionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ExtractedActionsTable> {
+  $$ExtractedActionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get memoId =>
+      $composableBuilder(column: $table.memoId, builder: (column) => column);
+
+  GeneratedColumn<String> get actionType => $composableBuilder(
+    column: $table.actionType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startTime =>
+      $composableBuilder(column: $table.startTime, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get endTime =>
+      $composableBuilder(column: $table.endTime, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get dueDate =>
+      $composableBuilder(column: $table.dueDate, builder: (column) => column);
+
+  GeneratedColumn<String> get location =>
+      $composableBuilder(column: $table.location, builder: (column) => column);
+
+  GeneratedColumn<int> get reminderMinutes => $composableBuilder(
+    column: $table.reminderMinutes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get created =>
+      $composableBuilder(column: $table.created, builder: (column) => column);
+
+  GeneratedColumn<bool> get dismissed =>
+      $composableBuilder(column: $table.dismissed, builder: (column) => column);
+
+  GeneratedColumn<String> get platformTargetId => $composableBuilder(
+    column: $table.platformTargetId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$ExtractedActionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ExtractedActionsTable,
+          ExtractedActionEntity,
+          $$ExtractedActionsTableFilterComposer,
+          $$ExtractedActionsTableOrderingComposer,
+          $$ExtractedActionsTableAnnotationComposer,
+          $$ExtractedActionsTableCreateCompanionBuilder,
+          $$ExtractedActionsTableUpdateCompanionBuilder,
+          (
+            ExtractedActionEntity,
+            BaseReferences<
+              _$AppDatabase,
+              $ExtractedActionsTable,
+              ExtractedActionEntity
+            >,
+          ),
+          ExtractedActionEntity,
+          PrefetchHooks Function()
+        > {
+  $$ExtractedActionsTableTableManager(
+    _$AppDatabase db,
+    $ExtractedActionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ExtractedActionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ExtractedActionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ExtractedActionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> memoId = const Value.absent(),
+                Value<String> actionType = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<DateTime?> startTime = const Value.absent(),
+                Value<DateTime?> endTime = const Value.absent(),
+                Value<DateTime?> dueDate = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<int?> reminderMinutes = const Value.absent(),
+                Value<bool> created = const Value.absent(),
+                Value<bool> dismissed = const Value.absent(),
+                Value<String?> platformTargetId = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
+              }) => ExtractedActionsCompanion(
+                id: id,
+                memoId: memoId,
+                actionType: actionType,
+                title: title,
+                notes: notes,
+                startTime: startTime,
+                endTime: endTime,
+                dueDate: dueDate,
+                location: location,
+                reminderMinutes: reminderMinutes,
+                created: created,
+                dismissed: dismissed,
+                platformTargetId: platformTargetId,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int memoId,
+                required String actionType,
+                required String title,
+                Value<String?> notes = const Value.absent(),
+                Value<DateTime?> startTime = const Value.absent(),
+                Value<DateTime?> endTime = const Value.absent(),
+                Value<DateTime?> dueDate = const Value.absent(),
+                Value<String?> location = const Value.absent(),
+                Value<int?> reminderMinutes = const Value.absent(),
+                Value<bool> created = const Value.absent(),
+                Value<bool> dismissed = const Value.absent(),
+                Value<String?> platformTargetId = const Value.absent(),
+                Value<DateTime?> createdAt = const Value.absent(),
+              }) => ExtractedActionsCompanion.insert(
+                id: id,
+                memoId: memoId,
+                actionType: actionType,
+                title: title,
+                notes: notes,
+                startTime: startTime,
+                endTime: endTime,
+                dueDate: dueDate,
+                location: location,
+                reminderMinutes: reminderMinutes,
+                created: created,
+                dismissed: dismissed,
+                platformTargetId: platformTargetId,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ExtractedActionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ExtractedActionsTable,
+      ExtractedActionEntity,
+      $$ExtractedActionsTableFilterComposer,
+      $$ExtractedActionsTableOrderingComposer,
+      $$ExtractedActionsTableAnnotationComposer,
+      $$ExtractedActionsTableCreateCompanionBuilder,
+      $$ExtractedActionsTableUpdateCompanionBuilder,
+      (
+        ExtractedActionEntity,
+        BaseReferences<
+          _$AppDatabase,
+          $ExtractedActionsTable,
+          ExtractedActionEntity
+        >,
+      ),
+      ExtractedActionEntity,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5527,4 +7360,6 @@ class $AppDatabaseManager {
       $$ConnectionEventsTableTableManager(_db, _db.connectionEvents);
   $$VoiceMemosTableTableManager get voiceMemos =>
       $$VoiceMemosTableTableManager(_db, _db.voiceMemos);
+  $$ExtractedActionsTableTableManager get extractedActions =>
+      $$ExtractedActionsTableTableManager(_db, _db.extractedActions);
 }

@@ -70,6 +70,12 @@ dependencies:
   # Location (for GPS requests from watch)
   geolocator: ^13.0.2
 
+  # Local LLM inference (llama.cpp via fllama)
+  fllama:
+    git:
+      url: https://github.com/Telosnex/fllama
+      ref: main
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
