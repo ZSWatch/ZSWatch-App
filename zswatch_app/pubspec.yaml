@@ -1,7 +1,7 @@
 name: zswatch_app
-description: "ZSWatch Companion App - BLE communication, firmware updates, health data, and developer tools for ZSWatch smartwatch."
+description: "Connect your Open Source ZSWatch smartwatch to set it up, update firmware, track health data and more."
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.1.0+1
 
 environment:
   sdk: ^3.10.1
