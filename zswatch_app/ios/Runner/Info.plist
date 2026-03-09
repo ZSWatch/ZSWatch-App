@@ -27,7 +27,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>MinimumOSVersion</key>
-	<string>13.0</string>
+	<string>14.0</string>
 	<!-- Bluetooth Permissions -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>ZSWatch needs Bluetooth to communicate with your smartwatch for syncing data, notifications, and firmware updates.</string>
