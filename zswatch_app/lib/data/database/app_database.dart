@@ -56,14 +56,16 @@ class AppDatabase extends _$AppDatabase {
         if (from < 5) {
           // Add AI-enhanced voice notes fields and extracted actions table
           await m.createTable(extractedActions);
-          await m.addColumn(voiceMemos, voiceMemos.summary);
-          await m.addColumn(voiceMemos, voiceMemos.category);
-          await m.addColumn(voiceMemos, voiceMemos.processingStatus);
-          await m.addColumn(voiceMemos, voiceMemos.aiModel);
-          await m.addColumn(voiceMemos, voiceMemos.aiProcessedAt);
-          await m.addColumn(voiceMemos, voiceMemos.taskCreated);
-          await m.addColumn(voiceMemos, voiceMemos.calendarEventCreated);
-          await m.addColumn(voiceMemos, voiceMemos.actionReviewState);
+          if (from == 4) {
+            await m.addColumn(voiceMemos, voiceMemos.summary);
+            await m.addColumn(voiceMemos, voiceMemos.category);
+            await m.addColumn(voiceMemos, voiceMemos.processingStatus);
+            await m.addColumn(voiceMemos, voiceMemos.aiModel);
+            await m.addColumn(voiceMemos, voiceMemos.aiProcessedAt);
+            await m.addColumn(voiceMemos, voiceMemos.taskCreated);
+            await m.addColumn(voiceMemos, voiceMemos.calendarEventCreated);
+            await m.addColumn(voiceMemos, voiceMemos.actionReviewState);
+          }
         }
       },
     );

@@ -17,9 +17,15 @@ import 'watch_providers.dart';
 
 /// Singleton LLM service backed by fllama.
 final llmServiceProvider = Provider<LlmService>((ref) {
-  final selectedModelId = ref.watch(selectedAiModelIdProvider);
   final service = LlmService();
-  service.selectModel(selectedModelId);
+  
+  // Update model gracefully without completely destroying the LlmService
+  ref.listen<String>(selectedAiModelIdProvider, (previous, next) {
+    service.selectModel(next);
+  });
+  
+  service.selectModel(ref.read(selectedAiModelIdProvider));
+  
   ref.onDispose(() => service.dispose());
   return service;
 });
