@@ -1,0 +1,10 @@
+name: chrono_ai_flow
+description: Shared chrono-based voice memo extraction flow for the app and benchmark.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.10.1
+
+dependencies:
+  chrono_dart: ^2.0.2
