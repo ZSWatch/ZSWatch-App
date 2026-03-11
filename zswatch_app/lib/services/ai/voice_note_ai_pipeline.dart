@@ -10,10 +10,20 @@ import 'llm_service.dart';
 class AiProcessingDebugInfo {
   final String filename;
   final String modelName;
+  final String? classifyPrompt;
+  final String? classifyPromptStrategy;
+  final int? classifyAttempts;
+  final bool retryEnabled;
   final String? originalTranscription;
   final String? correctedTranscription;
   final String? rawLlmResponse;
   final String? parsedJson;
+  final String? extractedIntent;
+  final String? extractedTitle;
+  final String? datetimeExpressionOriginal;
+  final String? datetimeExpressionEnglish;
+  final String? resolvedDateTime;
+  final String? resolverMethod;
   final String? summary;
   final String? category;
   final int actionCount;
@@ -35,16 +45,32 @@ class AiProcessingDebugInfo {
   /// Current token count for the active generation phase.
   final int liveTokenCount;
 
+  /// Elapsed wall-clock time since inference started (live updates).
+  final Duration? liveElapsed;
+
+  /// Live tokens-per-second during the current generation phase.
+  final double? liveTokensPerSecond;
+
   /// Whether processing has finished (final snapshot vs live update).
   final bool isComplete;
 
   const AiProcessingDebugInfo({
     required this.filename,
     required this.modelName,
+    this.classifyPrompt,
+    this.classifyPromptStrategy,
+    this.classifyAttempts,
+    this.retryEnabled = false,
     this.originalTranscription,
     this.correctedTranscription,
     this.rawLlmResponse,
     this.parsedJson,
+    this.extractedIntent,
+    this.extractedTitle,
+    this.datetimeExpressionOriginal,
+    this.datetimeExpressionEnglish,
+    this.resolvedDateTime,
+    this.resolverMethod,
     this.summary,
     this.category,
     this.actionCount = 0,
@@ -58,6 +84,8 @@ class AiProcessingDebugInfo {
     this.currentPhase,
     this.partialResponse = '',
     this.liveTokenCount = 0,
+    this.liveElapsed,
+    this.liveTokensPerSecond,
     this.isComplete = true,
   });
 }
@@ -73,6 +101,10 @@ class VoiceNoteAiPipeline {
   final LlmService _llmService;
   final VoiceMemoRepository _memoRepository;
   final ExtractedActionRepository _actionRepository;
+
+  /// Called after successful AI processing with (filename, summary).
+  /// Used to send the result toast back to the watch.
+  void Function(String filename, String title)? onProcessingComplete;
 
   /// Stream of debug info from the most recent AI processing runs.
   final _debugInfoSubject = BehaviorSubject<AiProcessingDebugInfo?>.seeded(null);
@@ -129,22 +161,49 @@ class VoiceNoteAiPipeline {
         timestamp: DateTime.now(),
       ));
 
+      // Route to brain dump prompt for long transcripts (Feature 6)
+      final useBrainDump = _llmService.isBrainDump(transcript);
+      debugPrint(
+        '[VoiceNoteAiPipeline] Brain dump routing: '
+        '${useBrainDump ? "YES" : "NO"} for $filename',
+      );
+
+      // Stopwatch to compute live elapsed time & tokens-per-second
+      final sw = Stopwatch()..start();
+
+      // Helper that emits a live progress update with timing metrics.
+      void emitLive(String phase, String partial, int tokens) {
+        final elapsedMs = sw.elapsedMilliseconds;
+        final tps = elapsedMs > 0 ? tokens / (elapsedMs / 1000.0) : 0.0;
+        _debugInfoSubject.add(AiProcessingDebugInfo(
+          filename: filename,
+          modelName: _llmService.modelName,
+          originalTranscription: transcript,
+          currentPhase: phase,
+          partialResponse: partial,
+          liveTokenCount: tokens,
+          liveElapsed: sw.elapsed,
+          liveTokensPerSecond: tps,
+          isComplete: false,
+          timestamp: DateTime.now(),
+        ));
+      }
+
       // Run the LLM processing with live progress updates
-      final result = await _llmService.processTranscript(
+      final result = useBrainDump
+          ? await _llmService.processTranscriptBrainDump(
+              transcript,
+              onProgress: (phase, partial, tokens) {
+                emitLive(phase, partial, tokens);
+              },
+            )
+          : await _llmService.processTranscript(
         transcript,
         onProgress: (phase, partial, tokens) {
-          _debugInfoSubject.add(AiProcessingDebugInfo(
-            filename: filename,
-            modelName: _llmService.modelName,
-            originalTranscription: transcript,
-            currentPhase: phase,
-            partialResponse: partial,
-            liveTokenCount: tokens,
-            isComplete: false,
-            timestamp: DateTime.now(),
-          ));
+          emitLive(phase, partial, tokens);
         },
       );
+      sw.stop();
 
       debugPrint(
           '[VoiceNoteAiPipeline] Processed $filename: '
@@ -168,6 +227,10 @@ class VoiceNoteAiPipeline {
         aiModel: _llmService.modelName,
       );
 
+      // Replace any previous extracted actions for this memo before inserting
+      // the latest set, so re-processing never duplicates suggestions.
+      await _actionRepository.deleteActionsForMemo(memoId);
+
       // Persist extracted actions
       for (final action in result.actions) {
         final actionType = _mapActionType(action.type);
@@ -182,14 +245,27 @@ class VoiceNoteAiPipeline {
         );
       }
 
+      // Notify watch with round-trip confirmation toast
+      onProcessingComplete?.call(filename, result.summary);
+
       // Publish final debug info and store per-file
       final finalDebug = AiProcessingDebugInfo(
         filename: filename,
         modelName: _llmService.modelName,
+        classifyPrompt: result.classifyMetrics?.rawPrompt,
+        classifyPromptStrategy: result.classifyMetrics?.promptStrategy,
+        classifyAttempts: result.classifyMetrics?.attempts,
+        retryEnabled: result.classifyMetrics?.retryEnabled ?? false,
         originalTranscription: result.originalTranscription,
         correctedTranscription: result.correctedTranscription,
         rawLlmResponse: result.classifyMetrics?.rawResponse,
         parsedJson: result.classifyMetrics?.parsedJson,
+        extractedIntent: result.extractedIntent,
+        extractedTitle: result.extractedTitle,
+        datetimeExpressionOriginal: result.datetimeExpressionOriginal,
+        datetimeExpressionEnglish: result.datetimeExpressionEnglish,
+        resolvedDateTime: result.resolvedDateTime,
+        resolverMethod: result.resolverMethod,
         summary: result.summary,
         category: result.category,
         actionCount: result.actions.length,

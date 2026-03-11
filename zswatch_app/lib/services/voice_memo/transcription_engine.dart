@@ -19,6 +19,18 @@ enum TranscriptionEngineType {
   /// KB-Whisper Base fine-tuned on 50 k+ hours of Swedish speech (~147 MB,
   /// q5_0 quantised). Downloaded from HuggingFace on first use.
   kbWhisperBase,
+
+  /// KB-Whisper Small q5_0 quantised (~175 MB). Massive accuracy improvement
+  /// over Base for Swedish at nearly the same size. ~500 MB RAM needed.
+  kbWhisperSmallQ5,
+
+  /// KB-Whisper Small full GGML checkpoint (~488 MB). Highest fidelity
+  /// available from the upstream GGML release. ~1 GB RAM needed.
+  kbWhisperSmallQ8,
+
+  /// Whisper Large-v3-Turbo q5_0 quantised (~547 MB). Near cloud-level
+  /// accuracy, optimised for speed. Needs ~1 GB RAM — modern flagships only.
+  whisperLargeV3TurboQ5,
 }
 
 /// Static metadata for a selectable transcription model.
@@ -62,27 +74,72 @@ abstract final class TranscriptionModelCatalog {
     expectedSizeBytes: 147 * 1024 * 1024,
   );
 
+  static const _kbWhisperSmallQ5 = TranscriptionModelInfo(
+    type: TranscriptionEngineType.kbWhisperSmallQ5,
+    name: 'KB-Whisper Small · Q5_0 (Swedish)',
+    language: 'sv',
+    sourceUrl:
+        'https://huggingface.co/KBLab/kb-whisper-small/resolve/main/ggml-model-q5_0.bin',
+    fileName: 'ggml-kb-whisper-small-q5_0.bin',
+    expectedSizeBytes: 175 * 1024 * 1024,
+  );
+
+  static const _kbWhisperSmallQ8 = TranscriptionModelInfo(
+    type: TranscriptionEngineType.kbWhisperSmallQ8,
+    name: 'KB-Whisper Small · Full GGML (Swedish)',
+    language: 'sv',
+    sourceUrl:
+        'https://huggingface.co/KBLab/kb-whisper-small/resolve/main/ggml-model.bin',
+    fileName: 'ggml-kb-whisper-small.bin',
+    expectedSizeBytes: 488 * 1024 * 1024,
+  );
+
+  static const _whisperLargeV3TurboQ5 = TranscriptionModelInfo(
+    type: TranscriptionEngineType.whisperLargeV3TurboQ5,
+    name: 'Whisper Large-v3-Turbo · Q5_0',
+    language: 'auto',
+    sourceUrl:
+        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin',
+    fileName: 'ggml-large-v3-turbo-q5_0.bin',
+    expectedSizeBytes: 547 * 1024 * 1024,
+  );
+
   static const List<TranscriptionModelInfo> all = [
     _tinyEn,
     _kbWhisperBase,
+    _kbWhisperSmallQ5,
+    _kbWhisperSmallQ8,
+    _whisperLargeV3TurboQ5,
   ];
 
   static TranscriptionModelInfo info(TranscriptionEngineType type) {
     switch (type) {
-      case TranscriptionEngineType.kbWhisperBase:
-        return _kbWhisperBase;
       case TranscriptionEngineType.whisperTinyEn:
         return _tinyEn;
+      case TranscriptionEngineType.kbWhisperBase:
+        return _kbWhisperBase;
+      case TranscriptionEngineType.kbWhisperSmallQ5:
+        return _kbWhisperSmallQ5;
+      case TranscriptionEngineType.kbWhisperSmallQ8:
+        return _kbWhisperSmallQ8;
+      case TranscriptionEngineType.whisperLargeV3TurboQ5:
+        return _whisperLargeV3TurboQ5;
     }
   }
 }
 
 TranscriptionEngine createTranscriptionEngine(TranscriptionEngineType type) {
   switch (type) {
-    case TranscriptionEngineType.kbWhisperBase:
-      return KbWhisperEngines.base();
     case TranscriptionEngineType.whisperTinyEn:
       return WhisperEngine();
+    case TranscriptionEngineType.kbWhisperBase:
+      return KbWhisperEngines.base();
+    case TranscriptionEngineType.kbWhisperSmallQ5:
+      return KbWhisperEngines.smallQ5();
+    case TranscriptionEngineType.kbWhisperSmallQ8:
+      return KbWhisperEngines.smallQ8();
+    case TranscriptionEngineType.whisperLargeV3TurboQ5:
+      return KbWhisperEngines.largeV3TurboQ5();
   }
 }
 
@@ -244,6 +301,7 @@ class WhisperEngine implements TranscriptionEngine {
         status: TranscriptionEngineStatus.error,
         errorMessage: e.toString(),
       ));
+      rethrow;
     }
   }
 
@@ -415,10 +473,11 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
 
   @override
   int get expectedModelSizeBytes {
-    if (_modelFileName == 'ggml-kb-whisper-base-q5_0.bin') {
-      return TranscriptionModelCatalog
-          .info(TranscriptionEngineType.kbWhisperBase)
-          .expectedSizeBytes;
+    // Try to look up from the catalog by filename
+    for (final info in TranscriptionModelCatalog.all) {
+      if (info.fileName == _modelFileName) {
+        return info.expectedSizeBytes;
+      }
     }
     return 0;
   }
@@ -466,6 +525,7 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
         status: TranscriptionEngineStatus.error,
         errorMessage: e.toString(),
       ));
+      rethrow;
     }
   }
 
@@ -676,6 +736,8 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
 /// Apache-2.0 licensed. Models are hosted on HuggingFace.
 abstract final class KbWhisperEngines {
   static const String _hfBase = 'https://huggingface.co/KBLab/kb-whisper-base/resolve/main';
+  static const String _hfSmall = 'https://huggingface.co/KBLab/kb-whisper-small/resolve/main';
+  static const String _hfWhisperCpp = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main';
 
   /// Base model, q5_0 quantised (~147 MB).
   /// Recommended: good accuracy, reasonable size for mobile.
@@ -684,5 +746,32 @@ abstract final class KbWhisperEngines {
         modelFileName: 'ggml-kb-whisper-base-q5_0.bin',
         languageCode: 'sv',
         displayName: 'KB-Whisper Base (Swedish)',
+      );
+
+  /// Small model, q5_0 quantised (~175 MB).
+  /// Big accuracy leap over Base at nearly the same size. ~500 MB RAM.
+  static CustomGgmlWhisperEngine smallQ5() => CustomGgmlWhisperEngine(
+        modelUrl: '$_hfSmall/ggml-model-q5_0.bin',
+        modelFileName: 'ggml-kb-whisper-small-q5_0.bin',
+        languageCode: 'sv',
+        displayName: 'KB-Whisper Small · Q5_0 (Swedish)',
+      );
+
+  /// Small model, full GGML checkpoint (~488 MB).
+  /// Highest fidelity Small variant currently published for whisper.cpp.
+  static CustomGgmlWhisperEngine smallQ8() => CustomGgmlWhisperEngine(
+        modelUrl: '$_hfSmall/ggml-model.bin',
+        modelFileName: 'ggml-kb-whisper-small.bin',
+        languageCode: 'sv',
+        displayName: 'KB-Whisper Small · Full GGML (Swedish)',
+      );
+
+  /// Whisper Large-v3-Turbo, q5_0 quantised (~547 MB).
+  /// Near-cloud accuracy, heavily optimised. ~1 GB RAM — flagship devices.
+  static CustomGgmlWhisperEngine largeV3TurboQ5() => CustomGgmlWhisperEngine(
+        modelUrl: '$_hfWhisperCpp/ggml-large-v3-turbo-q5_0.bin',
+        modelFileName: 'ggml-large-v3-turbo-q5_0.bin',
+        languageCode: 'auto',
+        displayName: 'Whisper Large-v3-Turbo · Q5_0',
       );
 }

@@ -19,6 +19,8 @@ abstract final class SettingsKeys {
   static const String localAiEnabled = 'local_ai_enabled';
   static const String autoProcessVoiceNotes = 'auto_process_voice_notes';
   static const String selectedAiModelId = 'selected_ai_model_id';
+  static const String selectedProductivityCalendarId =
+      'selected_productivity_calendar_id';
 }
 
 /// Provider for SharedPreferences instance
@@ -307,8 +309,8 @@ class TranscriptionEngineTypeNotifier
       : super(_parseType(_prefs?.getString(SettingsKeys.transcriptionEngineType)));
 
   static TranscriptionEngineType _parseType(String? value) {
-    if (value == TranscriptionEngineType.kbWhisperBase.name) {
-      return TranscriptionEngineType.kbWhisperBase;
+    for (final type in TranscriptionEngineType.values) {
+      if (value == type.name) return type;
     }
     return TranscriptionEngineType.whisperTinyEn;
   }
@@ -390,6 +392,31 @@ class SelectedAiModelIdNotifier extends StateNotifier<String> {
   void setModelId(String modelId) {
     state = modelId;
     _prefs?.setString(SettingsKeys.selectedAiModelId, modelId);
+  }
+}
+
+/// Currently selected Android calendar id for created reminders/events.
+final selectedProductivityCalendarIdProvider =
+    StateNotifierProvider<SelectedProductivityCalendarIdNotifier, int?>(
+  (ref) {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    return SelectedProductivityCalendarIdNotifier(prefs.valueOrNull);
+  },
+);
+
+class SelectedProductivityCalendarIdNotifier extends StateNotifier<int?> {
+  final SharedPreferences? _prefs;
+
+  SelectedProductivityCalendarIdNotifier(this._prefs)
+      : super(_prefs?.getInt(SettingsKeys.selectedProductivityCalendarId));
+
+  void setCalendarId(int? calendarId) {
+    state = calendarId;
+    if (calendarId == null) {
+      _prefs?.remove(SettingsKeys.selectedProductivityCalendarId);
+      return;
+    }
+    _prefs?.setInt(SettingsKeys.selectedProductivityCalendarId, calendarId);
   }
 }
 
