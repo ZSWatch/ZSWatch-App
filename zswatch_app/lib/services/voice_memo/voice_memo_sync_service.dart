@@ -110,7 +110,7 @@ class VoiceMemoSyncService {
 
   /// Called after sync completes with the number of newly downloaded memos.
   /// Used to trigger auto-transcription from the provider layer.
-  void Function(int downloadedCount)? onSyncCompleted;
+  Future<void> Function(int downloadedCount)? onSyncCompleted;
 
   final _syncState = BehaviorSubject<VoiceMemoSyncState>.seeded(
     const VoiceMemoSyncState(),
@@ -166,7 +166,7 @@ class VoiceMemoSyncService {
     // Auto-download the new recording
     if (_watchService.isConnected && !currentState.isSyncing) {
       _log('Auto-downloading new recording: ${info.filename}');
-      syncRecordings();
+      unawaited(syncRecordings());
     }
   }
 
@@ -296,7 +296,7 @@ class VoiceMemoSyncService {
 
       // Notify listeners that new memos were downloaded (triggers auto-transcribe)
       if (completed > 0) {
-        onSyncCompleted?.call(completed);
+        await onSyncCompleted?.call(completed);
       }
     } catch (e) {
       _log('Sync failed: $e');
@@ -462,6 +462,8 @@ class VoiceMemoSyncService {
         handleNewRecording(message);
       case 'list_result':
         handleListResult(message);
+      case 'undo_last':
+        unawaited(_handleUndoLast(message));
     }
   }
 
@@ -475,6 +477,44 @@ class VoiceMemoSyncService {
         _updateState(const VoiceMemoSyncState());
       }
     });
+  }
+
+  /// Send AI processing result back to the watch for toast confirmation.
+  ///
+  /// The watch displays the parsed title with an Undo button for 3 seconds.
+  Future<void> sendResultToWatch(String filename, String title) async {
+    if (!_watchService.isConnected) {
+      _log('Cannot send result to watch — not connected');
+      return;
+    }
+    try {
+      await _watchService.sendVoiceMemoCommand(
+        'result',
+        extraData: {'text': title, 'filename': filename},
+      );
+      _log('Sent AI result to watch: $filename → "$title"');
+    } catch (e) {
+      _log('Failed to send result to watch: $e');
+    }
+  }
+
+  /// Handle the undo_last command from the watch.
+  ///
+  /// Deletes AI-parsed results (summary, category, actions) but keeps the
+  /// raw audio and transcription intact.
+  Future<void> _handleUndoLast(Map<String, dynamic> message) async {
+    final filename = message['filename'] as String?;
+    if (filename == null || filename.isEmpty) {
+      _log('undo_last: missing filename');
+      return;
+    }
+    _log('Undo requested for: $filename');
+    try {
+      await _repository.clearAiResults(filename);
+      _log('Cleared AI results for: $filename');
+    } catch (e) {
+      _log('Failed to undo AI results for $filename: $e');
+    }
   }
 
   void _log(String message) {

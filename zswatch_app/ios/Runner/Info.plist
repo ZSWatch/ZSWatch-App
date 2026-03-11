@@ -43,6 +43,15 @@
 	<string>ZSWatch needs access to select firmware files from your photo library for watch updates.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>ZSWatch needs access to save images to your photo library.</string>
+	<!-- Calendar / Reminder permissions for AI-created actions -->
+	<key>NSCalendarsUsageDescription</key>
+	<string>ZSWatch needs calendar access to create events from AI-detected voice note actions.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>ZSWatch needs calendar access to create events from AI-detected voice note actions.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>ZSWatch needs reminders access to create reminder actions from voice notes.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>ZSWatch needs reminders access to create reminder actions from voice notes.</string>
 	<!-- UI Configuration -->
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>

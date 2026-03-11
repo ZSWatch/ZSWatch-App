@@ -22,6 +22,7 @@ import '../screens/health/health_screen.dart';
 import '../screens/health/heart_rate_screen.dart';
 import '../screens/notifications/notification_settings_screen.dart';
 import '../screens/onboarding/permission_onboarding_screen.dart';
+import '../screens/settings/ai_models_settings_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/start/start_page_screen.dart';
 import '../screens/voice_memos/voice_memos_screen.dart';
@@ -51,6 +52,9 @@ abstract final class AppRoutes {
   static const String shell = '/developer/shell';
   static const String sensors = '/developer/sensors';
   static const String commLog = '/developer/comm-log';
+
+  // Settings sub-routes
+  static const String aiModels = '/settings/ai-models';
 
   // Voice routes (placeholder)
   static const String voiceMemos = '/voice-memos';
@@ -105,6 +109,13 @@ class AppRouter {
         path: AppRoutes.settings,
         name: 'settings',
         builder: (context, state) => const SettingsScreen(),
+        routes: [
+          GoRoute(
+            path: 'ai-models',
+            name: 'ai-models',
+            builder: (context, state) => const AiModelsSettingsScreen(),
+          ),
+        ],
       ),
 
       // Firmware update

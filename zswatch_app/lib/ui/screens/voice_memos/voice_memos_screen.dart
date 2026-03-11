@@ -14,10 +14,12 @@ import '../../../providers/ai_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/voice_memo_providers.dart';
 import '../../../providers/watch_service_provider.dart';
+import '../../../services/ai/extracted_action_creation_service.dart';
 import '../../../services/ai/voice_note_ai_pipeline.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../../services/voice_memo/voice_memo_sync_service.dart';
 import '../../navigation/app_router.dart';
+import '../../widgets/ai_debug_widgets.dart';
 
 /// Transcript-first timeline view for synced voice notes.
 class VoiceMemosScreen extends ConsumerStatefulWidget {
@@ -500,12 +502,21 @@ class _AISummarySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final aiEnabled = ref.watch(localAiEnabledProvider);
     final modelDownloadedAsync = ref.watch(llmModelDownloadedProvider);
 
-    if (!aiEnabled) {
-      return const SizedBox.shrink();
-    }
+    ref.listen<AsyncValue<void>>(aiActionsProvider, (previous, next) {
+      next.whenOrNull(
+        error: (error, _) {
+          final message = error is StateError
+              ? error.message.toString()
+              : error.toString();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message)),
+          );
+        },
+      );
+    });
 
     return modelDownloadedAsync.when(
       data: (modelDownloaded) {
@@ -514,6 +525,7 @@ class _AISummarySection extends ConsumerWidget {
         }
 
         final hasSummary = memo.summary != null && memo.summary!.isNotEmpty;
+        final hasTranscript = memo.transcription?.trim().isNotEmpty == true;
         final hasCategory = memo.aiCategory != null;
         final isProcessing = memo.isAiProcessing;
         final hasFailed = memo.aiProcessingStatus == VoiceNoteProcessingStatus.failed;
@@ -533,7 +545,7 @@ class _AISummarySection extends ConsumerWidget {
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   style: _compactOutlinedButtonStyle(),
-                  onPressed: memo.transcription?.trim().isEmpty == true
+                  onPressed: !hasTranscript
                       ? null
                       : () => ref
                           .read(aiActionsProvider.notifier)
@@ -541,7 +553,7 @@ class _AISummarySection extends ConsumerWidget {
                   icon: const Icon(Icons.auto_awesome),
                   label: const Text('Process with AI'),
                 ),
-                if (memo.transcription?.trim().isEmpty == true)
+                if (!hasTranscript)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
@@ -593,11 +605,39 @@ class _AISummarySection extends ConsumerWidget {
                   ),
                 )
               else if (hasFailed)
-                Text(
-                  'AI processing failed. Please try again.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.errorColor,
-                      ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI processing failed. Please try again.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.errorColor,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: AppTheme.spacingSm,
+                      runSpacing: AppTheme.spacingSm,
+                      children: [
+                        OutlinedButton.icon(
+                          style: _compactOutlinedButtonStyle(),
+                          onPressed: !hasTranscript
+                              ? null
+                              : () => ref
+                                  .read(aiActionsProvider.notifier)
+                                  .processVoiceMemo(memo.filename),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Retry'),
+                        ),
+                        OutlinedButton.icon(
+                          style: _compactOutlinedButtonStyle(),
+                          onPressed: () => _showAiDebugDialog(context, ref),
+                          icon: const Icon(Icons.bug_report_outlined),
+                          label: const Text('Debug'),
+                        ),
+                      ],
+                    ),
+                  ],
                 )
               else ...[
                 if (hasCategory)
@@ -613,7 +653,7 @@ class _AISummarySection extends ConsumerWidget {
                         ),
                   ),
               ],
-              if (!isProcessing && (hasSummary || hasCategory))
+              if (!isProcessing && (hasSummary || hasCategory || hasFailed))
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: Wrap(
@@ -701,139 +741,183 @@ class _AiDebugSheet extends ConsumerWidget {
         .getDebugInfoForFile(memo.filename);
     // Prefer live (in-progress or just-completed) over stored
     final debugInfo = liveInfo ?? storedInfo;
-    final theme = Theme.of(context);
 
     return Column(
       children: [
-        // Handle bar
-        Padding(
-          padding: const EdgeInsets.only(top: 12, bottom: 8),
-          child: Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppTheme.textSecondary.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              const Icon(Icons.bug_report_outlined, size: 20),
-              const SizedBox(width: 8),
-              Text('AI Debug Info', style: theme.textTheme.titleMedium),
-              const Spacer(),
-              if (debugInfo != null && !debugInfo.isComplete)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppTheme.primaryColor,
-                    ),
-                  ),
-                ),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
+        aiDebugHandleBar(),
+        aiDebugSheetHeader(
+          context,
+          title: 'AI Debug Info',
+          showSpinner: debugInfo != null && !debugInfo.isComplete,
+          onClose: () => Navigator.of(context).pop(),
         ),
         const Divider(),
         Expanded(
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.all(16),
-            children: [
-              if (debugInfo == null) ...[
-                _debugNote(
-                  context,
-                  'No debug data available for the latest run. '
-                  'Re-process this memo to see debug info.',
-                ),
-                const SizedBox(height: 16),
-                _debugInfoFromMemo(context),
-              ] else if (!debugInfo.isComplete) ...[
-                // --- Live / in-progress view ---
-                _livePhaseHeader(context, debugInfo),
-                const SizedBox(height: 12),
-                if (debugInfo.originalTranscription != null) ...[
-                  _debugBlock(
-                    context,
-                    title: 'Original Transcription',
-                    content: debugInfo.originalTranscription!,
-                    icon: Icons.mic,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                // Only show the partial-response block once tokens are flowing
-                if (debugInfo.currentPhase != 'loading')
-                  _debugBlock(
-                    context,
-                    title: '${_phaseLabel(debugInfo.currentPhase)} (live)',
-                    content: debugInfo.partialResponse.isEmpty
-                        ? '...'
-                        : debugInfo.partialResponse,
-                    icon: debugInfo.currentPhase == 'correcting'
-                        ? Icons.auto_fix_high
-                        : Icons.code,
-                    mono: debugInfo.currentPhase == 'classifying',
-                  ),
-              ] else ...[
-                // --- Completed view ---
-                _metricsRow(context, debugInfo),
-                const SizedBox(height: 16),
-                if (debugInfo.originalTranscription != null &&
-                    debugInfo.correctedTranscription != null &&
-                    debugInfo.correctedTranscription !=
-                        debugInfo.originalTranscription) ...[
-                  _transcriptionDiffBlock(
-                    context,
-                    original: debugInfo.originalTranscription!,
-                    corrected: debugInfo.correctedTranscription!,
-                  ),
-                  const SizedBox(height: 12),
-                ] else if (debugInfo.originalTranscription != null) ...[
-                  _debugBlock(
-                    context,
-                    title: 'Transcription',
-                    content: debugInfo.originalTranscription!,
-                    icon: Icons.mic,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if (debugInfo.rawLlmResponse != null) ...[
-                  _debugBlock(
-                    context,
-                    title: 'Raw LLM Response',
-                    content: debugInfo.rawLlmResponse!,
-                    icon: Icons.code,
-                    mono: true,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if (debugInfo.parsedJson != null) ...[
-                  _debugBlock(
-                    context,
-                    title: 'Parsed JSON',
-                    content: debugInfo.parsedJson!,
-                    icon: Icons.data_object,
-                    mono: true,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                _resultRow(context, debugInfo),
-              ],
-            ],
+            children: _buildBody(context, debugInfo),
           ),
         ),
       ],
     );
+  }
+
+  List<Widget> _buildBody(
+      BuildContext context, AiProcessingDebugInfo? debugInfo) {
+    if (debugInfo == null) {
+      return [
+        aiDebugNote(
+          context,
+          'No debug data available for the latest run. '
+          'Re-process this memo to see debug info.',
+        ),
+        const SizedBox(height: 16),
+        _debugInfoFromMemo(context),
+      ];
+    }
+
+    if (!debugInfo.isComplete) {
+      // --- Live / in-progress view ---
+      final phaseText = switch (debugInfo.currentPhase) {
+        'loading' => 'Loading model...',
+        'correcting' => 'Correcting transcription...',
+        'classifying' => 'Classifying & summarizing...',
+        _ => 'Processing...',
+      };
+      return [
+        aiLivePhaseHeader(
+          context,
+          modelName: debugInfo.modelName,
+          phaseText: phaseText,
+          tokens: debugInfo.liveTokenCount,
+          tokensPerSecond: debugInfo.liveTokensPerSecond,
+          elapsed: debugInfo.liveElapsed,
+        ),
+        if (debugInfo.originalTranscription != null) ...[
+          const SizedBox(height: 12),
+          aiDebugBlock(
+            context,
+            title: 'Original Transcription',
+            content: debugInfo.originalTranscription!,
+            icon: Icons.mic,
+            showCopyButton: true,
+          ),
+        ],
+        // Only show the partial-response block once tokens are flowing
+        if (debugInfo.currentPhase != 'loading') ...[
+          const SizedBox(height: 12),
+          aiDebugBlock(
+            context,
+            title: '${_phaseLabel(debugInfo.currentPhase)} (live)',
+            content: debugInfo.partialResponse.isEmpty
+                ? '...'
+                : debugInfo.partialResponse,
+            icon: debugInfo.currentPhase == 'correcting'
+                ? Icons.auto_fix_high
+                : Icons.code,
+            mono: debugInfo.currentPhase == 'classifying',
+            showCopyButton: true,
+          ),
+        ],
+      ];
+    }
+
+    // --- Completed view ---
+    return [
+      _metricsRow(context, debugInfo),
+      const SizedBox(height: 12),
+      aiDebugBlock(
+        context,
+        title: 'Prompt / Flow',
+        content: aiFormatPromptFlow(
+          strategy: debugInfo.classifyPromptStrategy,
+          retryEnabled: debugInfo.retryEnabled,
+          attempts: debugInfo.classifyAttempts ?? 1,
+        ),
+        icon: Icons.tune,
+        showCopyButton: true,
+      ),
+      if (aiHasChronoDetails(
+        extractedIntent: debugInfo.extractedIntent,
+        extractedTitle: debugInfo.extractedTitle,
+        datetimeExpressionOriginal: debugInfo.datetimeExpressionOriginal,
+        datetimeExpressionEnglish: debugInfo.datetimeExpressionEnglish,
+        resolvedDateTime: debugInfo.resolvedDateTime,
+        resolverMethod: debugInfo.resolverMethod,
+      )) ...[
+        const SizedBox(height: 12),
+        aiDebugBlock(
+          context,
+          title: 'Chrono Extraction / Resolution',
+          content: aiFormatChronoDetails(
+            extractedIntent: debugInfo.extractedIntent,
+            extractedTitle: debugInfo.extractedTitle,
+            datetimeExpressionOriginal: debugInfo.datetimeExpressionOriginal,
+            datetimeExpressionEnglish: debugInfo.datetimeExpressionEnglish,
+            resolvedDateTime: debugInfo.resolvedDateTime,
+            resolverMethod: debugInfo.resolverMethod,
+          ),
+          icon: Icons.schedule,
+          showCopyButton: true,
+        ),
+      ],
+      const SizedBox(height: 16),
+      if (debugInfo.originalTranscription != null &&
+          debugInfo.correctedTranscription != null &&
+          debugInfo.correctedTranscription !=
+              debugInfo.originalTranscription) ...[
+        _transcriptionDiffBlock(
+          context,
+          original: debugInfo.originalTranscription!,
+          corrected: debugInfo.correctedTranscription!,
+        ),
+        const SizedBox(height: 12),
+      ] else if (debugInfo.originalTranscription != null) ...[
+        aiDebugBlock(
+          context,
+          title: 'Transcription',
+          content: debugInfo.originalTranscription!,
+          icon: Icons.mic,
+          showCopyButton: true,
+        ),
+        const SizedBox(height: 12),
+      ],
+      if (debugInfo.rawLlmResponse != null) ...[
+        aiDebugBlock(
+          context,
+          title: 'Raw LLM Response',
+          content: debugInfo.rawLlmResponse!,
+          icon: Icons.code,
+          mono: true,
+          showCopyButton: true,
+        ),
+        const SizedBox(height: 12),
+      ],
+      if (debugInfo.parsedJson != null) ...[
+        aiDebugBlock(
+          context,
+          title: 'Parsed JSON',
+          content: debugInfo.parsedJson!,
+          icon: Icons.data_object,
+          mono: true,
+          showCopyButton: true,
+        ),
+        const SizedBox(height: 12),
+      ],
+      if (debugInfo.classifyPrompt != null) ...[
+        aiDebugBlock(
+          context,
+          title: 'Prompt Sent',
+          content: debugInfo.classifyPrompt!,
+          icon: Icons.text_snippet_outlined,
+          mono: true,
+          showCopyButton: true,
+        ),
+        const SizedBox(height: 12),
+      ],
+      _resultRow(context, debugInfo),
+    ];
   }
 
   String _phaseLabel(String? phase) {
@@ -845,92 +929,6 @@ class _AiDebugSheet extends ConsumerWidget {
       default:
         return 'Output';
     }
-  }
-
-  Widget _livePhaseHeader(BuildContext context, AiProcessingDebugInfo info) {
-    final theme = Theme.of(context);
-    final phaseText = switch (info.currentPhase) {
-      'loading' => 'Loading model...',
-      'correcting' => 'Correcting transcription...',
-      'classifying' => 'Classifying & summarizing...',
-      _ => 'Processing...',
-    };
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            info.modelName,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppTheme.primaryColor,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                phaseText,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            children: [
-              _metricChip(
-                context,
-                'Tokens',
-                '${info.liveTokenCount}',
-                Icons.token,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _debugNote(BuildContext context, String text) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.textSecondary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline, size: 16, color: AppTheme.textSecondary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _debugInfoFromMemo(BuildContext context) {
@@ -958,164 +956,55 @@ class _AiDebugSheet extends ConsumerWidget {
   }
 
   Widget _metricsRow(BuildContext context, AiProcessingDebugInfo info) {
-    final theme = Theme.of(context);
+    final chips = <Widget>[
+      if (info.correctionTime != null)
+        aiMetricChip(
+          context,
+          'Correction',
+          '${info.correctionTime!.inMilliseconds}ms',
+          Icons.timer_outlined,
+        ),
+      if (info.correctionTokensPerSec != null)
+        aiMetricChip(
+          context,
+          'Correction tok/s',
+          info.correctionTokensPerSec!.toStringAsFixed(1),
+          Icons.speed,
+        ),
+      if (info.correctionTokens != null)
+        aiMetricChip(
+          context,
+          'Correction tokens',
+          '${info.correctionTokens}',
+          Icons.token,
+        ),
+      if (info.classifyTime != null)
+        aiMetricChip(
+          context,
+          'Classify',
+          '${info.classifyTime!.inMilliseconds}ms',
+          Icons.timer_outlined,
+        ),
+      if (info.classifyTokensPerSec != null)
+        aiMetricChip(
+          context,
+          'Classify tok/s',
+          info.classifyTokensPerSec!.toStringAsFixed(1),
+          Icons.speed,
+        ),
+      if (info.classifyTokens != null)
+        aiMetricChip(
+          context,
+          'Classify tokens',
+          '${info.classifyTokens}',
+          Icons.token,
+        ),
+    ];
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryColor.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            info.modelName,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            children: [
-              if (info.correctionTime != null)
-                _metricChip(
-                  context,
-                  'Correction',
-                  '${info.correctionTime!.inMilliseconds}ms',
-                  Icons.timer_outlined,
-                ),
-              if (info.correctionTokensPerSec != null)
-                _metricChip(
-                  context,
-                  'Correction tok/s',
-                  info.correctionTokensPerSec!.toStringAsFixed(1),
-                  Icons.speed,
-                ),
-              if (info.correctionTokens != null)
-                _metricChip(
-                  context,
-                  'Correction tokens',
-                  '${info.correctionTokens}',
-                  Icons.token,
-                ),
-              if (info.classifyTime != null)
-                _metricChip(
-                  context,
-                  'Classify',
-                  '${info.classifyTime!.inMilliseconds}ms',
-                  Icons.timer_outlined,
-                ),
-              if (info.classifyTokensPerSec != null)
-                _metricChip(
-                  context,
-                  'Classify tok/s',
-                  info.classifyTokensPerSec!.toStringAsFixed(1),
-                  Icons.speed,
-                ),
-              if (info.classifyTokens != null)
-                _metricChip(
-                  context,
-                  'Classify tokens',
-                  '${info.classifyTokens}',
-                  Icons.token,
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _metricChip(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-  ) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: AppTheme.textSecondary),
-        const SizedBox(width: 4),
-        Text(
-          '$label: ',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-                fontSize: 11,
-              ),
-        ),
-        Text(
-          value,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                fontSize: 11,
-              ),
-        ),
-      ],
-    );
-  }
-
-  Widget _debugBlock(
-    BuildContext context, {
-    required String title,
-    required String content,
-    required IconData icon,
-    bool mono = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: AppTheme.textSecondary),
-            const SizedBox(width: 6),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-            ),
-            const Spacer(),
-            IconButton(
-              icon: const Icon(Icons.copy, size: 16),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: content));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Copied $title'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppTheme.textSecondary.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: AppTheme.textSecondary.withValues(alpha: 0.12),
-            ),
-          ),
-          child: SelectableText(
-            content,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontFamily: mono ? 'monospace' : null,
-                  fontSize: mono ? 11 : null,
-                  height: 1.5,
-                ),
-          ),
-        ),
-      ],
+    return aiCompletedMetricsHeader(
+      context,
+      modelName: info.modelName,
+      extraChips: chips,
     );
   }
 
@@ -1136,7 +1025,8 @@ class _AiDebugSheet extends ConsumerWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.compare_arrows, size: 16, color: AppTheme.textSecondary),
+            const Icon(Icons.compare_arrows,
+                size: 16, color: AppTheme.textSecondary),
             const SizedBox(width: 6),
             Text(
               'Transcription Diff',
@@ -1163,7 +1053,8 @@ class _AiDebugSheet extends ConsumerWidget {
           ),
           child: Text.rich(
             TextSpan(children: spans),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.6),
+            style:
+                Theme.of(context).textTheme.bodySmall?.copyWith(height: 1.6),
           ),
         ),
       ],
@@ -1197,7 +1088,8 @@ class _AiDebugSheet extends ConsumerWidget {
     final dp = List.generate(n + 1, (_) => List.filled(m + 1, 0));
     for (var i = 1; i <= n; i++) {
       for (var j = 1; j <= m; j++) {
-        if (origWords[i - 1].toLowerCase() == corrWords[j - 1].toLowerCase()) {
+        if (origWords[i - 1].toLowerCase() ==
+            corrWords[j - 1].toLowerCase()) {
           dp[i][j] = dp[i - 1][j - 1] + 1;
         } else {
           dp[i][j] = dp[i - 1][j] > dp[i][j - 1]
@@ -1214,7 +1106,8 @@ class _AiDebugSheet extends ConsumerWidget {
     while (i > 0 || j > 0) {
       if (i > 0 &&
           j > 0 &&
-          origWords[i - 1].toLowerCase() == corrWords[j - 1].toLowerCase()) {
+          origWords[i - 1].toLowerCase() ==
+              corrWords[j - 1].toLowerCase()) {
         ops.add(_DiffOp.equal(corrWords[j - 1]));
         i--;
         j--;
@@ -1226,7 +1119,6 @@ class _AiDebugSheet extends ConsumerWidget {
         i--;
       }
     }
-    ops.reversed; // reversed is lazy, need toList
     final orderedOps = ops.reversed.toList();
 
     // Convert to TextSpans
@@ -1269,7 +1161,8 @@ class _AiDebugSheet extends ConsumerWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.check_circle_outline, size: 16, color: AppTheme.textSecondary),
+            const Icon(Icons.check_circle_outline,
+                size: 16, color: AppTheme.textSecondary),
             const SizedBox(width: 6),
             Text(
               'Parsed Result',
@@ -1335,12 +1228,6 @@ class _ExtractedActionsSectionState
 
   @override
   Widget build(BuildContext context) {
-    final aiEnabled = ref.watch(localAiEnabledProvider);
-
-    if (!aiEnabled) {
-      return const SizedBox.shrink();
-    }
-
     final actionsAsync = ref.watch(
       extractedActionsForMemoProvider(widget.memo.id),
     );
@@ -1389,10 +1276,21 @@ class _ExtractedActionsSectionState
   }
 }
 
-class _ActionItem extends StatelessWidget {
+class _ActionItem extends ConsumerStatefulWidget {
   final ExtractedAction action;
 
   const _ActionItem({required this.action});
+
+  @override
+  ConsumerState<_ActionItem> createState() => _ActionItemState();
+}
+
+class _ActionItemState extends ConsumerState<_ActionItem> {
+  bool _isCreating = false;
+  bool _isDismissing = false;
+  bool _isOpening = false;
+
+  ExtractedAction get action => widget.action;
 
   @override
   Widget build(BuildContext context) {
@@ -1417,14 +1315,32 @@ class _ActionItem extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                action.title,
-                style: Theme.of(context).textTheme.bodyMedium,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      action.title,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.spacingSm),
+                  _ActionStatusBadge(action: action),
+                ],
               ),
-              if (action.dueDate != null) ...[
+              if (_timingLabel(action) case final timingLabel?) ...[
                 const SizedBox(height: 4),
                 Text(
-                  'Due: ${DateFormat.yMMMd().format(action.dueDate!)}',
+                  timingLabel,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                ),
+              ],
+              if (action.notes != null && action.notes!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  action.notes!.trim(),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppTheme.textSecondary,
                       ),
@@ -1439,11 +1355,132 @@ class _ActionItem extends StatelessWidget {
                       ),
                 ),
               ],
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: AppTheme.spacingSm,
+                runSpacing: AppTheme.spacingSm,
+                children: [
+                  if (!action.created && !action.dismissed)
+                    FilledButton.icon(
+                      style: _compactFilledButtonStyle(),
+                      onPressed: _isCreating ? null : _createAction,
+                      icon: _isCreating
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.add_task_outlined),
+                      label: Text(_isCreating ? 'Creating…' : 'Create'),
+                    ),
+                  if (!action.created && !action.dismissed)
+                    OutlinedButton.icon(
+                      style: _compactOutlinedButtonStyle(),
+                      onPressed: _isDismissing ? null : _dismissAction,
+                      icon: _isDismissing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.close_rounded),
+                      label: const Text('Dismiss'),
+                    ),
+                  if (action.created && action.platformTargetId != null)
+                    OutlinedButton.icon(
+                      style: _compactOutlinedButtonStyle(),
+                      onPressed: _isOpening ? null : _openCreatedAction,
+                      icon: _isOpening
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.open_in_new_rounded),
+                      label: const Text('Open'),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _createAction() async {
+    setState(() => _isCreating = true);
+    try {
+      final selectedCalendarId = ref.read(selectedProductivityCalendarIdProvider);
+      final draft = ActionCreationDraft.fromAction(action).copyWith(
+        platformCalendarId: Platform.isAndroid ? selectedCalendarId : null,
+      );
+
+      final message = await ref.read(extractedActionOperationsProvider).createAction(
+            action: action,
+            draft: draft,
+          );
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to create action: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isCreating = false);
+      }
+    }
+  }
+
+  Future<void> _dismissAction() async {
+    setState(() => _isDismissing = true);
+    try {
+      await ref.read(extractedActionOperationsProvider).dismissAction(action.id);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to dismiss action: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDismissing = false);
+      }
+    }
+  }
+
+  Future<void> _openCreatedAction() async {
+    setState(() => _isOpening = true);
+    try {
+      await ref
+          .read(extractedActionCreationServiceProvider)
+          .openCreatedAction(action);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to open created action: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isOpening = false);
+      }
+    }
   }
 
   IconData _actionTypeIcon(ExtractedActionType type) {
@@ -1460,6 +1497,56 @@ class _ActionItem extends StatelessWidget {
       ExtractedActionType.reminder => AppTheme.warningColor,
       ExtractedActionType.calendarEvent => AppTheme.infoColor,
     };
+  }
+
+  String? _timingLabel(ExtractedAction action) {
+    final dateFormat = DateFormat.yMMMd();
+    final dateTimeFormat = DateFormat.yMMMd().add_jm();
+
+    if (action.startTime != null) {
+      final start = action.startTime!.toLocal();
+      if (action.endTime != null) {
+        final end = action.endTime!.toLocal();
+        return 'When: ${dateTimeFormat.format(start)} → ${dateTimeFormat.format(end)}';
+      }
+      return 'When: ${dateTimeFormat.format(start)}';
+    }
+
+    if (action.dueDate != null) {
+      return 'Due: ${dateFormat.format(action.dueDate!.toLocal())}';
+    }
+
+    return null;
+  }
+}
+
+class _ActionStatusBadge extends StatelessWidget {
+  final ExtractedAction action;
+
+  const _ActionStatusBadge({required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch ((action.created, action.dismissed)) {
+      (true, _) => ('Created', AppTheme.successColor),
+      (_, true) => ('Dismissed', AppTheme.textSecondary),
+      _ => ('Pending', AppTheme.warningColor),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusXLarge),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
   }
 }
 
@@ -2260,6 +2347,9 @@ class _TranscribeButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final engineStateAsync = ref.watch(transcriptionEngineStateProvider);
     final configuredAsync = ref.watch(transcriptionConfiguredProvider);
+    final actionState = ref.watch(voiceMemoActionsProvider);
+    // Also watch background auto-transcription so buttons update immediately
+    final autoTranscribeState = ref.watch(autoTranscribeStateProvider);
 
     return configuredAsync.when(
       data: (configured) {
@@ -2277,28 +2367,61 @@ class _TranscribeButton extends ConsumerWidget {
 
         return engineStateAsync.when(
           data: (engineState) {
-            final isTranscribing =
-                engineState.status == TranscriptionEngineStatus.transcribing;
+            final isTranscribing = actionState.isTranscribingMemo(memo.filename) ||
+                autoTranscribeState.isTranscribingMemo(memo.filename);
             final buttonLabel =
                 memo.transcription == null ? 'Transcribe' : 'Re-transcribe';
 
+            // Build a status label from the engine state while transcribing
+            String? statusLabel;
+            if (isTranscribing) {
+              statusLabel = switch (engineState.status) {
+                TranscriptionEngineStatus.downloading =>
+                  'Downloading model (${(engineState.downloadProgress * 100).toInt()}%)…',
+                TranscriptionEngineStatus.transcribing => 'Transcribing audio…',
+                TranscriptionEngineStatus.ready => 'Preparing…',
+                TranscriptionEngineStatus.error =>
+                  engineState.errorMessage ?? 'Error',
+                _ => 'Initializing…',
+              };
+            }
+
             return _ButtonBox(
               expand: expand,
-              child: OutlinedButton.icon(
-                style: _compactOutlinedButtonStyle(),
-                icon: isTranscribing
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.transcribe),
-                label: Text(isTranscribing ? 'Transcribing...' : buttonLabel),
-                onPressed: isTranscribing
-                    ? null
-                    : () => ref
-                        .read(voiceMemoActionsProvider.notifier)
-                        .retranscribe(memo),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: expand
+                    ? CrossAxisAlignment.stretch
+                    : CrossAxisAlignment.start,
+                children: [
+                  OutlinedButton.icon(
+                    style: _compactOutlinedButtonStyle(),
+                    icon: isTranscribing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.transcribe),
+                    label: Text(isTranscribing ? 'Transcribing...' : buttonLabel),
+                    onPressed: isTranscribing
+                        ? null
+                        : () => ref
+                            .read(voiceMemoActionsProvider.notifier)
+                            .retranscribe(memo),
+                  ),
+                  if (statusLabel != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 4),
+                      child: Text(
+                        statusLabel,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                              fontSize: 11,
+                            ),
+                      ),
+                    ),
+                ],
               ),
             );
           },
@@ -2319,8 +2442,7 @@ class _TranscribeButton extends ConsumerWidget {
       loading: () => const SizedBox.shrink(),
       error: (_, _) => engineStateAsync.when(
         data: (engineState) {
-          final isTranscribing =
-              engineState.status == TranscriptionEngineStatus.transcribing;
+          final isTranscribing = actionState.isTranscribingMemo(memo.filename);
 
           return _ButtonBox(
             expand: expand,
