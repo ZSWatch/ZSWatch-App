@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:chrono_ai_flow/chrono_ai_flow.dart';
 import 'package:fllama/fllama.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -99,6 +100,9 @@ class LlmInferenceMetrics {
   final int promptTokens;
   final int completionTokens;
   final double tokensPerSecond;
+  final int attempts;
+  final String? promptStrategy;
+  final bool retryEnabled;
 
   const LlmInferenceMetrics({
     required this.modelName,
@@ -109,6 +113,9 @@ class LlmInferenceMetrics {
     this.promptTokens = 0,
     this.completionTokens = 0,
     this.tokensPerSecond = 0.0,
+    this.attempts = 1,
+    this.promptStrategy,
+    this.retryEnabled = false,
   });
 
   LlmInferenceMetrics copyWithParsedJson(String? json) =>
@@ -121,6 +128,9 @@ class LlmInferenceMetrics {
         promptTokens: promptTokens,
         completionTokens: completionTokens,
         tokensPerSecond: tokensPerSecond,
+        attempts: attempts,
+        promptStrategy: promptStrategy,
+        retryEnabled: retryEnabled,
       );
 }
 
@@ -129,6 +139,12 @@ class TranscriptResult {
   final String summary;
   final String category;
   final List<ExtractedActionResult> actions;
+  final String? extractedIntent;
+  final String? extractedTitle;
+  final String? datetimeExpressionOriginal;
+  final String? datetimeExpressionEnglish;
+  final String? resolvedDateTime;
+  final String? resolverMethod;
   final String? originalTranscription;
   final String? correctedTranscription;
   final LlmInferenceMetrics? correctionMetrics;
@@ -138,6 +154,12 @@ class TranscriptResult {
     required this.summary,
     required this.category,
     this.actions = const [],
+    this.extractedIntent,
+    this.extractedTitle,
+    this.datetimeExpressionOriginal,
+    this.datetimeExpressionEnglish,
+    this.resolvedDateTime,
+    this.resolverMethod,
     this.originalTranscription,
     this.correctedTranscription,
     this.correctionMetrics,
@@ -157,6 +179,29 @@ class TranscriptResult {
 ///
 /// The model loads lazily on first inference and stays cached in-process.
 class LlmService {
+  static const int _maxStructuredOutputAttempts = 2;
+  static const String promptPlaceholderCurrentLocalDateTime =
+      ChronoPromptTemplate.promptPlaceholderCurrentLocalDateTime;
+  static const String promptPlaceholderCurrentLocalDateTimeCompact =
+      ChronoPromptTemplate.promptPlaceholderCurrentLocalDateTimeCompact;
+  static const String promptPlaceholderWeekday =
+      ChronoPromptTemplate.promptPlaceholderWeekday;
+  static const String promptPlaceholderTimezoneOffset =
+      ChronoPromptTemplate.promptPlaceholderTimezoneOffset;
+  static const String promptPlaceholderTranscript =
+      ChronoPromptTemplate.promptPlaceholderTranscript;
+
+  static String get defaultBenchmarkPromptTemplate =>
+      ChronoPromptTemplate.defaultTemplate;
+
+  static String get defaultClassifyPromptTemplate =>
+    defaultBenchmarkPromptTemplate;
+
+  final TimeExpressionResolver _timeExpressionResolver =
+    TimeExpressionResolver();
+    final ChronoLlmParser _chronoLlmParser = const ChronoLlmParser();
+
+
   static const String defaultModelId = 'qwen25_1_5b_q4_k_m';
   static const List<LlmModelInfo> catalogModels = [
     LlmModelInfo(
@@ -185,6 +230,33 @@ class LlmService {
       downloadUrl:
           'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q8_0.gguf',
       expectedSizeBytes: 1890 * 1024 * 1024,
+    ),
+    LlmModelInfo(
+      id: 'qwen3_1_7b_q4_k_m',
+      displayName: 'Qwen3 1.7B Instruct · Q4_K_M',
+      family: 'Qwen3-1.7B',
+      filename: 'Qwen3-1.7B-Q4_K_M.gguf',
+      downloadUrl:
+          'https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf',
+      expectedSizeBytes: 1220 * 1024 * 1024,
+    ),
+    LlmModelInfo(
+      id: 'smollm3_3b_q4_k_m',
+      displayName: 'SmolLM3 3B Instruct · Q4_K_M',
+      family: 'SmolLM3-3B',
+      filename: 'SmolLM3-Q4_K_M.gguf',
+      downloadUrl:
+          'https://huggingface.co/ggml-org/SmolLM3-3B-GGUF/resolve/main/SmolLM3-Q4_K_M.gguf',
+      expectedSizeBytes: 1840 * 1024 * 1024,
+    ),
+    LlmModelInfo(
+      id: 'qwen35_2b_q4_k_m',
+      displayName: 'Qwen3.5 2B Instruct · Q4_K_M (Experimental)',
+      family: 'Qwen3.5-2B',
+      filename: 'Qwen3.5-2B-Q4_K_M.gguf',
+      downloadUrl:
+          'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf',
+      expectedSizeBytes: 1222 * 1024 * 1024,
     ),
     LlmModelInfo(
       id: 'llama32_3b_q4_k_m',
@@ -542,6 +614,8 @@ class LlmService {
   Future<TranscriptResult> processTranscript(
     String transcript, {
     bool correctTranscription = true,
+    String? classifyPromptOverride,
+    String? promptStrategyOverride,
     void Function(String phase, String partialResponse, int tokens)? onProgress,
   }) async {
     _stateSubject.add(
@@ -592,37 +666,47 @@ class LlmService {
       await Future<void>.delayed(const Duration(milliseconds: 500));
 
       // --- Step 2: Build the extraction prompt ---
-      final prompt = _buildClassifyPrompt(effectiveTranscript);
-      final genResult = await _generate(
+      final promptTemplate = classifyPromptOverride?.trim();
+      final prompt = (promptTemplate != null && promptTemplate.isNotEmpty)
+          ? _renderClassifyPromptTemplate(
+              promptTemplate,
+              transcript: effectiveTranscript,
+            )
+          : _buildClassifyPrompt(effectiveTranscript);
+      final structuredResult = await _generateStructuredJsonWithRetry(
         prompt,
-        onPartialResponse: onProgress == null
-            ? null
-            : (partial, tokens) => onProgress('classifying', partial, tokens),
+        promptStrategy: (promptTemplate != null && promptTemplate.isNotEmpty)
+            ? (promptStrategyOverride ?? 'custom-template')
+            : 'full+/no_think',
+        phase: 'classifying',
+        onProgress: onProgress,
       );
-      final raw = genResult.text;
-      final classifyMetrics = genResult.metrics.copyWithParsedJson(null);
+      final raw = structuredResult.raw;
+      final classifyMetrics = structuredResult.metrics;
 
       debugPrint('[LlmService] Raw AI response: $raw');
 
       // --- Parse JSON from output ---
-      final result = _parseTranscriptResult(raw);
+      final result = structuredResult.result;
 
       _stateSubject.add(
         _stateSubject.value.copyWith(status: LlmServiceStatus.ready),
       );
 
-      // Attach the parsed JSON to classify metrics
-      final jsonStr = _extractFirstJsonObject(raw);
-      final finalClassifyMetrics = classifyMetrics.copyWithParsedJson(jsonStr);
-
       return TranscriptResult(
         summary: result.summary,
         category: result.category,
         actions: result.actions,
+        extractedIntent: result.extractedIntent,
+        extractedTitle: result.extractedTitle,
+        datetimeExpressionOriginal: result.datetimeExpressionOriginal,
+        datetimeExpressionEnglish: result.datetimeExpressionEnglish,
+        resolvedDateTime: result.resolvedDateTime,
+        resolverMethod: result.resolverMethod,
         originalTranscription: transcript,
         correctedTranscription: correctedTranscription,
         correctionMetrics: correctionMetrics,
-        classifyMetrics: finalClassifyMetrics,
+        classifyMetrics: classifyMetrics,
       );
     } catch (e) {
       debugPrint('[LlmService] Failed to process transcript: $e');
@@ -672,27 +756,71 @@ Corrected transcription:''';
   }
 
   String _buildClassifyPrompt(String transcript) {
+    return _renderClassifyPromptTemplate(
+      defaultClassifyPromptTemplate,
+      transcript: transcript,
+    );
+  }
+
+  String _renderClassifyPromptTemplate(
+    String template, {
+    required String transcript,
+  }) {
+    return ChronoPromptTemplate.render(
+      template,
+      transcript: transcript,
+    );
+  }
+
+  /// Word-count threshold for brain dump mode. Transcripts with more
+  /// words than this use the brain dump prompt instead of the standard
+  /// classify prompt.
+  static const int brainDumpWordThreshold = 50;
+
+  String _buildBrainDumpPrompt(String transcript) {
+    final localNow = DateTime.now();
+    final weekday = const [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+      'Friday', 'Saturday', 'Sunday',
+    ][localNow.weekday - 1];
+    final iso = localNow.toIso8601String();
+    final tzOffset = localNow.timeZoneOffset;
+    final tzSign = tzOffset.isNegative ? '-' : '+';
+    final tzHours = tzOffset.inHours.abs().toString().padLeft(2, '0');
+    final tzMinutes = (tzOffset.inMinutes.abs() % 60).toString().padLeft(2, '0');
+    final tz = '$tzSign$tzHours:$tzMinutes';
+
     return '''
-You are a precise voice-note extraction assistant.
+You are a voice-note summarization assistant specializing in long, unstructured recordings.
+
+Current local date/time: $iso ($weekday), timezone UTC$tz.
+Use this to resolve relative references like "tomorrow", "next Tuesday", "in 30 minutes", etc.
+
+The following transcript is from a "brain dump" — a long, stream-of-consciousness voice recording. It may contain:
+- Multiple unrelated topics
+- Rambling or repeated ideas
+- Filler words and false starts
+- Mixed actionable items and general thoughts
 
 Return EXACTLY ONE valid JSON object.
-Do not include markdown fences.
-Do not include explanations.
-Do not include any text before or after the JSON.
-Do not return multiple JSON objects.
+Do not include markdown fences, explanations, or any text before/after the JSON.
 
-Analyze the transcript and produce:
-1. a short summary
-2. a category
-3. structured actions if the transcript contains actionable items
-
-Preserve the transcript language in summary, title, notes, and location.
-Do not invent dates, times, or locations. Use null when unknown.
+Your job:
+1. Produce a concise executive summary (2-3 sentences max)
+2. Group the content into logical sections with headers
+3. Extract any actionable items mentioned anywhere in the transcript
+4. Assign the category "brain_dump"
 
 Use this exact schema:
 {
-  "summary": "short summary in the original language",
-  "category": "idea" | "task" | "reminder" | "meeting" | "note",
+  "summary": "concise 2-3 sentence executive summary in the original language",
+  "category": "brain_dump",
+  "sections": [
+    {
+      "header": "Topic or theme heading",
+      "bullets": ["key point 1", "key point 2"]
+    }
+  ],
   "actions": [
     {
       "type": "task" | "reminder" | "calendar_event",
@@ -709,61 +837,249 @@ Use this exact schema:
 }
 
 Rules:
-- Use "meeting" for calendar-like content.
-- Use "task" or "reminder" for actionable personal follow-ups.
-- Use "note" or "idea" when there is no clear action.
+- Keep sections to 4 or fewer.
+- Keep bullets concise (one line each).
+- Extract ALL actionable items regardless of where they appear.
 - If no actions exist, return an empty array.
-- Keep the summary short and useful for a timeline card.
+- Preserve the transcript language.
+- Do not invent dates, times, or locations. Use null when unknown.
 
 Transcript: "$transcript"
-JSON: ''';
+JSON:
+
+/no_think''';
+  }
+
+  /// Determine whether a transcript should use brain dump mode.
+  bool isBrainDump(String transcript) {
+    final wordCount = transcript.trim().split(RegExp(r'\s+')).length;
+    return wordCount >= brainDumpWordThreshold;
+  }
+
+  /// Process a transcript using the brain dump prompt for long recordings.
+  Future<TranscriptResult> processTranscriptBrainDump(
+    String transcript, {
+    bool correctTranscription = true,
+    void Function(String phase, String partialResponse, int tokens)? onProgress,
+  }) async {
+    _stateSubject.add(
+      _stateSubject.value.copyWith(status: LlmServiceStatus.processing),
+    );
+
+    try {
+      debugPrint(
+        '[LlmService] Processing brain dump transcript (${transcript.length} chars)',
+      );
+
+      String effectiveTranscript = transcript;
+      LlmInferenceMetrics? correctionMetrics;
+      String? correctedTranscription;
+
+      // --- Step 1: Correct transcription errors if enabled ---
+      if (correctTranscription) {
+        final correctionPrompt = _buildCorrectionPrompt(transcript);
+        final correctionResult = await _generate(
+          correctionPrompt,
+          overrideMaxTokens: 1024,
+          onPartialResponse: onProgress == null
+              ? null
+              : (partial, tokens) => onProgress('correcting', partial, tokens),
+        );
+
+        final corrected = correctionResult.text.trim();
+        correctionMetrics = correctionResult.metrics;
+
+        if (corrected.isNotEmpty &&
+            !corrected.startsWith('{') &&
+            corrected.length > 5) {
+          correctedTranscription = corrected;
+          effectiveTranscript = corrected;
+        }
+      }
+
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+
+      // --- Step 2: Brain dump extraction prompt ---
+      final prompt = _buildBrainDumpPrompt(effectiveTranscript);
+      final structuredResult = await _generateStructuredJsonWithRetry(
+        prompt,
+        overrideMaxTokens: 768,
+        promptStrategy: 'brain_dump+/no_think',
+        phase: 'summarizing',
+        onProgress: onProgress,
+      );
+      final raw = structuredResult.raw;
+      final classifyMetrics = structuredResult.metrics;
+
+      debugPrint('[LlmService] Raw brain dump response: $raw');
+
+      // Parse using the same JSON extraction logic
+      final result = structuredResult.result;
+      final jsonStr = classifyMetrics.parsedJson;
+
+      _stateSubject.add(
+        _stateSubject.value.copyWith(status: LlmServiceStatus.ready),
+      );
+
+      // Build a rich summary including sections if present
+      String richSummary = result.summary;
+      if (jsonStr != null) {
+        try {
+          final parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
+          final sections = parsed['sections'] as List<dynamic>?;
+          if (sections != null && sections.isNotEmpty) {
+            final buf = StringBuffer(result.summary);
+            buf.writeln();
+            for (final section in sections.whereType<Map<String, dynamic>>()) {
+              final header = section['header'] as String?;
+              final bullets = (section['bullets'] as List<dynamic>?)
+                      ?.whereType<String>()
+                      .toList() ??
+                  [];
+              if (header != null) {
+                buf.writeln('\n## $header');
+                for (final bullet in bullets) {
+                  buf.writeln('• $bullet');
+                }
+              }
+            }
+            richSummary = buf.toString().trim();
+          }
+        } catch (_) {
+          // Fall back to plain summary
+        }
+      }
+
+      return TranscriptResult(
+        summary: richSummary,
+        category: 'brain_dump',
+        actions: result.actions,
+        extractedIntent: result.extractedIntent,
+        extractedTitle: result.extractedTitle,
+        datetimeExpressionOriginal: result.datetimeExpressionOriginal,
+        datetimeExpressionEnglish: result.datetimeExpressionEnglish,
+        resolvedDateTime: result.resolvedDateTime,
+        resolverMethod: result.resolverMethod,
+        originalTranscription: transcript,
+        correctedTranscription: correctedTranscription,
+        correctionMetrics: correctionMetrics,
+        classifyMetrics: classifyMetrics,
+      );
+    } catch (e) {
+      debugPrint('[LlmService] Failed to process brain dump: $e');
+      _stateSubject.add(
+        _stateSubject.value.copyWith(
+          status: LlmServiceStatus.error,
+          error: e.toString(),
+        ),
+      );
+      rethrow;
+    }
   }
 
   // ---- Output parsing ----
 
+  Future<({
+    String raw,
+    TranscriptResult result,
+    LlmInferenceMetrics metrics,
+    int attempts,
+  })> _generateStructuredJsonWithRetry(
+    String prompt, {
+    int? overrideMaxTokens,
+    required String promptStrategy,
+    String phase = 'classifying',
+    void Function(String phase, String partialResponse, int tokens)? onProgress,
+  }) async {
+    String raw = '';
+    TranscriptResult parsed = const TranscriptResult(summary: '', category: 'note');
+    LlmInferenceMetrics? lastMetrics;
+    Duration totalWallTime = Duration.zero;
+    var totalCompletionTokens = 0;
+    var attempts = 0;
+
+    while (attempts < _maxStructuredOutputAttempts) {
+      attempts++;
+
+      final genResult = await _generate(
+        prompt,
+        overrideMaxTokens: overrideMaxTokens,
+        onPartialResponse: onProgress == null
+            ? null
+            : (partial, tokens) => onProgress(phase, partial, tokens),
+      );
+
+      raw = genResult.text;
+      parsed = _parseTranscriptResult(raw);
+      lastMetrics = genResult.metrics;
+      totalWallTime += genResult.metrics.wallTime;
+      totalCompletionTokens += genResult.metrics.completionTokens;
+
+      if (!_shouldRetryStructuredOutput(raw, parsed) ||
+          attempts >= _maxStructuredOutputAttempts) {
+        break;
+      }
+
+      debugPrint(
+        '[LlmService] Retrying invalid structured output '
+        '(attempt ${attempts + 1}/$_maxStructuredOutputAttempts)',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    }
+
+    final parsedJson = _extractFirstJsonObject(raw);
+    final metrics = LlmInferenceMetrics(
+      modelName: _selectedModelName,
+      rawPrompt: prompt,
+      rawResponse: raw,
+      parsedJson: parsedJson,
+      wallTime: totalWallTime,
+      completionTokens: totalCompletionTokens,
+      tokensPerSecond: lastMetrics?.tokensPerSecond ?? 0.0,
+      attempts: attempts,
+      promptStrategy: promptStrategy,
+      retryEnabled: _maxStructuredOutputAttempts > 1,
+    );
+
+    return (
+      raw: raw,
+      result: parsed,
+      metrics: metrics,
+      attempts: attempts,
+    );
+  }
+
+  String _sanitizeModelOutput(String raw) {
+    return _chronoLlmParser.sanitizeModelOutput(raw);
+  }
+
+  bool _shouldRetryStructuredOutput(String raw, TranscriptResult result) {
+    final cleaned = _sanitizeModelOutput(raw);
+    final jsonStr = _extractFirstJsonObject(cleaned);
+
+    if (jsonStr == null) {
+      return true;
+    }
+
+    if (result.summary.trim().isEmpty) {
+      return true;
+    }
+
+    if (result.summary.trim() == cleaned && result.actions.isEmpty) {
+      return true;
+    }
+
+    if (result.category == 'note' &&
+        result.actions.isEmpty &&
+        (result.summary.trim() == cleaned || result.summary.trim() == jsonStr.trim())) {
+      return true;
+    }
+
+    return false;
+  }
+
   String? _extractFirstJsonObject(String raw) {
-    final start = raw.indexOf('{');
-    if (start == -1) {
-      return null;
-    }
-
-    var depth = 0;
-    var inString = false;
-    var escaping = false;
-
-    for (var i = start; i < raw.length; i++) {
-      final char = raw[i];
-
-      if (escaping) {
-        escaping = false;
-        continue;
-      }
-
-      if (char == '\\' && inString) {
-        escaping = true;
-        continue;
-      }
-
-      if (char == '"') {
-        inString = !inString;
-        continue;
-      }
-
-      if (inString) {
-        continue;
-      }
-
-      if (char == '{') {
-        depth++;
-      } else if (char == '}') {
-        depth--;
-        if (depth == 0) {
-          return raw.substring(start, i + 1);
-        }
-      }
-    }
-
-    return null;
+    return _chronoLlmParser.extractFirstJsonObject(raw);
   }
 
   String _normalizeCategory(String? rawCategory) {
@@ -801,20 +1117,85 @@ JSON: ''';
     }
   }
 
+  ChronoLlmExtraction? _parseChronoExtractionResult(
+    Map<String, dynamic> parsed,
+  ) {
+    return _chronoLlmParser.parse(jsonEncode(parsed)).extraction;
+  }
+
+  TranscriptResult _buildTranscriptResultFromChronoExtraction(
+    ChronoLlmExtraction extraction,
+    String raw,
+  ) {
+    final summary = extraction.title.isNotEmpty
+        ? extraction.title
+        : raw.trim();
+    final category = switch (extraction.intent) {
+      'event' => 'meeting',
+      'reminder' => 'reminder',
+      _ => 'note',
+    };
+
+    if (extraction.intent == 'note') {
+      return TranscriptResult(
+        summary: summary,
+        category: 'note',
+        extractedIntent: extraction.intent,
+        extractedTitle: extraction.title,
+        datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
+        datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
+      );
+    }
+
+    final englishExpression = extraction.datetimeExpressionEnglish;
+    final resolved = englishExpression == null
+        ? null
+        : _timeExpressionResolver.resolve(englishExpression);
+
+    final action = ExtractedActionResult(
+      type: extraction.intent == 'event' ? 'calendar_event' : 'reminder',
+      title: summary,
+      notes: extraction.datetimeExpressionOriginal,
+      dueDate: extraction.intent == 'reminder' ? resolved?.dateTime.toIso8601String() : null,
+      startTime: extraction.intent == 'event' ? resolved?.dateTime.toIso8601String() : null,
+    );
+
+    return TranscriptResult(
+      summary: summary,
+      category: category,
+      actions: [action],
+      extractedIntent: extraction.intent,
+      extractedTitle: extraction.title,
+      datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
+      datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
+      resolvedDateTime: resolved?.dateTime.toIso8601String(),
+      resolverMethod: resolved?.method,
+    );
+  }
+
   TranscriptResult _parseTranscriptResult(String raw) {
-    final jsonStr = _extractFirstJsonObject(raw);
+    final cleaned = _sanitizeModelOutput(raw);
+    final jsonStr = _extractFirstJsonObject(cleaned);
 
     if (jsonStr == null) {
       debugPrint('[LlmService] Failed to parse AI response: '
           'FormatException: No JSON object found');
       return TranscriptResult(
-        summary: raw.trim(),
+        summary: cleaned.trim(),
         category: 'note',
       );
     }
 
     try {
       final parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+      final chronoExtraction = _parseChronoExtractionResult(parsed);
+      if (chronoExtraction != null) {
+        return _buildTranscriptResultFromChronoExtraction(
+          chronoExtraction,
+          raw,
+        );
+      }
 
       final category = _normalizeCategory(parsed['category'] as String?);
       final summary = (parsed['summary'] as String?)?.trim();

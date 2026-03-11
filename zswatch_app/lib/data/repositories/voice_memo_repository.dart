@@ -127,6 +127,26 @@ class VoiceMemoRepository {
     );
   }
 
+  /// Clear AI results (undo) — resets summary, category, and processing status
+  /// while keeping raw audio and transcription intact.
+  Future<void> clearAiResults(String filename) async {
+    final memo = await _db.getVoiceMemoByFilename(filename);
+    if (memo != null) {
+      await _db.deleteActionsForMemo(memo.id);
+    }
+
+    await _db.updateVoiceMemoAiResults(
+      filename: filename,
+      summary: '',
+      category: '',
+      aiModel: '',
+    );
+    await _db.updateVoiceMemoProcessingStatus(
+      filename: filename,
+      status: 'transcribed',
+    );
+  }
+
   /// Update AI processing status
   Future<void> updateProcessingStatus({
     required String filename,

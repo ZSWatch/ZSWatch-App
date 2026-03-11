@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/extracted_action.dart';
 import '../data/repositories/extracted_action_repository.dart';
 import '../data/repositories/voice_memo_repository.dart';
-import '../services/ai/ai_startup_test.dart';
+import '../services/ai/extracted_action_creation_service.dart';
 import '../services/ai/llm_service.dart';
 import '../services/ai/voice_note_ai_pipeline.dart';
 import 'settings_providers.dart';
@@ -56,10 +56,55 @@ final llmModelSizeProvider = FutureProvider<int?>((ref) async {
 // Extracted-action repository
 // ---------------------------------------------------------------------------
 
-final _extractedActionRepositoryProvider =
+final extractedActionRepositoryProvider =
     Provider<ExtractedActionRepository>((ref) {
   final db = ref.watch(databaseProvider);
   return ExtractedActionRepository(db);
+});
+
+final extractedActionCreationServiceProvider =
+    Provider<ExtractedActionCreationService>((ref) {
+  return const ExtractedActionCreationService();
+});
+
+final writableCalendarsProvider = FutureProvider<List<PlatformCalendar>>((ref) async {
+  final service = ref.watch(extractedActionCreationServiceProvider);
+  return service.listWritableCalendars();
+});
+
+class ExtractedActionOperations {
+  final ExtractedActionRepository _actionRepository;
+  final ExtractedActionCreationService _creationService;
+
+  const ExtractedActionOperations({
+    required ExtractedActionRepository actionRepository,
+    required ExtractedActionCreationService creationService,
+  })  : _actionRepository = actionRepository,
+        _creationService = creationService;
+
+  Future<String> createAction({
+    required ExtractedAction action,
+    required ActionCreationDraft draft,
+  }) async {
+    final created = await _creationService.createDraft(draft);
+    await _actionRepository.markCreated(
+      actionId: action.id,
+      platformTargetId: created.platformId,
+    );
+    return created.successMessage;
+  }
+
+  Future<void> dismissAction(int actionId) {
+    return _actionRepository.dismiss(actionId);
+  }
+}
+
+final extractedActionOperationsProvider =
+    Provider<ExtractedActionOperations>((ref) {
+  return ExtractedActionOperations(
+    actionRepository: ref.watch(extractedActionRepositoryProvider),
+    creationService: ref.watch(extractedActionCreationServiceProvider),
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -70,7 +115,7 @@ final _extractedActionRepositoryProvider =
 final voiceNoteAiPipelineProvider = Provider<VoiceNoteAiPipeline>((ref) {
   final llm = ref.watch(llmServiceProvider);
   final memoRepo = ref.watch(voiceMemoRepositoryProvider);
-  final actionRepo = ref.watch(_extractedActionRepositoryProvider);
+  final actionRepo = ref.watch(extractedActionRepositoryProvider);
   return VoiceNoteAiPipeline(
     llmService: llm,
     memoRepository: memoRepo,
@@ -107,11 +152,21 @@ class _AiActionsNotifier extends StateNotifier<AsyncValue<void>> {
       final memo = await _memoRepo.getMemoByFilename(filename);
       if (memo == null) throw Exception('Memo not found: $filename');
 
-      await _pipeline.processMemo(
+      final transcript = memo.transcription?.trim();
+      if (transcript == null || transcript.isEmpty) {
+        throw StateError('Transcribe the voice note before AI processing.');
+      }
+
+      final success = await _pipeline.processMemo(
         memoId: memo.id,
         filename: memo.filename,
-        transcript: memo.transcription ?? '',
+        transcript: transcript,
       );
+
+      if (!success) {
+        throw StateError('AI processing did not complete for $filename.');
+      }
+
       state = const AsyncData(null);
     } catch (e, st) {
       debugPrint('[AiActions] processVoiceMemo error: $e');
@@ -146,24 +201,6 @@ final aiActionsProvider =
 
 final extractedActionsForMemoProvider =
     StreamProvider.family<List<ExtractedAction>, int>((ref, memoId) {
-  final repo = ref.watch(_extractedActionRepositoryProvider);
+  final repo = ref.watch(extractedActionRepositoryProvider);
   return repo.watchActionsForMemo(memoId);
 });
-
-// ---------------------------------------------------------------------------
-// Startup test (re-export for app.dart)
-// ---------------------------------------------------------------------------
-
-/// Convenience re-export so app.dart can import just ai_providers.dart.
-Future<void> runAiStartupTest(WidgetRef ref) async {
-  final llm = ref.read(llmServiceProvider);
-  final downloaded = await llm.isModelDownloaded();
-  if (!downloaded) {
-    debugPrint(
-      '[AiStartupTest] Model not downloaded, skipping self-test. '
-      'Download via Settings → AI Processing.',
-    );
-    return;
-  }
-  await aiStartupSelfTest(llm);
-}
