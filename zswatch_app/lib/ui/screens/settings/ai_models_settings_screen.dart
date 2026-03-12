@@ -46,7 +46,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('AI & Transcription')),
+      appBar: AppBar(title: const Text('Voice Memo AI')),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 32),
         children: [
@@ -69,6 +69,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
           ),
           const _AiTogglesTile(),
           const _AiModelSelector(),
+          const _ImportModelTile(),
 
           // ---- GPU / Metal section (iOS only) ----
           if (Platform.isIOS) ...[
@@ -90,7 +91,9 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             // ---- Calendar / Reminders section ----
             const _SectionHeader(
               title: 'Calendar Integration',
-              subtitle: 'Permissions for AI-created events & reminders',
+              subtitle: 'When a voice memo mentions a meeting, deadline, or '
+                  'reminder, the AI can create it directly in your calendar. '
+                  'Grant access below to enable this.',
             ),
             const _CalendarPermissionTile(),
             if (Platform.isIOS) const _RemindersPermissionTile(),
@@ -498,20 +501,26 @@ class _RetranscribeButton extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppTheme.spacingMd,
-        AppTheme.spacingSm,
+        4,
         AppTheme.spacingMd,
         0,
       ),
-      child: SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          style: TextButton.styleFrom(
+            foregroundColor: AppTheme.textSecondary,
+            textStyle: Theme.of(context).textTheme.bodySmall,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
           icon: isBusy
               ? const SizedBox(
-                  width: 16,
-                  height: 16,
+                  width: 14,
+                  height: 14,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.refresh, size: 18),
+              : const Icon(Icons.refresh, size: 16),
           label: Text(
             isBusy ? 'Re-transcribing...' : 'Re-transcribe all with selected model',
           ),
@@ -779,43 +788,6 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
     }
   }
 
-  Future<void> _importModel() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-        dialogTitle: 'Select a GGUF model file',
-      );
-      final path = result?.files.single.path;
-      if (path == null) return;
-
-      if (!path.toLowerCase().endsWith('.gguf')) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Only .gguf model files can be imported')),
-          );
-        }
-        return;
-      }
-
-      final llm = ref.read(llmServiceProvider);
-      final imported = await llm.importModel(path);
-      ref.read(selectedAiModelIdProvider.notifier).setModelId(imported.id);
-      _refreshProviders();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Imported ${imported.filename}')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Import failed: $e')),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final selectedModelId = ref.watch(selectedAiModelIdProvider);
@@ -865,15 +837,67 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                         contentPadding:
                             EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
-                      items: models
-                          .map((m) => DropdownMenuItem<String>(
-                                value: m.id,
-                                child: Text(
-                                  m.displayName,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ))
-                          .toList(),
+                      items: () {
+                                // Assign ranks only to catalog models that
+                                // have a benchmarkScore (already sorted best→worst).
+                                final ranked = <String, int>{};
+                                var rank = 1;
+                                for (final m in models) {
+                                  if (m.benchmarkScore != null) {
+                                    ranked[m.id] = rank++;
+                                  }
+                                }
+                                return models.map((m) {
+                                  final modelRank = ranked[m.id];
+                                  final Color rankColor;
+                                  switch (modelRank) {
+                                    case 1:
+                                      rankColor = const Color(0xFFFFD700);
+                                    case 2:
+                                      rankColor = const Color(0xFFC0C0C0);
+                                    case 3:
+                                      rankColor = const Color(0xFFCD7F32);
+                                    default:
+                                      rankColor = AppTheme.textSecondary;
+                                  }
+                                  return DropdownMenuItem<String>(
+                                    value: m.id,
+                                    child: Row(
+                                      children: [
+                                        if (modelRank != null)
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                                right: 8),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: rankColor
+                                                  .withValues(alpha: 0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '#$modelRank',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelSmall
+                                                  ?.copyWith(
+                                                    color: rankColor,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                            ),
+                                          ),
+                                        Expanded(
+                                          child: Text(
+                                            m.displayName,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList();
+                              }(),
                       onChanged: isDownloading
                           ? null
                           : (value) {
@@ -1002,11 +1026,6 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                               onPressed: isDownloading ? null : _downloadModel,
                               showSpinner: isDownloading,
                             ),
-                          _CompactButton(
-                            icon: Icons.upload_file,
-                            label: 'Import .gguf',
-                            onPressed: isDownloading ? null : _importModel,
-                          ),
                         ],
                       ),
                     ],
@@ -1046,6 +1065,70 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
         child: Text('Error: $e',
             style: const TextStyle(color: AppTheme.errorColor)),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Import custom model tile
+// ---------------------------------------------------------------------------
+
+/// Standalone tile that lets the user sideload a local .gguf file.
+/// Kept separate from the catalog model selector so it's clear it's a
+/// one-time "bring your own model" action, not tied to the selected model.
+class _ImportModelTile extends ConsumerWidget {
+  const _ImportModelTile();
+
+  Future<void> _importModel(BuildContext context, WidgetRef ref) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        dialogTitle: 'Select a GGUF model file',
+      );
+      final path = result?.files.single.path;
+      if (path == null) return;
+
+      if (!path.toLowerCase().endsWith('.gguf')) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Only .gguf model files can be imported')),
+          );
+        }
+        return;
+      }
+
+      final llm = ref.read(llmServiceProvider);
+      final imported = await llm.importModel(path);
+      ref.read(selectedAiModelIdProvider.notifier).setModelId(imported.id);
+      ref.invalidate(llmAvailableModelsProvider);
+      ref.invalidate(selectedLlmModelInfoProvider);
+      ref.invalidate(llmModelDownloadedProvider);
+      ref.invalidate(llmModelSizeProvider);
+      ref.invalidate(llmServiceStateProvider);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Imported ${imported.filename}')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Import failed: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListTile(
+      leading: const Icon(Icons.upload_file_outlined),
+      title: const Text('Import custom model'),
+      subtitle: const Text('Use a local .gguf file from your device'),
+      trailing: const Icon(Icons.chevron_right, size: 18),
+      onTap: () => _importModel(context, ref),
     );
   }
 }
