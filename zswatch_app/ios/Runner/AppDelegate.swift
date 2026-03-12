@@ -28,11 +28,18 @@ import UIKit
   }
 
   private func handleProductivityCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    guard call.method == "createAction" else {
+    switch call.method {
+    case "createAction":
+      handleCreateAction(call, result: result)
+    case "getDeviceMemoryMB":
+      let bytes = ProcessInfo.processInfo.physicalMemory
+      result(Int(bytes / (1024 * 1024)))
+    default:
       result(FlutterMethodNotImplemented)
-      return
     }
+  }
 
+  private func handleCreateAction(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     guard let args = call.arguments as? [String: Any] else {
       result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing action arguments.", details: nil))
       return

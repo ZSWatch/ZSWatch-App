@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:chrono_ai_flow/chrono_ai_flow.dart';
 import 'package:fllama/fllama.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -23,6 +24,16 @@ class LlmModelInfo {
   final int? expectedSizeBytes;
   final bool userProvided;
 
+  /// Per-model context size override. When non-null the inference engine will
+  /// use this instead of the global [LlmService.nCtx]. Useful for memory-
+  /// hungry architectures (e.g. Qwen3.5 with gated attention).
+  final int? contextSize;
+
+  /// Per-model GPU layer limit. When non-null, overrides
+  /// [LlmService.numGpuLayers]. Set to a low value (or 0) for models that
+  /// exceed available Metal VRAM on smaller devices.
+  final int? maxGpuLayers;
+
   const LlmModelInfo({
     required this.id,
     required this.displayName,
@@ -31,6 +42,8 @@ class LlmModelInfo {
     this.downloadUrl,
     this.expectedSizeBytes,
     this.userProvided = false,
+    this.contextSize,
+    this.maxGpuLayers,
   });
 
   bool get isDownloadable => downloadUrl != null;
@@ -45,6 +58,49 @@ enum LlmServiceStatus {
   processing,
   ready,
   error,
+}
+
+/// How well a model fits into available device memory.
+enum ModelMemoryFit {
+  /// Plenty of headroom — full context, full GPU.
+  comfortable,
+
+  /// Tight — context will be reduced but GPU is still used.
+  reduced,
+
+  /// Very tight — minimal context and CPU-only fallback.
+  cpuFallback,
+}
+
+/// Result of [LlmService.checkModelFit] for a specific model on this device.
+class ModelFitResult {
+  final ModelMemoryFit fit;
+  final int contextSize;
+  final int gpuLayers;
+  final int deviceMemoryMB;
+  final int modelSizeMB;
+  final int headroomMB;
+
+  const ModelFitResult({
+    required this.fit,
+    required this.contextSize,
+    required this.gpuLayers,
+    required this.deviceMemoryMB,
+    required this.modelSizeMB,
+    required this.headroomMB,
+  });
+
+  /// Human-readable summary for the UI.
+  String get summary {
+    switch (fit) {
+      case ModelMemoryFit.comfortable:
+        return 'Fits well — full performance';
+      case ModelMemoryFit.reduced:
+        return 'Tight fit — context reduced to $contextSize tokens';
+      case ModelMemoryFit.cpuFallback:
+        return 'Low memory — CPU-only mode (slower)';
+    }
+  }
 }
 
 /// Observable state of the service (for the settings UI).
@@ -283,11 +339,14 @@ class LlmService {
   double temperature = 0.1;
   double topP = 0.9;
   double presencePenalty = 1.1;
+
+  /// GPU layer offloading. 99 = all layers on Metal/GPU, 0 = CPU-only.
   int numGpuLayers = 99;
 
   // ---- Internal state ----
   String? _modelPath;
   int _runningRequestId = -1;
+  int? _deviceMemoryMB;
 
   final _stateSubject = BehaviorSubject<LlmServiceState>.seeded(
     const LlmServiceState(),
@@ -296,6 +355,34 @@ class LlmService {
   /// Observable service state (for UI bindings).
   Stream<LlmServiceState> get stateStream => _stateSubject.stream;
   LlmServiceState get currentState => _stateSubject.value;
+
+  /// Check how well [modelInfo] fits on this device. Call from the UI when the
+  /// user selects a model to show a warning banner if limits will be applied.
+  Future<ModelFitResult> checkModelFit(LlmModelInfo modelInfo) async {
+    final params = await _computeInferenceParams(modelInfo);
+    final deviceMB = _deviceMemoryMB ?? 4096;
+    final modelMB = (modelInfo.expectedSizeBytes ?? 0) ~/ (1024 * 1024);
+    final usableMB = (deviceMB * 0.55).round();
+    final headroomMB = usableMB - modelMB;
+
+    ModelMemoryFit fit;
+    if (params.gpuLayers == 0) {
+      fit = ModelMemoryFit.cpuFallback;
+    } else if (params.contextSize < nCtx) {
+      fit = ModelMemoryFit.reduced;
+    } else {
+      fit = ModelMemoryFit.comfortable;
+    }
+
+    return ModelFitResult(
+      fit: fit,
+      contextSize: params.contextSize,
+      gpuLayers: params.gpuLayers,
+      deviceMemoryMB: deviceMB,
+      modelSizeMB: modelMB,
+      headroomMB: headroomMB,
+    );
+  }
 
   // ---- Helpers ----
 
@@ -533,6 +620,88 @@ class LlmService {
     _modelPath = path;
   }
 
+  // ---- Memory-aware tunables ----
+
+  static const MethodChannel _deviceChannel =
+      MethodChannel('dev.zswatch.app/productivity');
+
+  /// Query device physical RAM (MB), cached after first call.
+  Future<int> _queryDeviceMemoryMB() async {
+    if (_deviceMemoryMB != null) return _deviceMemoryMB!;
+    try {
+      final mb = await _deviceChannel.invokeMethod<int>('getDeviceMemoryMB');
+      _deviceMemoryMB = mb ?? 4096; // conservative fallback
+    } on MissingPluginException {
+      _deviceMemoryMB = 4096;
+    } catch (e) {
+      debugPrint('[LlmService] Failed to query device memory: $e');
+      _deviceMemoryMB = 4096;
+    }
+    debugPrint('[LlmService] Device physical RAM: ${_deviceMemoryMB}MB');
+    return _deviceMemoryMB!;
+  }
+
+  /// Compute context size dynamically based on available device RAM and model
+  /// size. Uses [LlmModelInfo.contextSize] if explicitly set, otherwise scales
+  /// down when the model weight file would leave too little headroom for the
+  /// KV cache + compute buffers on the GPU.
+  ///
+  /// Heuristic budget (conservative):
+  ///   usableGPU ≈ deviceRAM × 0.55          (OS + app + Flutter overhead)
+  ///   headroom  = usableGPU − modelFileSize
+  ///   if headroom ≥ 600 MB → nCtx 2048, full GPU
+  ///   if headroom ≥ 300 MB → nCtx 1024, full GPU
+  ///   if headroom ≥ 100 MB → nCtx  512, full GPU
+  ///   else                 → nCtx  512, CPU-only (avoid Metal OOM crash)
+  Future<({int contextSize, int gpuLayers})> _computeInferenceParams(
+    LlmModelInfo modelInfo,
+  ) async {
+    // Explicit per-model overrides win.
+    final explicitCtx = modelInfo.contextSize;
+    final explicitGpu = modelInfo.maxGpuLayers;
+    if (explicitCtx != null && explicitGpu != null) {
+      return (contextSize: explicitCtx, gpuLayers: explicitGpu);
+    }
+
+    final deviceMB = await _queryDeviceMemoryMB();
+    final modelMB = (modelInfo.expectedSizeBytes ?? 0) ~/ (1024 * 1024);
+
+    // On iOS, Metal shares unified memory with the system. After OS + app +
+    // Flutter + BLE overhead, roughly 55% is available for the GPU working set.
+    // On Android the GPU typically has even less available headroom.
+    final usableMB = (deviceMB * 0.55).round();
+    final headroomMB = usableMB - modelMB;
+
+    int ctx;
+    int gpu;
+
+    if (headroomMB >= 600) {
+      ctx = nCtx; // full context (default 2048)
+      gpu = numGpuLayers;
+    } else if (headroomMB >= 300) {
+      ctx = 1024;
+      gpu = numGpuLayers;
+    } else if (headroomMB >= 100) {
+      ctx = 512;
+      gpu = numGpuLayers;
+    } else {
+      // Very tight — fall back to CPU-only to avoid Metal page-fault crash.
+      ctx = 512;
+      gpu = 0;
+      debugPrint(
+        '[LlmService] WARNING: Low memory headroom (${headroomMB}MB). '
+        'Falling back to CPU-only inference to prevent GPU crash. '
+        'Model ${modelInfo.id} ($modelMB MB) on device with $deviceMB MB RAM.',
+      );
+    }
+
+    // Let explicit per-model values override the computed ones.
+    return (
+      contextSize: explicitCtx ?? ctx,
+      gpuLayers: explicitGpu ?? gpu,
+    );
+  }
+
   static void _logFilter(String log) {
     if (log.contains('loaded') ||
         log.contains('error') ||
@@ -562,16 +731,24 @@ class LlmService {
     final stopwatch = Stopwatch()..start();
     int tokenCount = 0;
 
+    final modelInfo = await currentModelInfo();
+    final params = await _computeInferenceParams(modelInfo);
+
+    debugPrint(
+      '[LlmService] Inference: model=${modelInfo.id} nCtx=${params.contextSize} '
+      'gpuLayers=${params.gpuLayers} deviceRAM=${_deviceMemoryMB ?? "?"}MB',
+    );
+
     final request = OpenAiRequest(
       messages: [Message(Role.user, prompt)],
       modelPath: _modelPath!,
       maxTokens: overrideMaxTokens ?? maxTokens,
-      numGpuLayers: numGpuLayers,
+      numGpuLayers: params.gpuLayers,
       temperature: temperature,
       topP: topP,
       frequencyPenalty: 0.0,
       presencePenalty: presencePenalty,
-      contextSize: nCtx,
+      contextSize: params.contextSize,
       logger: _logFilter,
     );
 

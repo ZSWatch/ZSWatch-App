@@ -58,6 +58,13 @@ final llmModelSizeProvider = FutureProvider<int?>((ref) async {
   return service.modelFileSize();
 });
 
+/// Memory fit check for the currently selected model on this device.
+final llmModelFitProvider = FutureProvider<ModelFitResult>((ref) async {
+  final service = ref.watch(llmServiceProvider);
+  final model = await ref.watch(selectedLlmModelInfoProvider.future);
+  return service.checkModelFit(model);
+});
+
 // ---------------------------------------------------------------------------
 // Extracted-action repository
 // ---------------------------------------------------------------------------
