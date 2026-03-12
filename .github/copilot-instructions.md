@@ -135,3 +135,51 @@ Providers expose `DfuService`, `FirmwareManager`, and `FilesystemUploadService` 
 - **Protocol reference**: `gadgetbridge_api.txt` — complete JSON message format for phone↔watch communication
 - **Firmware counterpart**: `ZSWatch-Firmware/app/src/ble/gadgetbridge/ble_gadgetbridge.c` — firmware-side protocol implementation
 - **Known issues**: `Issues:.md` — current bugs and TODOs at root level
+
+## AI Testbench (`ai_testbench/`)
+
+Standalone Flutter desktop app for benchmarking and evaluating on-device LLM models before shipping them in the companion app. It tests the same prompts and schemas used in production (`chrono_ai_flow` package) against local GGUF models via `fllama`.
+
+### What It Tests
+
+| Benchmark | Service | Purpose |
+|-----------|---------|---------|
+| **Structured extraction** | `model_benchmark_service.dart` | Validates LLM outputs valid JSON matching `chrono_ai_flow` schema (intent, title, datetime fields) |
+| **Time extraction** | `time_extraction_benchmark_service.dart` | End-to-end: transcript → LLM extraction → `chrono_dart` parsing → resolved `DateTime` |
+| **Correction** | `correction_benchmark_service.dart` | Verifies LLM can fix common STT errors (homophones, filler, punctuation) |
+
+### Running Benchmarks
+
+```bash
+cd ai_testbench
+flutter pub get
+
+# Interactive GUI
+flutter run -d linux
+
+# Headless (compiled for consistent timing)
+flutter build linux --release
+./build/linux/x64/release/bundle/ai_testbench --headless --output results.json
+./build/linux/x64/release/bundle/ai_testbench --headless-time --model Qwen3.5-2B-Q4_K_M.gguf
+./build/linux/x64/release/bundle/ai_testbench --headless-correction --model-dir models/
+```
+
+### Key Files
+
+- `lib/main.dart` — Entry point with headless mode dispatch (`--headless`, `--headless-time`, `--headless-correction`)
+- `lib/services/llm_service.dart` — `fllama` wrapper (`LlmService`) for inference with configurable parameters
+- `lib/prompts/` — Prompt templates (delegates to `chrono_ai_flow` for production prompts)
+- `benchmark_results/` — Saved benchmark summaries (Markdown)
+
+### Dependencies
+
+- **fllama** — Flutter llama.cpp bindings for on-device inference
+- **chrono_ai_flow** — Shared prompt templates and JSON schema (local package at `../packages/chrono_ai_flow`)
+- **chrono_dart** — Natural language time expression parsing
+
+### Notes
+
+- GGUF model files go in `models/` (gitignored — download separately from HuggingFace)
+- Native `.so` libraries go in `native_libs/` (gitignored — build from llama.cpp if using the CLI `bin/` runner)
+- Test cases are defined inline in the service files — add new cases there
+- The testbench shares the same `chrono_ai_flow` package as the main app, so prompt changes are tested against both
