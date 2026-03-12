@@ -46,5 +46,18 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
     end
+
+    # Enable calendar & reminders permissions for permission_handler on iOS.
+    # Without these macros the plugin compiles out the permission code and the
+    # system dialog never appears.
+    # Macro names: https://pub.dev/packages/permission_handler (iOS setup)
+    if target.name == 'permission_handler_apple'
+      target.build_configurations.each do |config|
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_EVENTS=1'
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_EVENTS_FULL_ACCESS=1'
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_REMINDERS=1'
+      end
+    end
   end
 end
