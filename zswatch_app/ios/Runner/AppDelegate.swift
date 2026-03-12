@@ -34,6 +34,16 @@ import UIKit
     case "getDeviceMemoryMB":
       let bytes = ProcessInfo.processInfo.physicalMemory
       result(Int(bytes / (1024 * 1024)))
+    case "getAvailableMemoryMB":
+      // On iOS, use os_proc_available_memory (iOS 13.0+) for real-time free RAM.
+      let availableMB: Int
+      if #available(iOS 13.0, *) {
+        availableMB = Int(os_proc_available_memory()) / (1024 * 1024)
+      } else {
+        // Fallback: conservative estimate of 40% of physical memory
+        availableMB = Int(ProcessInfo.processInfo.physicalMemory * 40 / 100) / (1024 * 1024)
+      }
+      result(availableMB)
     default:
       result(FlutterMethodNotImplemented)
     }
