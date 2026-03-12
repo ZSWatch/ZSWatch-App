@@ -191,8 +191,12 @@ Future<void> _autoTranscribeAndProcess({
       }
     }
 
-    // After transcription, run AI processing on all unprocessed memos
+    // After transcription, wait briefly to allow the whisper memory to be reclaimed
+    // and system to stabilize before starting LLM inference. This reduces memory
+    // pressure when the two models might both be in RAM simultaneously.
     if (pipeline != null) {
+      debugPrint('[VoiceMemoProviders] Waiting 500ms before AI processing');
+      await Future<void>.delayed(const Duration(milliseconds: 500));
       debugPrint('[VoiceMemoProviders] Starting auto AI processing');
       await pipeline.processAllUnprocessed();
     }

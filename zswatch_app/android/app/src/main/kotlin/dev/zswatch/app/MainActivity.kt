@@ -410,6 +410,12 @@ class MainActivity : FlutterActivity() {
                     am.getMemoryInfo(memInfo)
                     result.success((memInfo.totalMem / (1024 * 1024)).toInt())
                 }
+                "getAvailableMemoryMB" -> {
+                    val am = getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                    val memInfo = android.app.ActivityManager.MemoryInfo()
+                    am.getMemoryInfo(memInfo)
+                    result.success((memInfo.availMem / (1024 * 1024)).toInt())
+                }
                 else -> result.notImplemented()
             }
         }

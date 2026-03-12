@@ -74,10 +74,10 @@ enum ModelMemoryFit {
   /// Plenty of headroom — full context, full GPU.
   comfortable,
 
-  /// Tight — context will be reduced but GPU is still used.
+  /// Moderate — full context but CPU-only (GPU memory too tight).
   reduced,
 
-  /// Very tight — minimal context and CPU-only fallback.
+  /// Very tight — reduced context and/or CPU-only fallback.
   cpuFallback,
 }
 
@@ -620,6 +620,16 @@ class LlmService {
   static const MethodChannel _deviceChannel =
       MethodChannel('dev.zswatch.app/productivity');
 
+  /// Snapshot of memory state from the most recent `_computeInferenceParams`
+  /// call. Exposed so callers (e.g. the AI pipeline) can surface this in the
+  /// debug UI.
+  ({int deviceMB, int availableMB, int modelMB, int headroomMB,
+      int contextSize, int gpuLayers, int? maxTokensCap})?
+      get lastInferenceMemoryInfo => _lastInferenceMemoryInfo;
+  ({int deviceMB, int availableMB, int modelMB, int headroomMB,
+      int contextSize, int gpuLayers, int? maxTokensCap})?
+      _lastInferenceMemoryInfo;
+
   /// Query device physical RAM (MB), cached after first call.
   Future<int> _queryDeviceMemoryMB() async {
     if (_deviceMemoryMB != null) return _deviceMemoryMB!;
@@ -636,57 +646,123 @@ class LlmService {
     return _deviceMemoryMB!;
   }
 
-  /// Compute context size dynamically based on available device RAM and model
-  /// size. Uses [LlmModelInfo.contextSize] if explicitly set, otherwise scales
-  /// down when the model weight file would leave too little headroom for the
-  /// KV cache + compute buffers on the GPU.
+  /// Query currently available free RAM (MB) at inference time.
+  /// This is more accurate than using cached total, since it accounts for
+  /// memory used by other processes and the OS.
+  Future<int> _queryAvailableMemoryMB() async {
+    try {
+      final mb = await _deviceChannel.invokeMethod<int>('getAvailableMemoryMB');
+      return mb ?? 512; // conservative fallback if platform returns null
+    } on MissingPluginException {
+      // Fallback: estimate 50% of total is available (conservative)
+      final total = await _queryDeviceMemoryMB();
+      return (total * 0.5).toInt();
+    } catch (e) {
+      debugPrint('[LlmService] Failed to query available memory: $e');
+      return 512; // very conservative fallback
+    }
+  }
+
+  /// Compute context size, GPU layers, and max output tokens dynamically
+  /// based on real-time available RAM and model size.
   ///
-  /// Heuristic budget (conservative):
-  ///   usableGPU ≈ deviceRAM × 0.55          (OS + app + Flutter overhead)
-  ///   headroom  = usableGPU − modelFileSize
-  ///   if headroom ≥ 600 MB → nCtx 2048, full GPU
-  ///   if headroom ≥ 300 MB → nCtx 1024, full GPU
-  ///   if headroom ≥ 100 MB → nCtx  512, full GPU
-  ///   else                 → nCtx  512, CPU-only (avoid Metal OOM crash)
-  Future<({int contextSize, int gpuLayers})> _computeInferenceParams(
+  /// Uses [LlmModelInfo.contextSize] if explicitly set, otherwise scales
+  /// down when the model weight file would leave too little headroom for the
+  /// KV cache + compute buffers.
+  ///
+  /// IMPORTANT: This method runs AFTER `_ensureModel()` has loaded the model,
+  /// so `os_proc_available_memory()` already reflects the model's RAM usage.
+  /// We do NOT subtract model size again — that would double-count.
+  /// The available memory IS the headroom for KV cache + compute buffers.
+  ///
+  /// Metal (GPU) pre-allocates the FULL KV cache for nCtx upfront, so
+  /// nCtx=2048 on GPU needs ~1–1.5 GB of GPU-accessible memory. On 4 GB
+  /// iPhones with ~1 GB free after model load, GPU+2048 causes a page-fault
+  /// crash. The thresholds below prefer CPU with full context over GPU with
+  /// a crash:
+  ///
+  ///   available ≥ 1200 MB → nCtx 2048, full GPU,  maxTokens unchanged
+  ///   available ≥  600 MB → nCtx 2048, CPU-only,  maxTokens unchanged
+  ///   available ≥  300 MB → nCtx 1024, CPU-only,  maxTokens unchanged
+  ///   available ≥  100 MB → nCtx  512, CPU-only,  maxTokens unchanged
+  ///   available <  100 MB → nCtx  512, CPU-only,  maxTokens capped at 256
+  Future<({int contextSize, int gpuLayers, int? maxTokensCap})>
+      _computeInferenceParams(
     LlmModelInfo modelInfo,
   ) async {
     // Explicit per-model overrides win.
     final explicitCtx = modelInfo.contextSize;
     final explicitGpu = modelInfo.maxGpuLayers;
     if (explicitCtx != null && explicitGpu != null) {
-      return (contextSize: explicitCtx, gpuLayers: explicitGpu);
+      return (
+        contextSize: explicitCtx,
+        gpuLayers: explicitGpu,
+        maxTokensCap: null,
+      );
     }
 
     final deviceMB = await _queryDeviceMemoryMB();
+    final availableMB = await _queryAvailableMemoryMB();
     final modelMB = (modelInfo.expectedSizeBytes ?? 0) ~/ (1024 * 1024);
 
-    // On iOS, Metal shares unified memory with the system. After OS + app +
-    // Flutter + BLE overhead, roughly 55% is available for the GPU working set.
-    // On Android the GPU typically has even less available headroom.
-    final usableMB = (deviceMB * 0.55).round();
-    final headroomMB = usableMB - modelMB;
+    // The model is already loaded by `_ensureModel()` before this method runs,
+    // so `availableMB` already reflects the model's memory footprint.
+    // availableMB IS the headroom for KV cache + compute buffers — do NOT
+    // subtract modelMB again (that would double-count and go negative).
+    final headroomMB = availableMB;
+
+    debugPrint(
+      '[LlmService] Memory check: available=${availableMB}MB '
+      'model=${modelMB}MB (already loaded) headroom=${headroomMB}MB '
+      'deviceTotal=${deviceMB}MB',
+    );
 
     int ctx;
     int gpu;
+    int? tokensCap; // null = use default maxTokens
 
-    if (headroomMB >= 600) {
+    if (headroomMB >= 1200) {
+      // Plenty of room: full context on GPU. Metal needs ~1–1.5GB for KV cache
+      // + compute scratch buffers at nCtx=2048 on top of the model weights.
       ctx = nCtx; // full context (default 2048)
       gpu = numGpuLayers;
+    } else if (headroomMB >= 600) {
+      // Moderate room: full context but on CPU. This avoids Metal page-fault
+      // crashes (GPU pre-allocates the full nCtx KV cache upfront). CPU is
+      // slower (~5–7 tok/s vs ~20 tok/s) but doesn't crash and handles long
+      // prompts (e.g. classify prompt at ~1100 tokens).
+      ctx = nCtx;
+      gpu = 0;
+      debugPrint(
+        '[LlmService] Moderate memory (${headroomMB}MB). '
+        'Using CPU with full nCtx=$nCtx to avoid GPU memory pressure.',
+      );
     } else if (headroomMB >= 300) {
       ctx = 1024;
-      gpu = numGpuLayers;
+      gpu = 0;
+      debugPrint(
+        '[LlmService] Low memory (${headroomMB}MB). '
+        'Using CPU with nCtx=1024.',
+      );
     } else if (headroomMB >= 100) {
-      ctx = 512;
-      gpu = numGpuLayers;
-    } else {
-      // Very tight — fall back to CPU-only to avoid Metal page-fault crash.
       ctx = 512;
       gpu = 0;
       debugPrint(
-        '[LlmService] WARNING: Low memory headroom (${headroomMB}MB). '
-        'Falling back to CPU-only inference to prevent GPU crash. '
-        'Model ${modelInfo.id} ($modelMB MB) on device with $deviceMB MB RAM.',
+        '[LlmService] WARNING: Very low memory (${headroomMB}MB). '
+        'Using CPU with nCtx=512. '
+        'Model ${modelInfo.id} ($modelMB MB), '
+        'available=${availableMB}MB.',
+      );
+    } else {
+      // Critically low — still run but with absolute minimum settings.
+      ctx = 512;
+      gpu = 0;
+      tokensCap = 256;
+      debugPrint(
+        '[LlmService] CRITICAL: Extremely low memory (${headroomMB}MB). '
+        'Using minimum settings: nCtx=512, CPU-only, maxTokens=256. '
+        'Model ${modelInfo.id} ($modelMB MB), '
+        'available=${availableMB}MB, device=${deviceMB}MB.',
       );
     }
 
@@ -703,9 +779,23 @@ class LlmService {
       resolvedGpu = 0;
     }
 
-    return (
-      contextSize: explicitCtx ?? ctx,
+    final resolvedCtx = explicitCtx ?? ctx;
+
+    // Store memory snapshot for debug UI.
+    _lastInferenceMemoryInfo = (
+      deviceMB: deviceMB,
+      availableMB: availableMB,
+      modelMB: modelMB,
+      headroomMB: headroomMB,
+      contextSize: resolvedCtx,
       gpuLayers: resolvedGpu,
+      maxTokensCap: tokensCap,
+    );
+
+    return (
+      contextSize: resolvedCtx,
+      gpuLayers: resolvedGpu,
+      maxTokensCap: tokensCap,
     );
   }
 
@@ -741,15 +831,29 @@ class LlmService {
     final modelInfo = await currentModelInfo();
     final params = await _computeInferenceParams(modelInfo);
 
+    // Apply maxTokens cap from memory check. The cap is the hard ceiling;
+    // the caller's overrideMaxTokens or default maxTokens is also respected
+    // by taking the minimum.
+    int effectiveMaxTokens = overrideMaxTokens ?? maxTokens;
+    if (params.maxTokensCap != null &&
+        effectiveMaxTokens > params.maxTokensCap!) {
+      debugPrint(
+        '[LlmService] Capping maxTokens from $effectiveMaxTokens '
+        'to ${params.maxTokensCap} due to low memory.',
+      );
+      effectiveMaxTokens = params.maxTokensCap!;
+    }
+
     debugPrint(
       '[LlmService] Inference: model=${modelInfo.id} nCtx=${params.contextSize} '
-      'gpuLayers=${params.gpuLayers} deviceRAM=${_deviceMemoryMB ?? "?"}MB',
+      'gpuLayers=${params.gpuLayers} maxTokens=$effectiveMaxTokens '
+      'deviceRAM=${_deviceMemoryMB ?? "?"}MB',
     );
 
     final request = OpenAiRequest(
       messages: [Message(Role.user, prompt)],
       modelPath: _modelPath!,
-      maxTokens: overrideMaxTokens ?? maxTokens,
+      maxTokens: effectiveMaxTokens,
       numGpuLayers: params.gpuLayers,
       temperature: temperature,
       topP: topP,
