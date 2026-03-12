@@ -82,18 +82,20 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             const _GpuModeTile(),
           ],
 
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
+          if (ref.watch(localAiEnabledProvider)) ...[
+            const SizedBox(height: 24),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
 
-          // ---- Calendar / Reminders section ----
-          const _SectionHeader(
-            title: 'Calendar Integration',
-            subtitle: 'Permissions for AI-created events & reminders',
-          ),
-          const _CalendarPermissionTile(),
-          if (Platform.isIOS) const _RemindersPermissionTile(),
-          if (Platform.isAndroid) const _CalendarPickerTile(),
+            // ---- Calendar / Reminders section ----
+            const _SectionHeader(
+              title: 'Calendar Integration',
+              subtitle: 'Permissions for AI-created events & reminders',
+            ),
+            const _CalendarPermissionTile(),
+            if (Platform.isIOS) const _RemindersPermissionTile(),
+            if (Platform.isAndroid) const _CalendarPickerTile(),
+          ],
 
           const SizedBox(height: 24),
           const Divider(height: 1),

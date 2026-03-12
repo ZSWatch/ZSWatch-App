@@ -227,10 +227,13 @@ class ExtractedActionCreationService {
       return const [];
     }
 
-    await _requestPermission(
-      Permission.calendarFullAccess,
-      'Calendar permission is required to load calendars.',
-    );
+    // Only check permission status — don't request it here.
+    // The user grants calendar permission via the explicit "Grant" button
+    // in the AI settings screen.
+    final status = await Permission.calendarFullAccess.status;
+    if (!status.isGranted) {
+      return const [];
+    }
 
     final result = await _channel.invokeListMethod<dynamic>('listWritableCalendars');
     if (result == null) {
