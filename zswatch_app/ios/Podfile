@@ -4,6 +4,10 @@ platform :ios, '14.0'
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# Build-time patch: adds dynamic GPU/CPU switching to whisper_ggml_plus
+# to prevent Metal crashes when the app is backgrounded on iOS.
+require_relative 'patch_whisper_gpu'
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,
@@ -37,6 +41,11 @@ target 'Runner' do
 end
 
 post_install do |installer|
+  # Patch whisper_ggml_plus C++ source to support dynamic GPU/CPU switching.
+  # Must run before build — modifies the hardcoded use_gpu=true to be
+  # controllable via a "forceCpu" FFI command from Dart.
+  patch_whisper_gpu_control(installer)
+
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 

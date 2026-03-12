@@ -11,6 +11,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 
+import '../voice_memo/whisper_lifecycle_manager.dart';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -696,9 +698,21 @@ class LlmService {
     }
 
     // Let explicit per-model values override the computed ones.
+    // On iOS, also check if the GPU lifecycle manager says GPU is currently
+    // unsafe (app backgrounded in auto mode, or user forced CPU).
+    final gpuAllowed = GpuLifecycleManager.instance.shouldUseGpu;
+    int resolvedGpu = explicitGpu ?? gpu;
+    if (!gpuAllowed && resolvedGpu > 0) {
+      debugPrint(
+        '[LlmService] GPU not allowed (background or user preference) — '
+        'forcing CPU-only inference (was gpuLayers=$resolvedGpu).',
+      );
+      resolvedGpu = 0;
+    }
+
     return (
       contextSize: explicitCtx ?? ctx,
-      gpuLayers: explicitGpu ?? gpu,
+      gpuLayers: resolvedGpu,
     );
   }
 

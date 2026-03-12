@@ -15,6 +15,7 @@ import '../../../services/ai/extracted_action_creation_service.dart';
 import '../../../services/ai/llm_service.dart';
 import '../../../services/ai/model_benchmark_service.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
+import '../../../services/voice_memo/whisper_lifecycle_manager.dart';
 import '../../widgets/ai_debug_widgets.dart';
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,18 @@ class AiModelsSettingsScreen extends ConsumerWidget {
           ),
           const _AiTogglesTile(),
           const _AiModelSelector(),
+
+          // ---- GPU / Metal section (iOS only) ----
+          if (Platform.isIOS) ...[
+            const SizedBox(height: 24),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            const _SectionHeader(
+              title: 'GPU Acceleration (Metal)',
+              subtitle: 'Controls Metal GPU for transcription & LLM inference',
+            ),
+            const _GpuModeTile(),
+          ],
 
           const SizedBox(height: 24),
           const Divider(height: 1),
@@ -607,6 +620,82 @@ class _AiTogglesTile extends ConsumerWidget {
         ),
       ],
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// GPU inference mode selector (iOS Metal)
+// ---------------------------------------------------------------------------
+
+class _GpuModeTile extends ConsumerWidget {
+  const _GpuModeTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(gpuInferenceModeProvider);
+    final isBackground = GpuLifecycleManager.instance.isBackground;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spacingMd,
+        vertical: AppTheme.spacingSm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SegmentedButton<GpuInferenceMode>(
+            segments: const [
+              ButtonSegment(
+                value: GpuInferenceMode.auto,
+                label: Text('Auto'),
+                icon: Icon(Icons.auto_mode, size: 18),
+              ),
+              ButtonSegment(
+                value: GpuInferenceMode.alwaysGpu,
+                label: Text('GPU'),
+                icon: Icon(Icons.speed, size: 18),
+              ),
+              ButtonSegment(
+                value: GpuInferenceMode.alwaysCpu,
+                label: Text('CPU'),
+                icon: Icon(Icons.memory, size: 18),
+              ),
+            ],
+            selected: {mode},
+            onSelectionChanged: (selected) {
+              ref
+                  .read(gpuInferenceModeProvider.notifier)
+                  .setMode(selected.first);
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _modeDescription(mode, isBackground),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _modeDescription(GpuInferenceMode mode, bool isBackground) {
+    switch (mode) {
+      case GpuInferenceMode.auto:
+        return isBackground
+            ? 'Auto: Currently using CPU (app backgrounded)'
+            : 'Auto: Currently using Metal GPU (app in foreground). '
+                'Switches to CPU automatically when backgrounded to '
+                'prevent iOS Metal crashes.';
+      case GpuInferenceMode.alwaysGpu:
+        return 'Always use Metal GPU for maximum speed. '
+            'Warning: may crash if inference runs while the app is '
+            'backgrounded (e.g. auto-transcription after BLE sync).';
+      case GpuInferenceMode.alwaysCpu:
+        return 'Always use CPU. Slower but safe in all lifecycle states. '
+            'Useful for benchmarking CPU vs GPU performance.';
+    }
   }
 }
 
