@@ -108,10 +108,8 @@ class SettingsScreen extends ConsumerWidget {
 
           const Divider(height: 32),
 
-          const Divider(height: 32),
-
-          // AI & Transcription Models (sub-page)
-          _SectionHeader(title: 'AI & Transcription'),
+          // Voice Memo AI (sub-page)
+          _SectionHeader(title: 'Voice Memo AI'),
           _AiTranscriptionNavTile(),
 
           const Divider(height: 32),
@@ -366,8 +364,7 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// Compact summary tile that navigates to the consolidated AI & Transcription
-/// models sub-page.
+/// Compact summary tile that navigates to the Voice Memo AI sub-page.
 class _AiTranscriptionNavTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -379,11 +376,11 @@ class _AiTranscriptionNavTile extends ConsumerWidget {
         );
 
     return _SettingsTile(
-      leading: const Icon(Icons.psychology, color: AppTheme.primaryColor),
-      title: 'Model Configuration',
+      leading: const Icon(Icons.mic, color: AppTheme.primaryColor),
+      title: 'Voice Memo AI',
       subtitle:
-          'Transcription: ${transcriptionInfo.name}\n'
-          'AI: ${localAiEnabled ? (aiModelName ?? 'Loading...') : 'Disabled'}',
+          'Transcription: ${transcriptionInfo.name}  ·  '
+          'AI: ${localAiEnabled ? (aiModelName ?? 'Loading...') : 'Off'}',
       trailing: const Icon(Icons.chevron_right),
       onTap: () => context.push(AppRoutes.aiModels),
     );

@@ -36,6 +36,11 @@ class LlmModelInfo {
   /// exceed available Metal VRAM on smaller devices.
   final int? maxGpuLayers;
 
+  /// Benchmark score from ai_testbench (passed cases out of [benchmarkTotal]).
+  /// Shown in the model picker so users can compare accuracy.
+  final int? benchmarkScore;
+  final int? benchmarkTotal;
+
   const LlmModelInfo({
     required this.id,
     required this.displayName,
@@ -46,6 +51,8 @@ class LlmModelInfo {
     this.userProvided = false,
     this.contextSize,
     this.maxGpuLayers,
+    this.benchmarkScore,
+    this.benchmarkTotal,
   });
 
   bool get isDownloadable => downloadUrl != null;
@@ -261,24 +268,19 @@ class LlmService {
 
 
   static const String defaultModelId = 'qwen25_1_5b_q4_k_m';
+  // Models ordered by benchmark score (best first).
+  // Worst 3 removed: SmolLM3 (1/40), Llama-3.2-3B (25/40), Qwen3-1.7B (26/40).
   static const List<LlmModelInfo> catalogModels = [
     LlmModelInfo(
-      id: defaultModelId,
-      displayName: 'Qwen2.5 1.5B Instruct · Q4_K_M',
-      family: 'Qwen2.5-1.5B-Instruct',
-      filename: 'qwen2.5-1.5b-instruct-q4_k_m.gguf',
+      id: 'qwen35_2b_q4_k_m',
+      displayName: 'Qwen3.5 2B Instruct · Q4_K_M',
+      family: 'Qwen3.5-2B',
+      filename: 'Qwen3.5-2B-Q4_K_M.gguf',
       downloadUrl:
-          'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
-      expectedSizeBytes: 1120 * 1024 * 1024,
-    ),
-    LlmModelInfo(
-      id: 'qwen25_1_5b_q5_k_m',
-      displayName: 'Qwen2.5 1.5B Instruct · Q5_K_M',
-      family: 'Qwen2.5-1.5B-Instruct',
-      filename: 'qwen2.5-1.5b-instruct-q5_k_m.gguf',
-      downloadUrl:
-          'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q5_k_m.gguf',
-      expectedSizeBytes: 1290 * 1024 * 1024,
+          'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf',
+      expectedSizeBytes: 1222 * 1024 * 1024,
+      benchmarkScore: 35,
+      benchmarkTotal: 40,
     ),
     LlmModelInfo(
       id: 'qwen25_1_5b_q8_0',
@@ -288,42 +290,30 @@ class LlmService {
       downloadUrl:
           'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q8_0.gguf',
       expectedSizeBytes: 1890 * 1024 * 1024,
+      benchmarkScore: 35,
+      benchmarkTotal: 40,
     ),
     LlmModelInfo(
-      id: 'qwen3_1_7b_q4_k_m',
-      displayName: 'Qwen3 1.7B Instruct · Q4_K_M',
-      family: 'Qwen3-1.7B',
-      filename: 'Qwen3-1.7B-Q4_K_M.gguf',
+      id: 'qwen25_1_5b_q5_k_m',
+      displayName: 'Qwen2.5 1.5B Instruct · Q5_K_M',
+      family: 'Qwen2.5-1.5B-Instruct',
+      filename: 'qwen2.5-1.5b-instruct-q5_k_m.gguf',
       downloadUrl:
-          'https://huggingface.co/ggml-org/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf',
-      expectedSizeBytes: 1220 * 1024 * 1024,
+          'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q5_k_m.gguf',
+      expectedSizeBytes: 1290 * 1024 * 1024,
+      benchmarkScore: 34,
+      benchmarkTotal: 40,
     ),
     LlmModelInfo(
-      id: 'smollm3_3b_q4_k_m',
-      displayName: 'SmolLM3 3B Instruct · Q4_K_M',
-      family: 'SmolLM3-3B',
-      filename: 'SmolLM3-Q4_K_M.gguf',
+      id: defaultModelId,
+      displayName: 'Qwen2.5 1.5B Instruct · Q4_K_M',
+      family: 'Qwen2.5-1.5B-Instruct',
+      filename: 'qwen2.5-1.5b-instruct-q4_k_m.gguf',
       downloadUrl:
-          'https://huggingface.co/ggml-org/SmolLM3-3B-GGUF/resolve/main/SmolLM3-Q4_K_M.gguf',
-      expectedSizeBytes: 1840 * 1024 * 1024,
-    ),
-    LlmModelInfo(
-      id: 'qwen35_2b_q4_k_m',
-      displayName: 'Qwen3.5 2B Instruct · Q4_K_M (Experimental)',
-      family: 'Qwen3.5-2B',
-      filename: 'Qwen3.5-2B-Q4_K_M.gguf',
-      downloadUrl:
-          'https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf',
-      expectedSizeBytes: 1222 * 1024 * 1024,
-    ),
-    LlmModelInfo(
-      id: 'llama32_3b_q4_k_m',
-      displayName: 'Llama 3.2 3B Instruct · Q4_K_M',
-      family: 'Llama-3.2-3B-Instruct',
-      filename: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-      downloadUrl:
-          'https://huggingface.co/unsloth/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-      expectedSizeBytes: 2020 * 1024 * 1024,
+          'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
+      expectedSizeBytes: 1120 * 1024 * 1024,
+      benchmarkScore: 31,
+      benchmarkTotal: 40,
     ),
   ];
 
@@ -367,8 +357,11 @@ class LlmService {
     final usableMB = (deviceMB * 0.55).round();
     final headroomMB = usableMB - modelMB;
 
+    // Base fit on actual memory headroom, not on gpuLayers.
+    // gpuLayers is always 0 on Android (no Metal) even on high-RAM devices,
+    // so keying off it causes every model to falsely show "Low memory".
     ModelMemoryFit fit;
-    if (params.gpuLayers == 0) {
+    if (headroomMB < 100) {
       fit = ModelMemoryFit.cpuFallback;
     } else if (params.contextSize < nCtx) {
       fit = ModelMemoryFit.reduced;
@@ -764,6 +757,7 @@ class LlmService {
       presencePenalty: presencePenalty,
       contextSize: params.contextSize,
       logger: _logFilter,
+      enableThinking: false,
     );
 
     _runningRequestId = await fllamaChat(
