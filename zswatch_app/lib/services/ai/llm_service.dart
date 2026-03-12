@@ -811,9 +811,11 @@ class LlmService {
       // --- Step 1: Correct transcription errors if enabled ---
       if (correctTranscription) {
         final correctionPrompt = _buildCorrectionPrompt(transcript);
+        final correctionMaxTokens =
+            CorrectionPromptTemplate.estimateMaxTokens(transcript);
         final correctionResult = await _generate(
           correctionPrompt,
-          overrideMaxTokens: 1024,
+          overrideMaxTokens: correctionMaxTokens,
           onPartialResponse: onProgress == null
               ? null
               : (partial, tokens) => onProgress('correcting', partial, tokens),
@@ -913,23 +915,10 @@ class LlmService {
   // ---- Prompt construction ----
 
   String _buildCorrectionPrompt(String transcript) {
-    return '''
-You are a precise transcription correction assistant.
-
-The following text was produced by an automatic speech-to-text system and may contain errors such as:
-- Wrong words that sound similar (homophones)
-- Missing or extra words
-- Spelling mistakes in proper nouns
-- Grammar errors introduced by the speech recognizer
-
-Your job: output ONLY the corrected text, preserving the original language.
-Do not add explanations, markdown, or any text that was not in the original.
-If the transcription is already correct, output it unchanged.
-
-Original transcription:
-"$transcript"
-
-Corrected transcription:''';
+    return CorrectionPromptTemplate.render(
+      CorrectionPromptTemplate.defaultTemplate,
+      transcript: transcript,
+    );
   }
 
   String _buildClassifyPrompt(String transcript) {
@@ -1055,9 +1044,11 @@ JSON:
       // --- Step 1: Correct transcription errors if enabled ---
       if (correctTranscription) {
         final correctionPrompt = _buildCorrectionPrompt(transcript);
+        final correctionMaxTokens =
+            CorrectionPromptTemplate.estimateMaxTokens(transcript);
         final correctionResult = await _generate(
           correctionPrompt,
-          overrideMaxTokens: 1024,
+          overrideMaxTokens: correctionMaxTokens,
           onPartialResponse: onProgress == null
               ? null
               : (partial, tokens) => onProgress('correcting', partial, tokens),

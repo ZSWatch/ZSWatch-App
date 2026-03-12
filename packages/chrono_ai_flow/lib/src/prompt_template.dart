@@ -24,13 +24,14 @@ Your tasks:
 4. Extract a short title (the task or event, NOT the time part).
 
 Rules:
+- The title MUST stay in the SAME language as the voice memo. DO NOT translate the title to English.
 - NEVER compute or resolve dates. NEVER output ISO timestamps.
 - Keep time expressions relative: "tomorrow at 10 am", NOT "2026-03-10T10:00:00".
 - Copy the original time phrase exactly from the memo.
 - You MUST fill "datetime_expression_english" whenever "datetime_expression_original" is not null.
 - If the memo is in English, copy the same English time phrase to both fields.
 - If no time/date is mentioned, set both datetime fields to null and intent to "note".
-- The title must be short (2-5 words) and in the ORIGINAL language.
+- Title must be short (2-5 words). Only translate datetime fields to English, NEVER the title.
 - Translate time expressions accurately to natural English. Convert 24-hour to 12-hour format. Translate idioms correctly (e.g. the Swedish "halv 10" means 9:30, not 10:30).
 - Intent rules:
   - "event" = scheduled meetings, appointments, bookings (dentist, conference, meeting with someone)
@@ -60,6 +61,18 @@ Memo: "köp bröd på vägen hem"
 
 Memo: "call the plumber this afternoon at 3"
 {"intent":"reminder","title":"call the plumber","datetime_expression_original":"this afternoon at 3","datetime_expression_english":"this afternoon at 3 pm"}
+
+Memo: "Arzttermin am Donnerstag um 9 Uhr"
+{"intent":"event","title":"Arzttermin","datetime_expression_original":"am Donnerstag um 9 Uhr","datetime_expression_english":"Thursday at 9 am"}
+
+WRONG — never translate the title, not even for notes:
+Memo: "möte med projektgruppen på torsdag klockan 14"
+WRONG: {"intent":"event","title":"meeting with project group",...}
+RIGHT: {"intent":"event","title":"möte projektgruppen","datetime_expression_original":"på torsdag klockan 14","datetime_expression_english":"Thursday at 2 pm"}
+
+Memo: "köp mjölk och bröd på vägen hem"
+WRONG: {"intent":"note","title":"buy milk and bread",...}
+RIGHT: {"intent":"note","title":"köp mjölk och bröd","datetime_expression_original":null,"datetime_expression_english":null}
 
 Output JSON schema:
 {
