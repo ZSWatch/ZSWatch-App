@@ -54,6 +54,29 @@ class AiProcessingDebugInfo {
   /// Whether processing has finished (final snapshot vs live update).
   final bool isComplete;
 
+  // --- Memory & inference parameter debug info ---
+
+  /// Device total physical RAM in MB.
+  final int? deviceMemoryMB;
+
+  /// Available (free) RAM in MB at inference time.
+  final int? availableMemoryMB;
+
+  /// Model file size in MB.
+  final int? modelSizeMB;
+
+  /// Headroom = availableMemoryMB - modelSizeMB.
+  final int? memoryHeadroomMB;
+
+  /// Context size actually used for this inference.
+  final int? inferenceContextSize;
+
+  /// GPU layers actually used for this inference.
+  final int? inferenceGpuLayers;
+
+  /// Max tokens cap applied due to memory pressure (null = no cap).
+  final int? inferenceMaxTokensCap;
+
   const AiProcessingDebugInfo({
     required this.filename,
     required this.modelName,
@@ -87,6 +110,13 @@ class AiProcessingDebugInfo {
     this.liveElapsed,
     this.liveTokensPerSecond,
     this.isComplete = true,
+    this.deviceMemoryMB,
+    this.availableMemoryMB,
+    this.modelSizeMB,
+    this.memoryHeadroomMB,
+    this.inferenceContextSize,
+    this.inferenceGpuLayers,
+    this.inferenceMaxTokensCap,
   });
 }
 
@@ -175,6 +205,7 @@ class VoiceNoteAiPipeline {
       void emitLive(String phase, String partial, int tokens) {
         final elapsedMs = sw.elapsedMilliseconds;
         final tps = elapsedMs > 0 ? tokens / (elapsedMs / 1000.0) : 0.0;
+        final mem = _llmService.lastInferenceMemoryInfo;
         _debugInfoSubject.add(AiProcessingDebugInfo(
           filename: filename,
           modelName: _llmService.modelName,
@@ -186,6 +217,13 @@ class VoiceNoteAiPipeline {
           liveTokensPerSecond: tps,
           isComplete: false,
           timestamp: DateTime.now(),
+          deviceMemoryMB: mem?.deviceMB,
+          availableMemoryMB: mem?.availableMB,
+          modelSizeMB: mem?.modelMB,
+          memoryHeadroomMB: mem?.headroomMB,
+          inferenceContextSize: mem?.contextSize,
+          inferenceGpuLayers: mem?.gpuLayers,
+          inferenceMaxTokensCap: mem?.maxTokensCap,
         ));
       }
 
@@ -249,6 +287,7 @@ class VoiceNoteAiPipeline {
       onProcessingComplete?.call(filename, result.summary);
 
       // Publish final debug info and store per-file
+      final mem = _llmService.lastInferenceMemoryInfo;
       final finalDebug = AiProcessingDebugInfo(
         filename: filename,
         modelName: _llmService.modelName,
@@ -278,6 +317,13 @@ class VoiceNoteAiPipeline {
         currentPhase: 'done',
         isComplete: true,
         timestamp: DateTime.now(),
+        deviceMemoryMB: mem?.deviceMB,
+        availableMemoryMB: mem?.availableMB,
+        modelSizeMB: mem?.modelMB,
+        memoryHeadroomMB: mem?.headroomMB,
+        inferenceContextSize: mem?.contextSize,
+        inferenceGpuLayers: mem?.gpuLayers,
+        inferenceMaxTokensCap: mem?.maxTokensCap,
       );
       _debugInfoByFile[filename] = finalDebug;
       _debugInfoSubject.add(finalDebug);

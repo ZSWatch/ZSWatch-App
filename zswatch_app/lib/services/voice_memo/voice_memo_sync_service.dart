@@ -143,6 +143,7 @@ class VoiceMemoSyncService {
       });
     } else if (connection.isDisconnected) {
       _hasAutoSynced = false;
+      unawaited(_resetFsManager());
     }
   }
 
@@ -286,6 +287,7 @@ class VoiceMemoSyncService {
         } catch (e) {
           _log('Failed to disable SMP: $e');
         }
+        await _resetFsManager();
       }
 
       _updateState(VoiceMemoSyncState(
@@ -319,10 +321,21 @@ class VoiceMemoSyncService {
         return false;
       }
 
-      _fsManager ??= FsManager(device.remoteId.str);
+      // Recreate FsManager for each transfer attempt to avoid stale native
+      // transport handles after SMP disable/enable or reconnection cycles.
+      await _resetFsManager();
+      _fsManager = FsManager(device.remoteId.str);
 
       final remotePath = '$_recordingDir/${memo.filename}.zsw_opus';
       _log('Downloading: $remotePath');
+
+      // Preflight check to distinguish path/FS errors from transfer errors.
+      try {
+        final remoteSize = await _fsManager!.status(remotePath);
+        _log('Remote file status: $remoteSize bytes');
+      } catch (e) {
+        _log('Remote file status check failed: $e');
+      }
 
       // Set up download completion listener
       _downloadCompleter = Completer<Uint8List?>();
@@ -346,6 +359,10 @@ class VoiceMemoSyncService {
             _downloadCompleter?.complete(null);
             _downloadCompleter = null;
         }
+      }, onError: (Object error) {
+        _log('Download callback stream error: $error');
+        _downloadCompleter?.complete(null);
+        _downloadCompleter = null;
       });
 
       // Start download
@@ -414,7 +431,26 @@ class VoiceMemoSyncService {
       return true;
     } catch (e) {
       _log('Error downloading ${memo.filename}: $e');
+      await _resetFsManager();
       return false;
+    }
+  }
+
+  Future<void> _resetFsManager() async {
+    await _downloadSubscription?.cancel();
+    _downloadSubscription = null;
+
+    _downloadCompleter?.complete(null);
+    _downloadCompleter = null;
+
+    final manager = _fsManager;
+    _fsManager = null;
+    if (manager != null) {
+      try {
+        await manager.kill();
+      } catch (e) {
+        _log('FsManager cleanup failed: $e');
+      }
     }
   }
 
@@ -525,10 +561,8 @@ class VoiceMemoSyncService {
   void dispose() {
     _messageSubscription?.cancel();
     _connectionSubscription?.cancel();
-    _downloadSubscription?.cancel();
-    _downloadCompleter?.complete(null);
+    unawaited(_resetFsManager());
     _listCompleter?.complete([]);
-    _fsManager?.kill();
     _syncState.close();
   }
 }
