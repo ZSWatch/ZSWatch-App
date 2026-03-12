@@ -404,6 +404,12 @@ class MainActivity : FlutterActivity() {
                 "openCalendarEntry" -> handleOpenCalendarEntry(call, result)
                 "checkCalendarSyncHealth" -> handleCheckCalendarSyncHealth(call, result)
                 "openCalendarSyncSettings" -> handleOpenCalendarSyncSettings(call, result)
+                "getDeviceMemoryMB" -> {
+                    val am = getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                    val memInfo = android.app.ActivityManager.MemoryInfo()
+                    am.getMemoryInfo(memInfo)
+                    result.success((memInfo.totalMem / (1024 * 1024)).toInt())
+                }
                 else -> result.notImplemented()
             }
         }

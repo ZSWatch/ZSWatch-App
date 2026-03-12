@@ -69,19 +69,18 @@ class AiModelsSettingsScreen extends ConsumerWidget {
           const _AiTogglesTile(),
           const _AiModelSelector(),
 
-          if (Platform.isAndroid) ...[
-            const SizedBox(height: 24),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
 
-            // ---- Calendar section (Android only) ----
-            const _SectionHeader(
-              title: 'Calendar Integration',
-              subtitle: 'Permission and calendar for AI-created events',
-            ),
-            const _CalendarPermissionTile(),
-            const _CalendarPickerTile(),
-          ],
+          // ---- Calendar / Reminders section ----
+          const _SectionHeader(
+            title: 'Calendar Integration',
+            subtitle: 'Permissions for AI-created events & reminders',
+          ),
+          const _CalendarPermissionTile(),
+          if (Platform.isIOS) const _RemindersPermissionTile(),
+          if (Platform.isAndroid) const _CalendarPickerTile(),
 
           const SizedBox(height: 24),
           const Divider(height: 1),
@@ -872,6 +871,9 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                             : 'Catalog',
                       ),
 
+                      // Memory fit indicator
+                      _ModelMemoryFitBanner(model: selectedModel),
+
                       // Download progress
                       if (isDownloading) ...[
                         const SizedBox(height: 8),
@@ -1627,7 +1629,66 @@ class _CompactButton extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Calendar Integration (Android only)
+// Memory fit banner for the selected AI model
+// ---------------------------------------------------------------------------
+
+class _ModelMemoryFitBanner extends ConsumerWidget {
+  const _ModelMemoryFitBanner({required this.model});
+
+  final LlmModelInfo model;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fitAsync = ref.watch(llmModelFitProvider);
+
+    return fitAsync.when(
+      data: (fit) {
+        final IconData icon;
+        final Color color;
+        final String label;
+
+        switch (fit.fit) {
+          case ModelMemoryFit.comfortable:
+            icon = Icons.check_circle_outline;
+            color = AppTheme.successColor;
+            label = fit.summary;
+          case ModelMemoryFit.reduced:
+            icon = Icons.warning_amber_rounded;
+            color = AppTheme.warningColor;
+            label = fit.summary;
+          case ModelMemoryFit.cpuFallback:
+            icon = Icons.memory;
+            color = AppTheme.errorColor;
+            label = fit.summary;
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Row(
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Calendar Integration
 // ---------------------------------------------------------------------------
 
 /// Shows calendar permission status and a button to grant it.
@@ -1718,8 +1779,92 @@ class _CalendarPermissionTileState
   }
 }
 
+/// Shows iOS Reminders permission status (separate from calendar on iOS).
+class _RemindersPermissionTile extends ConsumerStatefulWidget {
+  const _RemindersPermissionTile();
+
+  @override
+  ConsumerState<_RemindersPermissionTile> createState() =>
+      _RemindersPermissionTileState();
+}
+
+class _RemindersPermissionTileState
+    extends ConsumerState<_RemindersPermissionTile>
+    with WidgetsBindingObserver {
+  bool _granted = false;
+  bool _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkPermission();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPermission();
+    }
+  }
+
+  Future<void> _checkPermission() async {
+    final status = await Permission.reminders.status;
+    if (mounted) {
+      setState(() {
+        _granted = status.isGranted;
+        _checking = false;
+      });
+    }
+  }
+
+  Future<void> _requestPermission() async {
+    final status = await Permission.reminders.request();
+    if (status.isPermanentlyDenied && mounted) {
+      await openAppSettings();
+    }
+    await _checkPermission();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_checking) {
+      return const ListTile(
+        leading: Icon(Icons.hourglass_empty, color: AppTheme.textSecondary),
+        title: Text('Reminders Permission'),
+        subtitle: Text('Checking...'),
+      );
+    }
+
+    return ListTile(
+      leading: Icon(
+        _granted ? Icons.check_circle : Icons.checklist,
+        color: _granted ? AppTheme.successColor : AppTheme.warningColor,
+      ),
+      title: const Text('Reminders Permission'),
+      subtitle: Text(
+        _granted
+            ? 'Granted — AI can create reminders'
+            : 'Required for creating reminders from voice memos',
+      ),
+      trailing: _granted
+          ? null
+          : FilledButton(
+              onPressed: _requestPermission,
+              child: const Text('Grant'),
+            ),
+    );
+  }
+}
+
 /// Shows the selected calendar and allows picking a different one.
-/// Only visible when calendar permission is granted.
+/// Only visible when calendar permission is granted (Android only).
 class _CalendarPickerTile extends ConsumerWidget {
   const _CalendarPickerTile();
 
