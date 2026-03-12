@@ -1033,15 +1033,7 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                 ),
 
                 // Process all button
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppTheme.spacingMd,
-                    AppTheme.spacingSm,
-                    AppTheme.spacingMd,
-                    0,
-                  ),
-                  child: _ProcessAllButton(),
-                ),
+                _ProcessAllButton(),
               ],
             );
           },
@@ -1140,17 +1132,30 @@ class _ProcessAllButton extends ConsumerWidget {
     final aiActionsState = ref.watch(aiActionsProvider);
     final isBusy = aiActionsState.isLoading;
 
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        icon: isBusy
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.auto_awesome, size: 18),
-        label: Text(isBusy ? 'Processing...' : 'Process all unprocessed'),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppTheme.spacingMd,
+        4,
+        AppTheme.spacingMd,
+        0,
+      ),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          style: TextButton.styleFrom(
+            foregroundColor: AppTheme.textSecondary,
+            textStyle: Theme.of(context).textTheme.bodySmall,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          icon: isBusy
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.auto_awesome, size: 16),
+          label: Text(isBusy ? 'Processing...' : 'Process all unprocessed'),
         onPressed: isBusy || !localAiEnabled
             ? null
             : () async {
@@ -1196,6 +1201,7 @@ class _ProcessAllButton extends ConsumerWidget {
                   }
                 }
               },
+        ),
       ),
     );
   }
