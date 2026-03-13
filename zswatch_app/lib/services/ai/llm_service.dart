@@ -328,9 +328,10 @@ class LlmService {
   int nCtx = 2048;
   int nThreads = 2;
   int maxTokens = 512;
-  double temperature = 0.1;
-  double topP = 0.9;
-  double presencePenalty = 1.1;
+  // Qwen3.5 recommended sampling for non-thinking text tasks.
+  double temperature = 0.3;
+  double topP = 1.0;
+  double presencePenalty = 2.0;
 
   /// GPU layer offloading. 99 = all layers on Metal/GPU, 0 = CPU-only.
   int numGpuLayers = 99;
@@ -1307,7 +1308,8 @@ JSON:
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
 
-    final parsedJson = _extractFirstJsonObject(raw);
+    final parsedJson = _chronoLlmParser.extractFirstJsonArray(raw) ??
+        _extractFirstJsonObject(raw);
     final metrics = LlmInferenceMetrics(
       modelName: _selectedModelName,
       rawPrompt: prompt,
@@ -1335,7 +1337,8 @@ JSON:
 
   bool _shouldRetryStructuredOutput(String raw, TranscriptResult result) {
     final cleaned = _sanitizeModelOutput(raw);
-    final jsonStr = _extractFirstJsonObject(cleaned);
+    final jsonStr = _chronoLlmParser.extractFirstJsonArray(cleaned) ??
+        _extractFirstJsonObject(cleaned);
 
     if (jsonStr == null) {
       return true;
@@ -1397,64 +1400,83 @@ JSON:
     }
   }
 
-  ChronoLlmExtraction? _parseChronoExtractionResult(
-    Map<String, dynamic> parsed,
-  ) {
-    return _chronoLlmParser.parse(jsonEncode(parsed)).extraction;
-  }
-
-  TranscriptResult _buildTranscriptResultFromChronoExtraction(
-    ChronoLlmExtraction extraction,
+  TranscriptResult _buildTranscriptResultFromChronoExtractions(
+    List<ChronoLlmExtraction> extractions,
     String raw,
   ) {
-    final summary = extraction.title.isNotEmpty
-        ? extraction.title
-        : raw.trim();
-    final category = switch (extraction.intent) {
+    final actions = <ExtractedActionResult>[];
+    String? firstResolvedDateTime;
+    String? firstResolverMethod;
+
+    for (final extraction in extractions) {
+      final title = extraction.title.isNotEmpty
+          ? extraction.title
+          : raw.trim();
+
+      if (extraction.intent == 'note') {
+        // Notes don't produce actions with time resolution
+        actions.add(ExtractedActionResult(
+          type: 'task',
+          title: title,
+          notes: extraction.datetimeExpressionOriginal,
+        ));
+        continue;
+      }
+
+      final englishExpression = extraction.datetimeExpressionEnglish;
+      final resolved = englishExpression == null
+          ? null
+          : _timeExpressionResolver.resolve(englishExpression);
+
+      firstResolvedDateTime ??= resolved?.dateTime.toIso8601String();
+      firstResolverMethod ??= resolved?.method;
+
+      actions.add(ExtractedActionResult(
+        type: extraction.intent == 'event' ? 'calendar_event' : 'reminder',
+        title: title,
+        notes: extraction.datetimeExpressionOriginal,
+        dueDate: extraction.intent == 'reminder'
+            ? resolved?.dateTime.toIso8601String()
+            : null,
+        startTime: extraction.intent == 'event'
+            ? resolved?.dateTime.toIso8601String()
+            : null,
+      ));
+    }
+
+    final first = extractions.first;
+    final summary = first.title.isNotEmpty ? first.title : raw.trim();
+    final category = switch (first.intent) {
       'event' => 'meeting',
       'reminder' => 'reminder',
       _ => 'note',
     };
 
-    if (extraction.intent == 'note') {
-      return TranscriptResult(
-        summary: summary,
-        category: 'note',
-        extractedIntent: extraction.intent,
-        extractedTitle: extraction.title,
-        datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
-        datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
-      );
-    }
-
-    final englishExpression = extraction.datetimeExpressionEnglish;
-    final resolved = englishExpression == null
-        ? null
-        : _timeExpressionResolver.resolve(englishExpression);
-
-    final action = ExtractedActionResult(
-      type: extraction.intent == 'event' ? 'calendar_event' : 'reminder',
-      title: summary,
-      notes: extraction.datetimeExpressionOriginal,
-      dueDate: extraction.intent == 'reminder' ? resolved?.dateTime.toIso8601String() : null,
-      startTime: extraction.intent == 'event' ? resolved?.dateTime.toIso8601String() : null,
-    );
-
     return TranscriptResult(
       summary: summary,
       category: category,
-      actions: [action],
-      extractedIntent: extraction.intent,
-      extractedTitle: extraction.title,
-      datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
-      datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
-      resolvedDateTime: resolved?.dateTime.toIso8601String(),
-      resolverMethod: resolved?.method,
+      actions: actions,
+      extractedIntent: first.intent,
+      extractedTitle: first.title,
+      datetimeExpressionOriginal: first.datetimeExpressionOriginal,
+      datetimeExpressionEnglish: first.datetimeExpressionEnglish,
+      resolvedDateTime: firstResolvedDateTime,
+      resolverMethod: firstResolverMethod,
     );
   }
 
   TranscriptResult _parseTranscriptResult(String raw) {
     final cleaned = _sanitizeModelOutput(raw);
+
+    // Try parsing via chrono parser first (handles both array and object)
+    final chronoResult = _chronoLlmParser.parse(cleaned);
+    if (chronoResult.extractions.isNotEmpty) {
+      return _buildTranscriptResultFromChronoExtractions(
+        chronoResult.extractions,
+        raw,
+      );
+    }
+
     final jsonStr = _extractFirstJsonObject(cleaned);
 
     if (jsonStr == null) {
@@ -1468,14 +1490,6 @@ JSON:
 
     try {
       final parsed = jsonDecode(jsonStr) as Map<String, dynamic>;
-
-      final chronoExtraction = _parseChronoExtractionResult(parsed);
-      if (chronoExtraction != null) {
-        return _buildTranscriptResultFromChronoExtraction(
-          chronoExtraction,
-          raw,
-        );
-      }
 
       final category = _normalizeCategory(parsed['category'] as String?);
       final summary = (parsed['summary'] as String?)?.trim();

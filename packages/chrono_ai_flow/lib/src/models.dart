@@ -17,10 +17,15 @@ class ChronoLlmParseResult {
   final String? parsedJson;
   final ChronoLlmExtraction? extraction;
 
+  /// All extractions when the model returns a JSON array.
+  /// For single-object output, this contains just the one [extraction].
+  final List<ChronoLlmExtraction> extractions;
+
   const ChronoLlmParseResult({
     required this.rawOutput,
     this.parsedJson,
     this.extraction,
+    this.extractions = const [],
   });
 }
 

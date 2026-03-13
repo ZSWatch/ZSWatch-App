@@ -64,10 +64,36 @@ class TimeExpressionResolver {
             return ResolvedTime(dateTime: resolved, method: 'chrono+adjusted');
           }
 
-          if (normalized.contains('next') &&
-              resolved.difference(ref).inDays > 7) {
-            resolved = resolved.subtract(const Duration(days: 7));
+          // "on Wednesday" spoken on a Wednesday → chrono gives today,
+          // but the user likely means next week's occurrence.
+          if (mentionedDay == ref.weekday &&
+              resolved.year == ref.year &&
+              resolved.month == ref.month &&
+              resolved.day == ref.day &&
+              !normalized.contains('today') &&
+              !normalized.contains('this')) {
+            resolved = resolved.add(const Duration(days: 7));
             return ResolvedTime(dateTime: resolved, method: 'chrono+adjusted');
+          }
+
+          if (normalized.contains('next')) {
+            final daysFromRef = resolved.difference(ref).inDays;
+            // "next <weekday>" means the occurrence in the following
+            // week. Days that haven't happened yet this week are
+            // "ahead" — chrono may resolve them to this-week's date.
+            final dayIsAheadInWeek = mentionedDay > ref.weekday;
+            if (dayIsAheadInWeek && daysFromRef < 7) {
+              // Chrono gave this week's occurrence — push to next week.
+              resolved = resolved.add(const Duration(days: 7));
+              return ResolvedTime(
+                  dateTime: resolved, method: 'chrono+adjusted');
+            }
+            if (daysFromRef > 13) {
+              // Chrono jumped too far — pull back one week.
+              resolved = resolved.subtract(const Duration(days: 7));
+              return ResolvedTime(
+                  dateTime: resolved, method: 'chrono+adjusted');
+            }
           }
         }
 

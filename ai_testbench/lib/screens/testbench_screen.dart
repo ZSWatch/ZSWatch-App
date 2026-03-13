@@ -675,6 +675,7 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
                                 'time=${caseResult.timePresenceMatch ? '✓' : '✗'} · '
                                 'lang=${caseResult.titleLanguageMatch ? '✓' : '✗'} · '
                                 'resolve=${caseResult.timeResolutionCorrect ? '✓' : '✗'} · '
+                                'count=${caseResult.extractedCount}/${caseResult.expectedCount}${caseResult.countMatch ? '✓' : '✗'} · '
                                 '${(caseResult.elapsed.inMilliseconds / 1000).toStringAsFixed(1)}s · '
                                 '${caseResult.tokensPerSecond.toStringAsFixed(1)} tok/s',
                               ),
@@ -706,6 +707,16 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
                                   style: const TextStyle(
                                     color: Colors.redAccent,
                                     fontSize: 12,
+                                  ),
+                                ),
+                              if (caseResult.itemFailures.isNotEmpty)
+                                ...caseResult.itemFailures.map(
+                                  (f) => Text(
+                                    '  ⚠ $f',
+                                    style: const TextStyle(
+                                      color: Colors.orangeAccent,
+                                      fontSize: 11,
+                                    ),
                                   ),
                                 ),
                             ],
