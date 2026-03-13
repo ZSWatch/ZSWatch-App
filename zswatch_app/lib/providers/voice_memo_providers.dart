@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/voice_memo.dart';
 import '../data/repositories/voice_memo_repository.dart';
+import '../services/ai/extracted_action_creation_service.dart';
 import '../services/ai/voice_note_ai_pipeline.dart';
 import '../services/voice_memo/transcription_engine.dart';
 import '../services/voice_memo/voice_memo_sync_service.dart';
@@ -105,8 +106,18 @@ final voiceMemoSyncServiceProvider = Provider<VoiceMemoSyncService>((ref) {
     if (aiEnabled && autoProcess) {
       pipeline = ref.read(voiceNoteAiPipelineProvider);
       // Wire round-trip confirmation: send result back to watch after AI processing
+      final autoCreate = ref.read(autoCreateActionsProvider);
       pipeline!.onProcessingComplete = (filename, title) {
-        service.sendResultToWatch(filename, title);
+        service.sendResultToWatch(
+          filename,
+          title,
+          onConfirmed: autoCreate
+              ? (confirmedFilename) => _autoCreateActionsForMemo(
+                    ref: ref,
+                    filename: confirmedFilename,
+                  )
+              : null,
+        );
       };
     }
     await _autoTranscribeAndProcess(
@@ -204,6 +215,49 @@ Future<void> _autoTranscribeAndProcess({
     debugPrint('[VoiceMemoProviders] Auto-transcription/processing error: $e');
   } finally {
     onDone?.call();
+  }
+}
+
+/// Auto-create all pending extracted actions for a memo after the watch
+/// confirmation timeout expires without an undo.
+Future<void> _autoCreateActionsForMemo({
+  required Ref ref,
+  required String filename,
+}) async {
+  try {
+    final repository = ref.read(voiceMemoRepositoryProvider);
+    final memo = await repository.getMemoByFilename(filename);
+    if (memo == null) {
+      debugPrint('[VoiceMemoProviders] Auto-create: memo not found for $filename');
+      return;
+    }
+
+    final actionRepo = ref.read(extractedActionRepositoryProvider);
+    final actions = await actionRepo.getActionsForMemo(memo.id);
+    final pending = actions.where((a) => !a.created && !a.dismissed).toList();
+
+    if (pending.isEmpty) {
+      debugPrint('[VoiceMemoProviders] Auto-create: no pending actions for $filename');
+      return;
+    }
+
+    final ops = ref.read(extractedActionOperationsProvider);
+    final selectedCalendarId = ref.read(selectedProductivityCalendarIdProvider);
+
+    for (final action in pending) {
+      try {
+        final draft = ActionCreationDraft.fromAction(action).copyWith(
+          platformCalendarId: Platform.isAndroid ? selectedCalendarId : null,
+        );
+        final message = await ops.createAction(action: action, draft: draft);
+        debugPrint('[VoiceMemoProviders] Auto-created action: $message');
+      } catch (e) {
+        debugPrint(
+            '[VoiceMemoProviders] Failed to auto-create action ${action.id}: $e');
+      }
+    }
+  } catch (e) {
+    debugPrint('[VoiceMemoProviders] Auto-create actions error: $e');
   }
 }
 
