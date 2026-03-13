@@ -23,6 +23,7 @@ abstract final class SettingsKeys {
   static const String selectedProductivityCalendarId =
       'selected_productivity_calendar_id';
   static const String gpuInferenceMode = 'gpu_inference_mode';
+  static const String autoCreateActions = 'auto_create_actions';
 }
 
 /// Provider for SharedPreferences instance
@@ -372,6 +373,26 @@ class AutoProcessVoiceNotesNotifier extends StateNotifier<bool> {
   void setEnabled(bool enabled) {
     state = enabled;
     _prefs?.setBool(SettingsKeys.autoProcessVoiceNotes, enabled);
+  }
+}
+
+/// Whether extracted actions (calendar events, reminders) should be automatically
+/// created after AI processing, with a watch-side undo window.
+final autoCreateActionsProvider =
+    StateNotifierProvider<AutoCreateActionsNotifier, bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return AutoCreateActionsNotifier(prefs.valueOrNull);
+});
+
+class AutoCreateActionsNotifier extends StateNotifier<bool> {
+  final SharedPreferences? _prefs;
+
+  AutoCreateActionsNotifier(this._prefs)
+      : super(_prefs?.getBool(SettingsKeys.autoCreateActions) ?? false);
+
+  void setEnabled(bool enabled) {
+    state = enabled;
+    _prefs?.setBool(SettingsKeys.autoCreateActions, enabled);
   }
 }
 
