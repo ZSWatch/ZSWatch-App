@@ -597,6 +597,55 @@ class ModelBenchmarkService {
       ],
     ),
 
+    // ── Conversational Swedish / Swenglish voice notes ───────────────
+
+    BenchmarkCase(
+      name: 'sv_multi_dev_tasks_swenglish',
+      transcript:
+          'Vi ska cleana upp klockans kod för voice memons sen ska vi testa att '
+          'det går avbryta en calender tilläggning genom att klicka cancel på popup på klockan',
+      expectedItems: [
+        ExpectedItem(
+          expectedIntent: 'note',
+          expectTime: false,
+          titleLanguageKeywords: ['clean', 'kod', 'voice'],
+        ),
+        ExpectedItem(
+          expectedIntent: 'note',
+          expectTime: false,
+          titleLanguageKeywords: ['testa', 'calender', 'cancel'],
+        ),
+      ],
+    ),
+    BenchmarkCase(
+      name: 'sv_multi_casual_planning',
+      transcript:
+          'Vi behöver fixa buggen med Bluetooth-anslutningen och sen ska vi '
+          'refaktorera sensor-koden lite grann.',
+      expectedItems: [
+        ExpectedItem(
+          expectedIntent: 'note',
+          expectTime: false,
+          titleLanguageKeywords: ['bugg', 'bluetooth'],
+        ),
+        ExpectedItem(
+          expectedIntent: 'note',
+          expectTime: false,
+          titleLanguageKeywords: ['refaktor', 'sensor'],
+        ),
+      ],
+    ),
+    BenchmarkCase.single(
+      name: 'sv_note_swenglish_long',
+      transcript:
+          'Jag tänkte att vi kanske borde adda en feature för att synca '
+          'notifications mellan telefonen och klockan typ via BLE, '
+          'kolla om det finns nåt library för det.',
+      expectedIntent: 'note',
+      expectTime: false,
+      titleLanguageKeywords: ['sync', 'notification', 'feature'],
+    ),
+
     // ── Multi-item cases ─────────────────────────────────────────────
 
     BenchmarkCase(
@@ -753,9 +802,11 @@ class ModelBenchmarkService {
   Future<List<BenchmarkModelResult>> runForModels(
     List<String> modelPaths, {
     void Function(BenchmarkProgress progress)? onProgress,
+    List<BenchmarkCase>? selectedCases,
   }) async {
     final results = <BenchmarkModelResult>[];
-    final totalCases = benchmarkCases.length;
+    final casesToRun = selectedCases ?? benchmarkCases;
+    final totalCases = casesToRun.length;
     final totalRuns = modelPaths.length * totalCases;
     var completedRuns = 0;
     final resolver = TimeExpressionResolver();
@@ -764,7 +815,7 @@ class ModelBenchmarkService {
       final modelPath = modelPaths[modelIndex];
       final llm = LlmService()
         ..setModel(modelPath)
-        ..nCtx = 2048
+        ..nCtx = 4096
         ..nThreads = Platform.numberOfProcessors
         ..maxTokens = 384
         ..temperature = 0.3
@@ -775,9 +826,9 @@ class ModelBenchmarkService {
       final caseResults = <BenchmarkCaseResult>[];
       try {
         for (var caseIndex = 0;
-            caseIndex < benchmarkCases.length;
+            caseIndex < casesToRun.length;
             caseIndex++) {
-          final testCase = benchmarkCases[caseIndex];
+          final testCase = casesToRun[caseIndex];
           onProgress?.call(
             BenchmarkProgress(
               totalModels: modelPaths.length,
