@@ -47,9 +47,9 @@ class LlmService {
   int nCtx = 2048;
   int nThreads = 2;
   int maxTokens = 512;
-  double temperature = 0.1;
-  double topP = 0.9;
-  double presencePenalty = 1.1;
+  double temperature = 0.3;
+  double topP = 1.0;
+  double presencePenalty = 2.0;
   int numGpuLayers = 99;
   /// When false, disables thinking/reasoning for models like Qwen3/3.5.
   bool enableThinking = true;
@@ -106,7 +106,6 @@ class LlmService {
       presencePenalty: presencePenalty,
       contextSize: nCtx,
       logger: _logFilter,
-      enableThinking: enableThinking,
     );
 
     _requestInFlight = true;
@@ -183,7 +182,6 @@ class LlmService {
       presencePenalty: presencePenalty,
       contextSize: nCtx,
       logger: _logFilter,
-      enableThinking: enableThinking,
     );
 
     _requestInFlight = true;

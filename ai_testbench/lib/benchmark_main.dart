@@ -187,6 +187,11 @@ Map<String, dynamic> _serializeModelResult(BenchmarkModelResult result) {
         'tokensPerSecond': caseResult.tokensPerSecond,
         'outputPreview': caseResult.outputPreview,
         'error': caseResult.error,
+        'extractedCount': caseResult.extractedCount,
+        'expectedCount': caseResult.expectedCount,
+        'countMatch': caseResult.countMatch,
+        if (caseResult.itemFailures.isNotEmpty)
+          'itemFailures': caseResult.itemFailures,
       };
     }).toList(growable: false),
   };
