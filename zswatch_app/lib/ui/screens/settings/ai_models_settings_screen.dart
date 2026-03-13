@@ -292,12 +292,66 @@ class _TranscriptionModelSelectorState
               border: OutlineInputBorder(),
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
-            items: TranscriptionModelCatalog.all.map((info) {
-              return DropdownMenuItem<TranscriptionEngineType>(
-                value: info.type,
-                child: Text(info.name, overflow: TextOverflow.ellipsis),
-              );
-            }).toList(),
+            items: () {
+                const all = TranscriptionModelCatalog.all;
+                // Rank within each language group (models already ordered
+                // best→worst, so first occurrence per language = rank 1).
+                final ranked = <TranscriptionEngineType, int>{};
+                final langCounters = <String, int>{};
+                for (final m in all) {
+                  final lang = m.language;
+                  final rank = (langCounters[lang] ?? 0) + 1;
+                  langCounters[lang] = rank;
+                  ranked[m.type] = rank;
+                }
+                return all.map((info) {
+                  final modelRank = ranked[info.type];
+                  final Color rankColor;
+                  switch (modelRank) {
+                    case 1:
+                      rankColor = const Color(0xFFFFD700);
+                    case 2:
+                      rankColor = const Color(0xFFC0C0C0);
+                    case 3:
+                      rankColor = const Color(0xFFCD7F32);
+                    default:
+                      rankColor = AppTheme.textSecondary;
+                  }
+                  return DropdownMenuItem<TranscriptionEngineType>(
+                    value: info.type,
+                    child: Row(
+                      children: [
+                        if (modelRank != null)
+                          Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: rankColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '#$modelRank',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: rankColor,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                        Expanded(
+                          child: Text(
+                            info.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList();
+              }(),
             onChanged: _isDownloading
                 ? null
                 : (value) {
@@ -307,6 +361,21 @@ class _TranscriptionModelSelectorState
                         .setType(value);
                     _invalidateTranscription();
                   },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppTheme.spacingMd,
+            6,
+            AppTheme.spacingMd,
+            0,
+          ),
+          child: Text(
+            TranscriptionModelCatalog.info(selectedType).description,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                  fontStyle: FontStyle.italic,
+                ),
           ),
         ),
 
