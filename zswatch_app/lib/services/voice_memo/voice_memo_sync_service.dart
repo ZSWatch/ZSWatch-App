@@ -518,9 +518,21 @@ class VoiceMemoSyncService {
   /// Send AI processing result back to the watch for toast confirmation.
   ///
   /// The watch displays the parsed title with an Undo button for 3 seconds.
-  Future<void> sendResultToWatch(String filename, String title) async {
+  /// If [onConfirmed] is provided, it will be called after [confirmationTimeout]
+  /// unless the watch sends an undo_last for this filename.
+  Future<void> sendResultToWatch(
+    String filename,
+    String title, {
+    Duration confirmationTimeout = const Duration(seconds: 5),
+    Future<void> Function(String filename)? onConfirmed,
+  }) async {
     if (!_watchService.isConnected) {
       _log('Cannot send result to watch — not connected');
+      // Still auto-create if watch is disconnected and callback is set
+      if (onConfirmed != null) {
+        _log('Watch disconnected — auto-creating actions immediately');
+        unawaited(onConfirmed(filename));
+      }
       return;
     }
     try {
@@ -532,7 +544,20 @@ class VoiceMemoSyncService {
     } catch (e) {
       _log('Failed to send result to watch: $e');
     }
+
+    if (onConfirmed != null) {
+      // Cancel any previous timer for this file
+      _pendingConfirmations[filename]?.cancel();
+      _pendingConfirmations[filename] = Timer(confirmationTimeout, () {
+        _pendingConfirmations.remove(filename);
+        _log('No undo received for $filename — auto-creating actions');
+        unawaited(onConfirmed(filename));
+      });
+    }
   }
+
+  /// Timers waiting for undo — keyed by filename.
+  final Map<String, Timer> _pendingConfirmations = {};
 
   /// Handle the undo_last command from the watch.
   ///
@@ -545,6 +570,9 @@ class VoiceMemoSyncService {
       return;
     }
     _log('Undo requested for: $filename');
+    // Cancel any pending auto-create for this file
+    _pendingConfirmations[filename]?.cancel();
+    _pendingConfirmations.remove(filename);
     try {
       await _repository.clearAiResults(filename);
       _log('Cleared AI results for: $filename');
@@ -561,6 +589,10 @@ class VoiceMemoSyncService {
   void dispose() {
     _messageSubscription?.cancel();
     _connectionSubscription?.cancel();
+    for (final timer in _pendingConfirmations.values) {
+      timer.cancel();
+    }
+    _pendingConfirmations.clear();
     unawaited(_resetFsManager());
     _listCompleter?.complete([]);
     _syncState.close();

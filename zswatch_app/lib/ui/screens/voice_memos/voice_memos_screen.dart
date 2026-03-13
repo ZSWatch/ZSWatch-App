@@ -12,6 +12,8 @@ import '../../../data/models/extracted_action.dart';
 import '../../../data/models/voice_memo.dart';
 import '../../../providers/ai_providers.dart';
 import '../../../providers/settings_providers.dart';
+import '../../../services/ai/extracted_action_creation_service.dart';
+import '../../widgets/ai_debug_widgets.dart';
 import '../../../providers/voice_memo_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../../services/ai/voice_note_ai_pipeline.dart';
@@ -827,6 +829,30 @@ class _AiDebugSheet extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                 ],
+                if (aiHasChronoDetails(
+                  extractedIntent: debugInfo.extractedIntent,
+                  extractedTitle: debugInfo.extractedTitle,
+                  datetimeExpressionOriginal: debugInfo.datetimeExpressionOriginal,
+                  datetimeExpressionEnglish: debugInfo.datetimeExpressionEnglish,
+                  resolvedDateTime: debugInfo.resolvedDateTime,
+                  resolverMethod: debugInfo.resolverMethod,
+                )) ...[
+                  aiDebugBlock(
+                    context,
+                    title: 'Chrono Extraction / Resolution',
+                    content: aiFormatChronoDetails(
+                      extractedIntent: debugInfo.extractedIntent,
+                      extractedTitle: debugInfo.extractedTitle,
+                      datetimeExpressionOriginal: debugInfo.datetimeExpressionOriginal,
+                      datetimeExpressionEnglish: debugInfo.datetimeExpressionEnglish,
+                      resolvedDateTime: debugInfo.resolvedDateTime,
+                      resolverMethod: debugInfo.resolverMethod,
+                    ),
+                    icon: Icons.schedule,
+                    showCopyButton: true,
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 _resultRow(context, debugInfo),
               ],
             ],
@@ -1469,10 +1495,21 @@ class _ExtractedActionsSectionState
   }
 }
 
-class _ActionItem extends StatelessWidget {
+class _ActionItem extends ConsumerStatefulWidget {
   final ExtractedAction action;
 
   const _ActionItem({required this.action});
+
+  @override
+  ConsumerState<_ActionItem> createState() => _ActionItemState();
+}
+
+class _ActionItemState extends ConsumerState<_ActionItem> {
+  bool _isCreating = false;
+  bool _isDismissing = false;
+  bool _isOpening = false;
+
+  ExtractedAction get action => widget.action;
 
   @override
   Widget build(BuildContext context) {
@@ -1497,14 +1534,32 @@ class _ActionItem extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                action.title,
-                style: Theme.of(context).textTheme.bodyMedium,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      action.title,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.spacingSm),
+                  _ActionStatusBadge(action: action),
+                ],
               ),
-              if (action.dueDate != null) ...[
+              if (_timingLabel(action) case final timingLabel?) ...[
                 const SizedBox(height: 4),
                 Text(
-                  'Due: ${DateFormat.yMMMd().format(action.dueDate!)}',
+                  timingLabel,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                ),
+              ],
+              if (action.notes != null && action.notes!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  action.notes!.trim(),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppTheme.textSecondary,
                       ),
@@ -1519,11 +1574,124 @@ class _ActionItem extends StatelessWidget {
                       ),
                 ),
               ],
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: AppTheme.spacingSm,
+                runSpacing: AppTheme.spacingSm,
+                children: [
+                  if (!action.created && !action.dismissed)
+                    FilledButton.icon(
+                      style: _compactFilledButtonStyle(),
+                      onPressed: _isCreating ? null : _createAction,
+                      icon: _isCreating
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.add_task_outlined),
+                      label: Text(_isCreating ? 'Creating\u2026' : 'Create'),
+                    ),
+                  if (!action.created && !action.dismissed)
+                    OutlinedButton.icon(
+                      style: _compactOutlinedButtonStyle(),
+                      onPressed: _isDismissing ? null : _dismissAction,
+                      icon: _isDismissing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.close_rounded),
+                      label: const Text('Dismiss'),
+                    ),
+                  if (action.created && action.platformTargetId != null)
+                    OutlinedButton.icon(
+                      style: _compactOutlinedButtonStyle(),
+                      onPressed: _isOpening ? null : _openCreatedAction,
+                      icon: _isOpening
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.open_in_new_rounded),
+                      label: const Text('Open'),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _createAction() async {
+    setState(() => _isCreating = true);
+    try {
+      final selectedCalendarId = ref.read(selectedProductivityCalendarIdProvider);
+      final draft = ActionCreationDraft.fromAction(action).copyWith(
+        platformCalendarId: Platform.isAndroid ? selectedCalendarId : null,
+      );
+
+      final message = await ref.read(extractedActionOperationsProvider).createAction(
+            action: action,
+            draft: draft,
+          );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to create action: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isCreating = false);
+      }
+    }
+  }
+
+  Future<void> _dismissAction() async {
+    setState(() => _isDismissing = true);
+    try {
+      await ref.read(extractedActionOperationsProvider).dismissAction(action.id);
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to dismiss action: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDismissing = false);
+      }
+    }
+  }
+
+  Future<void> _openCreatedAction() async {
+    setState(() => _isOpening = true);
+    try {
+      await ref
+          .read(extractedActionCreationServiceProvider)
+          .openCreatedAction(action);
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to open created action: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isOpening = false);
+      }
+    }
   }
 
   IconData _actionTypeIcon(ExtractedActionType type) {
@@ -1540,6 +1708,56 @@ class _ActionItem extends StatelessWidget {
       ExtractedActionType.reminder => AppTheme.warningColor,
       ExtractedActionType.calendarEvent => AppTheme.infoColor,
     };
+  }
+
+  String? _timingLabel(ExtractedAction action) {
+    final dateFormat = DateFormat.yMMMd();
+    final dateTimeFormat = DateFormat.yMMMd().add_jm();
+
+    if (action.startTime != null) {
+      final start = action.startTime!.toLocal();
+      if (action.endTime != null) {
+        final end = action.endTime!.toLocal();
+        return 'When: ${dateTimeFormat.format(start)} \u2192 ${dateTimeFormat.format(end)}';
+      }
+      return 'When: ${dateTimeFormat.format(start)}';
+    }
+
+    if (action.dueDate != null) {
+      return 'Due: ${dateFormat.format(action.dueDate!.toLocal())}';
+    }
+
+    return null;
+  }
+}
+
+class _ActionStatusBadge extends StatelessWidget {
+  final ExtractedAction action;
+
+  const _ActionStatusBadge({required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch ((action.created, action.dismissed)) {
+      (true, _) => ('Created', AppTheme.successColor),
+      (_, true) => ('Dismissed', AppTheme.textSecondary),
+      _ => ('Pending', AppTheme.warningColor),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusXLarge),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
   }
 }
 
@@ -2283,14 +2501,12 @@ class _AudioPlayerCardState extends ConsumerState<_AudioPlayerCard> {
         ),
         SizedBox(height: widget.compact ? 4 : AppTheme.spacingSm),
         Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               _formatDuration(_position),
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            SizedBox(
-              width: widget.compact ? 56 : 120,
+            Expanded(
               child: SliderTheme(
                 data: SliderTheme.of(context).copyWith(
                   trackHeight: widget.compact ? 2 : null,

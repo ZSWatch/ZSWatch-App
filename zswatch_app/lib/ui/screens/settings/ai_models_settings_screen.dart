@@ -591,6 +591,8 @@ class _AiTogglesTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final localAiEnabled = ref.watch(localAiEnabledProvider);
     final autoProcess = ref.watch(autoProcessVoiceNotesProvider);
+    final autoCreate = ref.watch(autoCreateActionsProvider);
+    final bothEnabled = localAiEnabled && autoProcess;
 
     return Column(
       children: [
@@ -625,6 +627,29 @@ class _AiTogglesTile extends ConsumerWidget {
             onChanged: localAiEnabled
                 ? (value) {
                     ref.read(autoProcessVoiceNotesProvider.notifier).setEnabled(value);
+                  }
+                : null,
+          ),
+        ),
+        Opacity(
+          opacity: bothEnabled ? 1.0 : 0.5,
+          child: SwitchListTile(
+            secondary: Icon(
+              Icons.event_available,
+              color: autoCreate && bothEnabled
+                  ? AppTheme.primaryColor
+                  : AppTheme.textSecondary,
+            ),
+            title: const Text('Auto-create calendar events'),
+            subtitle: Text(
+              bothEnabled
+                  ? 'Create events automatically (watch have undo window)'
+                  : 'Enable Local AI and auto-process first',
+            ),
+            value: autoCreate,
+            onChanged: bothEnabled
+                ? (value) {
+                    ref.read(autoCreateActionsProvider.notifier).setEnabled(value);
                   }
                 : null,
           ),
