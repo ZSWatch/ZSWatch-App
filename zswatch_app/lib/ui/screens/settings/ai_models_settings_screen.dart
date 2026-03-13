@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -1315,6 +1317,11 @@ class _BenchmarkSection extends ConsumerStatefulWidget {
 
 class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
   late final TextEditingController _aiInputController;
+  AudioRecorder? _audioRecorder;
+  bool _isRecording = false;
+  Duration _recordingDuration = Duration.zero;
+  Timer? _recordingTimer;
+  String? _lastRecordingPath;
 
   @override
   void initState() {
@@ -1327,6 +1334,13 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
   @override
   void dispose() {
     _aiInputController.dispose();
+    _recordingTimer?.cancel();
+    _audioRecorder?.dispose();
+    // Clean up temp recording file
+    if (_lastRecordingPath != null) {
+      final f = File(_lastRecordingPath!);
+      if (f.existsSync()) f.deleteSync();
+    }
     super.dispose();
   }
 
@@ -1337,137 +1351,217 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
         benchState.whenOrNull(data: (s) => s.isRunning) ?? false;
     final runningType =
         benchState.whenOrNull(data: (s) => s.runningTestType);
+    final hasTranscript = _aiInputController.text.trim().isNotEmpty;
 
-    return Column(
-      children: [
-        _AiBenchmarkInputEditor(
-          controller: _aiInputController,
-          onReset: () {
-            _aiInputController.text =
-                'Remind me to buy groceries tomorrow and call the dentist at 2 PM.';
-          },
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppTheme.spacingMd,
+        AppTheme.spacingSm,
+        AppTheme.spacingMd,
+        0,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
-
-        // ---------- Run buttons ----------
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppTheme.spacingMd,
-            AppTheme.spacingSm,
-            AppTheme.spacingMd,
-            0,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  icon: runningType == 'transcription'
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white70,
-                          ),
-                        )
-                      : const Icon(Icons.mic, size: 18),
-                  label: Text(runningType == 'transcription'
-                      ? 'Running…'
-                      : 'Test Transcription'),
-                  onPressed: isRunning
-                      ? null
-                      : () => _runTranscriptionBenchmark(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _BenchmarkPill(
+                  icon: _isRecording ? Icons.fiber_manual_record : Icons.mic,
+                  label: _isRecording ? 'Recording' : 'Phone input',
+                  color: _isRecording
+                      ? AppTheme.errorColor
+                      : AppTheme.primaryColor,
                 ),
+                _BenchmarkPill(
+                  icon: hasTranscript ? Icons.check_circle : Icons.edit_note,
+                  label: hasTranscript ? 'Transcript ready' : 'Type or record',
+                  color: hasTranscript
+                      ? AppTheme.successColor
+                      : AppTheme.textSecondary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _AiBenchmarkInputEditor(
+              controller: _aiInputController,
+              isRecording: _isRecording,
+              recordingDuration: _recordingDuration,
+              onReset: () {
+                _aiInputController.text =
+                    'Remind me to buy groceries tomorrow and call the dentist at 2 PM.';
+              },
+              onRecordToggle: isRunning ? null : () => _toggleRecording(context),
+            ),
+            const SizedBox(height: 14),
+            _BenchmarkHintCard(
+              message: _isRecording
+                  ? 'Recording in progress. Tap the microphone again to stop and transcribe.'
+                  : 'Record on the phone or paste text, then run the AI benchmark using the same prompt flow as voice memos.',
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                icon: runningType == 'ai'
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white70,
+                        ),
+                      )
+                    : const Icon(Icons.psychology, size: 18),
+                label: Text(runningType == 'ai' ? 'Running…' : 'Test AI'),
+                onPressed: isRunning || _isRecording
+                    ? null
+                    : () => _runAiBenchmark(context),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  icon: runningType == 'ai'
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white70,
-                          ),
-                        )
-                      : const Icon(Icons.psychology, size: 18),
-                  label: Text(
-                      runningType == 'ai' ? 'Running…' : 'Test AI'),
-                  onPressed: isRunning
-                      ? null
-                      : () => _runAiBenchmark(context),
-                ),
+            ),
+            const SizedBox(height: 12),
+            benchState.when(
+              data: (state) {
+                final progress = state.current;
+                if (progress == null || !progress.isComplete) {
+                  return const SizedBox.shrink();
+                }
+                return _LastResultTile(progress: progress);
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (e, _) => _BenchmarkHintCard(
+                message: 'Error: $e',
+                isError: true,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-
-        // ---------- Last result summary (shown after completion) ----------
-        benchState.when(
-          data: (state) {
-            final progress = state.current;
-            if (progress == null || !progress.isComplete) {
-              return Padding(
-                padding: const EdgeInsets.all(AppTheme.spacingMd),
-                child: Text(
-                  'Run a quick test to see how fast the selected models '
-                  'perform on your device.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                ),
-              );
-            }
-            // Show a compact last-result row with a "View" button to re-open
-            return _LastResultTile(progress: progress);
-          },
-          loading: () => const SizedBox.shrink(),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(AppTheme.spacingMd),
-            child: Text('Error: $e',
-                style: const TextStyle(color: AppTheme.errorColor)),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Future<void> _runTranscriptionBenchmark(BuildContext context) async {
-    // Find a real voice recording to use
-    final repo = ref.read(voiceMemoRepositoryProvider);
-    final memos = await repo.getAllMemos();
-    final usable = memos.where((m) {
-      final path = m.convertedFilePath ?? m.localFilePath;
-      return path != null && File(path).existsSync();
-    }).toList();
+  // ---- Recording ----
 
-    if (usable.isEmpty) {
+  Future<void> _toggleRecording(BuildContext context) async {
+    if (_isRecording) {
+      await _stopRecording();
+    } else {
+      await _startRecording(context);
+    }
+  }
+
+  Future<void> _startRecording(BuildContext context) async {
+    // Request microphone permission
+    final status = await Permission.microphone.request();
+    if (!status.isGranted) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'No voice recordings found — record one on the watch first.',
-            ),
+            content: Text('Microphone permission is required to record audio.'),
           ),
         );
       }
       return;
     }
 
-    final memo = usable.first;
-    final audioPath = memo.convertedFilePath ?? memo.localFilePath!;
+    _audioRecorder = AudioRecorder();
 
-    // Open debug sheet, then start the benchmark
-    if (context.mounted) {
-      _showBenchmarkSheet(context);
+    // Record as WAV for best Whisper compatibility
+    final tempDir = await getTemporaryDirectory();
+    _lastRecordingPath =
+        '${tempDir.path}/benchmark_recording_${DateTime.now().millisecondsSinceEpoch}.wav';
+
+    await _audioRecorder!.start(
+      const RecordConfig(
+        encoder: AudioEncoder.wav,
+        sampleRate: 16000,
+        numChannels: 1,
+      ),
+      path: _lastRecordingPath!,
+    );
+
+    setState(() {
+      _isRecording = true;
+      _recordingDuration = Duration.zero;
+    });
+
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() {
+        _recordingDuration += const Duration(seconds: 1);
+      });
+    });
+  }
+
+  Future<void> _stopRecording() async {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+
+    final path = await _audioRecorder?.stop();
+    await _audioRecorder?.dispose();
+    _audioRecorder = null;
+
+    setState(() {
+      _isRecording = false;
+    });
+
+    if (path == null || !File(path).existsSync()) {
+      debugPrint('[Benchmark] Recording failed – no file at $path');
+      return;
     }
 
+    _lastRecordingPath = path;
+
+    // Transcribe the recording and fill the text field
     final selectedType = ref.read(transcriptionEngineTypeProvider);
-    unawaited(
-      ref
-          .read(_benchmarkServiceProvider)
-          .benchmarkTranscription(selectedType, audioPath),
-    );
+    final engine = createTranscriptionEngine(selectedType);
+    try {
+      final available = await engine.isAvailable();
+      if (!available) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Transcription model not downloaded — download it in settings first.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Transcribing recording…')),
+        );
+      }
+
+      final transcript = await engine.transcribe(path);
+      if (transcript.isNotEmpty && mounted) {
+        _aiInputController.text = transcript;
+        ScaffoldMessenger.of(context).clearSnackBars();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No speech detected in recording.')),
+        );
+      }
+    } catch (e) {
+      debugPrint('[Benchmark] Transcription error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Transcription failed: $e')),
+        );
+      }
+    } finally {
+      engine.dispose();
+    }
   }
 
   void _runAiBenchmark(BuildContext context) {
@@ -1512,71 +1606,90 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
 
 class _AiBenchmarkInputEditor extends StatelessWidget {
   final TextEditingController controller;
+  final bool isRecording;
+  final Duration recordingDuration;
   final VoidCallback onReset;
+  final VoidCallback? onRecordToggle;
 
   const _AiBenchmarkInputEditor({
     required this.controller,
+    required this.isRecording,
+    required this.recordingDuration,
     required this.onReset,
+    required this.onRecordToggle,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final minutes = recordingDuration.inMinutes.remainder(60);
+    final seconds = recordingDuration.inSeconds.remainder(60);
+    final durationText = '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppTheme.spacingMd,
-        AppTheme.spacingSm,
-        AppTheme.spacingMd,
-        0,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'AI benchmark input',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+            Expanded(
+              child: Text(
+                'AI benchmark input',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
-                TextButton.icon(
-                  onPressed: onReset,
-                  icon: const Icon(Icons.restart_alt, size: 16),
-                  label: const Text('Reset'),
-                ),
-              ],
-            ),
-            Text(
-              'Edit only the sample transcript here. The benchmark uses the same fixed AI prompt and chrono flow as the main app.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              minLines: 3,
-              maxLines: 6,
-              decoration: const InputDecoration(
-                labelText: 'Test input text',
-                alignLabelWithHint: true,
-                border: OutlineInputBorder(),
+            if (isRecording) ...[
+              Text(
+                durationText,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: AppTheme.errorColor,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
+              const SizedBox(width: 4),
+            ],
+            IconButton(
+              onPressed: onRecordToggle,
+              icon: Icon(
+                isRecording ? Icons.stop_circle : Icons.mic,
+                color: isRecording ? AppTheme.errorColor : null,
+                size: 22,
+              ),
+              tooltip: isRecording ? 'Stop recording' : 'Record audio',
+              style: IconButton.styleFrom(
+                backgroundColor: isRecording
+                    ? AppTheme.errorColor.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.04),
+              ),
+            ),
+            const SizedBox(width: 4),
+            TextButton.icon(
+              onPressed: onReset,
+              icon: const Icon(Icons.restart_alt, size: 16),
+              label: const Text('Reset'),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          minLines: 4,
+          maxLines: 7,
+          decoration: InputDecoration(
+            labelText: 'Test input text',
+            alignLabelWithHint: true,
+            border: const OutlineInputBorder(),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.02),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1590,56 +1703,138 @@ class _LastResultTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isError = progress.isError;
-    final icon = progress.testType == 'transcription'
-        ? Icons.mic
-        : Icons.psychology;
+    final icon = switch (progress.testType) {
+      'transcription' => Icons.mic,
+      _ => Icons.psychology,
+    };
     final statusColor =
         isError ? AppTheme.errorColor : AppTheme.successColor;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppTheme.spacingMd,
-        AppTheme.spacingSm,
-        AppTheme.spacingMd,
-        0,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
       ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: statusColor.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-          border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: statusColor),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    progress.modelName,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: statusColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Latest run',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w600,
                   ),
-                  if (progress.elapsed > Duration.zero)
-                    Text(
-                      isError
-                          ? 'Failed'
-                          : '${(progress.elapsed.inMilliseconds / 1000).toStringAsFixed(1)}s'
-                              '${progress.tokensPerSecond != null ? '  •  ${progress.tokensPerSecond!.toStringAsFixed(1)} t/s' : ''}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  progress.modelName,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (progress.elapsed > Duration.zero)
+                  Text(
+                    isError
+                        ? 'Failed'
+                        : '${(progress.elapsed.inMilliseconds / 1000).toStringAsFixed(1)}s'
+                            '${progress.tokensPerSecond != null ? '  •  ${progress.tokensPerSecond!.toStringAsFixed(1)} t/s' : ''}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppTheme.textSecondary,
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BenchmarkPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _BenchmarkPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BenchmarkHintCard extends StatelessWidget {
+  final String message;
+  final bool isError;
+
+  const _BenchmarkHintCard({
+    required this.message,
+    this.isError = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isError ? AppTheme.errorColor : AppTheme.textSecondary;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isError ? 0.08 : 0.05),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isError ? Icons.error_outline : Icons.info_outline,
+            size: 16,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: color,
+                  ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1690,13 +1885,16 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
       return [aiDebugNote(context, 'Waiting for benchmark to start…')];
     }
 
+    final isAiType = progress.testType == 'ai';
+
     if (!progress.isComplete) {
       // ---- Live / in-progress view ----
       final phaseText = switch (progress.phase) {
         'loading' => 'Loading model…',
-        'running' => progress.testType == 'transcription'
-            ? 'Transcribing…'
-            : 'Generating…',
+        'transcribing' => 'Transcribing audio…',
+        'correcting' => 'Correcting transcription…',
+        'classifying' => 'Classifying & extracting…',
+        'running' => isAiType ? 'Generating…' : 'Transcribing…',
         _ => 'Processing…',
       };
       return [
@@ -1712,14 +1910,12 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
           const SizedBox(height: 12),
           aiDebugBlock(
             context,
-            title: progress.testType == 'transcription'
+            title: progress.phase == 'transcribing'
                 ? 'Transcription Status'
                 : 'LLM Output (live)',
             content: progress.partialOutput,
-            icon: progress.testType == 'transcription'
-                ? Icons.mic
-                : Icons.code,
-            mono: progress.testType == 'ai',
+            icon: progress.phase == 'transcribing' ? Icons.mic : Icons.code,
+            mono: progress.phase != 'transcribing',
             showCopyButton: true,
           ),
         ],
@@ -1736,7 +1932,20 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
         tokensPerSecond: progress.tokensPerSecond,
         elapsed: progress.elapsed,
       ),
-      if (progress.testType == 'ai') ...[
+      // Correction result
+      if (progress.correctedTranscription != null &&
+          progress.correctedTranscription!.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        aiDebugBlock(
+          context,
+          title: 'Corrected Transcription'
+              '${progress.correctionTokensPerSecond != null ? '  (${progress.correctionTokens} tokens, ${progress.correctionTokensPerSecond!.toStringAsFixed(1)} t/s, ${(progress.correctionElapsed.inMilliseconds / 1000).toStringAsFixed(1)}s)' : ''}',
+          content: progress.correctedTranscription!,
+          icon: Icons.spellcheck,
+          showCopyButton: true,
+        ),
+      ],
+      if (isAiType) ...[
         const SizedBox(height: 12),
         aiDebugBlock(
           context,
@@ -1750,7 +1959,7 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
           showCopyButton: true,
         ),
       ],
-      if (progress.testType == 'ai' &&
+      if (isAiType &&
           aiHasChronoDetails(
             extractedIntent: progress.extractedIntent,
             extractedTitle: progress.extractedTitle,
@@ -1775,18 +1984,14 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
           showCopyButton: true,
         ),
       ],
-      // Show parsed summary for AI tests
+      // Show parsed summary
       if (progress.partialOutput.isNotEmpty) ...[
         const SizedBox(height: 12),
         aiDebugBlock(
           context,
-          title: progress.testType == 'transcription'
-              ? 'Transcription Result'
-              : 'Parsed Result',
+          title: 'Parsed Result',
           content: progress.partialOutput,
-          icon: progress.testType == 'transcription'
-              ? Icons.mic
-              : Icons.check_circle_outline,
+          icon: Icons.check_circle_outline,
           showCopyButton: true,
         ),
       ],
@@ -1801,7 +2006,7 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
           showCopyButton: true,
         ),
       ],
-      // Show full raw LLM output for AI tests (preserved after completion)
+      // Show full raw LLM output (preserved after completion)
       if (progress.rawOutput != null &&
           progress.rawOutput!.isNotEmpty &&
           progress.rawOutput != progress.partialOutput) ...[
@@ -1956,7 +2161,7 @@ class _ModelMemoryFitBanner extends ConsumerWidget {
         );
       },
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }
