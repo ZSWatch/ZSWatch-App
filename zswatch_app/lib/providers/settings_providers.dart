@@ -315,7 +315,7 @@ class TranscriptionEngineTypeNotifier
     for (final type in TranscriptionEngineType.values) {
       if (value == type.name) return type;
     }
-    return TranscriptionEngineType.whisperTinyEn;
+    return TranscriptionEngineType.whisperSmallEn;
   }
 
   void setType(TranscriptionEngineType type) {
