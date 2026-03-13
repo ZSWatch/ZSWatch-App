@@ -25,30 +25,30 @@ Your tasks per item:
 3. Translate that time/date phrase into natural English. If already English, copy it.
 4. Extract a short title (the task or event, NOT the time part).
 
-Rules:
+IMPORTANT — item splitting:
 - ALWAYS return a JSON array, even for a single item.
-- Each distinct task, event, or note in the memo becomes its own object in the array.
-- Multi-item date context: when a preceding item establishes a date (e.g. "tomorrow", "on Friday"), carry it into subsequent items that only mention a time. Example: if item 1 says "tomorrow at 8 am" and item 2 says "at 3 pm", translate item 2 as "tomorrow at 3 pm".
-- The title MUST stay in the SAME language as the voice memo. DO NOT translate the title to English.
-- NEVER compute or resolve dates. NEVER output ISO timestamps.
-- Keep time expressions relative: "tomorrow at 10 am", NOT "2026-03-10T10:00:00".
-- Copy the original time phrase exactly from the memo.
-- You MUST fill "datetime_expression_english" whenever "datetime_expression_original" is not null.
-- If the memo is in English, copy the same English time phrase to both fields.
-- If no time/date is mentioned for an item, set both datetime fields to null and intent to "note".
-- Title must be short (2-5 words). Only translate datetime fields to English, NEVER the title.
-- Translate time expressions accurately to natural English. Convert 24-hour to 12-hour format. Translate idioms correctly (e.g. the Swedish "halv 10" means 9:30, not 10:30). Use PM for afternoon/evening context (e.g. picking up children, dinner, after work → PM, not AM).
-- Translate weekday references directly. Do NOT add "next" unless the original explicitly says "next" or equivalent ("nächsten", "nästa", "prochain"). When the original DOES contain "next" or its equivalent, you MUST preserve "next" in the English translation. E.g. "am Freitag" → "on Friday", "på torsdag" → "on Thursday", "nächsten Montag" → "next Monday", "by next Friday" → "by next Friday".
-- Intent rules:
-  - "event" = scheduled meetings, appointments, social plans, bookings (dentist, conference, meeting with someone, lunch with a person)
-  - "reminder" = personal tasks/actions with a specific time that are NOT meetings/appointments (call someone at 3 pm, pick up package at 5)
-  - "note" = no time/date mentioned at all (buy bread, good idea about sensors)
-  - When a task has NO time but appears alongside timed tasks, it is a "note" — NOT a "reminder"
-- Deadlines ARE time expressions: "by Friday", "bis Freitag", "senast fredag", "until Monday" → extract the deadline date/time.
-- NOT time expressions (never extract these as datetime):
-  - Locations: "on the way home", "at work", "at the store"
-  - Vague conditions: "when I get home", "after lunch", "later"
-  - These make the intent "note", not "reminder"
+- NEVER drop items. Every distinct action in the memo MUST appear as a separate object.
+- Connectors that introduce a NEW item: "and", "and then", "also", "och", "och sen", "sen", "und", commas between clauses.
+- A single idea with elaboration/details stays as ONE item.
+
+IMPORTANT — intent classification:
+- "event" = meetings, appointments, social plans, bookings, standups — things you ATTEND with others or at a place (dentist, fika with someone, team standup, conference, lunch with a person)
+- "reminder" = personal tasks/actions WITH a specific time — things you DO alone (call someone at 3 pm, pick up package at 5, go to gym at 8, take medicine at 8)
+- "note" = NO time/date mentioned — ideas, shopping lists, tasks without a deadline (buy bread, good idea about sensors, prototype a feature)
+- A task with NO time appearing alongside timed tasks is still a "note"
+
+Rules:
+- Multi-item date context: when a preceding item establishes a date (e.g. "tomorrow"), carry it into subsequent items that only mention a time. Example: "tomorrow at 8 am ... at 3 pm" → item 2 is "tomorrow at 3 pm".
+- The title MUST stay in the SAME language as the voice memo. DO NOT translate the title.
+- NEVER compute or resolve dates. Keep time expressions relative: "tomorrow at 10 am", NOT "2026-03-10T10:00:00".
+- Copy the original time phrase exactly. Fill "datetime_expression_english" whenever "datetime_expression_original" is not null.
+- If the memo is in English, copy the same phrase to both datetime fields.
+- If no time/date for an item, set both datetime fields to null.
+- Title must be short (2-5 words).
+- Translate time expressions to natural English. Convert 24-hour to 12-hour. Use PM for afternoon/evening context.
+- Do NOT add "next" to weekday translations unless the original explicitly says "next" / "nästa" / "nächsten".
+- Deadlines ARE time expressions: "by Friday", "senast fredag", "bis Freitag" → extract them.
+- NOT time expressions: locations ("at the store"), vague conditions ("when I get home", "after lunch"), words that look like time but aren't ("boka tid" = book appointment)
 
 Examples:
 
@@ -85,10 +85,31 @@ Memo: "Arzttermin am Donnerstag um 9 Uhr und Zahnarzt am Freitag um 14 Uhr"
 Memo: "Den Bericht bis Freitag um 17 Uhr an den Chef schicken"
 [{"intent":"reminder","title":"Bericht an Chef schicken","datetime_expression_original":"bis Freitag um 17 Uhr","datetime_expression_english":"on Friday at 5 pm"}]
 
+Memo: "Boka tid hos frisören"
+[{"intent":"note","title":"boka tid hos frisören","datetime_expression_original":null,"datetime_expression_english":null}]
+
+Memo: "Fika med Anna imorgon klockan 10 och sen lämna in paketet på posten"
+[{"intent":"event","title":"fika med Anna","datetime_expression_original":"imorgon klockan 10","datetime_expression_english":"tomorrow at 10 am"},{"intent":"note","title":"lämna in paketet","datetime_expression_original":null,"datetime_expression_english":null}]
+
+Memo: "Vi behöver fixa buggen och sen refaktorera koden"
+[{"intent":"note","title":"fixa buggen","datetime_expression_original":null,"datetime_expression_english":null},{"intent":"note","title":"refaktorera koden","datetime_expression_original":null,"datetime_expression_english":null}]
+
+Memo: "Bilservice på tisdag klockan 8"
+[{"intent":"event","title":"bilservice","datetime_expression_original":"på tisdag klockan 8","datetime_expression_english":"on Tuesday at 8 am"}]
+
+Memo: "Hämta barnen imorgon klockan halv 5"
+[{"intent":"reminder","title":"hämta barnen","datetime_expression_original":"imorgon klockan halv 5","datetime_expression_english":"tomorrow at 4:30 pm"}]
+
+Memo: "Ring tandläkaren imorgon klockan 9, köp presenter till kalaset och möte med chefen på fredag klockan 14"
+[{"intent":"reminder","title":"ring tandläkaren","datetime_expression_original":"imorgon klockan 9","datetime_expression_english":"tomorrow at 9 am"},{"intent":"note","title":"köp presenter","datetime_expression_original":null,"datetime_expression_english":null},{"intent":"event","title":"möte med chefen","datetime_expression_original":"på fredag klockan 14","datetime_expression_english":"on Friday at 2 pm"}]
+
+Memo: "Team standup tomorrow at 9:15 and I should prototype the new notification system"
+[{"intent":"event","title":"team standup","datetime_expression_original":"tomorrow at 9:15","datetime_expression_english":"tomorrow at 9:15 am"},{"intent":"note","title":"prototype notification system","datetime_expression_original":null,"datetime_expression_english":null}]
+
 WRONG — never translate the title, not even for notes:
-Memo: "möte med projektgruppen på torsdag klockan 14"
-WRONG: [{"intent":"event","title":"meeting with project group",...}]
-RIGHT: [{"intent":"event","title":"möte projektgruppen","datetime_expression_original":"på torsdag klockan 14","datetime_expression_english":"Thursday at 2 pm"}]
+Memo: "Bra idé om att lägga till stegräknare i klockan"
+WRONG: [{"intent":"note","title":"add step counter to watch",...}]
+RIGHT: [{"intent":"note","title":"stegräknare i klockan","datetime_expression_original":null,"datetime_expression_english":null}]
 
 Output JSON schema (always an array):
 [

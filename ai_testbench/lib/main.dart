@@ -26,7 +26,7 @@ void main(List<String> args) async {
   if (args.contains('--headless') ||
       Platform.environment['AI_BENCH_HEADLESS'] == '1') {
     await model_bench.main(args);
-    return;
+    exit(exitCode);
   }
 
   WidgetsFlutterBinding.ensureInitialized();

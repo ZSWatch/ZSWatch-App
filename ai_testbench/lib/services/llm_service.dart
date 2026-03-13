@@ -57,7 +57,10 @@ class LlmService {
   static void _logFilter(String log) {
     if (log.contains('loaded') || log.contains('error') || log.contains('Error') ||
         log.contains('token') || log.contains('speed') || log.contains('FAILED') ||
-        log.contains('Model loaded') || log.contains('Initialized')) {
+        log.contains('Model loaded') || log.contains('Initialized') ||
+        log.contains('Backend initialized') || log.contains('Available backends') ||
+        log.contains('GPU offload') || log.contains('Number of GPU layers requested') ||
+        log.contains('Metal') || log.contains('Vulkan') || log.contains('CUDA')) {
       debugPrint('[llama.cpp] $log');
     }
   }
@@ -100,6 +103,7 @@ class LlmService {
       modelPath: _modelPath!,
       maxTokens: overrideMaxTokens ?? maxTokens,
       numGpuLayers: numGpuLayers,
+      numThreads: nThreads,
       temperature: temperature,
       topP: topP,
       frequencyPenalty: 0.0,
@@ -176,6 +180,7 @@ class LlmService {
       modelPath: _modelPath!,
       maxTokens: overrideMaxTokens ?? maxTokens,
       numGpuLayers: numGpuLayers,
+      numThreads: nThreads,
       temperature: temperature,
       topP: topP,
       frequencyPenalty: 0.0,

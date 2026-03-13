@@ -5,6 +5,7 @@ import subprocess
 import sys
 import json
 import os
+import argparse
 
 APP_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -17,18 +18,33 @@ OUTPUT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "benchmar
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Run ai_testbench headless benchmark and capture output.")
+    parser.add_argument("--model", help="Substring filter for model filename")
+    parser.add_argument("--case", dest="case_filter", help="Substring filter for benchmark case name or transcript")
+    parser.add_argument("--case-limit", type=int, help="Maximum number of benchmark cases to run after filtering")
+    parser.add_argument("--output", help="Override output JSON path")
+    args = parser.parse_args()
+
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+    output_file = args.output or OUTPUT_FILE
 
     cmd = [
         APP_PATH,
         "--headless",
         "--model-dir", MODEL_DIR,
-        "--output", OUTPUT_FILE,
+        "--output", output_file,
     ]
+
+    if args.model:
+        cmd.extend(["--model", args.model])
+    if args.case_filter:
+        cmd.extend(["--case", args.case_filter])
+    if args.case_limit is not None:
+        cmd.extend(["--case-limit", str(args.case_limit)])
 
     print(f"Running: {' '.join(cmd)}")
     print(f"Model dir: {MODEL_DIR}")
-    print(f"Output: {OUTPUT_FILE}")
+    print(f"Output: {output_file}")
     print("-" * 60)
 
     proc = subprocess.Popen(
@@ -50,8 +66,8 @@ def main():
     print(f"Exit code: {proc.returncode}")
 
     # Try to load and pretty-print results
-    if os.path.exists(OUTPUT_FILE):
-        with open(OUTPUT_FILE) as f:
+    if os.path.exists(output_file):
+        with open(output_file) as f:
             results = json.load(f)
 
         print("\n" + "=" * 60)
@@ -100,7 +116,7 @@ def main():
                 if case.get("error"):
                     print(f"         ERROR: {case['error']}")
     else:
-        print(f"No output file found at {OUTPUT_FILE}")
+        print(f"No output file found at {output_file}")
 
     return proc.returncode
 
