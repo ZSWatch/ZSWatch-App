@@ -16,6 +16,13 @@ enum TranscriptionEngineType {
   /// Tiny English-only Whisper model (~75 MB). Downloaded from whisper.cpp CDN.
   whisperTinyEn,
 
+  /// Base English-only Whisper model (~142 MB). Noticeably better than Tiny.
+  whisperBaseEn,
+
+  /// Small English-only Whisper model (~466 MB). Highest-fidelity English
+  /// model at a manageable size. ~800 MB RAM needed.
+  whisperSmallEn,
+
   /// KB-Whisper Base fine-tuned on 50 k+ hours of Swedish speech (~147 MB,
   /// q5_0 quantised). Downloaded from HuggingFace on first use.
   kbWhisperBase,
@@ -27,6 +34,14 @@ enum TranscriptionEngineType {
   /// KB-Whisper Small full GGML checkpoint (~488 MB). Highest fidelity
   /// available from the upstream GGML release. ~1 GB RAM needed.
   kbWhisperSmallQ8,
+
+  /// Whisper Base multilingual model forced to German (~142 MB).
+  /// Solid German accuracy at a compact size.
+  whisperBaseMultiDe,
+
+  /// Whisper Small multilingual model forced to German (~244 MB).
+  /// Higher-fidelity German, noticeably better than Base. ~500 MB RAM.
+  whisperSmallMultiDe,
 
   /// Whisper Large-v3-Turbo q5_0 quantised (~547 MB). Near cloud-level
   /// accuracy, optimised for speed. Needs ~1 GB RAM — modern flagships only.
@@ -41,6 +56,7 @@ class TranscriptionModelInfo {
   final String sourceUrl;
   final String fileName;
   final int expectedSizeBytes;
+  final String description;
 
   const TranscriptionModelInfo({
     required this.type,
@@ -49,6 +65,7 @@ class TranscriptionModelInfo {
     required this.sourceUrl,
     required this.fileName,
     required this.expectedSizeBytes,
+    required this.description,
   });
 }
 
@@ -62,6 +79,32 @@ abstract final class TranscriptionModelCatalog {
         'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin',
     fileName: 'ggml-tiny.en.bin',
     expectedSizeBytes: 75 * 1024 * 1024,
+    description:
+        'Good English (75 MB, fast) — smallest download, lowest accuracy, best for short clear speech.',
+  );
+
+  static const _baseEn = TranscriptionModelInfo(
+    type: TranscriptionEngineType.whisperBaseEn,
+    name: 'Whisper Base (English)',
+    language: 'en',
+    sourceUrl:
+        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin',
+    fileName: 'ggml-base.en.bin',
+    expectedSizeBytes: 142 * 1024 * 1024,
+    description:
+        'Better English (142 MB) — noticeably more accurate than Tiny, still compact.',
+  );
+
+  static const _smallEn = TranscriptionModelInfo(
+    type: TranscriptionEngineType.whisperSmallEn,
+    name: 'Whisper Small (English)',
+    language: 'en',
+    sourceUrl:
+        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin',
+    fileName: 'ggml-small.en.bin',
+    expectedSizeBytes: 466 * 1024 * 1024,
+    description:
+        'Best English (466 MB, slow) — highest-fidelity English, significant accuracy boost over Base. ~800 MB RAM.',
   );
 
   static const _kbWhisperBase = TranscriptionModelInfo(
@@ -72,6 +115,8 @@ abstract final class TranscriptionModelCatalog {
         'https://huggingface.co/KBLab/kb-whisper-base/resolve/main/ggml-model-q5_0.bin',
     fileName: 'ggml-kb-whisper-base-q5_0.bin',
     expectedSizeBytes: 147 * 1024 * 1024,
+    description:
+        'Good (147 MB) — solid Swedish accuracy, fine-tuned on 50k+ hours of speech.',
   );
 
   static const _kbWhisperSmallQ5 = TranscriptionModelInfo(
@@ -82,33 +127,69 @@ abstract final class TranscriptionModelCatalog {
         'https://huggingface.co/KBLab/kb-whisper-small/resolve/main/ggml-model-q5_0.bin',
     fileName: 'ggml-kb-whisper-small-q5_0.bin',
     expectedSizeBytes: 175 * 1024 * 1024,
+    description:
+        'Better (175 MB) — noticeably better Swedish than Good at nearly the same size. ~500 MB RAM.',
   );
 
   static const _kbWhisperSmallQ8 = TranscriptionModelInfo(
     type: TranscriptionEngineType.kbWhisperSmallQ8,
-    name: 'KB-Whisper Small · Full GGML (Swedish)',
+    name: 'KB-Whisper Small · Full (Swedish)',
     language: 'sv',
     sourceUrl:
         'https://huggingface.co/KBLab/kb-whisper-small/resolve/main/ggml-model.bin',
     fileName: 'ggml-kb-whisper-small.bin',
     expectedSizeBytes: 488 * 1024 * 1024,
+    description:
+        'Best (488 MB, slow) — highest-fidelity Swedish, full-precision model. Needs ~1 GB RAM.',
+  );
+
+  static const _baseMultiDe = TranscriptionModelInfo(
+    type: TranscriptionEngineType.whisperBaseMultiDe,
+    name: 'Whisper Base (German)',
+    language: 'de',
+    sourceUrl:
+        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
+    fileName: 'ggml-base-multi-de.bin',
+    expectedSizeBytes: 142 * 1024 * 1024,
+    description:
+        'Good German (142 MB) — multilingual Whisper forced to German, solid accuracy.',
+  );
+
+  static const _smallMultiDe = TranscriptionModelInfo(
+    type: TranscriptionEngineType.whisperSmallMultiDe,
+    name: 'Whisper Small (German)',
+    language: 'de',
+    sourceUrl:
+        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin',
+    fileName: 'ggml-small-multi-de.bin',
+    expectedSizeBytes: 244 * 1024 * 1024,
+    description:
+        'Better German (244 MB) — higher-fidelity German, noticeably better than Base. ~500 MB RAM.',
   );
 
   static const _whisperLargeV3TurboQ5 = TranscriptionModelInfo(
     type: TranscriptionEngineType.whisperLargeV3TurboQ5,
-    name: 'Whisper Large-v3-Turbo · Q5_0',
+    name: 'Whisper Large-v3-Turbo · Q5_0 (Multilingual)',
     language: 'auto',
     sourceUrl:
         'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin',
     fileName: 'ggml-large-v3-turbo-q5_0.bin',
     expectedSizeBytes: 547 * 1024 * 1024,
+    description:
+        'Multilingual (547 MB, slow) — near cloud-level accuracy for any language. Needs ~1 GB RAM.',
   );
 
+  // Models grouped by language: English → Swedish → German → Multilingual,
+  // ordered best→worst within each group.
   static const List<TranscriptionModelInfo> all = [
+    _smallEn,
+    _baseEn,
     _tinyEn,
-    _kbWhisperBase,
-    _kbWhisperSmallQ5,
     _kbWhisperSmallQ8,
+    _kbWhisperSmallQ5,
+    _kbWhisperBase,
+    _smallMultiDe,
+    _baseMultiDe,
     _whisperLargeV3TurboQ5,
   ];
 
@@ -116,12 +197,20 @@ abstract final class TranscriptionModelCatalog {
     switch (type) {
       case TranscriptionEngineType.whisperTinyEn:
         return _tinyEn;
+      case TranscriptionEngineType.whisperBaseEn:
+        return _baseEn;
+      case TranscriptionEngineType.whisperSmallEn:
+        return _smallEn;
       case TranscriptionEngineType.kbWhisperBase:
         return _kbWhisperBase;
       case TranscriptionEngineType.kbWhisperSmallQ5:
         return _kbWhisperSmallQ5;
       case TranscriptionEngineType.kbWhisperSmallQ8:
         return _kbWhisperSmallQ8;
+      case TranscriptionEngineType.whisperBaseMultiDe:
+        return _baseMultiDe;
+      case TranscriptionEngineType.whisperSmallMultiDe:
+        return _smallMultiDe;
       case TranscriptionEngineType.whisperLargeV3TurboQ5:
         return _whisperLargeV3TurboQ5;
     }
@@ -132,12 +221,44 @@ TranscriptionEngine createTranscriptionEngine(TranscriptionEngineType type) {
   switch (type) {
     case TranscriptionEngineType.whisperTinyEn:
       return WhisperEngine();
+    case TranscriptionEngineType.whisperBaseEn:
+      return CustomGgmlWhisperEngine(
+        modelUrl:
+            'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin',
+        modelFileName: 'ggml-base.en.bin',
+        languageCode: 'en',
+        displayName: 'Whisper Base (English)',
+      );
+    case TranscriptionEngineType.whisperSmallEn:
+      return CustomGgmlWhisperEngine(
+        modelUrl:
+            'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin',
+        modelFileName: 'ggml-small.en.bin',
+        languageCode: 'en',
+        displayName: 'Whisper Small (English)',
+      );
     case TranscriptionEngineType.kbWhisperBase:
       return KbWhisperEngines.base();
     case TranscriptionEngineType.kbWhisperSmallQ5:
       return KbWhisperEngines.smallQ5();
     case TranscriptionEngineType.kbWhisperSmallQ8:
       return KbWhisperEngines.smallQ8();
+    case TranscriptionEngineType.whisperBaseMultiDe:
+      return CustomGgmlWhisperEngine(
+        modelUrl:
+            'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
+        modelFileName: 'ggml-base-multi-de.bin',
+        languageCode: 'de',
+        displayName: 'Whisper Base (German)',
+      );
+    case TranscriptionEngineType.whisperSmallMultiDe:
+      return CustomGgmlWhisperEngine(
+        modelUrl:
+            'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin',
+        modelFileName: 'ggml-small-multi-de.bin',
+        languageCode: 'de',
+        displayName: 'Whisper Small (German)',
+      );
     case TranscriptionEngineType.whisperLargeV3TurboQ5:
       return KbWhisperEngines.largeV3TurboQ5();
   }
