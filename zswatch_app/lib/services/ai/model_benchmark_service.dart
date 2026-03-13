@@ -27,7 +27,8 @@ class BenchmarkProgress {
   final int attempts;
   final bool retryEnabled;
 
-  /// Current phase: 'loading', 'running', 'done', 'error'.
+  /// Current phase: 'loading', 'running', 'transcribing', 'correcting',
+  /// 'classifying', 'done', 'error'.
   final String phase;
   final String partialOutput;
   final int tokens;
@@ -39,6 +40,19 @@ class BenchmarkProgress {
   /// this mirrors [partialOutput]; on completion [partialOutput] is set to a
   /// human-readable summary while [rawOutput] keeps the full model response.
   final String? rawOutput;
+
+  /// Corrected transcription (if the correction pass produced one).
+  final String? correctedTranscription;
+
+  /// Metrics from the correction LLM pass (separate from classify metrics).
+  final int correctionTokens;
+  final Duration correctionElapsed;
+  final double? correctionTokensPerSecond;
+
+  /// Reserved for richer benchmark variants that may include a separate
+  /// transcription stage.
+  final String? transcriptionResult;
+  final Duration? transcriptionElapsed;
 
   const BenchmarkProgress({
     required this.testType,
@@ -61,6 +75,12 @@ class BenchmarkProgress {
     this.tokensPerSecond,
     this.error,
     this.rawOutput,
+    this.correctedTranscription,
+    this.correctionTokens = 0,
+    this.correctionElapsed = Duration.zero,
+    this.correctionTokensPerSecond,
+    this.transcriptionResult,
+    this.transcriptionElapsed,
   });
 
   bool get isComplete => phase == 'done' || phase == 'error';
@@ -287,18 +307,24 @@ class ModelBenchmarkService {
       String lastRawOutput = '';
       final result = await llmService.processTranscript(
         benchmarkInput,
-        correctTranscription: false, // skip correction – test classify speed
+        correctTranscription: true,
         onProgress: (phase, partial, tokens) {
           lastRawOutput = partial;
           final tps = sw.elapsedMilliseconds > 0
               ? tokens / (sw.elapsedMilliseconds / 1000.0)
               : 0.0;
+          // Map LlmService phases to benchmark phases
+          final benchPhase = switch (phase) {
+            'correcting' => 'correcting',
+            'classifying' => 'classifying',
+            _ => 'running',
+          };
           _emit(BenchmarkProgress(
             testType: 'ai',
             modelName: modelName,
-          promptStrategy: 'shared-chrono-flow',
+            promptStrategy: 'shared-chrono-flow',
             retryEnabled: true,
-            phase: 'running',
+            phase: benchPhase,
             partialOutput: partial,
             rawOutput: partial,
             tokens: tokens,
@@ -313,8 +339,12 @@ class ModelBenchmarkService {
       final rawResponse =
           result.classifyMetrics?.rawResponse ?? lastRawOutput;
 
-      if (_abortRequested) {
-        _emit(BenchmarkProgress(
+      // Helper to extract correction metrics from result
+      BenchmarkProgress buildAiResult({
+        required String phase,
+        required String partialOutput,
+      }) {
+        return BenchmarkProgress(
           testType: 'ai',
           modelName: modelName,
           promptStrategy: result.classifyMetrics?.promptStrategy,
@@ -328,42 +358,30 @@ class ModelBenchmarkService {
           resolverMethod: result.resolverMethod,
           attempts: result.classifyMetrics?.attempts ?? 1,
           retryEnabled: result.classifyMetrics?.retryEnabled ?? false,
-          phase: 'done',
-          partialOutput: '(aborted)',
+          phase: phase,
+          partialOutput: partialOutput,
           rawOutput: rawResponse,
           tokens: result.classifyMetrics?.completionTokens ?? 0,
           elapsed: sw.elapsed,
-          tokensPerSecond:
-              result.classifyMetrics?.tokensPerSecond ?? 0.0,
-        ));
+          tokensPerSecond: result.classifyMetrics?.tokensPerSecond ?? 0.0,
+          correctedTranscription: result.correctedTranscription,
+          correctionTokens: result.correctionMetrics?.completionTokens ?? 0,
+          correctionElapsed: result.correctionMetrics?.wallTime ?? Duration.zero,
+          correctionTokensPerSecond: result.correctionMetrics?.tokensPerSecond,
+        );
+      }
+
+      if (_abortRequested) {
+        _emit(buildAiResult(phase: 'done', partialOutput: '(aborted)'));
         return;
       }
 
-      final tps = result.classifyMetrics?.tokensPerSecond ?? 0.0;
-
-      _emit(BenchmarkProgress(
-        testType: 'ai',
-        modelName: modelName,
-        promptStrategy: result.classifyMetrics?.promptStrategy,
-        rawPrompt: result.classifyMetrics?.rawPrompt,
-        parsedJson: result.classifyMetrics?.parsedJson,
-        extractedIntent: result.extractedIntent,
-        extractedTitle: result.extractedTitle,
-        datetimeExpressionOriginal: result.datetimeExpressionOriginal,
-        datetimeExpressionEnglish: result.datetimeExpressionEnglish,
-        resolvedDateTime: result.resolvedDateTime,
-        resolverMethod: result.resolverMethod,
-        attempts: result.classifyMetrics?.attempts ?? 1,
-        retryEnabled: result.classifyMetrics?.retryEnabled ?? false,
+      _emit(buildAiResult(
         phase: 'done',
         partialOutput:
             'Category: ${result.category}\n'
             'Summary: ${result.summary}\n'
             'Actions: ${result.actions.length}',
-        rawOutput: rawResponse,
-        tokens: result.classifyMetrics?.completionTokens ?? 0,
-        elapsed: sw.elapsed,
-        tokensPerSecond: tps,
       ));
     } catch (e) {
       debugPrint('[ModelBenchmark] AI benchmark error: $e');

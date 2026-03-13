@@ -64,6 +64,9 @@ dependencies:
   # Audio Playback (voice memo Ogg/Opus)
   just_audio: ^0.9.42
 
+  # Audio Recording (debug/benchmark recording on phone)
+  record: ^6.2.0
+
   # Speech-to-Text (offline Whisper inference)
   whisper_ggml_plus: ^1.3.5
   whisper_ggml_plus_ffmpeg: ^1.0.0
