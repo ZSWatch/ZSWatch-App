@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../voice_memo/whisper_lifecycle_manager.dart';
+import 'ai_debug_info.dart';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -215,6 +216,9 @@ class TranscriptResult {
   final LlmInferenceMetrics? correctionMetrics;
   final LlmInferenceMetrics? classifyMetrics;
 
+  /// Per-action chrono extraction details for debug display.
+  final List<ActionChronoDebug> actionChronoDetails;
+
   const TranscriptResult({
     required this.summary,
     required this.category,
@@ -229,6 +233,7 @@ class TranscriptResult {
     this.correctedTranscription,
     this.correctionMetrics,
     this.classifyMetrics,
+    this.actionChronoDetails = const [],
   });
 }
 
@@ -989,6 +994,7 @@ class LlmService {
         summary: result.summary,
         category: result.category,
         actions: result.actions,
+        actionChronoDetails: result.actionChronoDetails,
         extractedIntent: result.extractedIntent,
         extractedTitle: result.extractedTitle,
         datetimeExpressionOriginal: result.datetimeExpressionOriginal,
@@ -1235,6 +1241,7 @@ JSON:
         summary: richSummary,
         category: 'brain_dump',
         actions: result.actions,
+        actionChronoDetails: result.actionChronoDetails,
         extractedIntent: result.extractedIntent,
         extractedTitle: result.extractedTitle,
         datetimeExpressionOriginal: result.datetimeExpressionOriginal,
@@ -1405,6 +1412,7 @@ JSON:
     String raw,
   ) {
     final actions = <ExtractedActionResult>[];
+    final chronoDetails = <ActionChronoDebug>[];
     String? firstResolvedDateTime;
     String? firstResolverMethod;
 
@@ -1419,6 +1427,12 @@ JSON:
           type: 'task',
           title: title,
           notes: extraction.datetimeExpressionOriginal,
+        ));
+        chronoDetails.add(ActionChronoDebug(
+          intent: extraction.intent,
+          title: title,
+          datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
+          datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
         ));
         continue;
       }
@@ -1442,6 +1456,14 @@ JSON:
             ? resolved?.dateTime.toIso8601String()
             : null,
       ));
+      chronoDetails.add(ActionChronoDebug(
+        intent: extraction.intent,
+        title: title,
+        datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
+        datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
+        resolvedDateTime: resolved?.dateTime.toIso8601String(),
+        resolverMethod: resolved?.method,
+      ));
     }
 
     final first = extractions.first;
@@ -1456,6 +1478,7 @@ JSON:
       summary: summary,
       category: category,
       actions: actions,
+      actionChronoDetails: chronoDetails,
       extractedIntent: first.intent,
       extractedTitle: first.title,
       datetimeExpressionOriginal: first.datetimeExpressionOriginal,

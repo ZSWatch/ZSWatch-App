@@ -4,121 +4,8 @@ import 'package:rxdart/rxdart.dart';
 import '../../data/models/extracted_action.dart';
 import '../../data/repositories/extracted_action_repository.dart';
 import '../../data/repositories/voice_memo_repository.dart';
+import 'ai_debug_info.dart';
 import 'llm_service.dart';
-
-/// Debug info from the last AI processing run.
-class AiProcessingDebugInfo {
-  final String filename;
-  final String modelName;
-  final String? classifyPrompt;
-  final String? classifyPromptStrategy;
-  final int? classifyAttempts;
-  final bool retryEnabled;
-  final String? originalTranscription;
-  final String? correctedTranscription;
-  final String? rawLlmResponse;
-  final String? parsedJson;
-  final String? extractedIntent;
-  final String? extractedTitle;
-  final String? datetimeExpressionOriginal;
-  final String? datetimeExpressionEnglish;
-  final String? resolvedDateTime;
-  final String? resolverMethod;
-  final String? summary;
-  final String? category;
-  final int actionCount;
-  final Duration? correctionTime;
-  final double? correctionTokensPerSec;
-  final Duration? classifyTime;
-  final double? classifyTokensPerSec;
-  final int? correctionTokens;
-  final int? classifyTokens;
-  final DateTime timestamp;
-
-  /// Current processing phase: 'correcting', 'classifying', 'done', or null
-  /// when viewing a completed result.
-  final String? currentPhase;
-
-  /// Partial LLM output that builds up token-by-token during generation.
-  final String partialResponse;
-
-  /// Current token count for the active generation phase.
-  final int liveTokenCount;
-
-  /// Elapsed wall-clock time since inference started (live updates).
-  final Duration? liveElapsed;
-
-  /// Live tokens-per-second during the current generation phase.
-  final double? liveTokensPerSecond;
-
-  /// Whether processing has finished (final snapshot vs live update).
-  final bool isComplete;
-
-  // --- Memory & inference parameter debug info ---
-
-  /// Device total physical RAM in MB.
-  final int? deviceMemoryMB;
-
-  /// Available (free) RAM in MB at inference time.
-  final int? availableMemoryMB;
-
-  /// Model file size in MB.
-  final int? modelSizeMB;
-
-  /// Headroom = availableMemoryMB - modelSizeMB.
-  final int? memoryHeadroomMB;
-
-  /// Context size actually used for this inference.
-  final int? inferenceContextSize;
-
-  /// GPU layers actually used for this inference.
-  final int? inferenceGpuLayers;
-
-  /// Max tokens cap applied due to memory pressure (null = no cap).
-  final int? inferenceMaxTokensCap;
-
-  const AiProcessingDebugInfo({
-    required this.filename,
-    required this.modelName,
-    this.classifyPrompt,
-    this.classifyPromptStrategy,
-    this.classifyAttempts,
-    this.retryEnabled = false,
-    this.originalTranscription,
-    this.correctedTranscription,
-    this.rawLlmResponse,
-    this.parsedJson,
-    this.extractedIntent,
-    this.extractedTitle,
-    this.datetimeExpressionOriginal,
-    this.datetimeExpressionEnglish,
-    this.resolvedDateTime,
-    this.resolverMethod,
-    this.summary,
-    this.category,
-    this.actionCount = 0,
-    this.correctionTime,
-    this.correctionTokensPerSec,
-    this.classifyTime,
-    this.classifyTokensPerSec,
-    this.correctionTokens,
-    this.classifyTokens,
-    required this.timestamp,
-    this.currentPhase,
-    this.partialResponse = '',
-    this.liveTokenCount = 0,
-    this.liveElapsed,
-    this.liveTokensPerSecond,
-    this.isComplete = true,
-    this.deviceMemoryMB,
-    this.availableMemoryMB,
-    this.modelSizeMB,
-    this.memoryHeadroomMB,
-    this.inferenceContextSize,
-    this.inferenceGpuLayers,
-    this.inferenceMaxTokensCap,
-  });
-}
 
 /// Orchestrates AI processing of voice memo transcripts.
 ///
@@ -137,16 +24,16 @@ class VoiceNoteAiPipeline {
   void Function(String filename, String title)? onProcessingComplete;
 
   /// Stream of debug info from the most recent AI processing runs.
-  final _debugInfoSubject = BehaviorSubject<AiProcessingDebugInfo?>.seeded(null);
-  Stream<AiProcessingDebugInfo?> get debugInfoStream => _debugInfoSubject.stream;
-  AiProcessingDebugInfo? get lastDebugInfo => _debugInfoSubject.value;
+  final _debugInfoSubject = BehaviorSubject<AiDebugInfo?>.seeded(null);
+  Stream<AiDebugInfo?> get debugInfoStream => _debugInfoSubject.stream;
+  AiDebugInfo? get lastDebugInfo => _debugInfoSubject.value;
 
   /// Completed debug info stored per filename so the UI can retrieve results
   /// for a specific voice note rather than only the latest global run.
-  final Map<String, AiProcessingDebugInfo> _debugInfoByFile = {};
+  final Map<String, AiDebugInfo> _debugInfoByFile = {};
 
   /// Get the most recent completed debug info for [filename], or null.
-  AiProcessingDebugInfo? getDebugInfoForFile(String filename) =>
+  AiDebugInfo? getDebugInfoForFile(String filename) =>
       _debugInfoByFile[filename];
 
   VoiceNoteAiPipeline({
@@ -180,14 +67,13 @@ class VoiceNoteAiPipeline {
 
       // Publish initial loading state so the debug sheet shows something
       // immediately (before the model finishes loading / first token arrives).
-      _debugInfoSubject.add(AiProcessingDebugInfo(
+      _debugInfoSubject.add(AiDebugInfo(
         filename: filename,
         modelName: _llmService.modelName,
-        originalTranscription: transcript,
-        currentPhase: 'loading',
-        partialResponse: '',
-        liveTokenCount: 0,
-        isComplete: false,
+        transcriptionResult: transcript,
+        phase: 'loading',
+        partialOutput: '',
+        tokens: 0,
         timestamp: DateTime.now(),
       ));
 
@@ -206,16 +92,15 @@ class VoiceNoteAiPipeline {
         final elapsedMs = sw.elapsedMilliseconds;
         final tps = elapsedMs > 0 ? tokens / (elapsedMs / 1000.0) : 0.0;
         final mem = _llmService.lastInferenceMemoryInfo;
-        _debugInfoSubject.add(AiProcessingDebugInfo(
+        _debugInfoSubject.add(AiDebugInfo(
           filename: filename,
           modelName: _llmService.modelName,
-          originalTranscription: transcript,
-          currentPhase: phase,
-          partialResponse: partial,
-          liveTokenCount: tokens,
-          liveElapsed: sw.elapsed,
-          liveTokensPerSecond: tps,
-          isComplete: false,
+          transcriptionResult: transcript,
+          phase: phase,
+          partialOutput: partial,
+          tokens: tokens,
+          elapsed: sw.elapsed,
+          tokensPerSecond: tps,
           timestamp: DateTime.now(),
           deviceMemoryMB: mem?.deviceMB,
           availableMemoryMB: mem?.availableMB,
@@ -288,16 +173,16 @@ class VoiceNoteAiPipeline {
 
       // Publish final debug info and store per-file
       final mem = _llmService.lastInferenceMemoryInfo;
-      final finalDebug = AiProcessingDebugInfo(
+      final finalDebug = AiDebugInfo(
         filename: filename,
         modelName: _llmService.modelName,
-        classifyPrompt: result.classifyMetrics?.rawPrompt,
-        classifyPromptStrategy: result.classifyMetrics?.promptStrategy,
-        classifyAttempts: result.classifyMetrics?.attempts,
+        rawPrompt: result.classifyMetrics?.rawPrompt,
+        promptStrategy: result.classifyMetrics?.promptStrategy,
+        attempts: result.classifyMetrics?.attempts ?? 1,
         retryEnabled: result.classifyMetrics?.retryEnabled ?? false,
-        originalTranscription: result.originalTranscription,
+        transcriptionResult: result.originalTranscription,
         correctedTranscription: result.correctedTranscription,
-        rawLlmResponse: result.classifyMetrics?.rawResponse,
+        rawOutput: result.classifyMetrics?.rawResponse,
         parsedJson: result.classifyMetrics?.parsedJson,
         extractedIntent: result.extractedIntent,
         extractedTitle: result.extractedTitle,
@@ -305,17 +190,17 @@ class VoiceNoteAiPipeline {
         datetimeExpressionEnglish: result.datetimeExpressionEnglish,
         resolvedDateTime: result.resolvedDateTime,
         resolverMethod: result.resolverMethod,
+        extractedActions: result.actionChronoDetails,
         summary: result.summary,
         category: result.category,
         actionCount: result.actions.length,
-        correctionTime: result.correctionMetrics?.wallTime,
-        correctionTokensPerSec: result.correctionMetrics?.tokensPerSecond,
-        classifyTime: result.classifyMetrics?.wallTime,
-        classifyTokensPerSec: result.classifyMetrics?.tokensPerSecond,
-        correctionTokens: result.correctionMetrics?.completionTokens,
-        classifyTokens: result.classifyMetrics?.completionTokens,
-        currentPhase: 'done',
-        isComplete: true,
+        correctionElapsed: result.correctionMetrics?.wallTime ?? Duration.zero,
+        correctionTokensPerSecond: result.correctionMetrics?.tokensPerSecond,
+        elapsed: result.classifyMetrics?.wallTime ?? Duration.zero,
+        tokensPerSecond: result.classifyMetrics?.tokensPerSecond,
+        correctionTokens: result.correctionMetrics?.completionTokens ?? 0,
+        tokens: result.classifyMetrics?.completionTokens ?? 0,
+        phase: 'done',
         timestamp: DateTime.now(),
         deviceMemoryMB: mem?.deviceMB,
         availableMemoryMB: mem?.availableMB,

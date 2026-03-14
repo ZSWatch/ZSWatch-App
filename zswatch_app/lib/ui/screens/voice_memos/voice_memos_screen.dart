@@ -16,7 +16,7 @@ import '../../../services/ai/extracted_action_creation_service.dart';
 import '../../widgets/ai_debug_widgets.dart';
 import '../../../providers/voice_memo_providers.dart';
 import '../../../providers/watch_service_provider.dart';
-import '../../../services/ai/voice_note_ai_pipeline.dart';
+import '../../../services/ai/ai_debug_info.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../../services/voice_memo/voice_memo_sync_service.dart';
 import '../../navigation/app_router.dart';
@@ -764,66 +764,65 @@ class _AiDebugSheet extends ConsumerWidget {
                 // --- Live / in-progress view ---
                 _livePhaseHeader(context, debugInfo),
                 const SizedBox(height: 12),
-                if (debugInfo.originalTranscription != null) ...[
+                if (debugInfo.transcriptionResult != null) ...[
                   _debugBlock(
                     context,
                     title: 'Original Transcription',
-                    content: debugInfo.originalTranscription!,
+                    content: debugInfo.transcriptionResult!,
                     icon: Icons.mic,
                   ),
                   const SizedBox(height: 12),
                 ],
                 // Only show the partial-response block once tokens are flowing
-                if (debugInfo.currentPhase != 'loading')
+                if (debugInfo.phase != 'loading')
                   _debugBlock(
                     context,
-                    title: '${_phaseLabel(debugInfo.currentPhase)} (live)',
-                    content: debugInfo.partialResponse.isEmpty
+                    title: '${_phaseLabel(debugInfo.phase)} (live)',
+                    content: debugInfo.partialOutput.isEmpty
                         ? '...'
-                        : debugInfo.partialResponse,
-                    icon: debugInfo.currentPhase == 'correcting'
+                        : debugInfo.partialOutput,
+                    icon: debugInfo.phase == 'correcting'
                         ? Icons.auto_fix_high
                         : Icons.code,
-                    mono: debugInfo.currentPhase == 'classifying',
+                    mono: debugInfo.phase == 'classifying',
                   ),
               ] else ...[
                 // --- Completed view ---
                 _metricsRow(context, debugInfo),
                 const SizedBox(height: 16),
-                if (debugInfo.originalTranscription != null &&
+                if (debugInfo.transcriptionResult != null &&
                     debugInfo.correctedTranscription != null &&
                     debugInfo.correctedTranscription !=
-                        debugInfo.originalTranscription) ...[
+                        debugInfo.transcriptionResult) ...[
                   _transcriptionDiffBlock(
                     context,
-                    original: debugInfo.originalTranscription!,
+                    original: debugInfo.transcriptionResult!,
                     corrected: debugInfo.correctedTranscription!,
                   ),
                   const SizedBox(height: 12),
-                ] else if (debugInfo.originalTranscription != null) ...[
+                ] else if (debugInfo.transcriptionResult != null) ...[
                   _debugBlock(
                     context,
                     title: 'Transcription',
-                    content: debugInfo.originalTranscription!,
+                    content: debugInfo.transcriptionResult!,
                     icon: Icons.mic,
                   ),
                   const SizedBox(height: 12),
                 ],
-                if (debugInfo.rawLlmResponse != null) ...[
+                if (debugInfo.rawOutput != null) ...[
                   _debugBlock(
                     context,
                     title: 'Raw LLM Response',
-                    content: debugInfo.rawLlmResponse!,
+                    content: debugInfo.rawOutput!,
                     icon: Icons.code,
                     mono: true,
                   ),
                   const SizedBox(height: 12),
                 ],
-                if (debugInfo.parsedJson != null) ...[
-                  _debugBlock(
+                if (debugInfo.parsedJson != null) ...[                  _debugBlock(
                     context,
                     title: 'Parsed JSON',
-                    content: debugInfo.parsedJson!,
+                    content: aiFormatJson(debugInfo.parsedJson!),
                     icon: Icons.data_object,
                     mono: true,
                   ),
@@ -836,6 +835,7 @@ class _AiDebugSheet extends ConsumerWidget {
                   datetimeExpressionEnglish: debugInfo.datetimeExpressionEnglish,
                   resolvedDateTime: debugInfo.resolvedDateTime,
                   resolverMethod: debugInfo.resolverMethod,
+                  extractedActions: debugInfo.extractedActions,
                 )) ...[
                   aiDebugBlock(
                     context,
@@ -847,6 +847,7 @@ class _AiDebugSheet extends ConsumerWidget {
                       datetimeExpressionEnglish: debugInfo.datetimeExpressionEnglish,
                       resolvedDateTime: debugInfo.resolvedDateTime,
                       resolverMethod: debugInfo.resolverMethod,
+                      extractedActions: debugInfo.extractedActions,
                     ),
                     icon: Icons.schedule,
                     showCopyButton: true,
@@ -873,9 +874,9 @@ class _AiDebugSheet extends ConsumerWidget {
     }
   }
 
-  Widget _livePhaseHeader(BuildContext context, AiProcessingDebugInfo info) {
+  Widget _livePhaseHeader(BuildContext context, AiDebugInfo info) {
     final theme = Theme.of(context);
-    final phaseText = switch (info.currentPhase) {
+    final phaseText = switch (info.phase) {
       'loading' => 'Loading model...',
       'correcting' => 'Correcting transcription...',
       'classifying' => 'Classifying & summarizing...',
@@ -925,13 +926,13 @@ class _AiDebugSheet extends ConsumerWidget {
               _metricChip(
                 context,
                 'Tokens',
-                '${info.liveTokenCount}',
+                '${info.tokens}',
                 Icons.token,
               ),
             ],
           ),
-          if (info.availableMemoryMB != null) ...[            const SizedBox(height: 8),
-            _memoryInfoRow(context, info),
+          if (aiMemoryInfoBlock(context, info) != null) ...[            const SizedBox(height: 8),
+            aiMemoryInfoBlock(context, info)!,
           ],
         ],
       ),
@@ -986,7 +987,7 @@ class _AiDebugSheet extends ConsumerWidget {
     );
   }
 
-  Widget _metricsRow(BuildContext context, AiProcessingDebugInfo info) {
+  Widget _metricsRow(BuildContext context, AiDebugInfo info) {
     final theme = Theme.of(context);
 
     return Container(
@@ -1009,127 +1010,54 @@ class _AiDebugSheet extends ConsumerWidget {
             spacing: 16,
             runSpacing: 8,
             children: [
-              if (info.correctionTime != null)
+              if (info.correctionElapsed > Duration.zero)
                 _metricChip(
                   context,
                   'Correction',
-                  '${info.correctionTime!.inMilliseconds}ms',
+                  '${info.correctionElapsed.inMilliseconds}ms',
                   Icons.timer_outlined,
                 ),
-              if (info.correctionTokensPerSec != null)
+              if (info.correctionTokensPerSecond != null)
                 _metricChip(
                   context,
                   'Correction tok/s',
-                  info.correctionTokensPerSec!.toStringAsFixed(1),
+                  info.correctionTokensPerSecond!.toStringAsFixed(1),
                   Icons.speed,
                 ),
-              if (info.correctionTokens != null)
+              if (info.correctionTokens > 0)
                 _metricChip(
                   context,
                   'Correction tokens',
                   '${info.correctionTokens}',
                   Icons.token,
                 ),
-              if (info.classifyTime != null)
+              if (info.elapsed > Duration.zero)
                 _metricChip(
                   context,
                   'Classify',
-                  '${info.classifyTime!.inMilliseconds}ms',
+                  '${info.elapsed.inMilliseconds}ms',
                   Icons.timer_outlined,
                 ),
-              if (info.classifyTokensPerSec != null)
+              if (info.tokensPerSecond != null)
                 _metricChip(
                   context,
                   'Classify tok/s',
-                  info.classifyTokensPerSec!.toStringAsFixed(1),
+                  info.tokensPerSecond!.toStringAsFixed(1),
                   Icons.speed,
                 ),
-              if (info.classifyTokens != null)
+              if (info.tokens > 0)
                 _metricChip(
                   context,
                   'Classify tokens',
-                  '${info.classifyTokens}',
+                  '${info.tokens}',
                   Icons.token,
                 ),
             ],
           ),
-          if (info.availableMemoryMB != null) ...[
+          if (aiMemoryInfoBlock(context, info) != null) ...[
             const SizedBox(height: 8),
-            _memoryInfoRow(context, info),
+            aiMemoryInfoBlock(context, info)!,
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _memoryInfoRow(BuildContext context, AiProcessingDebugInfo info) {
-    final theme = Theme.of(context);
-    final isLowMemory = (info.memoryHeadroomMB ?? 999) < 100;
-    final statusColor = isLowMemory ? Colors.orange : AppTheme.textSecondary;
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: isLowMemory
-            ? Colors.orange.withValues(alpha: 0.08)
-            : AppTheme.textSecondary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: isLowMemory
-            ? Border.all(color: Colors.orange.withValues(alpha: 0.3))
-            : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.memory, size: 14, color: statusColor),
-              const SizedBox(width: 4),
-              Text(
-                'Memory & Inference',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: statusColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (isLowMemory) ...[
-                const SizedBox(width: 6),
-                Icon(Icons.warning_amber_rounded,
-                    size: 13, color: Colors.orange),
-              ],
-            ],
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 16,
-            runSpacing: 4,
-            children: [
-              if (info.availableMemoryMB != null)
-                _metricChip(context, 'Available RAM',
-                    '${info.availableMemoryMB}MB', Icons.memory),
-              if (info.deviceMemoryMB != null)
-                _metricChip(context, 'Total RAM',
-                    '${info.deviceMemoryMB}MB', Icons.phone_android),
-              if (info.modelSizeMB != null)
-                _metricChip(context, 'Model',
-                    '${info.modelSizeMB}MB', Icons.smart_toy_outlined),
-              if (info.memoryHeadroomMB != null)
-                _metricChip(context, 'Headroom',
-                    '${info.memoryHeadroomMB}MB', Icons.expand),
-              if (info.inferenceContextSize != null)
-                _metricChip(context, 'nCtx',
-                    '${info.inferenceContextSize}', Icons.tune),
-              if (info.inferenceGpuLayers != null)
-                _metricChip(context, 'GPU layers',
-                    info.inferenceGpuLayers == 0
-                        ? 'CPU only'
-                        : '${info.inferenceGpuLayers}',
-                    Icons.developer_board),
-              if (info.inferenceMaxTokensCap != null)
-                _metricChip(context, 'Max tokens cap',
-                    '${info.inferenceMaxTokensCap}', Icons.compress),
-            ],
-          ),
         ],
       ),
     );
@@ -1369,7 +1297,7 @@ class _AiDebugSheet extends ConsumerWidget {
     return spans;
   }
 
-  Widget _resultRow(BuildContext context, AiProcessingDebugInfo info) {
+  Widget _resultRow(BuildContext context, AiDebugInfo info) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1389,11 +1317,12 @@ class _AiDebugSheet extends ConsumerWidget {
         if (info.category != null) _kvRow(context, 'Category', info.category!),
         if (info.summary != null) _kvRow(context, 'Summary', info.summary!),
         _kvRow(context, 'Actions', '${info.actionCount}'),
-        _kvRow(
-          context,
-          'Processed',
-          DateFormat('HH:mm:ss.SSS').format(info.timestamp),
-        ),
+        if (info.timestamp != null)
+          _kvRow(
+            context,
+            'Processed',
+            DateFormat('HH:mm:ss.SSS').format(info.timestamp!),
+          ),
       ],
     );
   }
