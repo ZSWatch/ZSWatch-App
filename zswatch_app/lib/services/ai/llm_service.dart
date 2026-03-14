@@ -330,7 +330,7 @@ class LlmService {
   String get selectedModelId => _selectedModelId;
 
   // ---- Tunables ----
-  int nCtx = 2048;
+  int nCtx = 4096;
   int nThreads = 2;
   int maxTokens = 512;
   // Qwen3.5 recommended sampling for non-thinking text tasks.
@@ -682,16 +682,16 @@ class LlmService {
   /// The available memory IS the headroom for KV cache + compute buffers.
   ///
   /// Metal (GPU) pre-allocates the FULL KV cache for nCtx upfront, so
-  /// nCtx=2048 on GPU needs ~1–1.5 GB of GPU-accessible memory. On 4 GB
-  /// iPhones with ~1 GB free after model load, GPU+2048 causes a page-fault
+  /// nCtx=4096 on GPU needs ~2–3 GB of GPU-accessible memory. On 4 GB
+  /// iPhones with ~1 GB free after model load, GPU+4096 causes a page-fault
   /// crash. The thresholds below prefer CPU with full context over GPU with
   /// a crash:
   ///
-  ///   available ≥ 1200 MB → nCtx 2048, full GPU,  maxTokens unchanged
-  ///   available ≥  600 MB → nCtx 2048, CPU-only,  maxTokens unchanged
-  ///   available ≥  300 MB → nCtx 1024, CPU-only,  maxTokens unchanged
-  ///   available ≥  100 MB → nCtx  512, CPU-only,  maxTokens unchanged
-  ///   available <  100 MB → nCtx  512, CPU-only,  maxTokens capped at 256
+  ///   available ≥ 1500 MB → nCtx 4096, full GPU,  maxTokens unchanged
+  ///   available ≥  800 MB → nCtx 4096, CPU-only,  maxTokens unchanged
+  ///   available ≥  400 MB → nCtx 2048, CPU-only,  maxTokens unchanged (compact prompt)
+  ///   available ≥  100 MB → nCtx 1024, CPU-only,  maxTokens unchanged (compact prompt)
+  ///   available <  100 MB → nCtx 1024, CPU-only,  maxTokens capped at 256 (compact prompt)
   Future<({int contextSize, int gpuLayers, int? maxTokensCap})>
       _computeInferenceParams(
     LlmModelInfo modelInfo,
@@ -727,46 +727,47 @@ class LlmService {
     int gpu;
     int? tokensCap; // null = use default maxTokens
 
-    if (headroomMB >= 1200) {
-      // Plenty of room: full context on GPU. Metal needs ~1–1.5GB for KV cache
-      // + compute scratch buffers at nCtx=2048 on top of the model weights.
-      ctx = nCtx; // full context (default 2048)
+    if (headroomMB >= 1500) {
+      // Plenty of room: full context on GPU. Metal needs ~2–3GB for KV cache
+      // + compute scratch buffers at nCtx=4096 on top of the model weights.
+      ctx = nCtx; // full context (default 4096)
       gpu = numGpuLayers;
-    } else if (headroomMB >= 600) {
+    } else if (headroomMB >= 800) {
       // Moderate room: full context but on CPU. This avoids Metal page-fault
       // crashes (GPU pre-allocates the full nCtx KV cache upfront). CPU is
       // slower (~5–7 tok/s vs ~20 tok/s) but doesn't crash and handles long
-      // prompts (e.g. classify prompt at ~1100 tokens).
+      // prompts (classify prompt at ~1600 tokens + transcript + output).
       ctx = nCtx;
       gpu = 0;
       debugPrint(
         '[LlmService] Moderate memory (${headroomMB}MB). '
         'Using CPU with full nCtx=$nCtx to avoid GPU memory pressure.',
       );
-    } else if (headroomMB >= 300) {
-      ctx = 1024;
+    } else if (headroomMB >= 400) {
+      // Low — halved context, uses compact prompt automatically.
+      ctx = 2048;
       gpu = 0;
       debugPrint(
         '[LlmService] Low memory (${headroomMB}MB). '
-        'Using CPU with nCtx=1024.',
+        'Using CPU with nCtx=2048 (compact prompt).',
       );
     } else if (headroomMB >= 100) {
-      ctx = 512;
+      ctx = 1024;
       gpu = 0;
       debugPrint(
         '[LlmService] WARNING: Very low memory (${headroomMB}MB). '
-        'Using CPU with nCtx=512. '
+        'Using CPU with nCtx=1024 (compact prompt). '
         'Model ${modelInfo.id} ($modelMB MB), '
         'available=${availableMB}MB.',
       );
     } else {
-      // Critically low — still run but with absolute minimum settings.
-      ctx = 512;
+      // Critically low — minimum settings with compact prompt.
+      ctx = 1024;
       gpu = 0;
       tokensCap = 256;
       debugPrint(
         '[LlmService] CRITICAL: Extremely low memory (${headroomMB}MB). '
-        'Using minimum settings: nCtx=512, CPU-only, maxTokens=256. '
+        'Using minimum settings: nCtx=1024, CPU-only, maxTokens=256. '
         'Model ${modelInfo.id} ($modelMB MB), '
         'available=${availableMB}MB, device=${deviceMB}MB.',
       );
@@ -922,6 +923,12 @@ class LlmService {
         '[LlmService] Processing transcript (${transcript.length} chars)',
       );
 
+      // Pre-compute effective context size so we can select the right prompt.
+      await _ensureModel();
+      final modelInfo = await currentModelInfo();
+      final preParams = await _computeInferenceParams(modelInfo);
+      final effectiveCtx = preParams.contextSize;
+
       String effectiveTranscript = transcript;
       LlmInferenceMetrics? correctionMetrics;
       String? correctedTranscription;
@@ -969,12 +976,14 @@ class LlmService {
               promptTemplate,
               transcript: effectiveTranscript,
             )
-          : _buildClassifyPrompt(effectiveTranscript);
+          : _buildClassifyPrompt(effectiveTranscript, effectiveCtx: effectiveCtx);
       final structuredResult = await _generateStructuredJsonWithRetry(
         prompt,
         promptStrategy: (promptTemplate != null && promptTemplate.isNotEmpty)
             ? (promptStrategyOverride ?? 'custom-template')
-            : 'full+/no_think',
+            : effectiveCtx >= 4096
+                ? 'full+/no_think'
+                : 'compact+/no_think (nCtx=$effectiveCtx)',
         phase: 'classifying',
         onProgress: onProgress,
       );
@@ -1040,9 +1049,12 @@ class LlmService {
     );
   }
 
-  String _buildClassifyPrompt(String transcript) {
+  String _buildClassifyPrompt(String transcript, {int? effectiveCtx}) {
+    final template = ChronoPromptTemplate.templateForContextSize(
+      effectiveCtx ?? nCtx,
+    );
     return _renderClassifyPromptTemplate(
-      defaultClassifyPromptTemplate,
+      template,
       transcript: transcript,
     );
   }

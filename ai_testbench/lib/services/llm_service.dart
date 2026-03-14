@@ -44,7 +44,7 @@ class LlmService {
   bool _requestInFlight = false;
 
   // Configuration
-  int nCtx = 2048;
+  int nCtx = 4096;
   int nThreads = 2;
   int maxTokens = 512;
   double temperature = 0.3;
