@@ -132,6 +132,91 @@ $promptPlaceholderTranscript
 /no_think
 JSON:''';
 
+  /// Compact prompt with fewer examples for low-memory devices (nCtx < 4096).
+  /// Same rules, 5 examples instead of 18.
+  static const String compactTemplate = '''
+You extract structured information from a voice memo.
+
+A memo may contain ONE or MULTIPLE items. Return a JSON array with one object per item.
+
+The memo may be in ANY language.
+
+Return JSON only. Output MUST start with '[' and end with ']'. No text before or after.
+
+Your tasks per item:
+1. Detect intent: "reminder", "event", or "note".
+2. Extract the time/date phrase exactly as it appears in the memo.
+3. Translate that time/date phrase into natural English. If already English, copy it.
+4. Extract a short title (the task or event, NOT the time part).
+
+IMPORTANT — item splitting:
+- ALWAYS return a JSON array, even for a single item.
+- NEVER drop items. Every distinct action in the memo MUST appear as a separate object.
+- Connectors that introduce a NEW item: "and", "and then", "also", "och", "och sen", "sen", "und", commas between clauses, sentence boundaries.
+- A single idea with elaboration/details stays as ONE item.
+- Comma-separated lists (shopping items, ingredients, supplies) are ONE item.
+
+IMPORTANT — intent classification:
+- "event" = meetings, appointments, social plans, bookings, standups — things you ATTEND with others or at a place
+- "reminder" = personal tasks/actions WITH a specific time — things you DO alone
+- "note" = NO time/date mentioned — ideas, shopping lists, tasks without a deadline
+- A task with NO time appearing alongside timed tasks is still a "note"
+
+Rules:
+- Multi-item date context: if a later item only mentions a time (e.g. "at 3 pm"), reuse the most recent date from a previous item.
+- Copy title words directly from the memo. Never translate the title. Keep titles short (2-5 words).
+- Title must NOT contain time or date words.
+- Keep expressions relative: "tomorrow at 10 am", NOT "2026-03-10T10:00:00".
+- Copy the original time phrase exactly. Fill "datetime_expression_english" whenever "datetime_expression_original" is not null.
+- If the memo is in English, copy the same phrase to both datetime fields.
+- If no time/date for an item, set both datetime fields to null.
+- Translate time expressions to natural English. Convert 24-hour to 12-hour. Use PM for afternoon/evening context.
+- Do NOT add "next" to weekday translations unless the original explicitly says "next" / "nästa" / "nächsten".
+- Deadlines ARE time expressions: "by Friday", "senast fredag", "bis Freitag" → extract them.
+- NOT time expressions: locations ("at the store"), vague conditions ("when I get home", "after lunch"), words that look like time but aren't ("boka tid" = book appointment)
+
+Output JSON schema (always an array):
+[
+  {
+    "intent": "reminder" | "event" | "note",
+    "title": "short task description in original language",
+    "datetime_expression_original": "original time phrase" | null,
+    "datetime_expression_english": "english translation of time phrase" | null
+  }
+]
+
+Examples:
+
+Memo: "Remind me tomorrow at 10 am to buy milk"
+[{"intent":"reminder","title":"buy milk","datetime_expression_original":"tomorrow at 10 am","datetime_expression_english":"tomorrow at 10 am"}]
+
+Memo: "tandläkare den 15 mars klockan halv 10 och sen handla mat på vägen hem"
+[{"intent":"event","title":"tandläkare","datetime_expression_original":"den 15 mars klockan halv 10","datetime_expression_english":"March 15th at 9:30 am"},{"intent":"note","title":"handla mat","datetime_expression_original":null,"datetime_expression_english":null}]
+
+Memo: "Tomorrow at 3 pm call the electrician and also buy new light bulbs"
+[{"intent":"reminder","title":"call the electrician","datetime_expression_original":"tomorrow at 3 pm","datetime_expression_english":"tomorrow at 3 pm"},{"intent":"note","title":"buy new light bulbs","datetime_expression_original":null,"datetime_expression_english":null}]
+
+Memo: "Ring tandläkaren imorgon klockan 9, köp presenter till kalaset och möte med chefen på fredag klockan 14"
+[{"intent":"reminder","title":"ring tandläkaren","datetime_expression_original":"imorgon klockan 9","datetime_expression_english":"tomorrow at 9 am"},{"intent":"note","title":"köp presenter","datetime_expression_original":null,"datetime_expression_english":null},{"intent":"event","title":"möte med chefen","datetime_expression_original":"på fredag klockan 14","datetime_expression_english":"on Friday at 2 pm"}]
+
+Memo: "köp bröd på vägen hem"
+[{"intent":"note","title":"köp bröd","datetime_expression_original":null,"datetime_expression_english":null}]
+
+Current datetime: $promptPlaceholderCurrentLocalDateTimeCompact
+Timezone: UTC$promptPlaceholderTimezoneOffset
+
+Voice memo:
+
+$promptPlaceholderTranscript
+
+/no_think
+JSON:''';
+
+  /// Returns the appropriate template for the given context size.
+  static String templateForContextSize(int nCtx) {
+    return nCtx >= 4096 ? defaultTemplate : compactTemplate;
+  }
+
   static String render(
     String template, {
     required String transcript,
