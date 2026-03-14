@@ -13,6 +13,7 @@ import 'package:rxdart/rxdart.dart';
 
 import '../voice_memo/whisper_lifecycle_manager.dart';
 import 'ai_debug_info.dart';
+import 'llm_compute_service.dart';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -332,7 +333,16 @@ class LlmService {
 
   // ---- Tunables ----
   int nCtx = defaultTargetContextSize;
-  int nThreads = 2;
+  /// Compute a portable thread count for on-device inference.
+  /// Uses half the reported cores (targets performance/big cores on
+  /// big.LITTLE), clamped to [2, 6].  iOS with Metal doesn't benefit
+  /// from extra CPU threads; Android CPU-only benefits from ~4.
+  static int get _platformThreadCount {
+    final total = Platform.numberOfProcessors;
+    return (total ~/ 2).clamp(2, 6);
+  }
+
+  int nThreads = _platformThreadCount;
   int maxTokens = 512;
   // Qwen3.5 recommended sampling for non-thinking text tasks.
   double temperature = 0.3;
@@ -832,7 +842,8 @@ class LlmService {
   }
 
   static void _logFilter(String log) {
-    if (log.contains('loaded') ||
+    if (log.contains('[fllama]') ||
+        log.contains('loaded') ||
         log.contains('error') ||
         log.contains('Error') ||
         log.contains('token') ||
@@ -860,6 +871,9 @@ class LlmService {
     cancelInference();
     await _ensureModel();
 
+    // Keep CPU at full speed during inference (Android foreground service).
+    await LlmComputeService.instance.start();
+
     final completer = Completer<String>();
     final stopwatch = Stopwatch()..start();
     int tokenCount = 0;
@@ -883,7 +897,7 @@ class LlmService {
     debugPrint(
       '[LlmService] Inference: model=${modelInfo.id} nCtx=${params.contextSize} '
       'gpuLayers=${params.gpuLayers} maxTokens=$effectiveMaxTokens '
-      'deviceRAM=${_deviceMemoryMB ?? "?"}MB',
+      'threads=$nThreads deviceRAM=${_deviceMemoryMB ?? "?"}MB',
     );
 
     final request = OpenAiRequest(
@@ -891,6 +905,7 @@ class LlmService {
       modelPath: _modelPath!,
       maxTokens: effectiveMaxTokens,
       numGpuLayers: params.gpuLayers,
+      numThreads: nThreads,
       temperature: temperature,
       topP: topP,
       frequencyPenalty: 0.0,
@@ -914,6 +929,9 @@ class LlmService {
 
     final text = (await completer.future).trim();
     stopwatch.stop();
+
+    // Release the foreground service + wake lock.
+    await LlmComputeService.instance.stop();
 
     final wallTime = stopwatch.elapsed;
     final tokPerSec = wallTime.inMilliseconds > 0

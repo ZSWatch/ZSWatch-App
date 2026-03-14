@@ -215,7 +215,11 @@ JSON:''';
 
   /// Returns the appropriate template for the given context size.
   static String templateForContextSize(int nCtx) {
-    return nCtx >= 3072 ? defaultTemplate : compactTemplate;
+    // Always use compactTemplate (5 examples, ~1030 tokens) — the full
+    // template with 19 examples produces ~2150 tokens which dominates
+    // inference time due to O(n²) attention.  The compact template is
+    // sufficient for structured extraction quality.
+    return compactTemplate;
   }
 
   static String render(
