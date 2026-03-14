@@ -1604,6 +1604,7 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
       ref.read(_benchmarkServiceProvider).benchmarkAiModel(
             llm,
             testInput: benchmarkInput,
+            correctTranscription: ref.read(aiCorrectionEnabledProvider),
           ),
     );
   }

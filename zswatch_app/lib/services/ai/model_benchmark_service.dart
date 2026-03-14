@@ -198,6 +198,7 @@ class ModelBenchmarkService {
   Future<void> benchmarkAiModel(
     LlmService llmService, {
     String? testInput,
+    bool correctTranscription = false,
   }) async {
     _abortRequested = false;
     final modelName = llmService.modelName;
@@ -231,7 +232,7 @@ class ModelBenchmarkService {
       String lastRawOutput = '';
       final result = await llmService.processTranscript(
         benchmarkInput,
-        correctTranscription: true,
+        correctTranscription: correctTranscription,
         onProgress: (phase, partial, tokens) {
           lastRawOutput = partial;
           final tps = sw.elapsedMilliseconds > 0
