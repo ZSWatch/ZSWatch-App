@@ -17,7 +17,7 @@ A memo may contain ONE or MULTIPLE items. Return a JSON array with one object pe
 
 The memo may be in ANY language.
 
-Return JSON only. No explanation.
+Return JSON only. Output MUST start with '[' and end with ']'. No text before or after.
 
 Your tasks per item:
 1. Detect intent: "reminder", "event", or "note".
@@ -28,8 +28,9 @@ Your tasks per item:
 IMPORTANT — item splitting:
 - ALWAYS return a JSON array, even for a single item.
 - NEVER drop items. Every distinct action in the memo MUST appear as a separate object.
-- Connectors that introduce a NEW item: "and", "and then", "also", "och", "och sen", "sen", "und", commas between clauses.
+- Connectors that introduce a NEW item: "and", "and then", "also", "och", "och sen", "sen", "und", commas between clauses, sentence boundaries.
 - A single idea with elaboration/details stays as ONE item.
+- Comma-separated lists (shopping items, ingredients, supplies) are ONE item.
 
 IMPORTANT — intent classification:
 - "event" = meetings, appointments, social plans, bookings, standups — things you ATTEND with others or at a place (dentist, fika with someone, team standup, conference, lunch with a person)
@@ -38,17 +39,27 @@ IMPORTANT — intent classification:
 - A task with NO time appearing alongside timed tasks is still a "note"
 
 Rules:
-- Multi-item date context: when a preceding item establishes a date (e.g. "tomorrow"), carry it into subsequent items that only mention a time. Example: "tomorrow at 8 am ... at 3 pm" → item 2 is "tomorrow at 3 pm".
-- The title MUST stay in the SAME language as the voice memo. DO NOT translate the title.
-- NEVER compute or resolve dates. Keep time expressions relative: "tomorrow at 10 am", NOT "2026-03-10T10:00:00".
+- Multi-item date context: if a later item only mentions a time (e.g. "at 3 pm"), reuse the most recent date from a previous item. Example: "tomorrow at 8 am ... at 3 pm" → item 2 is "tomorrow at 3 pm".
+- Copy title words directly from the memo. Never translate the title. Keep titles short (2-5 words).
+- Title must NOT contain time or date words.
+- Do not resolve relative dates to absolute dates or ISO timestamps. Keep expressions relative: "tomorrow at 10 am", NOT "2026-03-10T10:00:00".
 - Copy the original time phrase exactly. Fill "datetime_expression_english" whenever "datetime_expression_original" is not null.
 - If the memo is in English, copy the same phrase to both datetime fields.
 - If no time/date for an item, set both datetime fields to null.
-- Title must be short (2-5 words).
 - Translate time expressions to natural English. Convert 24-hour to 12-hour. Use PM for afternoon/evening context.
 - Do NOT add "next" to weekday translations unless the original explicitly says "next" / "nästa" / "nächsten".
 - Deadlines ARE time expressions: "by Friday", "senast fredag", "bis Freitag" → extract them.
 - NOT time expressions: locations ("at the store"), vague conditions ("when I get home", "after lunch"), words that look like time but aren't ("boka tid" = book appointment)
+
+Output JSON schema (always an array):
+[
+  {
+    "intent": "reminder" | "event" | "note",
+    "title": "short task description in original language",
+    "datetime_expression_original": "original time phrase" | null,
+    "datetime_expression_english": "english translation of time phrase" | null
+  }
+]
 
 Examples:
 
@@ -106,20 +117,10 @@ Memo: "Ring tandläkaren imorgon klockan 9, köp presenter till kalaset och möt
 Memo: "Team standup tomorrow at 9:15 and I should prototype the new notification system"
 [{"intent":"event","title":"team standup","datetime_expression_original":"tomorrow at 9:15","datetime_expression_english":"tomorrow at 9:15 am"},{"intent":"note","title":"prototype notification system","datetime_expression_original":null,"datetime_expression_english":null}]
 
-WRONG — never translate the title, not even for notes:
+WRONG — never translate the title:
 Memo: "Bra idé om att lägga till stegräknare i klockan"
 WRONG: [{"intent":"note","title":"add step counter to watch",...}]
 RIGHT: [{"intent":"note","title":"stegräknare i klockan","datetime_expression_original":null,"datetime_expression_english":null}]
-
-Output JSON schema (always an array):
-[
-  {
-    "intent": "reminder" | "event" | "note",
-    "title": "short task description in original language",
-    "datetime_expression_original": "original time phrase" | null,
-    "datetime_expression_english": "english translation of time phrase" | null
-  }
-]
 
 Current datetime: $promptPlaceholderCurrentLocalDateTimeCompact
 Timezone: UTC$promptPlaceholderTimezoneOffset

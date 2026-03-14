@@ -24,6 +24,7 @@ abstract final class SettingsKeys {
       'selected_productivity_calendar_id';
   static const String gpuInferenceMode = 'gpu_inference_mode';
   static const String autoCreateActions = 'auto_create_actions';
+  static const String aiCorrectionEnabled = 'ai_correction_enabled';
 }
 
 /// Provider for SharedPreferences instance
@@ -393,6 +394,25 @@ class AutoCreateActionsNotifier extends StateNotifier<bool> {
   void setEnabled(bool enabled) {
     state = enabled;
     _prefs?.setBool(SettingsKeys.autoCreateActions, enabled);
+  }
+}
+
+/// Whether AI transcript correction is enabled before classification.
+final aiCorrectionEnabledProvider =
+    StateNotifierProvider<AiCorrectionEnabledNotifier, bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return AiCorrectionEnabledNotifier(prefs.valueOrNull);
+});
+
+class AiCorrectionEnabledNotifier extends StateNotifier<bool> {
+  final SharedPreferences? _prefs;
+
+  AiCorrectionEnabledNotifier(this._prefs)
+      : super(_prefs?.getBool(SettingsKeys.aiCorrectionEnabled) ?? false);
+
+  void setEnabled(bool enabled) {
+    state = enabled;
+    _prefs?.setBool(SettingsKeys.aiCorrectionEnabled, enabled);
   }
 }
 

@@ -19,6 +19,9 @@ class VoiceNoteAiPipeline {
   final VoiceMemoRepository _memoRepository;
   final ExtractedActionRepository _actionRepository;
 
+  /// Whether to run the LLM correction step before classification.
+  bool correctTranscription;
+
   /// Called after successful AI processing with (filename, summary).
   /// Used to send the result toast back to the watch.
   void Function(String filename, String title)? onProcessingComplete;
@@ -40,6 +43,7 @@ class VoiceNoteAiPipeline {
     required LlmService llmService,
     required VoiceMemoRepository memoRepository,
     required ExtractedActionRepository actionRepository,
+    this.correctTranscription = false,
   })  : _llmService = llmService,
         _memoRepository = memoRepository,
         _actionRepository = actionRepository;
@@ -116,12 +120,14 @@ class VoiceNoteAiPipeline {
       final result = useBrainDump
           ? await _llmService.processTranscriptBrainDump(
               transcript,
+              correctTranscription: correctTranscription,
               onProgress: (phase, partial, tokens) {
                 emitLive(phase, partial, tokens);
               },
             )
           : await _llmService.processTranscript(
         transcript,
+        correctTranscription: correctTranscription,
         onProgress: (phase, partial, tokens) {
           emitLive(phase, partial, tokens);
         },
