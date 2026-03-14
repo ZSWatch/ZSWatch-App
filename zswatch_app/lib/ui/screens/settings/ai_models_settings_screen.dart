@@ -664,6 +664,7 @@ class _AiTogglesTile extends ConsumerWidget {
     final localAiEnabled = ref.watch(localAiEnabledProvider);
     final autoProcess = ref.watch(autoProcessVoiceNotesProvider);
     final autoCreate = ref.watch(autoCreateActionsProvider);
+    final correctionEnabled = ref.watch(aiCorrectionEnabledProvider);
     final bothEnabled = localAiEnabled && autoProcess;
 
     return Column(
@@ -722,6 +723,29 @@ class _AiTogglesTile extends ConsumerWidget {
             onChanged: bothEnabled
                 ? (value) {
                     ref.read(autoCreateActionsProvider.notifier).setEnabled(value);
+                  }
+                : null,
+          ),
+        ),
+        Opacity(
+          opacity: localAiEnabled ? 1.0 : 0.5,
+          child: SwitchListTile(
+            secondary: Icon(
+              Icons.spellcheck,
+              color: correctionEnabled && localAiEnabled
+                  ? AppTheme.primaryColor
+                  : AppTheme.textSecondary,
+            ),
+            title: const Text('AI transcript correction'),
+            subtitle: Text(
+              localAiEnabled
+                  ? 'Fix transcription errors before classification'
+                  : 'Enable Local AI first',
+            ),
+            value: correctionEnabled,
+            onChanged: localAiEnabled
+                ? (value) {
+                    ref.read(aiCorrectionEnabledProvider.notifier).setEnabled(value);
                   }
                 : null,
           ),

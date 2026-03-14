@@ -130,10 +130,12 @@ final voiceNoteAiPipelineProvider = Provider<VoiceNoteAiPipeline>((ref) {
   final llm = ref.watch(llmServiceProvider);
   final memoRepo = ref.watch(voiceMemoRepositoryProvider);
   final actionRepo = ref.watch(extractedActionRepositoryProvider);
+  final correctionEnabled = ref.watch(aiCorrectionEnabledProvider);
   return VoiceNoteAiPipeline(
     llmService: llm,
     memoRepository: memoRepo,
     actionRepository: actionRepo,
+    correctTranscription: correctionEnabled,
   );
 });
 
