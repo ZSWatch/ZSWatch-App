@@ -829,6 +829,10 @@ class LlmService {
     int? overrideMaxTokens,
     void Function(String partial, int tokens)? onPartialResponse,
   }) async {
+    // Cancel any still-running inference (e.g. leftover from hot-restart or
+    // a previous phase) before starting a new one.  This reduces the window
+    // for the "Callback invoked after it has been deleted" crash.
+    cancelInference();
     await _ensureModel();
 
     final completer = Completer<String>();
