@@ -43,6 +43,7 @@ class MainActivity : FlutterActivity() {
         private const val MEDIA_CHANNEL = "dev.zswatch.app/media"
         private const val MEDIA_EVENTS_CHANNEL = "dev.zswatch.app/media_events"
         private const val FOREGROUND_SERVICE_CHANNEL = "dev.zswatch.app/foreground_service"
+        private const val LLM_COMPUTE_CHANNEL = "dev.zswatch.app/llm_compute"
         private const val PRODUCTIVITY_CHANNEL = "dev.zswatch.app/productivity"
     }
 
@@ -85,8 +86,9 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Create notification channel for foreground service (FR-092)
+        // Create notification channels for foreground services
         BleConnectionForegroundService.createNotificationChannel(this)
+        LlmComputeService.createNotificationChannel(this)
     }
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -95,6 +97,7 @@ class MainActivity : FlutterActivity() {
         setupNotificationChannel(flutterEngine)
         setupMediaChannel(flutterEngine)
         setupForegroundServiceChannel(flutterEngine)
+        setupLlmComputeChannel(flutterEngine)
         setupProductivityChannel(flutterEngine)
     }
     
@@ -393,6 +396,25 @@ class MainActivity : FlutterActivity() {
             // Use method channel to notify Flutter of disconnect request
             MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FOREGROUND_SERVICE_CHANNEL)
                 .invokeMethod("onDisconnectRequested", null)
+        }
+    }
+
+    private fun setupLlmComputeChannel(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LLM_COMPUTE_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "start" -> {
+                    LlmComputeService.start(this)
+                    result.success(true)
+                }
+                "stop" -> {
+                    LlmComputeService.stop(this)
+                    result.success(true)
+                }
+                "isRunning" -> {
+                    result.success(LlmComputeService.isRunning())
+                }
+                else -> result.notImplemented()
+            }
         }
     }
 
