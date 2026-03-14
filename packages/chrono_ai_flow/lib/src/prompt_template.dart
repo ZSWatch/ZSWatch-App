@@ -6,11 +6,11 @@ class ChronoPromptTemplate {
   static const String promptPlaceholderCurrentLocalDateTimeCompact =
       '{{current_local_datetime_compact}}';
   static const String promptPlaceholderWeekday = '{{weekday}}';
-  static const String promptPlaceholderTimezoneOffset =
-      '{{timezone_offset}}';
+  static const String promptPlaceholderTimezoneOffset = '{{timezone_offset}}';
   static const String promptPlaceholderTranscript = '{{transcript}}';
 
-  static const String defaultTemplate = '''
+  static const String defaultTemplate =
+      '''
 You extract structured information from a voice memo.
 
 A memo may contain ONE or MULTIPLE items. Return a JSON array with one object per item.
@@ -134,7 +134,8 @@ JSON:''';
 
   /// Compact prompt with fewer examples for low-memory devices (nCtx < 4096).
   /// Same rules, 5 examples instead of 18.
-  static const String compactTemplate = '''
+  static const String compactTemplate =
+      '''
 You extract structured information from a voice memo.
 
 A memo may contain ONE or MULTIPLE items. Return a JSON array with one object per item.
@@ -214,7 +215,7 @@ JSON:''';
 
   /// Returns the appropriate template for the given context size.
   static String templateForContextSize(int nCtx) {
-    return nCtx >= 4096 ? defaultTemplate : compactTemplate;
+    return nCtx >= 3072 ? defaultTemplate : compactTemplate;
   }
 
   static String render(
@@ -236,8 +237,10 @@ JSON:''';
     final tzOffset = localNow.timeZoneOffset;
     final tzSign = tzOffset.isNegative ? '-' : '+';
     final tzHours = tzOffset.inHours.abs().toString().padLeft(2, '0');
-    final tzMinutes =
-        (tzOffset.inMinutes.abs() % 60).toString().padLeft(2, '0');
+    final tzMinutes = (tzOffset.inMinutes.abs() % 60).toString().padLeft(
+      2,
+      '0',
+    );
     final tz = '$tzSign$tzHours:$tzMinutes';
     final compactDateTime =
         '${localNow.year}-${localNow.month.toString().padLeft(2, '0')}-${localNow.day.toString().padLeft(2, '0')} '
@@ -245,7 +248,10 @@ JSON:''';
 
     return template
         .replaceAll(promptPlaceholderCurrentLocalDateTime, iso)
-        .replaceAll(promptPlaceholderCurrentLocalDateTimeCompact, compactDateTime)
+        .replaceAll(
+          promptPlaceholderCurrentLocalDateTimeCompact,
+          compactDateTime,
+        )
         .replaceAll(promptPlaceholderWeekday, weekday)
         .replaceAll(promptPlaceholderTimezoneOffset, tz)
         .replaceAll(promptPlaceholderTranscript, transcript);

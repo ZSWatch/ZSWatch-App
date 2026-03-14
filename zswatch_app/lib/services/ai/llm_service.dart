@@ -62,13 +62,7 @@ class LlmModelInfo {
 }
 
 /// Status of the LLM service.
-enum LlmServiceStatus {
-  idle,
-  downloading,
-  processing,
-  ready,
-  error,
-}
+enum LlmServiceStatus { idle, downloading, processing, ready, error }
 
 /// How well a model fits into available device memory.
 enum ModelMemoryFit {
@@ -104,11 +98,11 @@ class ModelFitResult {
   String get summary {
     switch (fit) {
       case ModelMemoryFit.comfortable:
-        return 'Fits well — full performance';
+        return 'Fits well — full prompt should be available';
       case ModelMemoryFit.reduced:
-        return 'Tight fit — context reduced to $contextSize tokens';
+        return 'Tight fit — may switch to a shorter prompt';
       case ModelMemoryFit.cpuFallback:
-        return 'Low memory — CPU-only mode (slower)';
+        return 'Low memory — may fall back to the smallest prompt';
     }
   }
 }
@@ -129,12 +123,11 @@ class LlmServiceState {
     LlmServiceStatus? status,
     double? downloadProgress,
     String? error,
-  }) =>
-      LlmServiceState(
-        status: status ?? this.status,
-        downloadProgress: downloadProgress ?? this.downloadProgress,
-        error: error ?? this.error,
-      );
+  }) => LlmServiceState(
+    status: status ?? this.status,
+    downloadProgress: downloadProgress ?? this.downloadProgress,
+    error: error ?? this.error,
+  );
 }
 
 /// One extracted action from the LLM output.
@@ -184,20 +177,19 @@ class LlmInferenceMetrics {
     this.retryEnabled = false,
   });
 
-  LlmInferenceMetrics copyWithParsedJson(String? json) =>
-      LlmInferenceMetrics(
-        modelName: modelName,
-        rawPrompt: rawPrompt,
-        rawResponse: rawResponse,
-        parsedJson: json ?? parsedJson,
-        wallTime: wallTime,
-        promptTokens: promptTokens,
-        completionTokens: completionTokens,
-        tokensPerSecond: tokensPerSecond,
-        attempts: attempts,
-        promptStrategy: promptStrategy,
-        retryEnabled: retryEnabled,
-      );
+  LlmInferenceMetrics copyWithParsedJson(String? json) => LlmInferenceMetrics(
+    modelName: modelName,
+    rawPrompt: rawPrompt,
+    rawResponse: rawResponse,
+    parsedJson: json ?? parsedJson,
+    wallTime: wallTime,
+    promptTokens: promptTokens,
+    completionTokens: completionTokens,
+    tokensPerSecond: tokensPerSecond,
+    attempts: attempts,
+    promptStrategy: promptStrategy,
+    retryEnabled: retryEnabled,
+  );
 }
 
 /// Result of processTranscript().
@@ -249,6 +241,10 @@ class TranscriptResult {
 ///
 /// The model loads lazily on first inference and stays cached in-process.
 class LlmService {
+  static const int defaultTargetContextSize = 3072;
+  static const int reducedContextSize = 2048;
+  static const int minimumContextSize = 1024;
+
   static const int _maxStructuredOutputAttempts = 2;
   static const String promptPlaceholderCurrentLocalDateTime =
       ChronoPromptTemplate.promptPlaceholderCurrentLocalDateTime;
@@ -265,12 +261,11 @@ class LlmService {
       ChronoPromptTemplate.defaultTemplate;
 
   static String get defaultClassifyPromptTemplate =>
-    defaultBenchmarkPromptTemplate;
+      defaultBenchmarkPromptTemplate;
 
   final TimeExpressionResolver _timeExpressionResolver =
-    TimeExpressionResolver();
-    final ChronoLlmParser _chronoLlmParser = const ChronoLlmParser();
-
+      TimeExpressionResolver();
+  final ChronoLlmParser _chronoLlmParser = const ChronoLlmParser();
 
   static const String defaultModelId = 'qwen25_1_5b_q4_k_m';
   // Models ordered by benchmark score (best first).
@@ -329,8 +324,14 @@ class LlmService {
   String get modelName => _selectedModelName;
   String get selectedModelId => _selectedModelId;
 
+  static bool usesFullPrompt(int contextSize) =>
+      contextSize >= defaultTargetContextSize;
+
+  static bool usesEmergencyCompactPrompt(int contextSize) =>
+      contextSize <= minimumContextSize;
+
   // ---- Tunables ----
-  int nCtx = 4096;
+  int nCtx = defaultTargetContextSize;
   int nThreads = 2;
   int maxTokens = 512;
   // Qwen3.5 recommended sampling for non-thinking text tasks.
@@ -400,7 +401,8 @@ class LlmService {
     return dir.path;
   }
 
-  static String customModelIdForFilename(String filename) => 'custom::$filename';
+  static String customModelIdForFilename(String filename) =>
+      'custom::$filename';
 
   static bool _isCustomModelId(String id) => id.startsWith('custom::');
 
@@ -435,7 +437,8 @@ class LlmService {
   void selectModel(String modelId) {
     _selectedModelId = modelId;
     final builtIn = catalogModels.where((m) => m.id == modelId).firstOrNull;
-    _selectedModelName = builtIn?.displayName ??
+    _selectedModelName =
+        builtIn?.displayName ??
         (_isCustomModelId(modelId)
             ? modelId.replaceFirst('custom::', '')
             : catalogModels.first.displayName);
@@ -473,14 +476,16 @@ class LlmService {
 
   /// Whether the model file is present on disk.
   Future<bool> isModelDownloaded({String? modelId}) async {
-    final model = await _resolveModelById(modelId ?? _selectedModelId) ??
+    final model =
+        await _resolveModelById(modelId ?? _selectedModelId) ??
         catalogModels.first;
     return File(await _modelFilePathFor(model)).existsSync();
   }
 
   /// Size of the local model file in bytes, or null if not downloaded.
   Future<int?> modelFileSize({String? modelId}) async {
-    final model = await _resolveModelById(modelId ?? _selectedModelId) ??
+    final model =
+        await _resolveModelById(modelId ?? _selectedModelId) ??
         catalogModels.first;
     final f = File(await _modelFilePathFor(model));
     return f.existsSync() ? f.lengthSync() : null;
@@ -490,7 +495,8 @@ class LlmService {
 
   /// Download the GGUF model from HuggingFace.
   Future<void> downloadModel({String? modelId}) async {
-    final model = await _resolveModelById(modelId ?? _selectedModelId) ??
+    final model =
+        await _resolveModelById(modelId ?? _selectedModelId) ??
         catalogModels.first;
 
     if (!model.isDownloadable) {
@@ -502,10 +508,12 @@ class LlmService {
       return;
     }
 
-    _stateSubject.add(_stateSubject.value.copyWith(
-      status: LlmServiceStatus.downloading,
-      downloadProgress: 0.0,
-    ));
+    _stateSubject.add(
+      _stateSubject.value.copyWith(
+        status: LlmServiceStatus.downloading,
+        downloadProgress: 0.0,
+      ),
+    );
 
     try {
       final destPath = await _modelFilePathFor(model);
@@ -526,9 +534,11 @@ class LlmService {
         sink.add(chunk);
         received += chunk.length;
         if (contentLength > 0) {
-          _stateSubject.add(_stateSubject.value.copyWith(
-            downloadProgress: received / contentLength,
-          ));
+          _stateSubject.add(
+            _stateSubject.value.copyWith(
+              downloadProgress: received / contentLength,
+            ),
+          );
         }
       }
 
@@ -538,25 +548,30 @@ class LlmService {
       // Atomic rename
       File(tmpPath).renameSync(destPath);
 
-      _stateSubject.add(_stateSubject.value.copyWith(
-        status: LlmServiceStatus.ready,
-        downloadProgress: 1.0,
-      ));
+      _stateSubject.add(
+        _stateSubject.value.copyWith(
+          status: LlmServiceStatus.ready,
+          downloadProgress: 1.0,
+        ),
+      );
 
       _selectedModelName = model.displayName;
       debugPrint('[LlmService] Model downloaded to $destPath');
     } catch (e) {
-      _stateSubject.add(_stateSubject.value.copyWith(
-        status: LlmServiceStatus.error,
-        error: e.toString(),
-      ));
+      _stateSubject.add(
+        _stateSubject.value.copyWith(
+          status: LlmServiceStatus.error,
+          error: e.toString(),
+        ),
+      );
       rethrow;
     }
   }
 
   /// Delete the local model file.
   Future<void> deleteModel({String? modelId}) async {
-    final model = await _resolveModelById(modelId ?? _selectedModelId) ??
+    final model =
+        await _resolveModelById(modelId ?? _selectedModelId) ??
         catalogModels.first;
     final f = File(await _modelFilePathFor(model));
     if (f.existsSync()) {
@@ -623,18 +638,35 @@ class LlmService {
 
   // ---- Memory-aware tunables ----
 
-  static const MethodChannel _deviceChannel =
-      MethodChannel('dev.zswatch.app/productivity');
+  static const MethodChannel _deviceChannel = MethodChannel(
+    'dev.zswatch.app/productivity',
+  );
 
   /// Snapshot of memory state from the most recent `_computeInferenceParams`
   /// call. Exposed so callers (e.g. the AI pipeline) can surface this in the
   /// debug UI.
-  ({int deviceMB, int availableMB, int modelMB, int headroomMB,
-      int contextSize, int gpuLayers, int? maxTokensCap})?
-      get lastInferenceMemoryInfo => _lastInferenceMemoryInfo;
-  ({int deviceMB, int availableMB, int modelMB, int headroomMB,
-      int contextSize, int gpuLayers, int? maxTokensCap})?
-      _lastInferenceMemoryInfo;
+  ({
+    int deviceMB,
+    int availableMB,
+    int modelMB,
+    int headroomMB,
+    int requestedContextSize,
+    int contextSize,
+    int gpuLayers,
+    int? maxTokensCap,
+  })?
+  get lastInferenceMemoryInfo => _lastInferenceMemoryInfo;
+  ({
+    int deviceMB,
+    int availableMB,
+    int modelMB,
+    int headroomMB,
+    int requestedContextSize,
+    int contextSize,
+    int gpuLayers,
+    int? maxTokensCap,
+  })?
+  _lastInferenceMemoryInfo;
 
   /// Query device physical RAM (MB), cached after first call.
   Future<int> _queryDeviceMemoryMB() async {
@@ -681,21 +713,17 @@ class LlmService {
   /// We do NOT subtract model size again — that would double-count.
   /// The available memory IS the headroom for KV cache + compute buffers.
   ///
-  /// Metal (GPU) pre-allocates the FULL KV cache for nCtx upfront, so
-  /// nCtx=4096 on GPU needs ~2–3 GB of GPU-accessible memory. On 4 GB
-  /// iPhones with ~1 GB free after model load, GPU+4096 causes a page-fault
-  /// crash. The thresholds below prefer CPU with full context over GPU with
-  /// a crash:
+  /// Larger context windows need a larger KV cache and more scratch space.
+  /// The thresholds below prefer a smaller or CPU-only configuration over a
+  /// crash when free RAM is tight:
   ///
-  ///   available ≥ 1500 MB → nCtx 4096, full GPU,  maxTokens unchanged
-  ///   available ≥  800 MB → nCtx 4096, CPU-only,  maxTokens unchanged
-  ///   available ≥  400 MB → nCtx 2048, CPU-only,  maxTokens unchanged (compact prompt)
+  ///   available ≥ 1500 MB → target nCtx, full GPU,  maxTokens unchanged
+  ///   available ≥  800 MB → target nCtx, CPU-only,  maxTokens unchanged
+  ///   available ≥  400 MB → nCtx 2048, CPU-only,  maxTokens unchanged (shorter prompt)
   ///   available ≥  100 MB → nCtx 1024, CPU-only,  maxTokens unchanged (compact prompt)
   ///   available <  100 MB → nCtx 1024, CPU-only,  maxTokens capped at 256 (compact prompt)
   Future<({int contextSize, int gpuLayers, int? maxTokensCap})>
-      _computeInferenceParams(
-    LlmModelInfo modelInfo,
-  ) async {
+  _computeInferenceParams(LlmModelInfo modelInfo) async {
     // Explicit per-model overrides win.
     final explicitCtx = modelInfo.contextSize;
     final explicitGpu = modelInfo.maxGpuLayers;
@@ -728,46 +756,42 @@ class LlmService {
     int? tokensCap; // null = use default maxTokens
 
     if (headroomMB >= 1500) {
-      // Plenty of room: full context on GPU. Metal needs ~2–3GB for KV cache
-      // + compute scratch buffers at nCtx=4096 on top of the model weights.
-      ctx = nCtx; // full context (default 4096)
+      // Plenty of room: use the full target context on GPU.
+      ctx = nCtx;
       gpu = numGpuLayers;
     } else if (headroomMB >= 800) {
-      // Moderate room: full context but on CPU. This avoids Metal page-fault
-      // crashes (GPU pre-allocates the full nCtx KV cache upfront). CPU is
-      // slower (~5–7 tok/s vs ~20 tok/s) but doesn't crash and handles long
-      // prompts (classify prompt at ~1600 tokens + transcript + output).
+      // Moderate room: keep the full target context, but on CPU.
       ctx = nCtx;
       gpu = 0;
       debugPrint(
         '[LlmService] Moderate memory (${headroomMB}MB). '
-        'Using CPU with full nCtx=$nCtx to avoid GPU memory pressure.',
+        'Using CPU with full target context ($nCtx) to avoid GPU memory pressure.',
       );
     } else if (headroomMB >= 400) {
-      // Low — halved context, uses compact prompt automatically.
-      ctx = 2048;
+      // Low — shorter prompt and reduced context.
+      ctx = reducedContextSize;
       gpu = 0;
       debugPrint(
         '[LlmService] Low memory (${headroomMB}MB). '
-        'Using CPU with nCtx=2048 (compact prompt).',
+        'Using CPU with shorter prompt context ($ctx).',
       );
     } else if (headroomMB >= 100) {
-      ctx = 1024;
+      ctx = minimumContextSize;
       gpu = 0;
       debugPrint(
         '[LlmService] WARNING: Very low memory (${headroomMB}MB). '
-        'Using CPU with nCtx=1024 (compact prompt). '
+        'Using CPU with emergency compact prompt ($ctx). '
         'Model ${modelInfo.id} ($modelMB MB), '
         'available=${availableMB}MB.',
       );
     } else {
       // Critically low — minimum settings with compact prompt.
-      ctx = 1024;
+      ctx = minimumContextSize;
       gpu = 0;
       tokensCap = 256;
       debugPrint(
         '[LlmService] CRITICAL: Extremely low memory (${headroomMB}MB). '
-        'Using minimum settings: nCtx=1024, CPU-only, maxTokens=256. '
+        'Using minimum settings: compact prompt ($ctx), CPU-only, maxTokens=256. '
         'Model ${modelInfo.id} ($modelMB MB), '
         'available=${availableMB}MB, device=${deviceMB}MB.',
       );
@@ -794,6 +818,7 @@ class LlmService {
       availableMB: availableMB,
       modelMB: modelMB,
       headroomMB: headroomMB,
+      requestedContextSize: nCtx,
       contextSize: resolvedCtx,
       gpuLayers: resolvedGpu,
       maxTokensCap: tokensCap,
@@ -875,16 +900,17 @@ class LlmService {
       enableThinking: false,
     );
 
-    _runningRequestId = await fllamaChat(
-      request,
-      (String response, String responseJson, bool done) {
-        tokenCount++;
-        onPartialResponse?.call(response, tokenCount);
-        if (done && !completer.isCompleted) {
-          completer.complete(response);
-        }
-      },
-    );
+    _runningRequestId = await fllamaChat(request, (
+      String response,
+      String responseJson,
+      bool done,
+    ) {
+      tokenCount++;
+      onPartialResponse?.call(response, tokenCount);
+      if (done && !completer.isCompleted) {
+        completer.complete(response);
+      }
+    });
 
     final text = (await completer.future).trim();
     stopwatch.stop();
@@ -940,8 +966,9 @@ class LlmService {
       // --- Step 1: Correct transcription errors if enabled ---
       if (correctTranscription) {
         final correctionPrompt = _buildCorrectionPrompt(transcript);
-        final correctionMaxTokens =
-            CorrectionPromptTemplate.estimateMaxTokens(transcript);
+        final correctionMaxTokens = CorrectionPromptTemplate.estimateMaxTokens(
+          transcript,
+        );
         final correctionResult = await _generate(
           correctionPrompt,
           overrideMaxTokens: correctionMaxTokens,
@@ -962,7 +989,8 @@ class LlmService {
           debugPrint('[LlmService] Corrected transcription: $corrected');
         } else {
           debugPrint(
-              '[LlmService] Correction output not usable, using original');
+            '[LlmService] Correction output not usable, using original',
+          );
         }
       }
 
@@ -980,14 +1008,19 @@ class LlmService {
               promptTemplate,
               transcript: effectiveTranscript,
             )
-          : _buildClassifyPrompt(effectiveTranscript, effectiveCtx: effectiveCtx);
+          : _buildClassifyPrompt(
+              effectiveTranscript,
+              effectiveCtx: effectiveCtx,
+            );
       final structuredResult = await _generateStructuredJsonWithRetry(
         prompt,
         promptStrategy: (promptTemplate != null && promptTemplate.isNotEmpty)
             ? (promptStrategyOverride ?? 'custom-template')
-            : effectiveCtx >= 4096
-                ? 'full+/no_think'
-                : 'compact+/no_think (nCtx=$effectiveCtx)',
+            : usesFullPrompt(effectiveCtx)
+            ? 'full+/no_think'
+            : usesEmergencyCompactPrompt(effectiveCtx)
+            ? 'emergency-compact/no_think (nCtx=$effectiveCtx)'
+            : 'shortened/no_think (nCtx=$effectiveCtx)',
         phase: 'classifying',
         onProgress: onProgress,
       );
@@ -1057,20 +1090,14 @@ class LlmService {
     final template = ChronoPromptTemplate.templateForContextSize(
       effectiveCtx ?? nCtx,
     );
-    return _renderClassifyPromptTemplate(
-      template,
-      transcript: transcript,
-    );
+    return _renderClassifyPromptTemplate(template, transcript: transcript);
   }
 
   String _renderClassifyPromptTemplate(
     String template, {
     required String transcript,
   }) {
-    return ChronoPromptTemplate.render(
-      template,
-      transcript: transcript,
-    );
+    return ChronoPromptTemplate.render(template, transcript: transcript);
   }
 
   /// Word-count threshold for brain dump mode. Transcripts with more
@@ -1081,14 +1108,22 @@ class LlmService {
   String _buildBrainDumpPrompt(String transcript) {
     final localNow = DateTime.now();
     final weekday = const [
-      'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-      'Friday', 'Saturday', 'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
     ][localNow.weekday - 1];
     final iso = localNow.toIso8601String();
     final tzOffset = localNow.timeZoneOffset;
     final tzSign = tzOffset.isNegative ? '-' : '+';
     final tzHours = tzOffset.inHours.abs().toString().padLeft(2, '0');
-    final tzMinutes = (tzOffset.inMinutes.abs() % 60).toString().padLeft(2, '0');
+    final tzMinutes = (tzOffset.inMinutes.abs() % 60).toString().padLeft(
+      2,
+      '0',
+    );
     final tz = '$tzSign$tzHours:$tzMinutes';
 
     return '''
@@ -1179,8 +1214,9 @@ JSON:
       // --- Step 1: Correct transcription errors if enabled ---
       if (correctTranscription) {
         final correctionPrompt = _buildCorrectionPrompt(transcript);
-        final correctionMaxTokens =
-            CorrectionPromptTemplate.estimateMaxTokens(transcript);
+        final correctionMaxTokens = CorrectionPromptTemplate.estimateMaxTokens(
+          transcript,
+        );
         final correctionResult = await _generate(
           correctionPrompt,
           overrideMaxTokens: correctionMaxTokens,
@@ -1235,7 +1271,8 @@ JSON:
             buf.writeln();
             for (final section in sections.whereType<Map<String, dynamic>>()) {
               final header = section['header'] as String?;
-              final bullets = (section['bullets'] as List<dynamic>?)
+              final bullets =
+                  (section['bullets'] as List<dynamic>?)
                       ?.whereType<String>()
                       .toList() ??
                   [];
@@ -1283,12 +1320,15 @@ JSON:
 
   // ---- Output parsing ----
 
-  Future<({
-    String raw,
-    TranscriptResult result,
-    LlmInferenceMetrics metrics,
-    int attempts,
-  })> _generateStructuredJsonWithRetry(
+  Future<
+    ({
+      String raw,
+      TranscriptResult result,
+      LlmInferenceMetrics metrics,
+      int attempts,
+    })
+  >
+  _generateStructuredJsonWithRetry(
     String prompt, {
     int? overrideMaxTokens,
     required String promptStrategy,
@@ -1296,7 +1336,10 @@ JSON:
     void Function(String phase, String partialResponse, int tokens)? onProgress,
   }) async {
     String raw = '';
-    TranscriptResult parsed = const TranscriptResult(summary: '', category: 'note');
+    TranscriptResult parsed = const TranscriptResult(
+      summary: '',
+      category: 'note',
+    );
     LlmInferenceMetrics? lastMetrics;
     Duration totalWallTime = Duration.zero;
     var totalCompletionTokens = 0;
@@ -1331,7 +1374,8 @@ JSON:
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
 
-    final parsedJson = _chronoLlmParser.extractFirstJsonArray(raw) ??
+    final parsedJson =
+        _chronoLlmParser.extractFirstJsonArray(raw) ??
         _extractFirstJsonObject(raw);
     final metrics = LlmInferenceMetrics(
       modelName: _selectedModelName,
@@ -1346,12 +1390,7 @@ JSON:
       retryEnabled: _maxStructuredOutputAttempts > 1,
     );
 
-    return (
-      raw: raw,
-      result: parsed,
-      metrics: metrics,
-      attempts: attempts,
-    );
+    return (raw: raw, result: parsed, metrics: metrics, attempts: attempts);
   }
 
   String _sanitizeModelOutput(String raw) {
@@ -1360,7 +1399,8 @@ JSON:
 
   bool _shouldRetryStructuredOutput(String raw, TranscriptResult result) {
     final cleaned = _sanitizeModelOutput(raw);
-    final jsonStr = _chronoLlmParser.extractFirstJsonArray(cleaned) ??
+    final jsonStr =
+        _chronoLlmParser.extractFirstJsonArray(cleaned) ??
         _extractFirstJsonObject(cleaned);
 
     if (jsonStr == null) {
@@ -1377,7 +1417,8 @@ JSON:
 
     if (result.category == 'note' &&
         result.actions.isEmpty &&
-        (result.summary.trim() == cleaned || result.summary.trim() == jsonStr.trim())) {
+        (result.summary.trim() == cleaned ||
+            result.summary.trim() == jsonStr.trim())) {
       return true;
     }
 
@@ -1433,23 +1474,25 @@ JSON:
     String? firstResolverMethod;
 
     for (final extraction in extractions) {
-      final title = extraction.title.isNotEmpty
-          ? extraction.title
-          : raw.trim();
+      final title = extraction.title.isNotEmpty ? extraction.title : raw.trim();
 
       if (extraction.intent == 'note') {
         // Notes don't produce actions with time resolution
-        actions.add(ExtractedActionResult(
-          type: 'task',
-          title: title,
-          notes: extraction.datetimeExpressionOriginal,
-        ));
-        chronoDetails.add(ActionChronoDebug(
-          intent: extraction.intent,
-          title: title,
-          datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
-          datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
-        ));
+        actions.add(
+          ExtractedActionResult(
+            type: 'task',
+            title: title,
+            notes: extraction.datetimeExpressionOriginal,
+          ),
+        );
+        chronoDetails.add(
+          ActionChronoDebug(
+            intent: extraction.intent,
+            title: title,
+            datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
+            datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
+          ),
+        );
         continue;
       }
 
@@ -1461,25 +1504,29 @@ JSON:
       firstResolvedDateTime ??= resolved?.dateTime.toIso8601String();
       firstResolverMethod ??= resolved?.method;
 
-      actions.add(ExtractedActionResult(
-        type: extraction.intent == 'event' ? 'calendar_event' : 'reminder',
-        title: title,
-        notes: extraction.datetimeExpressionOriginal,
-        dueDate: extraction.intent == 'reminder'
-            ? resolved?.dateTime.toIso8601String()
-            : null,
-        startTime: extraction.intent == 'event'
-            ? resolved?.dateTime.toIso8601String()
-            : null,
-      ));
-      chronoDetails.add(ActionChronoDebug(
-        intent: extraction.intent,
-        title: title,
-        datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
-        datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
-        resolvedDateTime: resolved?.dateTime.toIso8601String(),
-        resolverMethod: resolved?.method,
-      ));
+      actions.add(
+        ExtractedActionResult(
+          type: extraction.intent == 'event' ? 'calendar_event' : 'reminder',
+          title: title,
+          notes: extraction.datetimeExpressionOriginal,
+          dueDate: extraction.intent == 'reminder'
+              ? resolved?.dateTime.toIso8601String()
+              : null,
+          startTime: extraction.intent == 'event'
+              ? resolved?.dateTime.toIso8601String()
+              : null,
+        ),
+      );
+      chronoDetails.add(
+        ActionChronoDebug(
+          intent: extraction.intent,
+          title: title,
+          datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
+          datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
+          resolvedDateTime: resolved?.dateTime.toIso8601String(),
+          resolverMethod: resolved?.method,
+        ),
+      );
     }
 
     final first = extractions.first;
@@ -1519,12 +1566,11 @@ JSON:
     final jsonStr = _extractFirstJsonObject(cleaned);
 
     if (jsonStr == null) {
-      debugPrint('[LlmService] Failed to parse AI response: '
-          'FormatException: No JSON object found');
-      return TranscriptResult(
-        summary: cleaned.trim(),
-        category: 'note',
+      debugPrint(
+        '[LlmService] Failed to parse AI response: '
+        'FormatException: No JSON object found',
       );
+      return TranscriptResult(summary: cleaned.trim(), category: 'note');
     }
 
     try {
@@ -1551,7 +1597,8 @@ JSON:
               title: actionTitle,
               notes: ((action['notes'] ?? action['body']) as String?)?.trim(),
               dueDate: (action['due_date'] ?? action['dueDate']) as String?,
-              startTime: (action['start_time'] ?? action['startTime']) as String?,
+              startTime:
+                  (action['start_time'] ?? action['startTime']) as String?,
               location: (action['location'] as String?)?.trim(),
             ),
           );
@@ -1559,7 +1606,8 @@ JSON:
       }
 
       if (actions.isEmpty) {
-        final actionItems = (parsed['action_items'] as List<dynamic>?)
+        final actionItems =
+            (parsed['action_items'] as List<dynamic>?)
                 ?.whereType<String>()
                 .map((item) => item.trim())
                 .where((item) => item.isNotEmpty)
@@ -1576,8 +1624,9 @@ JSON:
         }
       }
 
-      final resolvedSummary =
-          (summary != null && summary.isNotEmpty) ? summary : (title ?? '').trim();
+      final resolvedSummary = (summary != null && summary.isNotEmpty)
+          ? summary
+          : (title ?? '').trim();
 
       return TranscriptResult(
         summary: resolvedSummary.isEmpty ? raw.trim() : resolvedSummary,
@@ -1586,10 +1635,7 @@ JSON:
       );
     } catch (e) {
       debugPrint('[LlmService] Failed to parse AI response: $e');
-      return TranscriptResult(
-        summary: jsonStr,
-        category: 'note',
-      );
+      return TranscriptResult(summary: jsonStr, category: 'note');
     }
   }
 }

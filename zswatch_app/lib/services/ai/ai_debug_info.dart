@@ -58,6 +58,7 @@ class AiDebugInfo {
   final int? availableMemoryMB;
   final int? modelSizeMB;
   final int? memoryHeadroomMB;
+  final int? requestedContextSize;
   final int? inferenceContextSize;
   final int? inferenceGpuLayers;
   final int? inferenceMaxTokensCap;
@@ -101,6 +102,7 @@ class AiDebugInfo {
     this.availableMemoryMB,
     this.modelSizeMB,
     this.memoryHeadroomMB,
+    this.requestedContextSize,
     this.inferenceContextSize,
     this.inferenceGpuLayers,
     this.inferenceMaxTokensCap,
