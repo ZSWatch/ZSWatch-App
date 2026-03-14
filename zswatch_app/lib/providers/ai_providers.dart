@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/extracted_action.dart';
 import '../data/repositories/extracted_action_repository.dart';
 import '../data/repositories/voice_memo_repository.dart';
+import '../services/ai/ai_debug_info.dart';
 import '../services/ai/extracted_action_creation_service.dart';
 import '../services/ai/llm_service.dart';
 import '../services/ai/voice_note_ai_pipeline.dart';
@@ -138,7 +139,7 @@ final voiceNoteAiPipelineProvider = Provider<VoiceNoteAiPipeline>((ref) {
 
 /// Stream of debug info from the most recent AI processing run.
 final aiProcessingDebugInfoProvider =
-    StreamProvider<AiProcessingDebugInfo?>((ref) {
+    StreamProvider<AiDebugInfo?>((ref) {
   final pipeline = ref.watch(voiceNoteAiPipelineProvider);
   return pipeline.debugInfoStream;
 });

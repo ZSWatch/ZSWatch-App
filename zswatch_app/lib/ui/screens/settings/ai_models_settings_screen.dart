@@ -13,6 +13,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../providers/ai_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/voice_memo_providers.dart';
+import '../../../services/ai/ai_debug_info.dart';
 import '../../../services/ai/extracted_action_creation_service.dart';
 import '../../../services/ai/llm_service.dart';
 import '../../../services/ai/model_benchmark_service.dart';
@@ -1696,7 +1697,7 @@ class _AiBenchmarkInputEditor extends StatelessWidget {
 
 /// Compact tile shown in the benchmark section after a completed run.
 class _LastResultTile extends StatelessWidget {
-  final BenchmarkProgress progress;
+  final AiDebugInfo progress;
   const _LastResultTile({required this.progress});
 
   @override
@@ -1880,7 +1881,7 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
     );
   }
 
-  List<Widget> _buildBody(BuildContext context, BenchmarkProgress? progress) {
+  List<Widget> _buildBody(BuildContext context, AiDebugInfo? progress) {
     if (progress == null) {
       return [aiDebugNote(context, 'Waiting for benchmark to start…')];
     }
@@ -1918,6 +1919,11 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
             mono: progress.phase != 'transcribing',
             showCopyButton: true,
           ),
+        ],
+        // Memory & inference info
+        if (aiMemoryInfoBlock(context, progress) != null) ...[
+          const SizedBox(height: 12),
+          aiMemoryInfoBlock(context, progress)!,
         ],
       ];
     }
@@ -1967,6 +1973,7 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
             datetimeExpressionEnglish: progress.datetimeExpressionEnglish,
             resolvedDateTime: progress.resolvedDateTime,
             resolverMethod: progress.resolverMethod,
+            extractedActions: progress.extractedActions,
           )) ...[
         const SizedBox(height: 12),
         aiDebugBlock(
@@ -1979,6 +1986,7 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
             datetimeExpressionEnglish: progress.datetimeExpressionEnglish,
             resolvedDateTime: progress.resolvedDateTime,
             resolverMethod: progress.resolverMethod,
+            extractedActions: progress.extractedActions,
           ),
           icon: Icons.schedule,
           showCopyButton: true,
@@ -2000,7 +2008,7 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
         aiDebugBlock(
           context,
           title: 'Parsed JSON',
-          content: progress.parsedJson!,
+          content: aiFormatJson(progress.parsedJson!),
           icon: Icons.data_object,
           mono: true,
           showCopyButton: true,
@@ -2029,6 +2037,11 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
           icon: Icons.error_outline,
           showCopyButton: true,
         ),
+      ],
+      // Memory & inference info
+      if (aiMemoryInfoBlock(context, progress) != null) ...[
+        const SizedBox(height: 12),
+        aiMemoryInfoBlock(context, progress)!,
       ],
     ];
   }

@@ -1,7 +1,21 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../services/ai/ai_debug_info.dart';
+
+/// Try to pretty-print a JSON string.  Returns the original string unchanged
+/// when it isn't valid JSON.
+String aiFormatJson(String raw) {
+  try {
+    final decoded = jsonDecode(raw);
+    return const JsonEncoder.withIndent('  ').convert(decoded);
+  } catch (_) {
+    return raw;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Shared UI primitives for AI / benchmark debug bottom sheets.
@@ -182,7 +196,9 @@ bool aiHasChronoDetails({
   String? datetimeExpressionEnglish,
   String? resolvedDateTime,
   String? resolverMethod,
+  List<ActionChronoDebug> extractedActions = const [],
 }) {
+  if (extractedActions.isNotEmpty) return true;
   return (extractedIntent?.isNotEmpty ?? false) ||
       (extractedTitle?.isNotEmpty ?? false) ||
       (datetimeExpressionOriginal?.isNotEmpty ?? false) ||
@@ -198,16 +214,36 @@ String aiFormatChronoDetails({
   String? datetimeExpressionEnglish,
   String? resolvedDateTime,
   String? resolverMethod,
+  List<ActionChronoDebug> extractedActions = const [],
 }) {
   String show(String? value) =>
       (value != null && value.trim().isNotEmpty) ? value.trim() : 'null';
 
-  return 'Intent: ${show(extractedIntent)}\n'
-      'Title: ${show(extractedTitle)}\n'
-      'Original time phrase: ${show(datetimeExpressionOriginal)}\n'
-      'English time phrase: ${show(datetimeExpressionEnglish)}\n'
-      'Resolved datetime: ${show(resolvedDateTime)}\n'
-      'Resolver: ${show(resolverMethod)}';
+  // When multiple actions are available, show all of them.
+  if (extractedActions.length > 1) {
+    final buf = StringBuffer();
+    for (var i = 0; i < extractedActions.length; i++) {
+      final a = extractedActions[i];
+      if (i > 0) buf.writeln();
+      buf.writeln('--- Action ${i + 1} ---');
+      buf.writeln('Intent: ${show(a.intent)}');
+      buf.writeln('Title: ${show(a.title)}');
+      buf.writeln('Original time phrase: ${show(a.datetimeExpressionOriginal)}');
+      buf.writeln('English time phrase: ${show(a.datetimeExpressionEnglish)}');
+      buf.writeln('Resolved datetime: ${show(a.resolvedDateTime)}');
+      buf.write('Resolver: ${show(a.resolverMethod)}');
+    }
+    return buf.toString();
+  }
+
+  // Single action — use the direct fields (or the single extractedAction).
+  final a = extractedActions.isNotEmpty ? extractedActions.first : null;
+  return 'Intent: ${show(a?.intent ?? extractedIntent)}\n'
+      'Title: ${show(a?.title ?? extractedTitle)}\n'
+      'Original time phrase: ${show(a?.datetimeExpressionOriginal ?? datetimeExpressionOriginal)}\n'
+      'English time phrase: ${show(a?.datetimeExpressionEnglish ?? datetimeExpressionEnglish)}\n'
+      'Resolved datetime: ${show(a?.resolvedDateTime ?? resolvedDateTime)}\n'
+      'Resolver: ${show(a?.resolverMethod ?? resolverMethod)}';
 }
 
 /// Small label + value chip used inside metric rows.
@@ -418,6 +454,89 @@ Widget aiCompletedMetricsHeader(
           const SizedBox(height: 8),
           Wrap(spacing: 16, runSpacing: 8, children: extraChips),
         ],
+      ],
+    ),
+  );
+}
+
+/// Memory & inference parameter info block.
+///
+/// Returns `null` when no memory data is available so callers can skip it with
+/// a simple null check:
+/// ```dart
+/// final memBlock = aiMemoryInfoBlock(context, info);
+/// if (memBlock != null) ...[const SizedBox(height: 12), memBlock],
+/// ```
+Widget? aiMemoryInfoBlock(BuildContext context, AiDebugInfo info) {
+  if (info.availableMemoryMB == null) return null;
+
+  final theme = Theme.of(context);
+  final isLowMemory = (info.memoryHeadroomMB ?? 999) < 100;
+  final statusColor = isLowMemory ? Colors.orange : AppTheme.textSecondary;
+
+  return Container(
+    padding: const EdgeInsets.all(8),
+    decoration: BoxDecoration(
+      color: isLowMemory
+          ? Colors.orange.withValues(alpha: 0.08)
+          : AppTheme.textSecondary.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(8),
+      border: isLowMemory
+          ? Border.all(color: Colors.orange.withValues(alpha: 0.3))
+          : null,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.memory, size: 14, color: statusColor),
+            const SizedBox(width: 4),
+            Text(
+              'Memory & Inference',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: statusColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (isLowMemory) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.warning_amber_rounded,
+                  size: 13, color: Colors.orange),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 16,
+          runSpacing: 4,
+          children: [
+            if (info.availableMemoryMB != null)
+              aiMetricChip(context, 'Available RAM',
+                  '${info.availableMemoryMB}MB', Icons.memory),
+            if (info.deviceMemoryMB != null)
+              aiMetricChip(context, 'Total RAM',
+                  '${info.deviceMemoryMB}MB', Icons.phone_android),
+            if (info.modelSizeMB != null)
+              aiMetricChip(context, 'Model',
+                  '${info.modelSizeMB}MB', Icons.smart_toy_outlined),
+            if (info.memoryHeadroomMB != null)
+              aiMetricChip(context, 'Headroom',
+                  '${info.memoryHeadroomMB}MB', Icons.expand),
+            if (info.inferenceContextSize != null)
+              aiMetricChip(context, 'nCtx',
+                  '${info.inferenceContextSize}', Icons.tune),
+            if (info.inferenceGpuLayers != null)
+              aiMetricChip(context, 'GPU layers',
+                  info.inferenceGpuLayers == 0
+                      ? 'CPU only'
+                      : '${info.inferenceGpuLayers}',
+                  Icons.developer_board),
+            if (info.inferenceMaxTokensCap != null)
+              aiMetricChip(context, 'Max tokens cap',
+                  '${info.inferenceMaxTokensCap}', Icons.compress),
+          ],
+        ),
       ],
     ),
   );

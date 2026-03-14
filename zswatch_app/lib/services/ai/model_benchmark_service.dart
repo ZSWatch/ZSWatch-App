@@ -4,88 +4,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:rxdart/rxdart.dart';
 import '../voice_memo/transcription_engine.dart';
+import 'ai_debug_info.dart';
 import 'llm_service.dart';
 
 // ---------------------------------------------------------------------------
 // State model
 // ---------------------------------------------------------------------------
-
-/// Live-updating benchmark run (mirrors the AiProcessingDebugInfo pattern from
-/// the voice-memo debug sheet so the UI can reuse the same visual style).
-class BenchmarkProgress {
-  final String testType; // 'transcription' or 'ai'
-  final String modelName;
-  final String? promptStrategy;
-  final String? rawPrompt;
-  final String? parsedJson;
-  final String? extractedIntent;
-  final String? extractedTitle;
-  final String? datetimeExpressionOriginal;
-  final String? datetimeExpressionEnglish;
-  final String? resolvedDateTime;
-  final String? resolverMethod;
-  final int attempts;
-  final bool retryEnabled;
-
-  /// Current phase: 'loading', 'running', 'transcribing', 'correcting',
-  /// 'classifying', 'done', 'error'.
-  final String phase;
-  final String partialOutput;
-  final int tokens;
-  final Duration elapsed;
-  final double? tokensPerSecond;
-  final String? error;
-
-  /// Full raw LLM output preserved across completion. During live streaming
-  /// this mirrors [partialOutput]; on completion [partialOutput] is set to a
-  /// human-readable summary while [rawOutput] keeps the full model response.
-  final String? rawOutput;
-
-  /// Corrected transcription (if the correction pass produced one).
-  final String? correctedTranscription;
-
-  /// Metrics from the correction LLM pass (separate from classify metrics).
-  final int correctionTokens;
-  final Duration correctionElapsed;
-  final double? correctionTokensPerSecond;
-
-  /// Reserved for richer benchmark variants that may include a separate
-  /// transcription stage.
-  final String? transcriptionResult;
-  final Duration? transcriptionElapsed;
-
-  const BenchmarkProgress({
-    required this.testType,
-    required this.modelName,
-    this.promptStrategy,
-    this.rawPrompt,
-    this.parsedJson,
-    this.extractedIntent,
-    this.extractedTitle,
-    this.datetimeExpressionOriginal,
-    this.datetimeExpressionEnglish,
-    this.resolvedDateTime,
-    this.resolverMethod,
-    this.attempts = 1,
-    this.retryEnabled = false,
-    this.phase = 'loading',
-    this.partialOutput = '',
-    this.tokens = 0,
-    this.elapsed = Duration.zero,
-    this.tokensPerSecond,
-    this.error,
-    this.rawOutput,
-    this.correctedTranscription,
-    this.correctionTokens = 0,
-    this.correctionElapsed = Duration.zero,
-    this.correctionTokensPerSecond,
-    this.transcriptionResult,
-    this.transcriptionElapsed,
-  });
-
-  bool get isComplete => phase == 'done' || phase == 'error';
-  bool get isError => phase == 'error';
-}
 
 /// Top-level state for the benchmark section.
 class BenchmarkState {
@@ -93,7 +17,7 @@ class BenchmarkState {
 
   /// Which test is currently running ('transcription' or 'ai'), null if idle.
   final String? runningTestType;
-  final BenchmarkProgress? current;
+  final AiDebugInfo? current;
 
   const BenchmarkState({
     this.isRunning = false,
@@ -104,7 +28,7 @@ class BenchmarkState {
   BenchmarkState copyWith({
     bool? isRunning,
     String? runningTestType,
-    BenchmarkProgress? current,
+    AiDebugInfo? current,
   }) =>
       BenchmarkState(
         isRunning: isRunning ?? this.isRunning,
@@ -140,7 +64,7 @@ class ModelBenchmarkService {
     _abortRequested = true;
     final current = currentState.current;
     if (current != null) {
-      _emit(BenchmarkProgress(
+      _emit(AiDebugInfo(
         testType: current.testType,
         modelName: current.modelName,
         phase: 'running',
@@ -167,7 +91,7 @@ class ModelBenchmarkService {
     final engine = createTranscriptionEngine(type);
     StreamSubscription<TranscriptionEngineState>? engineSub;
 
-    _emit(BenchmarkProgress(
+    _emit(AiDebugInfo(
       testType: 'transcription',
       modelName: info.name,
       phase: 'loading',
@@ -177,7 +101,7 @@ class ModelBenchmarkService {
     try {
       // Verify the audio file exists
       if (!File(audioFilePath).existsSync()) {
-        _emit(BenchmarkProgress(
+        _emit(AiDebugInfo(
           testType: 'transcription',
           modelName: info.name,
           phase: 'error',
@@ -188,7 +112,7 @@ class ModelBenchmarkService {
 
       final available = await engine.isAvailable();
       if (!available) {
-        _emit(BenchmarkProgress(
+        _emit(AiDebugInfo(
           testType: 'transcription',
           modelName: info.name,
           phase: 'error',
@@ -210,7 +134,7 @@ class ModelBenchmarkService {
         };
         // Only emit running-phase status updates while we're still running
         if (!currentState.current!.isComplete) {
-          _emit(BenchmarkProgress(
+          _emit(AiDebugInfo(
             testType: 'transcription',
             modelName: info.name,
             phase: 'running',
@@ -219,7 +143,7 @@ class ModelBenchmarkService {
         }
       });
 
-      _emit(BenchmarkProgress(
+      _emit(AiDebugInfo(
         testType: 'transcription',
         modelName: info.name,
         phase: 'running',
@@ -231,7 +155,7 @@ class ModelBenchmarkService {
       sw.stop();
 
       if (_abortRequested) {
-        _emit(BenchmarkProgress(
+        _emit(AiDebugInfo(
           testType: 'transcription',
           modelName: info.name,
           phase: 'done',
@@ -241,7 +165,7 @@ class ModelBenchmarkService {
         return;
       }
 
-      _emit(BenchmarkProgress(
+      _emit(AiDebugInfo(
         testType: 'transcription',
         modelName: info.name,
         phase: 'done',
@@ -249,7 +173,7 @@ class ModelBenchmarkService {
         elapsed: sw.elapsed,
       ));
     } catch (e) {
-      _emit(BenchmarkProgress(
+      _emit(AiDebugInfo(
         testType: 'transcription',
         modelName: info.name,
         phase: 'error',
@@ -278,7 +202,7 @@ class ModelBenchmarkService {
     _abortRequested = false;
     final modelName = llmService.modelName;
 
-    _emit(BenchmarkProgress(
+    _emit(AiDebugInfo(
       testType: 'ai',
       modelName: modelName,
       phase: 'loading',
@@ -288,7 +212,7 @@ class ModelBenchmarkService {
     try {
       final isDownloaded = await llmService.isModelDownloaded();
       if (!isDownloaded) {
-        _emit(BenchmarkProgress(
+        _emit(AiDebugInfo(
           testType: 'ai',
           modelName: modelName,
           phase: 'error',
@@ -319,7 +243,8 @@ class ModelBenchmarkService {
             'classifying' => 'classifying',
             _ => 'running',
           };
-          _emit(BenchmarkProgress(
+          final mem = llmService.lastInferenceMemoryInfo;
+          _emit(AiDebugInfo(
             testType: 'ai',
             modelName: modelName,
             promptStrategy: 'shared-chrono-flow',
@@ -330,6 +255,13 @@ class ModelBenchmarkService {
             tokens: tokens,
             elapsed: sw.elapsed,
             tokensPerSecond: tps,
+            deviceMemoryMB: mem?.deviceMB,
+            availableMemoryMB: mem?.availableMB,
+            modelSizeMB: mem?.modelMB,
+            memoryHeadroomMB: mem?.headroomMB,
+            inferenceContextSize: mem?.contextSize,
+            inferenceGpuLayers: mem?.gpuLayers,
+            inferenceMaxTokensCap: mem?.maxTokensCap,
           ));
         },
       );
@@ -340,11 +272,12 @@ class ModelBenchmarkService {
           result.classifyMetrics?.rawResponse ?? lastRawOutput;
 
       // Helper to extract correction metrics from result
-      BenchmarkProgress buildAiResult({
+      final mem = llmService.lastInferenceMemoryInfo;
+      AiDebugInfo buildAiResult({
         required String phase,
         required String partialOutput,
       }) {
-        return BenchmarkProgress(
+        return AiDebugInfo(
           testType: 'ai',
           modelName: modelName,
           promptStrategy: result.classifyMetrics?.promptStrategy,
@@ -356,6 +289,7 @@ class ModelBenchmarkService {
           datetimeExpressionEnglish: result.datetimeExpressionEnglish,
           resolvedDateTime: result.resolvedDateTime,
           resolverMethod: result.resolverMethod,
+          extractedActions: result.actionChronoDetails,
           attempts: result.classifyMetrics?.attempts ?? 1,
           retryEnabled: result.classifyMetrics?.retryEnabled ?? false,
           phase: phase,
@@ -368,6 +302,13 @@ class ModelBenchmarkService {
           correctionTokens: result.correctionMetrics?.completionTokens ?? 0,
           correctionElapsed: result.correctionMetrics?.wallTime ?? Duration.zero,
           correctionTokensPerSecond: result.correctionMetrics?.tokensPerSecond,
+          deviceMemoryMB: mem?.deviceMB,
+          availableMemoryMB: mem?.availableMB,
+          modelSizeMB: mem?.modelMB,
+          memoryHeadroomMB: mem?.headroomMB,
+          inferenceContextSize: mem?.contextSize,
+          inferenceGpuLayers: mem?.gpuLayers,
+          inferenceMaxTokensCap: mem?.maxTokensCap,
         );
       }
 
@@ -385,7 +326,7 @@ class ModelBenchmarkService {
       ));
     } catch (e) {
       debugPrint('[ModelBenchmark] AI benchmark error: $e');
-      _emit(BenchmarkProgress(
+      _emit(AiDebugInfo(
         testType: 'ai',
         modelName: modelName,
         phase: 'error',
@@ -411,7 +352,7 @@ class ModelBenchmarkService {
 
   // ---- Helpers ----
 
-  void _emit(BenchmarkProgress progress) {
+  void _emit(AiDebugInfo progress) {
     _stateSubject.add(BenchmarkState(
       isRunning: !progress.isComplete,
       runningTestType: progress.isComplete ? null : progress.testType,
