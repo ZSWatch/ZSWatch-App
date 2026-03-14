@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../services/ai/ai_debug_info.dart';
+import '../../services/ai/llm_service.dart';
 
 /// Try to pretty-print a JSON string.  Returns the original string unchanged
 /// when it isn't valid JSON.
@@ -80,10 +81,7 @@ Widget aiDebugSheetHeader(
             label: const Text('Stop'),
             onPressed: onStop,
           ),
-        IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: onClose,
-        ),
+        IconButton(icon: const Icon(Icons.close), onPressed: onClose),
       ],
     ),
   );
@@ -104,9 +102,9 @@ Widget aiDebugNote(BuildContext context, String text) {
         Expanded(
           child: Text(
             text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
           ),
         ),
       ],
@@ -132,9 +130,9 @@ Widget aiDebugBlock(
           const SizedBox(width: 6),
           Text(
             title,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: AppTheme.textSecondary),
           ),
           if (showCopyButton) ...[
             const Spacer(),
@@ -169,10 +167,10 @@ Widget aiDebugBlock(
         child: SelectableText(
           content,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontFamily: mono ? 'monospace' : null,
-                fontSize: mono ? 11 : null,
-                height: 1.5,
-              ),
+            fontFamily: mono ? 'monospace' : null,
+            fontSize: mono ? 11 : null,
+            height: 1.5,
+          ),
         ),
       ),
     ],
@@ -228,7 +226,9 @@ String aiFormatChronoDetails({
       buf.writeln('--- Action ${i + 1} ---');
       buf.writeln('Intent: ${show(a.intent)}');
       buf.writeln('Title: ${show(a.title)}');
-      buf.writeln('Original time phrase: ${show(a.datetimeExpressionOriginal)}');
+      buf.writeln(
+        'Original time phrase: ${show(a.datetimeExpressionOriginal)}',
+      );
       buf.writeln('English time phrase: ${show(a.datetimeExpressionEnglish)}');
       buf.writeln('Resolved datetime: ${show(a.resolvedDateTime)}');
       buf.write('Resolver: ${show(a.resolverMethod)}');
@@ -261,16 +261,16 @@ Widget aiMetricChip(
       Text(
         '$label: ',
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
-              fontSize: 11,
-            ),
+          color: AppTheme.textSecondary,
+          fontSize: 11,
+        ),
       ),
       Text(
         value,
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              fontSize: 11,
-            ),
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+        ),
       ),
     ],
   );
@@ -375,8 +375,7 @@ Widget aiCompletedHeader(
   Duration? elapsed,
 }) {
   final theme = Theme.of(context);
-  final statusColor =
-      isError ? AppTheme.errorColor : AppTheme.successColor;
+  final statusColor = isError ? AppTheme.errorColor : AppTheme.successColor;
   final chips = aiMetricChips(
     context,
     tokens: tokens,
@@ -472,16 +471,50 @@ Widget? aiMemoryInfoBlock(BuildContext context, AiDebugInfo info) {
 
   final theme = Theme.of(context);
   final isLowMemory = (info.memoryHeadroomMB ?? 999) < 100;
-  final statusColor = isLowMemory ? Colors.orange : AppTheme.textSecondary;
+  final requestedContextSize =
+      info.requestedContextSize ?? info.inferenceContextSize;
+  final actualContextSize = info.inferenceContextSize;
+  final availableMemoryMB = info.availableMemoryMB;
+  final headroomMB = info.memoryHeadroomMB;
+  final showSeparateHeadroom =
+      headroomMB != null &&
+      availableMemoryMB != null &&
+      headroomMB != availableMemoryMB;
+  final isFullPrompt = requestedContextSize != null && actualContextSize != null
+      ? actualContextSize >= requestedContextSize
+      : false;
+  final isEmergencyCompact = actualContextSize != null
+      ? LlmService.usesEmergencyCompactPrompt(actualContextSize)
+      : false;
+
+  final String promptLabel;
+  final String promptExplanation;
+  final Color statusColor;
+
+  if (isEmergencyCompact) {
+    promptLabel = 'Emergency compact';
+    promptExplanation =
+        'Very low free RAM forced the smallest prompt so the model could still run.';
+    statusColor = Colors.orange;
+  } else if (isFullPrompt) {
+    promptLabel = 'Full prompt';
+    promptExplanation = 'The full prompt fit in memory for this run.';
+    statusColor = AppTheme.textSecondary;
+  } else {
+    promptLabel = 'Shorter prompt';
+    promptExplanation =
+        'Free RAM was tight, so the app shortened the prompt for this run.';
+    statusColor = AppTheme.warningColor;
+  }
 
   return Container(
     padding: const EdgeInsets.all(8),
     decoration: BoxDecoration(
-      color: isLowMemory
+      color: (isLowMemory || !isFullPrompt)
           ? Colors.orange.withValues(alpha: 0.08)
           : AppTheme.textSecondary.withValues(alpha: 0.05),
       borderRadius: BorderRadius.circular(8),
-      border: isLowMemory
+      border: (isLowMemory || !isFullPrompt)
           ? Border.all(color: Colors.orange.withValues(alpha: 0.3))
           : null,
     ),
@@ -499,42 +532,83 @@ Widget? aiMemoryInfoBlock(BuildContext context, AiDebugInfo info) {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (isLowMemory) ...[
+            if (isLowMemory || !isFullPrompt) ...[
               const SizedBox(width: 6),
-              Icon(Icons.warning_amber_rounded,
-                  size: 13, color: Colors.orange),
+              Icon(Icons.warning_amber_rounded, size: 13, color: Colors.orange),
             ],
           ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          promptExplanation,
+          style: theme.textTheme.bodySmall?.copyWith(color: statusColor),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          showSeparateHeadroom
+              ? 'RAM values are measured after the model is loaded. Headroom is the free memory left for the prompt and KV cache.'
+              : 'Free RAM is measured after the model is loaded, so headroom would be the same number and is hidden here.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppTheme.textSecondary,
+          ),
         ),
         const SizedBox(height: 6),
         Wrap(
           spacing: 16,
           runSpacing: 4,
           children: [
-            if (info.availableMemoryMB != null)
-              aiMetricChip(context, 'Available RAM',
-                  '${info.availableMemoryMB}MB', Icons.memory),
+            aiMetricChip(context, 'Prompt', promptLabel, Icons.short_text),
+            if (availableMemoryMB != null)
+              aiMetricChip(
+                context,
+                'Free RAM after load',
+                '${availableMemoryMB}MB',
+                Icons.memory,
+              ),
             if (info.deviceMemoryMB != null)
-              aiMetricChip(context, 'Total RAM',
-                  '${info.deviceMemoryMB}MB', Icons.phone_android),
+              aiMetricChip(
+                context,
+                'Total RAM',
+                '${info.deviceMemoryMB}MB',
+                Icons.phone_android,
+              ),
             if (info.modelSizeMB != null)
-              aiMetricChip(context, 'Model',
-                  '${info.modelSizeMB}MB', Icons.smart_toy_outlined),
-            if (info.memoryHeadroomMB != null)
-              aiMetricChip(context, 'Headroom',
-                  '${info.memoryHeadroomMB}MB', Icons.expand),
-            if (info.inferenceContextSize != null)
-              aiMetricChip(context, 'nCtx',
-                  '${info.inferenceContextSize}', Icons.tune),
+              aiMetricChip(
+                context,
+                'Model',
+                '${info.modelSizeMB}MB',
+                Icons.smart_toy_outlined,
+              ),
+            if (showSeparateHeadroom)
+              aiMetricChip(
+                context,
+                'Headroom',
+                '${headroomMB}MB',
+                Icons.expand,
+              ),
+            if (actualContextSize != null && requestedContextSize != null)
+              aiMetricChip(
+                context,
+                'Prompt window',
+                '$actualContextSize of $requestedContextSize',
+                Icons.tune,
+              ),
             if (info.inferenceGpuLayers != null)
-              aiMetricChip(context, 'GPU layers',
-                  info.inferenceGpuLayers == 0
-                      ? 'CPU only'
-                      : '${info.inferenceGpuLayers}',
-                  Icons.developer_board),
+              aiMetricChip(
+                context,
+                'GPU layers',
+                info.inferenceGpuLayers == 0
+                    ? 'CPU only'
+                    : '${info.inferenceGpuLayers}',
+                Icons.developer_board,
+              ),
             if (info.inferenceMaxTokensCap != null)
-              aiMetricChip(context, 'Max tokens cap',
-                  '${info.inferenceMaxTokensCap}', Icons.compress),
+              aiMetricChip(
+                context,
+                'Max tokens cap',
+                '${info.inferenceMaxTokensCap}',
+                Icons.compress,
+              ),
           ],
         ),
       ],

@@ -29,12 +29,11 @@ class BenchmarkState {
     bool? isRunning,
     String? runningTestType,
     AiDebugInfo? current,
-  }) =>
-      BenchmarkState(
-        isRunning: isRunning ?? this.isRunning,
-        runningTestType: runningTestType ?? this.runningTestType,
-        current: current ?? this.current,
-      );
+  }) => BenchmarkState(
+    isRunning: isRunning ?? this.isRunning,
+    runningTestType: runningTestType ?? this.runningTestType,
+    current: current ?? this.current,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -64,15 +63,17 @@ class ModelBenchmarkService {
     _abortRequested = true;
     final current = currentState.current;
     if (current != null) {
-      _emit(AiDebugInfo(
-        testType: current.testType,
-        modelName: current.modelName,
-        phase: 'running',
-        partialOutput: 'Aborting after current operation…',
-        tokens: current.tokens,
-        elapsed: current.elapsed,
-        tokensPerSecond: current.tokensPerSecond,
-      ));
+      _emit(
+        AiDebugInfo(
+          testType: current.testType,
+          modelName: current.modelName,
+          phase: 'running',
+          partialOutput: 'Aborting after current operation…',
+          tokens: current.tokens,
+          elapsed: current.elapsed,
+          tokensPerSecond: current.tokensPerSecond,
+        ),
+      );
     }
   }
 
@@ -91,33 +92,39 @@ class ModelBenchmarkService {
     final engine = createTranscriptionEngine(type);
     StreamSubscription<TranscriptionEngineState>? engineSub;
 
-    _emit(AiDebugInfo(
-      testType: 'transcription',
-      modelName: info.name,
-      phase: 'loading',
-      partialOutput: 'Checking model availability…',
-    ));
+    _emit(
+      AiDebugInfo(
+        testType: 'transcription',
+        modelName: info.name,
+        phase: 'loading',
+        partialOutput: 'Checking model availability…',
+      ),
+    );
 
     try {
       // Verify the audio file exists
       if (!File(audioFilePath).existsSync()) {
-        _emit(AiDebugInfo(
-          testType: 'transcription',
-          modelName: info.name,
-          phase: 'error',
-          error: 'Audio file not found: $audioFilePath',
-        ));
+        _emit(
+          AiDebugInfo(
+            testType: 'transcription',
+            modelName: info.name,
+            phase: 'error',
+            error: 'Audio file not found: $audioFilePath',
+          ),
+        );
         return;
       }
 
       final available = await engine.isAvailable();
       if (!available) {
-        _emit(AiDebugInfo(
-          testType: 'transcription',
-          modelName: info.name,
-          phase: 'error',
-          error: 'Model not downloaded – download it first.',
-        ));
+        _emit(
+          AiDebugInfo(
+            testType: 'transcription',
+            modelName: info.name,
+            phase: 'error',
+            error: 'Model not downloaded – download it first.',
+          ),
+        );
         return;
       }
 
@@ -134,59 +141,71 @@ class ModelBenchmarkService {
         };
         // Only emit running-phase status updates while we're still running
         if (!currentState.current!.isComplete) {
-          _emit(AiDebugInfo(
-            testType: 'transcription',
-            modelName: info.name,
-            phase: 'running',
-            partialOutput: statusText,
-          ));
+          _emit(
+            AiDebugInfo(
+              testType: 'transcription',
+              modelName: info.name,
+              phase: 'running',
+              partialOutput: statusText,
+            ),
+          );
         }
       });
 
-      _emit(AiDebugInfo(
-        testType: 'transcription',
-        modelName: info.name,
-        phase: 'running',
-        partialOutput: 'Starting transcription…',
-      ));
+      _emit(
+        AiDebugInfo(
+          testType: 'transcription',
+          modelName: info.name,
+          phase: 'running',
+          partialOutput: 'Starting transcription…',
+        ),
+      );
 
       final sw = Stopwatch()..start();
       final output = await engine.transcribe(audioFilePath);
       sw.stop();
 
       if (_abortRequested) {
-        _emit(AiDebugInfo(
-          testType: 'transcription',
-          modelName: info.name,
-          phase: 'done',
-          partialOutput: '(aborted)\n${output.isEmpty ? '' : output}',
-          elapsed: sw.elapsed,
-        ));
+        _emit(
+          AiDebugInfo(
+            testType: 'transcription',
+            modelName: info.name,
+            phase: 'done',
+            partialOutput: '(aborted)\n${output.isEmpty ? '' : output}',
+            elapsed: sw.elapsed,
+          ),
+        );
         return;
       }
 
-      _emit(AiDebugInfo(
-        testType: 'transcription',
-        modelName: info.name,
-        phase: 'done',
-        partialOutput: output.isEmpty ? '(no speech detected)' : output,
-        elapsed: sw.elapsed,
-      ));
+      _emit(
+        AiDebugInfo(
+          testType: 'transcription',
+          modelName: info.name,
+          phase: 'done',
+          partialOutput: output.isEmpty ? '(no speech detected)' : output,
+          elapsed: sw.elapsed,
+        ),
+      );
     } catch (e) {
-      _emit(AiDebugInfo(
-        testType: 'transcription',
-        modelName: info.name,
-        phase: 'error',
-        error: e.toString(),
-      ));
+      _emit(
+        AiDebugInfo(
+          testType: 'transcription',
+          modelName: info.name,
+          phase: 'error',
+          error: e.toString(),
+        ),
+      );
     } finally {
       await engineSub?.cancel();
       engine.dispose();
-      _stateSubject.add(BenchmarkState(
-        isRunning: false,
-        runningTestType: null,
-        current: currentState.current,
-      ));
+      _stateSubject.add(
+        BenchmarkState(
+          isRunning: false,
+          runningTestType: null,
+          current: currentState.current,
+        ),
+      );
     }
   }
 
@@ -203,26 +222,30 @@ class ModelBenchmarkService {
     _abortRequested = false;
     final modelName = llmService.modelName;
 
-    _emit(AiDebugInfo(
-      testType: 'ai',
-      modelName: modelName,
-      phase: 'loading',
-      partialOutput: 'Loading model…',
-    ));
+    _emit(
+      AiDebugInfo(
+        testType: 'ai',
+        modelName: modelName,
+        phase: 'loading',
+        partialOutput: 'Loading model…',
+      ),
+    );
 
     try {
       final isDownloaded = await llmService.isModelDownloaded();
       if (!isDownloaded) {
-        _emit(AiDebugInfo(
-          testType: 'ai',
-          modelName: modelName,
-          phase: 'error',
-          error: 'Model not downloaded – download it first.',
-        ));
+        _emit(
+          AiDebugInfo(
+            testType: 'ai',
+            modelName: modelName,
+            phase: 'error',
+            error: 'Model not downloaded – download it first.',
+          ),
+        );
         return;
       }
 
-        final benchmarkInput = (testInput != null && testInput.trim().isNotEmpty)
+      final benchmarkInput = (testInput != null && testInput.trim().isNotEmpty)
           ? testInput.trim()
           : 'Remind me to buy groceries tomorrow and call the dentist at 2 PM.';
 
@@ -245,32 +268,34 @@ class ModelBenchmarkService {
             _ => 'running',
           };
           final mem = llmService.lastInferenceMemoryInfo;
-          _emit(AiDebugInfo(
-            testType: 'ai',
-            modelName: modelName,
-            promptStrategy: 'shared-chrono-flow',
-            retryEnabled: true,
-            phase: benchPhase,
-            partialOutput: partial,
-            rawOutput: partial,
-            tokens: tokens,
-            elapsed: sw.elapsed,
-            tokensPerSecond: tps,
-            deviceMemoryMB: mem?.deviceMB,
-            availableMemoryMB: mem?.availableMB,
-            modelSizeMB: mem?.modelMB,
-            memoryHeadroomMB: mem?.headroomMB,
-            inferenceContextSize: mem?.contextSize,
-            inferenceGpuLayers: mem?.gpuLayers,
-            inferenceMaxTokensCap: mem?.maxTokensCap,
-          ));
+          _emit(
+            AiDebugInfo(
+              testType: 'ai',
+              modelName: modelName,
+              promptStrategy: 'shared-chrono-flow',
+              retryEnabled: true,
+              phase: benchPhase,
+              partialOutput: partial,
+              rawOutput: partial,
+              tokens: tokens,
+              elapsed: sw.elapsed,
+              tokensPerSecond: tps,
+              deviceMemoryMB: mem?.deviceMB,
+              availableMemoryMB: mem?.availableMB,
+              modelSizeMB: mem?.modelMB,
+              memoryHeadroomMB: mem?.headroomMB,
+              requestedContextSize: mem?.requestedContextSize,
+              inferenceContextSize: mem?.contextSize,
+              inferenceGpuLayers: mem?.gpuLayers,
+              inferenceMaxTokensCap: mem?.maxTokensCap,
+            ),
+          );
         },
       );
       sw.stop();
 
       // Use the raw classify response when available
-      final rawResponse =
-          result.classifyMetrics?.rawResponse ?? lastRawOutput;
+      final rawResponse = result.classifyMetrics?.rawResponse ?? lastRawOutput;
 
       // Helper to extract correction metrics from result
       final mem = llmService.lastInferenceMemoryInfo;
@@ -301,12 +326,14 @@ class ModelBenchmarkService {
           tokensPerSecond: result.classifyMetrics?.tokensPerSecond ?? 0.0,
           correctedTranscription: result.correctedTranscription,
           correctionTokens: result.correctionMetrics?.completionTokens ?? 0,
-          correctionElapsed: result.correctionMetrics?.wallTime ?? Duration.zero,
+          correctionElapsed:
+              result.correctionMetrics?.wallTime ?? Duration.zero,
           correctionTokensPerSecond: result.correctionMetrics?.tokensPerSecond,
           deviceMemoryMB: mem?.deviceMB,
           availableMemoryMB: mem?.availableMB,
           modelSizeMB: mem?.modelMB,
           memoryHeadroomMB: mem?.headroomMB,
+          requestedContextSize: mem?.requestedContextSize,
           inferenceContextSize: mem?.contextSize,
           inferenceGpuLayers: mem?.gpuLayers,
           inferenceMaxTokensCap: mem?.maxTokensCap,
@@ -318,27 +345,33 @@ class ModelBenchmarkService {
         return;
       }
 
-      _emit(buildAiResult(
-        phase: 'done',
-        partialOutput:
-            'Category: ${result.category}\n'
-            'Summary: ${result.summary}\n'
-            'Actions: ${result.actions.length}',
-      ));
+      _emit(
+        buildAiResult(
+          phase: 'done',
+          partialOutput:
+              'Category: ${result.category}\n'
+              'Summary: ${result.summary}\n'
+              'Actions: ${result.actions.length}',
+        ),
+      );
     } catch (e) {
       debugPrint('[ModelBenchmark] AI benchmark error: $e');
-      _emit(AiDebugInfo(
-        testType: 'ai',
-        modelName: modelName,
-        phase: 'error',
-        error: e.toString(),
-      ));
+      _emit(
+        AiDebugInfo(
+          testType: 'ai',
+          modelName: modelName,
+          phase: 'error',
+          error: e.toString(),
+        ),
+      );
     } finally {
-      _stateSubject.add(BenchmarkState(
-        isRunning: false,
-        runningTestType: null,
-        current: currentState.current,
-      ));
+      _stateSubject.add(
+        BenchmarkState(
+          isRunning: false,
+          runningTestType: null,
+          current: currentState.current,
+        ),
+      );
     }
   }
 
@@ -354,10 +387,12 @@ class ModelBenchmarkService {
   // ---- Helpers ----
 
   void _emit(AiDebugInfo progress) {
-    _stateSubject.add(BenchmarkState(
-      isRunning: !progress.isComplete,
-      runningTestType: progress.isComplete ? null : progress.testType,
-      current: progress,
-    ));
+    _stateSubject.add(
+      BenchmarkState(
+        isRunning: !progress.isComplete,
+        runningTestType: progress.isComplete ? null : progress.testType,
+        current: progress,
+      ),
+    );
   }
 }

@@ -44,9 +44,9 @@ class VoiceNoteAiPipeline {
     required VoiceMemoRepository memoRepository,
     required ExtractedActionRepository actionRepository,
     this.correctTranscription = false,
-  })  : _llmService = llmService,
-        _memoRepository = memoRepository,
-        _actionRepository = actionRepository;
+  }) : _llmService = llmService,
+       _memoRepository = memoRepository,
+       _actionRepository = actionRepository;
 
   /// Process a single voice memo's transcript with the local LLM.
   ///
@@ -58,7 +58,9 @@ class VoiceNoteAiPipeline {
     required String transcript,
   }) async {
     if (transcript.trim().isEmpty) {
-      debugPrint('[VoiceNoteAiPipeline] Skipping empty transcript for $filename');
+      debugPrint(
+        '[VoiceNoteAiPipeline] Skipping empty transcript for $filename',
+      );
       return false;
     }
 
@@ -71,15 +73,17 @@ class VoiceNoteAiPipeline {
 
       // Publish initial loading state so the debug sheet shows something
       // immediately (before the model finishes loading / first token arrives).
-      _debugInfoSubject.add(AiDebugInfo(
-        filename: filename,
-        modelName: _llmService.modelName,
-        transcriptionResult: transcript,
-        phase: 'loading',
-        partialOutput: '',
-        tokens: 0,
-        timestamp: DateTime.now(),
-      ));
+      _debugInfoSubject.add(
+        AiDebugInfo(
+          filename: filename,
+          modelName: _llmService.modelName,
+          transcriptionResult: transcript,
+          phase: 'loading',
+          partialOutput: '',
+          tokens: 0,
+          timestamp: DateTime.now(),
+        ),
+      );
 
       // Route to brain dump prompt for long transcripts (Feature 6)
       final useBrainDump = _llmService.isBrainDump(transcript);
@@ -96,24 +100,27 @@ class VoiceNoteAiPipeline {
         final elapsedMs = sw.elapsedMilliseconds;
         final tps = elapsedMs > 0 ? tokens / (elapsedMs / 1000.0) : 0.0;
         final mem = _llmService.lastInferenceMemoryInfo;
-        _debugInfoSubject.add(AiDebugInfo(
-          filename: filename,
-          modelName: _llmService.modelName,
-          transcriptionResult: transcript,
-          phase: phase,
-          partialOutput: partial,
-          tokens: tokens,
-          elapsed: sw.elapsed,
-          tokensPerSecond: tps,
-          timestamp: DateTime.now(),
-          deviceMemoryMB: mem?.deviceMB,
-          availableMemoryMB: mem?.availableMB,
-          modelSizeMB: mem?.modelMB,
-          memoryHeadroomMB: mem?.headroomMB,
-          inferenceContextSize: mem?.contextSize,
-          inferenceGpuLayers: mem?.gpuLayers,
-          inferenceMaxTokensCap: mem?.maxTokensCap,
-        ));
+        _debugInfoSubject.add(
+          AiDebugInfo(
+            filename: filename,
+            modelName: _llmService.modelName,
+            transcriptionResult: transcript,
+            phase: phase,
+            partialOutput: partial,
+            tokens: tokens,
+            elapsed: sw.elapsed,
+            tokensPerSecond: tps,
+            timestamp: DateTime.now(),
+            deviceMemoryMB: mem?.deviceMB,
+            availableMemoryMB: mem?.availableMB,
+            modelSizeMB: mem?.modelMB,
+            memoryHeadroomMB: mem?.headroomMB,
+            requestedContextSize: mem?.requestedContextSize,
+            inferenceContextSize: mem?.contextSize,
+            inferenceGpuLayers: mem?.gpuLayers,
+            inferenceMaxTokensCap: mem?.maxTokensCap,
+          ),
+        );
       }
 
       // Run the LLM processing with live progress updates
@@ -126,18 +133,19 @@ class VoiceNoteAiPipeline {
               },
             )
           : await _llmService.processTranscript(
-        transcript,
-        correctTranscription: correctTranscription,
-        onProgress: (phase, partial, tokens) {
-          emitLive(phase, partial, tokens);
-        },
-      );
+              transcript,
+              correctTranscription: correctTranscription,
+              onProgress: (phase, partial, tokens) {
+                emitLive(phase, partial, tokens);
+              },
+            );
       sw.stop();
 
       debugPrint(
-          '[VoiceNoteAiPipeline] Processed $filename: '
-          'summary="${result.summary}", category=${result.category}, '
-          '${result.actions.length} actions');
+        '[VoiceNoteAiPipeline] Processed $filename: '
+        'summary="${result.summary}", category=${result.category}, '
+        '${result.actions.length} actions',
+      );
 
       // If the LLM corrected the transcription, update the transcript as well
       if (result.correctedTranscription != null &&
@@ -212,6 +220,7 @@ class VoiceNoteAiPipeline {
         availableMemoryMB: mem?.availableMB,
         modelSizeMB: mem?.modelMB,
         memoryHeadroomMB: mem?.headroomMB,
+        requestedContextSize: mem?.requestedContextSize,
         inferenceContextSize: mem?.contextSize,
         inferenceGpuLayers: mem?.gpuLayers,
         inferenceMaxTokensCap: mem?.maxTokensCap,
