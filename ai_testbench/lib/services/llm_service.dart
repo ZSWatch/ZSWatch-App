@@ -50,7 +50,7 @@ class LlmService {
   double temperature = 0.3;
   double topP = 1.0;
   double presencePenalty = 2.0;
-  int numGpuLayers = 99;
+  int numGpuLayers = 0;
   /// When false, disables thinking/reasoning for models like Qwen3/3.5.
   bool enableThinking = true;
 
@@ -58,9 +58,7 @@ class LlmService {
     if (log.contains('loaded') || log.contains('error') || log.contains('Error') ||
         log.contains('token') || log.contains('speed') || log.contains('FAILED') ||
         log.contains('Model loaded') || log.contains('Initialized') ||
-        log.contains('Backend initialized') || log.contains('Available backends') ||
-        log.contains('GPU offload') || log.contains('Number of GPU layers requested') ||
-        log.contains('Metal') || log.contains('Vulkan') || log.contains('CUDA')) {
+        log.contains('Backend initialized') || log.contains('Available backends')) {
       debugPrint('[llama.cpp] $log');
     }
   }

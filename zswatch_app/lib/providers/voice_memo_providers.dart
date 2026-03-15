@@ -10,8 +10,6 @@ import '../services/ai/extracted_action_creation_service.dart';
 import '../services/ai/voice_note_ai_pipeline.dart';
 import '../services/voice_memo/transcription_engine.dart';
 import '../services/voice_memo/voice_memo_sync_service.dart';
-import '../services/voice_memo/whisper_lifecycle_manager.dart'; // GpuLifecycleManager
-import '../services/voice_memo/whisper_native_bridge.dart';
 import 'ai_providers.dart';
 import 'settings_providers.dart';
 import 'watch_providers.dart';
@@ -171,17 +169,6 @@ Future<void> _autoTranscribeAndProcess({
 
     debugPrint(
         '[VoiceMemoProviders] Auto-transcribing ${untranscribed.length} memos');
-
-    // Safety: ensure whisper uses CPU-only if we're in the background.
-    // The GpuLifecycleManager handles this proactively, but if the
-    // lifecycle callback hasn't fired yet (e.g. rapid background entry),
-    // this explicit check prevents the Metal GPU crash on iOS.
-    final isBackground = GpuLifecycleManager.instance.isBackground;
-    if (isBackground) {
-      debugPrint(
-          '[VoiceMemoProviders] App is backgrounded — ensuring CPU-only whisper');
-      await WhisperNativeBridge.setForceCpu(forceCpu: true);
-    }
 
     for (final memo in untranscribed) {
       try {

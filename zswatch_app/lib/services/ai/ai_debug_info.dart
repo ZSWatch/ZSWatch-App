@@ -60,7 +60,6 @@ class AiDebugInfo {
   final int? memoryHeadroomMB;
   final int? requestedContextSize;
   final int? inferenceContextSize;
-  final int? inferenceGpuLayers;
   final int? inferenceMaxTokensCap;
 
   // ---- Per-action chrono extraction details (multi-action support) ----
@@ -104,7 +103,6 @@ class AiDebugInfo {
     this.memoryHeadroomMB,
     this.requestedContextSize,
     this.inferenceContextSize,
-    this.inferenceGpuLayers,
     this.inferenceMaxTokensCap,
     this.extractedActions = const [],
   });
