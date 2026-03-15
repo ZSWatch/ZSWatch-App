@@ -22,9 +22,9 @@ class VoiceNoteAiPipeline {
   /// Whether to run the LLM correction step before classification.
   bool correctTranscription;
 
-  /// Called after successful AI processing with (filename, summary).
+  /// Called after successful AI processing with (filename, summary, actionType, datetime).
   /// Used to send the result toast back to the watch.
-  void Function(String filename, String title)? onProcessingComplete;
+  void Function(String filename, String title, String? actionType, String? datetime)? onProcessingComplete;
 
   /// Stream of debug info from the most recent AI processing runs.
   final _debugInfoSubject = BehaviorSubject<AiDebugInfo?>.seeded(null);
@@ -182,7 +182,14 @@ class VoiceNoteAiPipeline {
       }
 
       // Notify watch with round-trip confirmation toast
-      onProcessingComplete?.call(filename, result.summary);
+      final firstAction = result.actions.isNotEmpty ? result.actions.first : null;
+      final actionDatetime = firstAction?.startTime ?? firstAction?.dueDate;
+      onProcessingComplete?.call(
+        filename,
+        result.summary,
+        firstAction?.type,
+        actionDatetime,
+      );
 
       // Publish final debug info and store per-file
       final mem = _llmService.lastInferenceMemoryInfo;

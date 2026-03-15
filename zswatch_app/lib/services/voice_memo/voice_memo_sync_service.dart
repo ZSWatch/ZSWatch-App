@@ -523,7 +523,9 @@ class VoiceMemoSyncService {
   Future<void> sendResultToWatch(
     String filename,
     String title, {
-    Duration confirmationTimeout = const Duration(seconds: 5),
+    String? actionType,
+    String? datetime,
+    Duration confirmationTimeout = const Duration(seconds: 20),
     Future<void> Function(String filename)? onConfirmed,
   }) async {
     if (!_watchService.isConnected) {
@@ -538,7 +540,12 @@ class VoiceMemoSyncService {
     try {
       await _watchService.sendVoiceMemoCommand(
         'result',
-        extraData: {'text': title, 'filename': filename},
+        extraData: {
+          'text': title,
+          'filename': filename,
+          if (actionType != null) 'action_type': actionType,
+          if (datetime != null) 'datetime': datetime,
+        },
       );
       _log('Sent AI result to watch: $filename → "$title"');
     } catch (e) {
