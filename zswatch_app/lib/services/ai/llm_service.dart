@@ -11,7 +11,6 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 
-import '../voice_memo/whisper_lifecycle_manager.dart';
 import 'ai_debug_info.dart';
 import 'llm_compute_service.dart';
 
@@ -33,11 +32,6 @@ class LlmModelInfo {
   /// hungry architectures (e.g. Qwen3.5 with gated attention).
   final int? contextSize;
 
-  /// Per-model GPU layer limit. When non-null, overrides
-  /// [LlmService.numGpuLayers]. Set to a low value (or 0) for models that
-  /// exceed available Metal VRAM on smaller devices.
-  final int? maxGpuLayers;
-
   /// Benchmark score from ai_testbench (passed cases out of [benchmarkTotal]).
   /// Shown in the model picker so users can compare accuracy.
   final int? benchmarkScore;
@@ -52,7 +46,6 @@ class LlmModelInfo {
     this.expectedSizeBytes,
     this.userProvided = false,
     this.contextSize,
-    this.maxGpuLayers,
     this.benchmarkScore,
     this.benchmarkTotal,
   });
@@ -67,13 +60,13 @@ enum LlmServiceStatus { idle, downloading, processing, ready, error }
 
 /// How well a model fits into available device memory.
 enum ModelMemoryFit {
-  /// Plenty of headroom — full context, full GPU.
+  /// Plenty of headroom — full context.
   comfortable,
 
-  /// Moderate — full context but CPU-only (GPU memory too tight).
+  /// Moderate — full context but tighter memory.
   reduced,
 
-  /// Very tight — reduced context and/or CPU-only fallback.
+  /// Very tight — reduced context fallback.
   cpuFallback,
 }
 
@@ -81,7 +74,6 @@ enum ModelMemoryFit {
 class ModelFitResult {
   final ModelMemoryFit fit;
   final int contextSize;
-  final int gpuLayers;
   final int deviceMemoryMB;
   final int modelSizeMB;
   final int headroomMB;
@@ -89,7 +81,6 @@ class ModelFitResult {
   const ModelFitResult({
     required this.fit,
     required this.contextSize,
-    required this.gpuLayers,
     required this.deviceMemoryMB,
     required this.modelSizeMB,
     required this.headroomMB,
@@ -349,9 +340,6 @@ class LlmService {
   double topP = 1.0;
   double presencePenalty = 2.0;
 
-  /// GPU layer offloading. 99 = all layers on Metal/GPU, 0 = CPU-only.
-  int numGpuLayers = 99;
-
   // ---- Internal state ----
   String? _modelPath;
   int _runningRequestId = -1;
@@ -374,9 +362,7 @@ class LlmService {
     final usableMB = (deviceMB * 0.55).round();
     final headroomMB = usableMB - modelMB;
 
-    // Base fit on actual memory headroom, not on gpuLayers.
-    // gpuLayers is always 0 on Android (no Metal) even on high-RAM devices,
-    // so keying off it causes every model to falsely show "Low memory".
+    // Base fit on actual memory headroom.
     ModelMemoryFit fit;
     if (headroomMB < 100) {
       fit = ModelMemoryFit.cpuFallback;
@@ -389,7 +375,6 @@ class LlmService {
     return ModelFitResult(
       fit: fit,
       contextSize: params.contextSize,
-      gpuLayers: params.gpuLayers,
       deviceMemoryMB: deviceMB,
       modelSizeMB: modelMB,
       headroomMB: headroomMB,
@@ -662,7 +647,6 @@ class LlmService {
     int headroomMB,
     int requestedContextSize,
     int contextSize,
-    int gpuLayers,
     int? maxTokensCap,
   })?
   get lastInferenceMemoryInfo => _lastInferenceMemoryInfo;
@@ -673,7 +657,6 @@ class LlmService {
     int headroomMB,
     int requestedContextSize,
     int contextSize,
-    int gpuLayers,
     int? maxTokensCap,
   })?
   _lastInferenceMemoryInfo;
@@ -711,8 +694,8 @@ class LlmService {
     }
   }
 
-  /// Compute context size, GPU layers, and max output tokens dynamically
-  /// based on real-time available RAM and model size.
+  /// Compute context size and max output tokens dynamically based on
+  /// real-time available RAM and model size. GPU is always off (CPU-only).
   ///
   /// Uses [LlmModelInfo.contextSize] if explicitly set, otherwise scales
   /// down when the model weight file would leave too little headroom for the
@@ -724,23 +707,20 @@ class LlmService {
   /// The available memory IS the headroom for KV cache + compute buffers.
   ///
   /// Larger context windows need a larger KV cache and more scratch space.
-  /// The thresholds below prefer a smaller or CPU-only configuration over a
-  /// crash when free RAM is tight:
+  /// The thresholds below prefer a smaller configuration over a crash when
+  /// free RAM is tight:
   ///
-  ///   available ≥ 1500 MB → target nCtx, full GPU,  maxTokens unchanged
-  ///   available ≥  800 MB → target nCtx, CPU-only,  maxTokens unchanged
-  ///   available ≥  400 MB → nCtx 2048, CPU-only,  maxTokens unchanged (shorter prompt)
-  ///   available ≥  100 MB → nCtx 1024, CPU-only,  maxTokens unchanged (compact prompt)
-  ///   available <  100 MB → nCtx 1024, CPU-only,  maxTokens capped at 256 (compact prompt)
-  Future<({int contextSize, int gpuLayers, int? maxTokensCap})>
+  ///   available ≥  800 MB → target nCtx, maxTokens unchanged
+  ///   available ≥  400 MB → nCtx 2048, maxTokens unchanged (shorter prompt)
+  ///   available ≥  100 MB → nCtx 1024, maxTokens unchanged (compact prompt)
+  ///   available <  100 MB → nCtx 1024, maxTokens capped at 256 (compact prompt)
+  Future<({int contextSize, int? maxTokensCap})>
   _computeInferenceParams(LlmModelInfo modelInfo) async {
-    // Explicit per-model overrides win.
+    // Explicit per-model context override wins.
     final explicitCtx = modelInfo.contextSize;
-    final explicitGpu = modelInfo.maxGpuLayers;
-    if (explicitCtx != null && explicitGpu != null) {
+    if (explicitCtx != null) {
       return (
         contextSize: explicitCtx,
-        gpuLayers: explicitGpu,
         maxTokensCap: null,
       );
     }
@@ -762,65 +742,36 @@ class LlmService {
     );
 
     int ctx;
-    int gpu;
     int? tokensCap; // null = use default maxTokens
 
-    if (headroomMB >= 1500) {
-      // Plenty of room: use the full target context on GPU.
+    if (headroomMB >= 800) {
       ctx = nCtx;
-      gpu = numGpuLayers;
-    } else if (headroomMB >= 800) {
-      // Moderate room: keep the full target context, but on CPU.
-      ctx = nCtx;
-      gpu = 0;
-      debugPrint(
-        '[LlmService] Moderate memory (${headroomMB}MB). '
-        'Using CPU with full target context ($nCtx) to avoid GPU memory pressure.',
-      );
     } else if (headroomMB >= 400) {
       // Low — shorter prompt and reduced context.
       ctx = reducedContextSize;
-      gpu = 0;
       debugPrint(
         '[LlmService] Low memory (${headroomMB}MB). '
-        'Using CPU with shorter prompt context ($ctx).',
+        'Using shorter prompt context ($ctx).',
       );
     } else if (headroomMB >= 100) {
       ctx = minimumContextSize;
-      gpu = 0;
       debugPrint(
         '[LlmService] WARNING: Very low memory (${headroomMB}MB). '
-        'Using CPU with emergency compact prompt ($ctx). '
+        'Using emergency compact prompt ($ctx). '
         'Model ${modelInfo.id} ($modelMB MB), '
         'available=${availableMB}MB.',
       );
     } else {
       // Critically low — minimum settings with compact prompt.
       ctx = minimumContextSize;
-      gpu = 0;
       tokensCap = 256;
       debugPrint(
         '[LlmService] CRITICAL: Extremely low memory (${headroomMB}MB). '
-        'Using minimum settings: compact prompt ($ctx), CPU-only, maxTokens=256. '
+        'Using minimum settings: compact prompt ($ctx), maxTokens=256. '
         'Model ${modelInfo.id} ($modelMB MB), '
         'available=${availableMB}MB, device=${deviceMB}MB.',
       );
     }
-
-    // Let explicit per-model values override the computed ones.
-    // On iOS, also check if the GPU lifecycle manager says GPU is currently
-    // unsafe (app backgrounded in auto mode, or user forced CPU).
-    final gpuAllowed = GpuLifecycleManager.instance.shouldUseGpu;
-    int resolvedGpu = explicitGpu ?? gpu;
-    if (!gpuAllowed && resolvedGpu > 0) {
-      debugPrint(
-        '[LlmService] GPU not allowed (background or user preference) — '
-        'forcing CPU-only inference (was gpuLayers=$resolvedGpu).',
-      );
-      resolvedGpu = 0;
-    }
-
-    final resolvedCtx = explicitCtx ?? ctx;
 
     // Store memory snapshot for debug UI.
     _lastInferenceMemoryInfo = (
@@ -829,14 +780,12 @@ class LlmService {
       modelMB: modelMB,
       headroomMB: headroomMB,
       requestedContextSize: nCtx,
-      contextSize: resolvedCtx,
-      gpuLayers: resolvedGpu,
+      contextSize: ctx,
       maxTokensCap: tokensCap,
     );
 
     return (
-      contextSize: resolvedCtx,
-      gpuLayers: resolvedGpu,
+      contextSize: ctx,
       maxTokensCap: tokensCap,
     );
   }
@@ -868,8 +817,11 @@ class LlmService {
     // Cancel any still-running inference (e.g. leftover from hot-restart or
     // a previous phase) before starting a new one.  This reduces the window
     // for the "Callback invoked after it has been deleted" crash.
+    final generateStopwatch = Stopwatch()..start();
+    debugPrint('[LlmService] TIMING _generate: cancelInference at ${generateStopwatch.elapsedMilliseconds}ms');
     cancelInference();
     await _ensureModel();
+    debugPrint('[LlmService] TIMING _generate: ensureModel done at ${generateStopwatch.elapsedMilliseconds}ms');
 
     // Keep CPU at full speed during inference (Android foreground service).
     await LlmComputeService.instance.start();
@@ -896,7 +848,8 @@ class LlmService {
 
     debugPrint(
       '[LlmService] Inference: model=${modelInfo.id} nCtx=${params.contextSize} '
-      'gpuLayers=${params.gpuLayers} maxTokens=$effectiveMaxTokens '
+      'maxTokens=$effectiveMaxTokens '
+      'deviceRAM=${_deviceMemoryMB ?? "?"}MB',
       'threads=$nThreads deviceRAM=${_deviceMemoryMB ?? "?"}MB',
     );
 
@@ -904,7 +857,8 @@ class LlmService {
       messages: [Message(Role.user, prompt)],
       modelPath: _modelPath!,
       maxTokens: effectiveMaxTokens,
-      numGpuLayers: params.gpuLayers,
+      numThreads: nThreads,
+      numGpuLayers: 0,
       numThreads: nThreads,
       temperature: temperature,
       topP: topP,
@@ -915,6 +869,7 @@ class LlmService {
       enableThinking: false,
     );
 
+    debugPrint('[LlmService] TIMING _generate: calling fllamaChat at ${generateStopwatch.elapsedMilliseconds}ms');
     _runningRequestId = await fllamaChat(request, (
       String response,
       String responseJson,
@@ -923,11 +878,14 @@ class LlmService {
       tokenCount++;
       onPartialResponse?.call(response, tokenCount);
       if (done && !completer.isCompleted) {
+        debugPrint('[LlmService] TIMING _generate: done callback received at ${generateStopwatch.elapsedMilliseconds}ms (tokens=$tokenCount)');
         completer.complete(response);
       }
     });
+    debugPrint('[LlmService] TIMING _generate: fllamaChat returned requestId=$_runningRequestId at ${generateStopwatch.elapsedMilliseconds}ms');
 
     final text = (await completer.future).trim();
+    debugPrint('[LlmService] TIMING _generate: completer resolved at ${generateStopwatch.elapsedMilliseconds}ms');
     stopwatch.stop();
 
     // Release the foreground service + wake lock.
@@ -967,6 +925,7 @@ class LlmService {
     );
 
     try {
+      final totalStopwatch = Stopwatch()..start();
       debugPrint(
         '[LlmService] Processing transcript (${transcript.length} chars)',
       );
@@ -983,6 +942,7 @@ class LlmService {
 
       // --- Step 1: Correct transcription errors if enabled ---
       if (correctTranscription) {
+        debugPrint('[LlmService] TIMING: Starting correction step at ${totalStopwatch.elapsedMilliseconds}ms');
         final correctionPrompt = _buildCorrectionPrompt(transcript);
         final correctionMaxTokens = CorrectionPromptTemplate.estimateMaxTokens(
           transcript,
@@ -994,6 +954,7 @@ class LlmService {
               ? null
               : (partial, tokens) => onProgress('correcting', partial, tokens),
         );
+        debugPrint('[LlmService] TIMING: Correction _generate() returned at ${totalStopwatch.elapsedMilliseconds}ms');
 
         final corrected = correctionResult.text.trim();
         correctionMetrics = correctionResult.metrics;
@@ -1017,7 +978,9 @@ class LlmService {
       // the next fllamaChat call triggers cleanup of the previous logger
       // NativeCallable while C++ may still be invoking it, causing a fatal
       // "Callback invoked after it has been deleted" crash.
+      debugPrint('[LlmService] TIMING: Starting 500ms delay at ${totalStopwatch.elapsedMilliseconds}ms');
       await Future<void>.delayed(const Duration(milliseconds: 500));
+      debugPrint('[LlmService] TIMING: 500ms delay done at ${totalStopwatch.elapsedMilliseconds}ms');
 
       // --- Step 2: Build the extraction prompt ---
       final promptTemplate = classifyPromptOverride?.trim();
@@ -1030,6 +993,7 @@ class LlmService {
               effectiveTranscript,
               effectiveCtx: effectiveCtx,
             );
+      debugPrint('[LlmService] TIMING: Starting classify step at ${totalStopwatch.elapsedMilliseconds}ms (prompt ${prompt.length} chars)');
       final structuredResult = await _generateStructuredJsonWithRetry(
         prompt,
         promptStrategy: (promptTemplate != null && promptTemplate.isNotEmpty)
@@ -1045,6 +1009,7 @@ class LlmService {
       final raw = structuredResult.raw;
       final classifyMetrics = structuredResult.metrics;
 
+      debugPrint('[LlmService] TIMING: Classify done at ${totalStopwatch.elapsedMilliseconds}ms');
       debugPrint('[LlmService] Raw AI response: $raw');
 
       // --- Parse JSON from output ---
@@ -1365,6 +1330,7 @@ JSON:
 
     while (attempts < _maxStructuredOutputAttempts) {
       attempts++;
+      debugPrint('[LlmService] TIMING _generateStructuredJson: attempt $attempts starting');
 
       final genResult = await _generate(
         prompt,
@@ -1380,8 +1346,15 @@ JSON:
       totalWallTime += genResult.metrics.wallTime;
       totalCompletionTokens += genResult.metrics.completionTokens;
 
-      if (!_shouldRetryStructuredOutput(raw, parsed) ||
-          attempts >= _maxStructuredOutputAttempts) {
+      final needsRetry = _shouldRetryStructuredOutput(raw, parsed);
+      debugPrint(
+        '[LlmService] TIMING attempt $attempts done: '
+        'needsRetry=$needsRetry, '
+        'summary="${parsed.summary.length > 50 ? parsed.summary.substring(0, 50) : parsed.summary}", '
+        'actions=${parsed.actions.length}',
+      );
+
+      if (!needsRetry || attempts >= _maxStructuredOutputAttempts) {
         break;
       }
 
