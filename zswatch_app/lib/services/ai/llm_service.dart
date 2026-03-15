@@ -876,14 +876,14 @@ class LlmService {
       tokenCount++;
       onPartialResponse?.call(response, tokenCount);
       if (done && !completer.isCompleted) {
-        debugPrint('[LlmService] TIMING _generate: done callback received at ${generateStopwatch.elapsedMilliseconds}ms (tokens=$tokenCount)');
+        debugPrint('[LlmService] TIMING _generate: done callback received at ${generateStopwatch.elapsedMilliseconds}ms wallClock=${DateTime.now().toIso8601String()} (tokens=$tokenCount)');
         completer.complete(response);
       }
     });
     debugPrint('[LlmService] TIMING _generate: fllamaChat returned requestId=$_runningRequestId at ${generateStopwatch.elapsedMilliseconds}ms');
 
     final text = (await completer.future).trim();
-    debugPrint('[LlmService] TIMING _generate: completer resolved at ${generateStopwatch.elapsedMilliseconds}ms');
+    debugPrint('[LlmService] TIMING _generate: completer resolved at ${generateStopwatch.elapsedMilliseconds}ms wallClock=${DateTime.now().toIso8601String()}');
     stopwatch.stop();
 
     // Release the foreground service + wake lock.
@@ -991,7 +991,7 @@ class LlmService {
               effectiveTranscript,
               effectiveCtx: effectiveCtx,
             );
-      debugPrint('[LlmService] TIMING: Starting classify step at ${totalStopwatch.elapsedMilliseconds}ms (prompt ${prompt.length} chars)');
+      debugPrint('[LlmService] TIMING: Starting classify step at ${totalStopwatch.elapsedMilliseconds}ms wallClock=${DateTime.now().toIso8601String()} (prompt ${prompt.length} chars)');
       final structuredResult = await _generateStructuredJsonWithRetry(
         prompt,
         promptStrategy: (promptTemplate != null && promptTemplate.isNotEmpty)
@@ -1007,7 +1007,7 @@ class LlmService {
       final raw = structuredResult.raw;
       final classifyMetrics = structuredResult.metrics;
 
-      debugPrint('[LlmService] TIMING: Classify done at ${totalStopwatch.elapsedMilliseconds}ms');
+      debugPrint('[LlmService] TIMING: Classify done at ${totalStopwatch.elapsedMilliseconds}ms wallClock=${DateTime.now().toIso8601String()}');
       debugPrint('[LlmService] Raw AI response: $raw');
 
       // --- Parse JSON from output ---
