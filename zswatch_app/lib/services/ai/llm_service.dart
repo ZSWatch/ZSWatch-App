@@ -849,7 +849,6 @@ class LlmService {
     debugPrint(
       '[LlmService] Inference: model=${modelInfo.id} nCtx=${params.contextSize} '
       'maxTokens=$effectiveMaxTokens '
-      'deviceRAM=${_deviceMemoryMB ?? "?"}MB',
       'threads=$nThreads deviceRAM=${_deviceMemoryMB ?? "?"}MB',
     );
 
@@ -857,7 +856,6 @@ class LlmService {
       messages: [Message(Role.user, prompt)],
       modelPath: _modelPath!,
       maxTokens: effectiveMaxTokens,
-      numThreads: nThreads,
       numGpuLayers: 0,
       numThreads: nThreads,
       temperature: temperature,
