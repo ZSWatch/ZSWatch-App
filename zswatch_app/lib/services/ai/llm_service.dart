@@ -817,11 +817,8 @@ class LlmService {
     // Cancel any still-running inference (e.g. leftover from hot-restart or
     // a previous phase) before starting a new one.  This reduces the window
     // for the "Callback invoked after it has been deleted" crash.
-    final generateStopwatch = Stopwatch()..start();
-    debugPrint('[LlmService] TIMING _generate: cancelInference at ${generateStopwatch.elapsedMilliseconds}ms');
     cancelInference();
     await _ensureModel();
-    debugPrint('[LlmService] TIMING _generate: ensureModel done at ${generateStopwatch.elapsedMilliseconds}ms');
 
     // Keep CPU at full speed during inference (Android foreground service).
     await LlmComputeService.instance.start();
@@ -867,7 +864,6 @@ class LlmService {
       enableThinking: false,
     );
 
-    debugPrint('[LlmService] TIMING _generate: calling fllamaChat at ${generateStopwatch.elapsedMilliseconds}ms');
     _runningRequestId = await fllamaChat(request, (
       String response,
       String responseJson,
@@ -876,14 +872,11 @@ class LlmService {
       tokenCount++;
       onPartialResponse?.call(response, tokenCount);
       if (done && !completer.isCompleted) {
-        debugPrint('[LlmService] TIMING _generate: done callback received at ${generateStopwatch.elapsedMilliseconds}ms wallClock=${DateTime.now().toIso8601String()} (tokens=$tokenCount)');
         completer.complete(response);
       }
     });
-    debugPrint('[LlmService] TIMING _generate: fllamaChat returned requestId=$_runningRequestId at ${generateStopwatch.elapsedMilliseconds}ms');
 
     final text = (await completer.future).trim();
-    debugPrint('[LlmService] TIMING _generate: completer resolved at ${generateStopwatch.elapsedMilliseconds}ms wallClock=${DateTime.now().toIso8601String()}');
     stopwatch.stop();
 
     // Release the foreground service + wake lock.
@@ -940,7 +933,6 @@ class LlmService {
 
       // --- Step 1: Correct transcription errors if enabled ---
       if (correctTranscription) {
-        debugPrint('[LlmService] TIMING: Starting correction step at ${totalStopwatch.elapsedMilliseconds}ms');
         final correctionPrompt = _buildCorrectionPrompt(transcript);
         final correctionMaxTokens = CorrectionPromptTemplate.estimateMaxTokens(
           transcript,
@@ -952,8 +944,6 @@ class LlmService {
               ? null
               : (partial, tokens) => onProgress('correcting', partial, tokens),
         );
-        debugPrint('[LlmService] TIMING: Correction _generate() returned at ${totalStopwatch.elapsedMilliseconds}ms');
-
         final corrected = correctionResult.text.trim();
         correctionMetrics = correctionResult.metrics;
 
@@ -976,9 +966,7 @@ class LlmService {
       // the next fllamaChat call triggers cleanup of the previous logger
       // NativeCallable while C++ may still be invoking it, causing a fatal
       // "Callback invoked after it has been deleted" crash.
-      debugPrint('[LlmService] TIMING: Starting 500ms delay at ${totalStopwatch.elapsedMilliseconds}ms');
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      debugPrint('[LlmService] TIMING: 500ms delay done at ${totalStopwatch.elapsedMilliseconds}ms');
 
       // --- Step 2: Build the extraction prompt ---
       final promptTemplate = classifyPromptOverride?.trim();
@@ -991,7 +979,6 @@ class LlmService {
               effectiveTranscript,
               effectiveCtx: effectiveCtx,
             );
-      debugPrint('[LlmService] TIMING: Starting classify step at ${totalStopwatch.elapsedMilliseconds}ms wallClock=${DateTime.now().toIso8601String()} (prompt ${prompt.length} chars)');
       final structuredResult = await _generateStructuredJsonWithRetry(
         prompt,
         promptStrategy: (promptTemplate != null && promptTemplate.isNotEmpty)
@@ -1007,7 +994,7 @@ class LlmService {
       final raw = structuredResult.raw;
       final classifyMetrics = structuredResult.metrics;
 
-      debugPrint('[LlmService] TIMING: Classify done at ${totalStopwatch.elapsedMilliseconds}ms wallClock=${DateTime.now().toIso8601String()}');
+      debugPrint('[LlmService] Classify done at ${totalStopwatch.elapsedMilliseconds}ms');
       debugPrint('[LlmService] Raw AI response: $raw');
 
       // --- Parse JSON from output ---
@@ -1328,8 +1315,6 @@ JSON:
 
     while (attempts < _maxStructuredOutputAttempts) {
       attempts++;
-      debugPrint('[LlmService] TIMING _generateStructuredJson: attempt $attempts starting');
-
       final genResult = await _generate(
         prompt,
         overrideMaxTokens: overrideMaxTokens,
@@ -1337,7 +1322,6 @@ JSON:
             ? null
             : (partial, tokens) => onProgress(phase, partial, tokens),
       );
-
       raw = genResult.text;
       parsed = _parseTranscriptResult(raw);
       lastMetrics = genResult.metrics;
@@ -1345,12 +1329,6 @@ JSON:
       totalCompletionTokens += genResult.metrics.completionTokens;
 
       final needsRetry = _shouldRetryStructuredOutput(raw, parsed);
-      debugPrint(
-        '[LlmService] TIMING attempt $attempts done: '
-        'needsRetry=$needsRetry, '
-        'summary="${parsed.summary.length > 50 ? parsed.summary.substring(0, 50) : parsed.summary}", '
-        'actions=${parsed.actions.length}',
-      );
 
       if (!needsRetry || attempts >= _maxStructuredOutputAttempts) {
         break;
