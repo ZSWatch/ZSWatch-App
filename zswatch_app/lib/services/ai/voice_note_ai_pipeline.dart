@@ -117,7 +117,6 @@ class VoiceNoteAiPipeline {
             memoryHeadroomMB: mem?.headroomMB,
             requestedContextSize: mem?.requestedContextSize,
             inferenceContextSize: mem?.contextSize,
-            inferenceGpuLayers: mem?.gpuLayers,
             inferenceMaxTokensCap: mem?.maxTokensCap,
           ),
         );
@@ -222,7 +221,6 @@ class VoiceNoteAiPipeline {
         memoryHeadroomMB: mem?.headroomMB,
         requestedContextSize: mem?.requestedContextSize,
         inferenceContextSize: mem?.contextSize,
-        inferenceGpuLayers: mem?.gpuLayers,
         inferenceMaxTokensCap: mem?.maxTokensCap,
       );
       _debugInfoByFile[filename] = finalDebug;

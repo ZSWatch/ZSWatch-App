@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/voice_memo/transcription_engine.dart';
-import '../services/voice_memo/whisper_lifecycle_manager.dart';
 
 /// Keys for SharedPreferences
 abstract final class SettingsKeys {
@@ -22,7 +21,6 @@ abstract final class SettingsKeys {
   static const String selectedAiModelId = 'selected_ai_model_id';
   static const String selectedProductivityCalendarId =
       'selected_productivity_calendar_id';
-  static const String gpuInferenceMode = 'gpu_inference_mode';
   static const String autoCreateActions = 'auto_create_actions';
   static const String aiCorrectionEnabled = 'ai_correction_enabled';
 }
@@ -460,52 +458,6 @@ class SelectedProductivityCalendarIdNotifier extends StateNotifier<int?> {
       return;
     }
     _prefs?.setInt(SettingsKeys.selectedProductivityCalendarId, calendarId);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// GPU inference mode (iOS Metal)
-// ---------------------------------------------------------------------------
-
-/// Controls GPU usage for whisper (transcription) and fllama (LLM) on iOS.
-///
-/// - [GpuInferenceMode.auto]: GPU in foreground, CPU in background (default,
-///   prevents Metal crashes when iOS suspends GPU access).
-/// - [GpuInferenceMode.alwaysGpu]: Force Metal GPU always (faster, but risky
-///   if inference runs while backgrounded).
-/// - [GpuInferenceMode.alwaysCpu]: Force CPU always (safe, slower — useful
-///   for benchmarking).
-final gpuInferenceModeProvider =
-    StateNotifierProvider<GpuInferenceModeNotifier, GpuInferenceMode>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return GpuInferenceModeNotifier(prefs.valueOrNull);
-});
-
-class GpuInferenceModeNotifier extends StateNotifier<GpuInferenceMode> {
-  final SharedPreferences? _prefs;
-
-  GpuInferenceModeNotifier(this._prefs)
-      : super(_fromString(
-            _prefs?.getString(SettingsKeys.gpuInferenceMode))) {
-    // Sync the initial value to the lifecycle manager.
-    GpuLifecycleManager.instance.setGpuMode(state);
-  }
-
-  static GpuInferenceMode _fromString(String? value) {
-    switch (value) {
-      case 'alwaysGpu':
-        return GpuInferenceMode.alwaysGpu;
-      case 'alwaysCpu':
-        return GpuInferenceMode.alwaysCpu;
-      default:
-        return GpuInferenceMode.auto;
-    }
-  }
-
-  void setMode(GpuInferenceMode mode) {
-    state = mode;
-    _prefs?.setString(SettingsKeys.gpuInferenceMode, mode.name);
-    GpuLifecycleManager.instance.setGpuMode(mode);
   }
 }
 

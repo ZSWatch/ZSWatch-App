@@ -286,7 +286,6 @@ class ModelBenchmarkService {
               memoryHeadroomMB: mem?.headroomMB,
               requestedContextSize: mem?.requestedContextSize,
               inferenceContextSize: mem?.contextSize,
-              inferenceGpuLayers: mem?.gpuLayers,
               inferenceMaxTokensCap: mem?.maxTokensCap,
             ),
           );
@@ -335,7 +334,6 @@ class ModelBenchmarkService {
           memoryHeadroomMB: mem?.headroomMB,
           requestedContextSize: mem?.requestedContextSize,
           inferenceContextSize: mem?.contextSize,
-          inferenceGpuLayers: mem?.gpuLayers,
           inferenceMaxTokensCap: mem?.maxTokensCap,
         );
       }

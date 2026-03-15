@@ -11,7 +11,6 @@ import 'providers/notification_providers.dart';
 import 'providers/permission_providers.dart';
 import 'providers/voice_memo_providers.dart';
 import 'providers/watch_service_provider.dart';
-import 'services/voice_memo/whisper_lifecycle_manager.dart';
 import 'ui/navigation/app_router.dart';
 
 /// Main application widget
@@ -64,10 +63,6 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       // Initialize voice memo sync service to handle recording sync from watch
       // This subscribes to watch messages for new recording notifications
       ref.read(voiceMemoSyncServiceProvider);
-      // Initialize GPU lifecycle manager to switch between Metal GPU
-      // (foreground) and CPU-only (background) — prevents iOS Metal crashes
-      // for both whisper (transcription) and fllama (LLM inference).
-      GpuLifecycleManager.instance.initialize();
     } catch (e) {
       debugPrint('BLE initialization error: $e');
     }

@@ -593,15 +593,6 @@ Widget? aiMemoryInfoBlock(BuildContext context, AiDebugInfo info) {
                 '$actualContextSize of $requestedContextSize',
                 Icons.tune,
               ),
-            if (info.inferenceGpuLayers != null)
-              aiMetricChip(
-                context,
-                'GPU layers',
-                info.inferenceGpuLayers == 0
-                    ? 'CPU only'
-                    : '${info.inferenceGpuLayers}',
-                Icons.developer_board,
-              ),
             if (info.inferenceMaxTokensCap != null)
               aiMetricChip(
                 context,
