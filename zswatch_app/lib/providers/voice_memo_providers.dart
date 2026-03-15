@@ -105,10 +105,12 @@ final voiceMemoSyncServiceProvider = Provider<VoiceMemoSyncService>((ref) {
       pipeline = ref.read(voiceNoteAiPipelineProvider);
       // Wire round-trip confirmation: send result back to watch after AI processing
       final autoCreate = ref.read(autoCreateActionsProvider);
-      pipeline!.onProcessingComplete = (filename, title) {
+      pipeline!.onProcessingComplete = (filename, title, actionType, datetime) {
         service.sendResultToWatch(
           filename,
           title,
+          actionType: actionType,
+          datetime: datetime,
           onConfirmed: autoCreate
               ? (confirmedFilename) => _autoCreateActionsForMemo(
                     ref: ref,
