@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../navigation/app_router.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../../data/database/app_database.dart';
 import '../../../data/models/connection_state.dart';
@@ -12,7 +14,6 @@ import '../../../providers/auto_reconnect_provider.dart';
 import '../../../providers/ble_providers.dart';
 import '../../../providers/watch_providers.dart' as db;
 import '../../../providers/watch_service_provider.dart';
-import '../../widgets/connection_status_pill.dart';
 import '../../widgets/watch_config_dialog.dart';
 
 /// Start page showing stored watches and option to add new watch (FR-067 to FR-070)
@@ -82,7 +83,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
           ),
         );
         // Navigate to dashboard on successful connection (FR-074)
-        context.go('/');
+        context.go(AppRoutes.home);
       }
     } catch (e) {
       if (mounted) {
@@ -106,42 +107,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
   void _navigateToScan() {
     // Cancel auto-reconnect when user wants to add new watch (FR-073)
     ref.read(autoReconnectNotifierProvider.notifier).cancel();
-    context.push('/scan');
-  }
-
-  Future<void> _deleteWatch(WatchEntity watch) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Watch'),
-        content: Text(
-          'Remove "${watch.customName ?? watch.name}" from saved watches?\n\n'
-          'You can pair it again later.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await ref.read(db.watchNotifierProvider.notifier).deleteWatch(watch.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${watch.customName ?? watch.name} removed'),
-          ),
-        );
-      }
-    }
+    context.push(AppRoutes.scan);
   }
 
   /// Open the watch config dialog for renaming or forgetting a watch (T116)
@@ -195,7 +161,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
     // Navigate to dashboard when connected (FR-074)
     ref.listen(connectionStateProvider, (previous, next) {
       if (next == WatchConnectionState.connected && mounted) {
-        context.go('/');
+        context.go(AppRoutes.home);
       }
     });
 
@@ -209,7 +175,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => context.push('/settings'),
+            onPressed: () => context.push(AppRoutes.settings),
             tooltip: 'Settings',
           ),
         ],

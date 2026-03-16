@@ -1,14 +1,16 @@
 import 'package:drift/drift.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../database/app_database.dart';
 import '../models/health_sample.dart';
+import 'base_repository.dart';
 
 /// Repository for health data operations
 ///
 /// Provides a clean interface for CRUD operations on health samples,
 /// abstracting the database layer from the rest of the app.
 /// Includes 60-day data retention with automatic cleanup.
-class HealthRepository {
+class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> {
   final AppDatabase _db;
 
   HealthRepository(this._db);
@@ -333,7 +335,7 @@ class HealthRepository {
 
   /// Delete old data (60-day retention policy)
   Future<int> cleanupOldData() async {
-    final cutoff = DateTime.now().subtract(const Duration(days: 60));
+    final cutoff = DateTime.now().subtract(const Duration(days: AppConstants.analyticsRetentionDays));
     return _db.deleteOldHealthSamples(cutoff);
   }
 
@@ -435,6 +437,9 @@ class HealthRepository {
   }
 
   // ==================== Mapping ====================
+
+  @override
+  HealthSample fromEntity(HealthSampleEntity entity) => _entityToModel(entity);
 
   HealthSample _entityToModel(HealthSampleEntity entity) {
     return HealthSample(

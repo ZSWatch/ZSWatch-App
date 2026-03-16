@@ -1,8 +1,10 @@
 import 'dart:io';
 
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../core/constants/filesystem_constants.dart';
+
+part 'filesystem_image.freezed.dart';
 
 /// Status of a filesystem upload operation
 enum FilesystemUploadStatus {
@@ -21,10 +23,11 @@ enum FilesystemUploadStatus {
 /// Extension methods for FilesystemUploadStatus
 extension FilesystemUploadStatusExtension on FilesystemUploadStatus {
   bool get isInProgress => this == FilesystemUploadStatus.uploading;
-  bool get isTerminal => this == FilesystemUploadStatus.completed ||
+  bool get isTerminal =>
+      this == FilesystemUploadStatus.completed ||
       this == FilesystemUploadStatus.failed ||
       this == FilesystemUploadStatus.cancelled;
-  
+
   String get statusText {
     switch (this) {
       case FilesystemUploadStatus.idle:
@@ -42,36 +45,32 @@ extension FilesystemUploadStatusExtension on FilesystemUploadStatus {
 }
 
 /// Represents a filesystem image that can be uploaded to the watch
-/// 
+///
 /// This is typically the lvgl_resources_raw.bin file found alongside
 /// dfu_application.zip in release archives.
-class FilesystemImage extends Equatable {
-  /// Display name for the image
-  final String name;
+@freezed
+abstract class FilesystemImage with _$FilesystemImage {
+  const FilesystemImage._();
 
-  /// Local file path to the image
-  final String filePath;
+  const factory FilesystemImage({
+    /// Display name for the image
+    required String name,
 
-  /// Target path on the device where the file will be uploaded
-  final String targetPath;
+    /// Local file path to the image
+    required String filePath,
 
-  /// File size in bytes
-  final int size;
+    /// Target path on the device where the file will be uploaded
+    required String targetPath,
 
-  /// Optional source URL (if downloaded from GitHub)
-  final String? sourceUrl;
+    /// File size in bytes
+    required int size,
 
-  /// Version string (if known)
-  final String? version;
+    /// Optional source URL (if downloaded from GitHub)
+    String? sourceUrl,
 
-  const FilesystemImage({
-    required this.name,
-    required this.filePath,
-    required this.targetPath,
-    required this.size,
-    this.sourceUrl,
-    this.version,
-  });
+    /// Version string (if known)
+    String? version,
+  }) = _FilesystemImage;
 
   /// Create from a local file with default target path
   factory FilesystemImage.fromFile({
@@ -82,7 +81,7 @@ class FilesystemImage extends Equatable {
   }) {
     final file = File(filePath);
     final fileName = file.uri.pathSegments.last;
-    
+
     return FilesystemImage(
       name: fileName,
       filePath: filePath,
@@ -113,53 +112,38 @@ class FilesystemImage extends Equatable {
   Future<List<int>> readBytes() async {
     return File(filePath).readAsBytes();
   }
-
-  @override
-  List<Object?> get props => [name, filePath, targetPath, size, sourceUrl, version];
-
-  @override
-  String toString() => 'FilesystemImage(name: $name, size: $formattedSize, target: $targetPath)';
 }
 
 /// State for filesystem upload operations
-class FilesystemUploadState extends Equatable {
-  /// Current status
-  final FilesystemUploadStatus status;
+@freezed
+abstract class FilesystemUploadState with _$FilesystemUploadState {
+  const FilesystemUploadState._();
 
-  /// Progress (0.0 to 1.0)
-  final double progress;
+  const factory FilesystemUploadState({
+    /// Current status
+    @Default(FilesystemUploadStatus.idle) FilesystemUploadStatus status,
 
-  /// Bytes transferred
-  final int bytesTransferred;
+    /// Progress (0.0 to 1.0)
+    @Default(0.0) double progress,
 
-  /// Total bytes to transfer
-  final int totalBytes;
+    /// Bytes transferred
+    @Default(0) int bytesTransferred,
 
-  /// Upload speed in bytes per second
-  final int speedBytesPerSecond;
+    /// Total bytes to transfer
+    @Default(0) int totalBytes,
 
-  /// When the upload started
-  final DateTime? startedAt;
+    /// Upload speed in bytes per second
+    @Default(0) int speedBytesPerSecond,
 
-  /// Error message (if failed)
-  final String? errorMessage;
+    /// When the upload started
+    DateTime? startedAt,
 
-  /// Current image being uploaded
-  final String? imageName;
+    /// Error message (if failed)
+    String? errorMessage,
 
-  const FilesystemUploadState({
-    this.status = FilesystemUploadStatus.idle,
-    this.progress = 0.0,
-    this.bytesTransferred = 0,
-    this.totalBytes = 0,
-    this.speedBytesPerSecond = 0,
-    this.startedAt,
-    this.errorMessage,
-    this.imageName,
-  });
-
-  /// Idle state
-  static const idle = FilesystemUploadState();
+    /// Current image being uploaded
+    String? imageName,
+  }) = _FilesystemUploadState;
 
   /// Create uploading state
   factory FilesystemUploadState.uploading({
@@ -226,10 +210,10 @@ class FilesystemUploadState extends Equatable {
     if (speedBytesPerSecond <= 0 || bytesTransferred >= totalBytes) {
       return '--:--';
     }
-    
+
     final remaining = totalBytes - bytesTransferred;
     final seconds = remaining ~/ speedBytesPerSecond;
-    
+
     if (seconds < 60) {
       return '${seconds}s';
     } else if (seconds < 3600) {
@@ -258,39 +242,4 @@ class FilesystemUploadState extends Equatable {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
     }
   }
-
-  FilesystemUploadState copyWith({
-    FilesystemUploadStatus? status,
-    double? progress,
-    int? bytesTransferred,
-    int? totalBytes,
-    int? speedBytesPerSecond,
-    DateTime? startedAt,
-    String? errorMessage,
-    String? imageName,
-  }) {
-    return FilesystemUploadState(
-      status: status ?? this.status,
-      progress: progress ?? this.progress,
-      bytesTransferred: bytesTransferred ?? this.bytesTransferred,
-      totalBytes: totalBytes ?? this.totalBytes,
-      speedBytesPerSecond: speedBytesPerSecond ?? this.speedBytesPerSecond,
-      startedAt: startedAt ?? this.startedAt,
-      errorMessage: errorMessage ?? this.errorMessage,
-      imageName: imageName ?? this.imageName,
-    );
-  }
-
-  @override
-  List<Object?> get props => [
-        status,
-        progress,
-        bytesTransferred,
-        totalBytes,
-        speedBytesPerSecond,
-        startedAt,
-        errorMessage,
-        imageName,
-      ];
 }
-

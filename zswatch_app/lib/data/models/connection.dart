@@ -1,15 +1,17 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'connection_state.dart';
+
+part 'connection.freezed.dart';
 
 /// PHY mode for BLE connection
 enum PhyMode {
   /// 1 Mbps PHY (default)
   phy1M,
-  
+
   /// 2 Mbps PHY (preferred for higher throughput)
   phy2M,
-  
+
   /// Coded PHY (long range, not typically used for ZSWatch)
   coded,
 }
@@ -18,61 +20,50 @@ enum PhyMode {
 ///
 /// This is an in-memory model that holds the current connection state
 /// and metadata. It's not persisted to the database.
-class Connection extends Equatable {
-  /// ID of the connected watch
-  final String watchId;
+@freezed
+abstract class Connection with _$Connection {
+  const Connection._();
 
-  /// Name of the connected watch
-  final String? watchName;
+  const factory Connection({
+    /// ID of the connected watch
+    required String watchId,
 
-  /// Current connection state
-  final WatchConnectionState state;
+    /// Name of the connected watch
+    String? watchName,
 
-  /// Signal strength in dBm (negative value, closer to 0 is stronger)
-  final int? rssi;
+    /// Current connection state
+    required WatchConnectionState state,
 
-  /// Negotiated MTU size
-  final int? mtu;
+    /// Signal strength in dBm (negative value, closer to 0 is stronger)
+    int? rssi,
 
-  /// Current PHY mode
-  final PhyMode? phyMode;
+    /// Negotiated MTU size
+    int? mtu,
 
-  /// Whether Data Length Extension is enabled
-  final bool dleEnabled;
+    /// Current PHY mode
+    PhyMode? phyMode,
 
-  /// Whether watch is currently charging
-  final bool isCharging;
+    /// Whether Data Length Extension is enabled
+    @Default(false) bool dleEnabled,
 
-  /// Number of reconnection attempts in current session
-  final int reconnectionCount;
+    /// Whether watch is currently charging
+    @Default(false) bool isCharging,
 
-  /// When the current connection was established
-  final DateTime? connectedAt;
+    /// Number of reconnection attempts in current session
+    @Default(0) int reconnectionCount,
 
-  /// Last data exchange timestamp
-  final DateTime? lastActivityAt;
+    /// When the current connection was established
+    DateTime? connectedAt,
 
-  /// Error information if state is error
-  final ConnectionErrorType? errorType;
+    /// Last data exchange timestamp
+    DateTime? lastActivityAt,
 
-  /// Additional error details
-  final String? errorDetails;
+    /// Error information if state is error
+    ConnectionErrorType? errorType,
 
-  const Connection({
-    required this.watchId,
-    this.watchName,
-    required this.state,
-    this.rssi,
-    this.mtu,
-    this.phyMode,
-    this.dleEnabled = false,
-    this.isCharging = false,
-    this.reconnectionCount = 0,
-    this.connectedAt,
-    this.lastActivityAt,
-    this.errorType,
-    this.errorDetails,
-  });
+    /// Additional error details
+    String? errorDetails,
+  }) = _Connection;
 
   /// Create initial disconnected connection state
   factory Connection.disconnected(String watchId) {
@@ -101,39 +92,6 @@ class Connection extends Equatable {
       state: WatchConnectionState.error,
       errorType: errorType,
       errorDetails: details,
-    );
-  }
-
-  /// Copy with modified fields
-  Connection copyWith({
-    String? watchId,
-    String? watchName,
-    WatchConnectionState? state,
-    int? rssi,
-    int? mtu,
-    PhyMode? phyMode,
-    bool? dleEnabled,
-    bool? isCharging,
-    int? reconnectionCount,
-    DateTime? connectedAt,
-    DateTime? lastActivityAt,
-    ConnectionErrorType? errorType,
-    String? errorDetails,
-  }) {
-    return Connection(
-      watchId: watchId ?? this.watchId,
-      watchName: watchName ?? this.watchName,
-      state: state ?? this.state,
-      rssi: rssi ?? this.rssi,
-      mtu: mtu ?? this.mtu,
-      phyMode: phyMode ?? this.phyMode,
-      dleEnabled: dleEnabled ?? this.dleEnabled,
-      isCharging: isCharging ?? this.isCharging,
-      reconnectionCount: reconnectionCount ?? this.reconnectionCount,
-      connectedAt: connectedAt ?? this.connectedAt,
-      lastActivityAt: lastActivityAt ?? this.lastActivityAt,
-      errorType: errorType ?? this.errorType,
-      errorDetails: errorDetails ?? this.errorDetails,
     );
   }
 
@@ -183,27 +141,4 @@ class Connection extends Equatable {
     final clamped = rssi!.clamp(-100, -30);
     return ((clamped + 100) * 100 ~/ 70).clamp(0, 100);
   }
-
-  @override
-  List<Object?> get props => [
-        watchId,
-        watchName,
-        state,
-        rssi,
-        mtu,
-        phyMode,
-        dleEnabled,
-        isCharging,
-        reconnectionCount,
-        connectedAt,
-        lastActivityAt,
-        errorType,
-        errorDetails,
-      ];
-
-  @override
-  String toString() {
-    return 'Connection(watchId: $watchId, state: ${state.name}, rssi: $rssi, mtu: $mtu)';
-  }
 }
-

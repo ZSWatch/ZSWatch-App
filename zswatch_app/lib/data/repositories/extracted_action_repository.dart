@@ -3,9 +3,11 @@ import 'package:flutter/foundation.dart';
 
 import '../database/app_database.dart';
 import '../models/extracted_action.dart';
+import 'base_repository.dart';
 
 /// Repository for AI-extracted action operations
-class ExtractedActionRepository {
+class ExtractedActionRepository
+    extends BaseRepository<ExtractedAction, ExtractedActionEntity> {
   final AppDatabase _db;
 
   ExtractedActionRepository(this._db);
@@ -82,6 +84,10 @@ class ExtractedActionRepository {
   }
 
   // ==================== Private Helpers ====================
+
+  @override
+  ExtractedAction fromEntity(ExtractedActionEntity entity) =>
+      _entityToModel(entity);
 
   ExtractedAction _entityToModel(ExtractedActionEntity entity) {
     return ExtractedAction(

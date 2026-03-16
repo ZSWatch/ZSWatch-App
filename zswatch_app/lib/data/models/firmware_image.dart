@@ -1,52 +1,46 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'firmware_image.freezed.dart';
 
 /// Represents a firmware image prepared for upload
 ///
 /// This model holds metadata about firmware files that can be uploaded
 /// to the watch via MCUmgr/SMP protocol.
-class FirmwareImage extends Equatable {
-  /// Display name for the firmware
-  final String name;
+@freezed
+abstract class FirmwareImage with _$FirmwareImage {
+  const FirmwareImage._();
 
-  /// Firmware version string (e.g., "3.0.0", "v3.0.0-rc1")
-  final String? version;
+  const factory FirmwareImage({
+    /// Display name for the firmware
+    required String name,
 
-  /// Local file path where the firmware is stored
-  final String filePath;
+    /// Firmware version string (e.g., "3.0.0", "v3.0.0-rc1")
+    String? version,
 
-  /// File size in bytes
-  final int size;
+    /// Local file path where the firmware is stored
+    required String filePath,
 
-  /// MCUmgr image slot from manifest.json (0=app internal, 1=netCore, 2=app external)
-  final int? slot;
+    /// File size in bytes
+    required int size,
 
-  /// Board identifier from manifest.json (e.g., "watchdk" or "watchdk@1/nrf5340/cpunet")
-  final String? board;
+    /// MCUmgr image slot from manifest.json (0=app internal, 1=netCore, 2=app external)
+    int? slot,
 
-  /// SHA256 hash of the file (optional, for verification)
-  final String? hash;
+    /// Board identifier from manifest.json (e.g., "watchdk" or "watchdk@1/nrf5340/cpunet")
+    String? board,
 
-  /// When the firmware was downloaded (null for local files)
-  final DateTime? downloadedAt;
+    /// SHA256 hash of the file (optional, for verification)
+    String? hash,
 
-  /// Source URL if downloaded from GitHub
-  final String? sourceUrl;
+    /// When the firmware was downloaded (null for local files)
+    DateTime? downloadedAt,
 
-  /// Git branch or tag name
-  final String? branch;
+    /// Source URL if downloaded from GitHub
+    String? sourceUrl,
 
-  const FirmwareImage({
-    required this.name,
-    this.version,
-    required this.filePath,
-    required this.size,
-    this.slot,
-    this.board,
-    this.hash,
-    this.downloadedAt,
-    this.sourceUrl,
-    this.branch,
-  });
+    /// Git branch or tag name
+    String? branch,
+  }) = _FirmwareImage;
 
   /// Create a firmware image from a local file
   factory FirmwareImage.fromLocalFile({
@@ -120,19 +114,19 @@ class FirmwareImage extends Equatable {
       if (slot == 1) {
         return 'Network Core';
       }
-      
+
       // Check board field for netCore indicator
       if (board?.toLowerCase().contains('cpunet') ?? false) {
         return 'Network Core';
       }
-      
+
       // image_index 0 and 2 are application (main app and external app)
       if (slot == 0) {
         return 'Application (Internal)';
       } else if (slot == 2) {
         return 'Application (External)';
       }
-      
+
       return 'Application';
     }
 
@@ -147,7 +141,7 @@ class FirmwareImage extends Equatable {
         lowerPath.contains('filesystem')) {
       return 'Filesystem';
     }
-    
+
     return 'Application';
   }
 
@@ -160,70 +154,23 @@ class FirmwareImage extends Equatable {
     if (dotIndex == -1) return '';
     return filePath.substring(dotIndex + 1).toLowerCase();
   }
-
-  /// Copy with modified fields
-  FirmwareImage copyWith({
-    String? name,
-    String? version,
-    String? filePath,
-    int? size,
-    int? slot,
-    String? board,
-    String? hash,
-    DateTime? downloadedAt,
-    String? sourceUrl,
-    String? branch,
-  }) {
-    return FirmwareImage(
-      name: name ?? this.name,
-      version: version ?? this.version,
-      filePath: filePath ?? this.filePath,
-      size: size ?? this.size,
-      slot: slot ?? this.slot,
-      board: board ?? this.board,
-      hash: hash ?? this.hash,
-      downloadedAt: downloadedAt ?? this.downloadedAt,
-      sourceUrl: sourceUrl ?? this.sourceUrl,
-      branch: branch ?? this.branch,
-    );
-  }
-
-  @override
-  List<Object?> get props => [
-        name,
-        version,
-        filePath,
-        size,
-        slot,
-        board,
-        hash,
-        downloadedAt,
-        sourceUrl,
-        branch,
-      ];
-
-  @override
-  String toString() {
-    return 'FirmwareImage(name: $name, slot: $slot, version: $version, type: $displayName, size: $formattedSize)';
-  }
 }
 
 /// Represents a single firmware asset in a GitHub release
-class ReleaseAsset extends Equatable {
-  /// Asset file name (e.g., "watchdk@1_nrf5340_cpuapp_debug.zip")
-  final String name;
+@freezed
+abstract class ReleaseAsset with _$ReleaseAsset {
+  const ReleaseAsset._();
 
-  /// Download URL
-  final String downloadUrl;
+  const factory ReleaseAsset({
+    /// Asset file name (e.g., "watchdk@1_nrf5340_cpuapp_debug.zip")
+    required String name,
 
-  /// File size in bytes
-  final int size;
+    /// Download URL
+    required String downloadUrl,
 
-  const ReleaseAsset({
-    required this.name,
-    required this.downloadUrl,
-    required this.size,
-  });
+    /// File size in bytes
+    required int size,
+  }) = _ReleaseAsset;
 
   /// Human-readable file size
   String get formattedSize {
@@ -243,39 +190,32 @@ class ReleaseAsset extends Equatable {
     }
     return name;
   }
-
-  @override
-  List<Object?> get props => [name, downloadUrl, size];
 }
 
 /// Represents a GitHub release with available firmware
-class GitHubRelease extends Equatable {
-  /// Release tag name (e.g., "v3.0.0")
-  final String tagName;
+@freezed
+abstract class GitHubRelease with _$GitHubRelease {
+  const GitHubRelease._();
 
-  /// Release title
-  final String name;
+  const factory GitHubRelease({
+    /// Release tag name (e.g., "v3.0.0")
+    required String tagName,
 
-  /// Release description/body
-  final String? body;
+    /// Release title
+    required String name,
 
-  /// Whether this is a prerelease
-  final bool isPrerelease;
+    /// Release description/body
+    String? body,
 
-  /// When the release was published
-  final DateTime publishedAt;
+    /// Whether this is a prerelease
+    required bool isPrerelease,
 
-  /// All available firmware assets in this release
-  final List<ReleaseAsset> assets;
+    /// When the release was published
+    required DateTime publishedAt,
 
-  const GitHubRelease({
-    required this.tagName,
-    required this.name,
-    this.body,
-    required this.isPrerelease,
-    required this.publishedAt,
-    required this.assets,
-  });
+    /// All available firmware assets in this release
+    required List<ReleaseAsset> assets,
+  }) = _GitHubRelease;
 
   /// Version string without 'v' prefix
   String get version {
@@ -292,54 +232,38 @@ class GitHubRelease extends Equatable {
 
   /// Whether this release has any firmware assets
   bool get hasFirmware => assets.isNotEmpty;
-
-  @override
-  List<Object?> get props => [
-        tagName,
-        name,
-        body,
-        isPrerelease,
-        publishedAt,
-        assets,
-      ];
 }
 
 /// Represents a GitHub Actions workflow artifact
-class GitHubArtifact extends Equatable {
-  /// Branch name
-  final String branch;
+@freezed
+abstract class GitHubArtifact with _$GitHubArtifact {
+  const GitHubArtifact._();
 
-  /// Workflow run ID
-  final String runId;
+  const factory GitHubArtifact({
+    /// Branch name
+    required String branch,
 
-  /// Artifact name
-  final String name;
+    /// Workflow run ID
+    required String runId,
 
-  /// Artifact size in bytes
-  final int size;
+    /// Artifact name
+    required String name,
 
-  /// When the artifact was created
-  final DateTime createdAt;
+    /// Artifact size in bytes
+    required int size,
 
-  /// Download URL (requires authentication)
-  final String downloadUrl;
+    /// When the artifact was created
+    required DateTime createdAt,
 
-  /// Commit SHA
-  final String? commitSha;
+    /// Download URL (requires authentication)
+    required String downloadUrl,
 
-  /// Commit message
-  final String? commitMessage;
+    /// Commit SHA
+    String? commitSha,
 
-  const GitHubArtifact({
-    required this.branch,
-    required this.runId,
-    required this.name,
-    required this.size,
-    required this.createdAt,
-    required this.downloadUrl,
-    this.commitSha,
-    this.commitMessage,
-  });
+    /// Commit message
+    String? commitMessage,
+  }) = _GitHubArtifact;
 
   /// Short commit SHA (first 7 chars)
   String get shortSha => commitSha?.substring(0, 7) ?? '';
@@ -359,17 +283,4 @@ class GitHubArtifact extends Equatable {
   String get formattedDate {
     return '${createdAt.day}/${createdAt.month}/${createdAt.year}';
   }
-
-  @override
-  List<Object?> get props => [
-        branch,
-        runId,
-        name,
-        size,
-        createdAt,
-        downloadUrl,
-        commitSha,
-        commitMessage,
-      ];
 }
-

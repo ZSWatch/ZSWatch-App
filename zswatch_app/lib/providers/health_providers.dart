@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/health_sample.dart';
@@ -9,6 +10,8 @@ import 'watch_providers.dart';
 import 'watch_service_provider.dart';
 
 export '../services/health/health_sync_service.dart' show ActivityState, ActivityBreakdown;
+
+part 'health_providers.freezed.dart';
 
 // ==================== Repository Provider ====================
 
@@ -37,32 +40,16 @@ final healthSyncServiceProvider = Provider<HealthSyncService>((ref) {
 // ==================== Heart Rate Streaming State ====================
 
 /// State class for heart rate streaming
-class HeartRateStreamingState {
-  final bool isStreaming;
-  final int? currentBpm;
-  final List<HeartRateReading> recentReadings;
-  final DateTime? lastUpdate;
+@freezed
+abstract class HeartRateStreamingState with _$HeartRateStreamingState {
+  const HeartRateStreamingState._();
 
-  const HeartRateStreamingState({
-    this.isStreaming = false,
-    this.currentBpm,
-    this.recentReadings = const [],
-    this.lastUpdate,
-  });
-
-  HeartRateStreamingState copyWith({
-    bool? isStreaming,
+  const factory HeartRateStreamingState({
+    @Default(false) bool isStreaming,
     int? currentBpm,
-    List<HeartRateReading>? recentReadings,
+    @Default(<HeartRateReading>[]) List<HeartRateReading> recentReadings,
     DateTime? lastUpdate,
-  }) {
-    return HeartRateStreamingState(
-      isStreaming: isStreaming ?? this.isStreaming,
-      currentBpm: currentBpm ?? this.currentBpm,
-      recentReadings: recentReadings ?? this.recentReadings,
-      lastUpdate: lastUpdate ?? this.lastUpdate,
-    );
-  }
+  }) = _HeartRateStreamingState;
 
   /// Average BPM from recent readings
   int? get averageBpm {
@@ -189,32 +176,14 @@ final heartRateStreamingProvider =
 // ==================== Activity Breakdown Provider ====================
 
 /// State class for activity breakdown with range support
-class ActivityBreakdownState {
-  final StepsHistoryRange range;
-  final ActivityBreakdown breakdown;
-  final bool isLoading;
-  final String? error;
-
-  const ActivityBreakdownState({
-    this.range = StepsHistoryRange.day,
-    this.breakdown = const ActivityBreakdown(),
-    this.isLoading = false,
-    this.error,
-  });
-
-  ActivityBreakdownState copyWith({
-    StepsHistoryRange? range,
-    ActivityBreakdown? breakdown,
-    bool? isLoading,
+@freezed
+abstract class ActivityBreakdownState with _$ActivityBreakdownState {
+  const factory ActivityBreakdownState({
+    @Default(StepsHistoryRange.day) StepsHistoryRange range,
+    @Default(ActivityBreakdown()) ActivityBreakdown breakdown,
+    @Default(false) bool isLoading,
     String? error,
-  }) {
-    return ActivityBreakdownState(
-      range: range ?? this.range,
-      breakdown: breakdown ?? this.breakdown,
-      isLoading: isLoading ?? this.isLoading,
-      error: error,
-    );
-  }
+  }) = _ActivityBreakdownState;
 }
 
 /// Notifier for activity breakdown state with range support
@@ -342,36 +311,15 @@ final activityBreakdownProvider =
 // ==================== Health Summary State ====================
 
 /// State class for health summary
-class HealthSummaryState {
-  final int todaySteps;
-  final int? latestHeartRate;
-  final List<HealthAggregate> weeklySteps;
-  final bool isLoading;
-  final String? error;
-
-  const HealthSummaryState({
-    this.todaySteps = 0,
-    this.latestHeartRate,
-    this.weeklySteps = const [],
-    this.isLoading = false,
-    this.error,
-  });
-
-  HealthSummaryState copyWith({
-    int? todaySteps,
+@freezed
+abstract class HealthSummaryState with _$HealthSummaryState {
+  const factory HealthSummaryState({
+    @Default(0) int todaySteps,
     int? latestHeartRate,
-    List<HealthAggregate>? weeklySteps,
-    bool? isLoading,
+    @Default(<HealthAggregate>[]) List<HealthAggregate> weeklySteps,
+    @Default(false) bool isLoading,
     String? error,
-  }) {
-    return HealthSummaryState(
-      todaySteps: todaySteps ?? this.todaySteps,
-      latestHeartRate: latestHeartRate ?? this.latestHeartRate,
-      weeklySteps: weeklySteps ?? this.weeklySteps,
-      isLoading: isLoading ?? this.isLoading,
-      error: error,
-    );
-  }
+  }) = _HealthSummaryState;
 }
 
 /// Notifier for health summary state
@@ -477,36 +425,15 @@ enum StepsHistoryRange {
 }
 
 /// State class for steps history
-class StepsHistoryState {
-  final StepsHistoryRange range;
-  final List<HealthAggregate> data;
-  final int totalSteps;
-  final bool isLoading;
-  final String? error;
-
-  const StepsHistoryState({
-    this.range = StepsHistoryRange.day,
-    this.data = const [],
-    this.totalSteps = 0,
-    this.isLoading = false,
-    this.error,
-  });
-
-  StepsHistoryState copyWith({
-    StepsHistoryRange? range,
-    List<HealthAggregate>? data,
-    int? totalSteps,
-    bool? isLoading,
+@freezed
+abstract class StepsHistoryState with _$StepsHistoryState {
+  const factory StepsHistoryState({
+    @Default(StepsHistoryRange.day) StepsHistoryRange range,
+    @Default(<HealthAggregate>[]) List<HealthAggregate> data,
+    @Default(0) int totalSteps,
+    @Default(false) bool isLoading,
     String? error,
-  }) {
-    return StepsHistoryState(
-      range: range ?? this.range,
-      data: data ?? this.data,
-      totalSteps: totalSteps ?? this.totalSteps,
-      isLoading: isLoading ?? this.isLoading,
-      error: error,
-    );
-  }
+  }) = _StepsHistoryState;
 }
 
 /// Notifier for steps history state

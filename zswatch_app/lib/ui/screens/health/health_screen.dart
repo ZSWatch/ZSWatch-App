@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../navigation/app_router.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/health_sample.dart';
 import '../../../providers/health_providers.dart';
@@ -143,7 +145,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with SingleTickerPr
                 maxHr: hrHistory.todayAggregate?.max.round(),
                 sampleCount: hrHistory.todayReadings.length,
                 isConnected: isConnected,
-                onTap: () => context.push('/health/heart-rate'),
+                onTap: () => context.push(AppRoutes.heartRate),
               ),
 
               const SizedBox(height: AppTheme.spacingLg),

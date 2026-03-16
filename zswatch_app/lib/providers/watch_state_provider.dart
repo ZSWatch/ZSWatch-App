@@ -1,29 +1,30 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/watch.dart';
 import '../data/models/connection.dart';
 import '../data/models/connection_state.dart';
 import '../data/repositories/watch_repository.dart';
-import '../services/ble/ble_connection_manager.dart';
-import 'ble_providers.dart';
+import '../services/ble/ble_connection_service.dart';
 import 'watch_providers.dart';
+import 'watch_service_provider.dart';
+
+part 'watch_state_provider.freezed.dart';
 
 /// The current state of the connected watch
-class WatchState {
-  final Watch? watch;
-  final Connection connection;
-  final bool isLoading;
-  final String? error;
+@freezed
+abstract class WatchState with _$WatchState {
+  const WatchState._();
 
-  const WatchState({
-    this.watch,
-    required this.connection,
-    this.isLoading = false,
-    this.error,
-  });
+  const factory WatchState({
+    Watch? watch,
+    required Connection connection,
+    @Default(false) bool isLoading,
+    String? error,
+  }) = _WatchState;
 
   factory WatchState.initial() => const WatchState(
         connection: Connection(
@@ -32,20 +33,6 @@ class WatchState {
         ),
       );
 
-  WatchState copyWith({
-    Watch? watch,
-    Connection? connection,
-    bool? isLoading,
-    String? error,
-  }) {
-    return WatchState(
-      watch: watch ?? this.watch,
-      connection: connection ?? this.connection,
-      isLoading: isLoading ?? this.isLoading,
-      error: error,
-    );
-  }
-
   bool get isConnected => connection.state == WatchConnectionState.connected;
   bool get isConnecting => connection.state.isConnectingOrReconnecting;
   bool get hasWatch => watch != null;
@@ -53,18 +40,18 @@ class WatchState {
 
 /// Notifier that manages the connected watch state
 class WatchStateNotifier extends StateNotifier<WatchState> {
-  final BleConnectionManager _connectionManager;
+  final BleConnectionService _connectionService;
   final WatchRepository? _watchRepository;
   StreamSubscription<Connection>? _connectionSubscription;
 
-  WatchStateNotifier(this._connectionManager, this._watchRepository)
+  WatchStateNotifier(this._connectionService, this._watchRepository)
       : super(WatchState.initial()) {
     _init();
   }
 
   void _init() {
     // Listen to connection state changes
-    _connectionSubscription = _connectionManager.connectionStream.listen(
+    _connectionSubscription = _connectionService.connectionStream.listen(
       _handleConnectionChange,
     );
   }
@@ -125,13 +112,15 @@ class WatchStateNotifier extends StateNotifier<WatchState> {
   }) {
     if (state.watch == null) return;
 
-    final updatedWatch = state.watch!.copyWith(
-      name: name,
+    var updatedWatch = state.watch!.copyWith(
       firmwareVersion: firmwareVersion,
       hardwareVersion: hardwareVersion,
       batteryLevel: batteryLevel,
       lastConnectedAt: DateTime.now(),
     );
+    if (name != null) {
+      updatedWatch = updatedWatch.copyWith(name: name);
+    }
 
     state = state.copyWith(watch: updatedWatch);
 
@@ -153,7 +142,7 @@ class WatchStateNotifier extends StateNotifier<WatchState> {
 
   /// Disconnect from the current watch
   Future<void> disconnect() async {
-    await _connectionManager.disconnect();
+    await _connectionService.disconnect();
   }
 
   /// Save the current watch to the database
@@ -178,9 +167,9 @@ final watchRepositoryProvider = Provider<WatchRepository>((ref) {
 /// Provider for the watch state notifier
 final watchStateProvider =
     StateNotifierProvider<WatchStateNotifier, WatchState>((ref) {
-  final connectionManager = ref.watch(bleConnectionManagerProvider);
+  final connectionService = ref.watch(bleConnectionServiceProvider);
   final watchRepository = ref.watch(watchRepositoryProvider);
-  return WatchStateNotifier(connectionManager, watchRepository);
+  return WatchStateNotifier(connectionService, watchRepository);
 });
 
 /// Convenience providers for specific watch state properties

@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'log_entry.freezed.dart';
 
 /// Direction of the log entry (incoming from watch or outgoing to watch)
 enum LogDirection {
@@ -8,10 +10,10 @@ enum LogDirection {
 
 /// Log level parsed from log messages (<dbg>, <inf>, <wrn>, <err>)
 enum LogLevel {
-  debug,   // <dbg>
-  info,    // <inf>
+  debug, // <dbg>
+  info, // <inf>
   warning, // <wrn>
-  error,   // <err>
+  error, // <err>
   unknown, // No level tag found
 }
 
@@ -64,48 +66,32 @@ enum LogEntryType {
 }
 
 /// A single log entry representing BLE NUS data
-@immutable
-class LogEntry {
-  /// Unique identifier for this entry
-  final int id;
+@freezed
+abstract class LogEntry with _$LogEntry {
+  const LogEntry._();
 
-  /// Timestamp when the entry was received/sent
-  final DateTime timestamp;
+  const factory LogEntry({
+    /// Unique identifier for this entry
+    required int id,
 
-  /// The raw message content
-  final String message;
+    /// Timestamp when the entry was received/sent
+    required DateTime timestamp,
 
-  /// The parsed message type (from 't' field in JSON)
-  final String? messageType;
+    /// The raw message content
+    required String message,
 
-  /// Categorized type for filtering
-  final LogEntryType type;
+    /// The parsed message type (from 't' field in JSON)
+    String? messageType,
 
-  /// Direction (incoming from watch or outgoing to watch)
-  final LogDirection direction;
+    /// Categorized type for filtering
+    required LogEntryType type,
 
-  /// Whether this is a JSON message (vs raw text/log)
-  final bool isJson;
+    /// Direction (incoming from watch or outgoing to watch)
+    required LogDirection direction,
 
-  const LogEntry({
-    required this.id,
-    required this.timestamp,
-    required this.message,
-    this.messageType,
-    required this.type,
-    required this.direction,
-    this.isJson = false,
-  });
-
-  /// Log level parsed from message (<dbg>, <inf>, <wrn>, <err>)
-  /// Computed on-demand from message content to avoid issues with hot reload
-  LogLevel get level {
-    if (message.contains('<dbg>')) return LogLevel.debug;
-    if (message.contains('<inf>')) return LogLevel.info;
-    if (message.contains('<wrn>')) return LogLevel.warning;
-    if (message.contains('<err>')) return LogLevel.error;
-    return LogLevel.unknown;
-  }
+    /// Whether this is a JSON message (vs raw text/log)
+    @Default(false) bool isJson,
+  }) = _LogEntry;
 
   /// Create a log entry from incoming BLE data
   factory LogEntry.incoming({
@@ -200,6 +186,16 @@ class LogEntry {
     }
   }
 
+  /// Log level parsed from message (<dbg>, <inf>, <wrn>, <err>)
+  /// Computed on-demand from message content to avoid issues with hot reload
+  LogLevel get level {
+    if (message.contains('<dbg>')) return LogLevel.debug;
+    if (message.contains('<inf>')) return LogLevel.info;
+    if (message.contains('<wrn>')) return LogLevel.warning;
+    if (message.contains('<err>')) return LogLevel.error;
+    return LogLevel.unknown;
+  }
+
   /// Get a display-friendly type name
   String get typeDisplayName {
     switch (type) {
@@ -263,20 +259,4 @@ class LogEntry {
         return '';
     }
   }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is LogEntry &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          timestamp == other.timestamp &&
-          message == other.message;
-
-  @override
-  int get hashCode => Object.hash(id, timestamp, message);
-
-  @override
-  String toString() =>
-      'LogEntry(id: $id, type: $type, direction: $direction, message: $message)';
 }

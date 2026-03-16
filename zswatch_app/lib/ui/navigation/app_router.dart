@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../data/models/connection_state.dart';
 import '../../data/models/voice_memo.dart';
 import '../../providers/auto_reconnect_provider.dart';
-import '../../providers/ble_providers.dart';
 import '../../providers/foreground_service_providers.dart';
 import '../../providers/permission_providers.dart';
 import '../../providers/watch_service_provider.dart';
@@ -284,10 +283,8 @@ class _HomeScreen extends ConsumerWidget {
                     ref.read(foregroundServiceNotifierProvider.notifier).markUserDisconnect();
                     // Cancel auto-reconnect and suppress for session
                     ref.read(autoReconnectNotifierProvider.notifier).cancel();
-                    // Also cancel any pending connection on WatchService
+                    // Cancel any pending connection (goes through BleConnectionService)
                     ref.read(watchServiceProvider).cancelPendingConnection();
-                    // Also cancel on BleConnectionManager (in case it was used)
-                    ref.read(bleNotifierProvider.notifier).cancelPendingConnection();
                   },
                   child: const Text('Cancel'),
                 ),

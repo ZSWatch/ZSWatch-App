@@ -1,4 +1,6 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'dfu_state.freezed.dart';
 
 /// DFU (Device Firmware Update) process states
 enum DfuStatus {
@@ -119,53 +121,44 @@ extension DfuStatusExtension on DfuStatus {
 }
 
 /// Represents the current state of a DFU operation
-class DfuState extends Equatable {
-  /// Current status of the DFU process
-  final DfuStatus status;
+@freezed
+abstract class DfuState with _$DfuState {
+  const DfuState._();
 
-  /// Overall progress (0.0 to 1.0)
-  final double progress;
+  const factory DfuState({
+    /// Current status of the DFU process
+    @Default(DfuStatus.idle) DfuStatus status,
 
-  /// Bytes transferred so far
-  final int bytesTransferred;
+    /// Overall progress (0.0 to 1.0)
+    @Default(0.0) double progress,
 
-  /// Total bytes to transfer
-  final int totalBytes;
+    /// Bytes transferred so far
+    @Default(0) int bytesTransferred,
 
-  /// Current upload speed in bytes per second
-  final int speedBytesPerSecond;
+    /// Total bytes to transfer
+    @Default(0) int totalBytes,
 
-  /// Current image being uploaded (for multi-image updates)
-  final int currentImage;
+    /// Current upload speed in bytes per second
+    @Default(0) int speedBytesPerSecond,
 
-  /// Total number of images to upload
-  final int totalImages;
+    /// Current image being uploaded (for multi-image updates)
+    @Default(0) int currentImage,
 
-  /// Name of the current image being processed
-  final String? currentImageName;
+    /// Total number of images to upload
+    @Default(1) int totalImages,
 
-  /// Error message if status is failed
-  final String? errorMessage;
+    /// Name of the current image being processed
+    String? currentImageName,
 
-  /// When the DFU started
-  final DateTime? startedAt;
+    /// Error message if status is failed
+    String? errorMessage,
 
-  /// When the DFU completed/failed
-  final DateTime? completedAt;
+    /// When the DFU started
+    DateTime? startedAt,
 
-  const DfuState({
-    this.status = DfuStatus.idle,
-    this.progress = 0.0,
-    this.bytesTransferred = 0,
-    this.totalBytes = 0,
-    this.speedBytesPerSecond = 0,
-    this.currentImage = 0,
-    this.totalImages = 1,
-    this.currentImageName,
-    this.errorMessage,
-    this.startedAt,
-    this.completedAt,
-  });
+    /// When the DFU completed/failed
+    DateTime? completedAt,
+  }) = _DfuState;
 
   /// Initial idle state
   static const idle = DfuState();
@@ -174,14 +167,10 @@ class DfuState extends Equatable {
   int get progressPercent => (progress * 100).round();
 
   /// Human-readable bytes transferred
-  String get formattedBytesTransferred {
-    return _formatBytes(bytesTransferred);
-  }
+  String get formattedBytesTransferred => _formatBytes(bytesTransferred);
 
   /// Human-readable total bytes
-  String get formattedTotalBytes {
-    return _formatBytes(totalBytes);
-  }
+  String get formattedTotalBytes => _formatBytes(totalBytes);
 
   /// Human-readable speed
   String get formattedSpeed {
@@ -207,7 +196,9 @@ class DfuState extends Equatable {
     final seconds = estimatedSecondsRemaining;
     if (seconds == null) {
       // During active upload, show "calculating..." instead of "--"
-      if (status == DfuStatus.uploading && bytesTransferred > 0 && speedBytesPerSecond == 0) {
+      if (status == DfuStatus.uploading &&
+          bytesTransferred > 0 &&
+          speedBytesPerSecond == 0) {
         return 'calculating...';
       }
       return '--';
@@ -244,35 +235,6 @@ class DfuState extends Equatable {
     } else {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
     }
-  }
-
-  /// Copy with modified fields
-  DfuState copyWith({
-    DfuStatus? status,
-    double? progress,
-    int? bytesTransferred,
-    int? totalBytes,
-    int? speedBytesPerSecond,
-    int? currentImage,
-    int? totalImages,
-    String? currentImageName,
-    String? errorMessage,
-    DateTime? startedAt,
-    DateTime? completedAt,
-  }) {
-    return DfuState(
-      status: status ?? this.status,
-      progress: progress ?? this.progress,
-      bytesTransferred: bytesTransferred ?? this.bytesTransferred,
-      totalBytes: totalBytes ?? this.totalBytes,
-      speedBytesPerSecond: speedBytesPerSecond ?? this.speedBytesPerSecond,
-      currentImage: currentImage ?? this.currentImage,
-      totalImages: totalImages ?? this.totalImages,
-      currentImageName: currentImageName ?? this.currentImageName,
-      errorMessage: errorMessage ?? this.errorMessage,
-      startedAt: startedAt ?? this.startedAt,
-      completedAt: completedAt ?? this.completedAt,
-    );
   }
 
   /// Create a preparing state
@@ -327,27 +289,6 @@ class DfuState extends Equatable {
       startedAt: startedAt,
       completedAt: DateTime.now(),
     );
-  }
-
-  @override
-  List<Object?> get props => [
-        status,
-        progress,
-        bytesTransferred,
-        totalBytes,
-        speedBytesPerSecond,
-        currentImage,
-        totalImages,
-        currentImageName,
-        errorMessage,
-        startedAt,
-        completedAt,
-      ];
-
-  @override
-  String toString() {
-    return 'DfuState(status: ${status.name}, progress: $progressPercent%, '
-        '$formattedBytesTransferred/$formattedTotalBytes, speed: $formattedSpeed)';
   }
 }
 
@@ -430,4 +371,3 @@ extension DfuErrorTypeExtension on DfuErrorType {
     }
   }
 }
-

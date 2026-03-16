@@ -1,52 +1,46 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'watch.freezed.dart';
 
 /// Watch model representing a paired ZSWatch device
 ///
 /// This is a domain model used throughout the app. It's mapped from
 /// the database entity (WatchEntity) and contains business logic.
-class Watch extends Equatable {
-  /// BLE device identifier (MAC address on Android, UUID on iOS)
-  final String id;
+@freezed
+abstract class Watch with _$Watch {
+  const Watch._();
 
-  /// Advertised device name
-  final String name;
+  const factory Watch({
+    /// BLE device identifier (MAC address on Android, UUID on iOS)
+    required String id,
 
-  /// User-defined custom name for the watch (FR-099 to FR-102)
-  final String? customName;
+    /// Advertised device name
+    required String name,
 
-  /// Last known firmware version
-  final String? firmwareVersion;
+    /// User-defined custom name for the watch (FR-099 to FR-102)
+    String? customName,
 
-  /// Hardware revision
-  final String? hardwareVersion;
+    /// Last known firmware version
+    String? firmwareVersion,
 
-  /// Last known battery level (0-100)
-  final int? batteryLevel;
+    /// Hardware revision
+    String? hardwareVersion,
 
-  /// Whether this is the currently selected watch
-  final bool isPrimary;
+    /// Last known battery level (0-100)
+    int? batteryLevel,
 
-  /// Whether firmware supports Extended ZSWatch API
-  final bool supportsExtendedApi;
+    /// Whether this is the currently selected watch
+    @Default(false) bool isPrimary,
 
-  /// Last successful connection timestamp
-  final DateTime? lastConnectedAt;
+    /// Whether firmware supports Extended ZSWatch API
+    @Default(false) bool supportsExtendedApi,
 
-  /// When the device was first paired
-  final DateTime createdAt;
+    /// Last successful connection timestamp
+    DateTime? lastConnectedAt,
 
-  const Watch({
-    required this.id,
-    required this.name,
-    this.customName,
-    this.firmwareVersion,
-    this.hardwareVersion,
-    this.batteryLevel,
-    this.isPrimary = false,
-    this.supportsExtendedApi = false,
-    this.lastConnectedAt,
-    required this.createdAt,
-  });
+    /// When the device was first paired
+    required DateTime createdAt,
+  }) = _Watch;
 
   /// Create a Watch from a scanned device (before pairing)
   factory Watch.fromScan({
@@ -57,33 +51,6 @@ class Watch extends Equatable {
       id: id,
       name: name,
       createdAt: DateTime.now(),
-    );
-  }
-
-  /// Copy with modified fields
-  Watch copyWith({
-    String? id,
-    String? name,
-    String? customName,
-    String? firmwareVersion,
-    String? hardwareVersion,
-    int? batteryLevel,
-    bool? isPrimary,
-    bool? supportsExtendedApi,
-    DateTime? lastConnectedAt,
-    DateTime? createdAt,
-  }) {
-    return Watch(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      customName: customName ?? this.customName,
-      firmwareVersion: firmwareVersion ?? this.firmwareVersion,
-      hardwareVersion: hardwareVersion ?? this.hardwareVersion,
-      batteryLevel: batteryLevel ?? this.batteryLevel,
-      isPrimary: isPrimary ?? this.isPrimary,
-      supportsExtendedApi: supportsExtendedApi ?? this.supportsExtendedApi,
-      lastConnectedAt: lastConnectedAt ?? this.lastConnectedAt,
-      createdAt: createdAt ?? this.createdAt,
     );
   }
 
@@ -117,24 +84,4 @@ class Watch extends Equatable {
         .replaceFirst(RegExp(r'^ZSWatch\s*', caseSensitive: false), '')
         .trim();
   }
-
-  @override
-  List<Object?> get props => [
-        id,
-        name,
-        customName,
-        firmwareVersion,
-        hardwareVersion,
-        batteryLevel,
-        isPrimary,
-        supportsExtendedApi,
-        lastConnectedAt,
-        createdAt,
-      ];
-
-  @override
-  String toString() {
-    return 'Watch(id: $id, name: $name, battery: $batteryLevel%, fw: $firmwareVersion)';
-  }
 }
-

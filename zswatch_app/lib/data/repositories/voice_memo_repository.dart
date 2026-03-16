@@ -5,12 +5,13 @@ import 'package:flutter/foundation.dart';
 
 import '../database/app_database.dart';
 import '../models/voice_memo.dart';
+import 'base_repository.dart';
 
 /// Repository for voice memo data operations
 ///
 /// Provides a clean interface for CRUD operations on voice memos,
 /// abstracting the database layer from the rest of the app.
-class VoiceMemoRepository {
+class VoiceMemoRepository extends BaseRepository<VoiceMemo, VoiceMemoEntity> {
   final AppDatabase _db;
 
   VoiceMemoRepository(this._db);
@@ -198,6 +199,9 @@ class VoiceMemoRepository {
   }
 
   // ==================== Private Helpers ====================
+
+  @override
+  VoiceMemo fromEntity(VoiceMemoEntity entity) => _entityToModel(entity);
 
   VoiceMemo _entityToModel(VoiceMemoEntity entity) {
     return VoiceMemo(

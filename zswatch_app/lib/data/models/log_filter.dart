@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'log_filter.freezed.dart';
 
 /// Filter types for log viewer
 enum LogFilter {
@@ -40,63 +42,25 @@ enum LogFilter {
 }
 
 /// Current state of log streaming from watch
-@immutable
-class LogStreamingState {
-  /// Whether app has requested log streaming from watch
-  final bool requestedByApp;
+@freezed
+abstract class LogStreamingState with _$LogStreamingState {
+  const LogStreamingState._();
 
-  /// Whether log streaming is currently enabled on watch
-  /// Note: May be true even if not requested by app (watch setting)
-  final bool enabledOnWatch;
+  const factory LogStreamingState({
+    /// Whether app has requested log streaming from watch
+    @Default(false) bool requestedByApp,
 
-  /// Whether we're waiting for confirmation from watch
-  final bool pending;
+    /// Whether log streaming is currently enabled on watch
+    /// Note: May be true even if not requested by app (watch setting)
+    @Default(false) bool enabledOnWatch,
 
-  /// Error message if log enable/disable failed
-  final String? error;
+    /// Whether we're waiting for confirmation from watch
+    @Default(false) bool pending,
 
-  const LogStreamingState({
-    this.requestedByApp = false,
-    this.enabledOnWatch = false,
-    this.pending = false,
-    this.error,
-  });
-
-  const LogStreamingState.initial()
-      : requestedByApp = false,
-        enabledOnWatch = false,
-        pending = false,
-        error = null;
-
-  LogStreamingState copyWith({
-    bool? requestedByApp,
-    bool? enabledOnWatch,
-    bool? pending,
+    /// Error message if log enable/disable failed
     String? error,
-  }) {
-    return LogStreamingState(
-      requestedByApp: requestedByApp ?? this.requestedByApp,
-      enabledOnWatch: enabledOnWatch ?? this.enabledOnWatch,
-      pending: pending ?? this.pending,
-      error: error,
-    );
-  }
+  }) = _LogStreamingState;
 
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is LogStreamingState &&
-          runtimeType == other.runtimeType &&
-          requestedByApp == other.requestedByApp &&
-          enabledOnWatch == other.enabledOnWatch &&
-          pending == other.pending &&
-          error == other.error;
-
-  @override
-  int get hashCode =>
-      Object.hash(requestedByApp, enabledOnWatch, pending, error);
-
-  @override
-  String toString() =>
-      'LogStreamingState(requestedByApp: $requestedByApp, enabledOnWatch: $enabledOnWatch, pending: $pending)';
+  /// Initial state
+  factory LogStreamingState.initial() => const LogStreamingState();
 }

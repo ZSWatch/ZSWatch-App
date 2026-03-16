@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/http_request.dart';
 import '../services/http/http_relay_service.dart';
 import '../services/watch_service.dart';
 import 'watch_service_provider.dart';
+
+part 'http_providers.freezed.dart';
 
 /// HTTP relay service provider
 final httpRelayServiceProvider = Provider<HttpRelayService>((ref) {
@@ -16,39 +19,26 @@ final httpRelayServiceProvider = Provider<HttpRelayService>((ref) {
 });
 
 /// State for HTTP relay tracking
-class HttpRelayState {
-  /// Currently pending requests (keyed by request ID)
-  final Map<String, HttpRequest> pendingRequests;
+@freezed
+abstract class HttpRelayState with _$HttpRelayState {
+  const HttpRelayState._();
 
-  /// Recently completed requests (for debugging/logging)
-  final List<HttpRequest> recentRequests;
+  const factory HttpRelayState({
+    /// Currently pending requests (keyed by request ID)
+    @Default(<String, HttpRequest>{}) Map<String, HttpRequest> pendingRequests,
 
-  /// Whether HTTP relay is enabled
-  final bool isEnabled;
+    /// Recently completed requests (for debugging/logging)
+    @Default(<HttpRequest>[]) List<HttpRequest> recentRequests,
 
-  const HttpRelayState({
-    this.pendingRequests = const {},
-    this.recentRequests = const [],
-    this.isEnabled = true,
-  });
+    /// Whether HTTP relay is enabled
+    @Default(true) bool isEnabled,
+  }) = _HttpRelayState;
 
   /// Number of pending requests
   int get pendingCount => pendingRequests.length;
 
   /// Whether any requests are pending
   bool get hasPending => pendingRequests.isNotEmpty;
-
-  HttpRelayState copyWith({
-    Map<String, HttpRequest>? pendingRequests,
-    List<HttpRequest>? recentRequests,
-    bool? isEnabled,
-  }) {
-    return HttpRelayState(
-      pendingRequests: pendingRequests ?? this.pendingRequests,
-      recentRequests: recentRequests ?? this.recentRequests,
-      isEnabled: isEnabled ?? this.isEnabled,
-    );
-  }
 }
 
 /// HTTP relay notifier that handles HTTP requests from the watch.

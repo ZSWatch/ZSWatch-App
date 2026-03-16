@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -9,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/background/foreground_service.dart';
 import '../services/permission/permission_service.dart';
 import 'notification_providers.dart';
+
+part 'permission_providers.freezed.dart';
 
 /// Key for storing whether onboarding has been completed
 const _onboardingCompletedKey = 'permission_onboarding_completed';
@@ -41,34 +44,18 @@ final permissionOnboardingCompletedProvider = FutureProvider<bool>((ref) async {
 });
 
 /// State for the permission notifier
-class PermissionState {
-  final AppPermissionsStatus status;
-  final bool isChecking;
-  final bool onboardingCompleted;
+@freezed
+abstract class PermissionState with _$PermissionState {
+  const PermissionState._();
 
-  const PermissionState({
-    this.status = const AppPermissionsStatus(),
-    this.isChecking = false,
-    this.onboardingCompleted = false,
-  });
-
-  PermissionState copyWith({
-    AppPermissionsStatus? status,
-    bool? isChecking,
-    bool? onboardingCompleted,
-  }) {
-    return PermissionState(
-      status: status ?? this.status,
-      isChecking: isChecking ?? this.isChecking,
-      onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
-    );
-  }
+  const factory PermissionState({
+    @Default(AppPermissionsStatus()) AppPermissionsStatus status,
+    @Default(false) bool isChecking,
+    @Default(false) bool onboardingCompleted,
+  }) = _PermissionState;
 
   /// Whether the app should show the permission onboarding screen
-  bool get shouldShowOnboarding {
-    // Show onboarding if not completed yet
-    return !onboardingCompleted;
-  }
+  bool get shouldShowOnboarding => !onboardingCompleted;
 }
 
 /// Notifier that manages permission state and lifecycle

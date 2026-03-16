@@ -20,6 +20,8 @@ import '../../../services/ai/ai_debug_info.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../../services/voice_memo/voice_memo_sync_service.dart';
 import '../../navigation/app_router.dart';
+import '../../widgets/voice_memos/memo_list_item.dart';
+import '../../widgets/voice_memos/sync_progress_bar.dart';
 
 /// Transcript-first timeline view for synced voice notes.
 class VoiceMemosScreen extends ConsumerStatefulWidget {
@@ -89,7 +91,8 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
       body: Column(
         children: [
           syncStateAsync.when(
-            data: (syncState) => _SyncProgressBar(state: syncState),
+            data: (syncState) =>
+                VoiceMemoSyncProgressBar(state: syncState),
             loading: () => const SizedBox.shrink(),
             error: (_, _) => const SizedBox.shrink(),
           ),
@@ -428,7 +431,7 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
                             icon: const Icon(Icons.delete_outline),
                             label: const Text('Delete'),
                           ),
-                          if (!_hasLocalAudio(effectiveMemo))
+                          if (!hasLocalAudio(effectiveMemo))
                             FilledButton.icon(
                               style: _compactFilledButtonStyle(),
                               onPressed: ref.watch(isWatchConnectedProvider)
@@ -482,7 +485,7 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
   }
 
   Future<void> _deleteMemo(VoiceMemo memo) async {
-    final shouldDelete = await _confirmDelete(context, memo);
+    final shouldDelete = await confirmDeleteMemo(context, memo);
     if (shouldDelete != true || !mounted) {
       return;
     }
@@ -1703,22 +1706,22 @@ class _CategoryBadge extends StatelessWidget {
         vertical: 6,
       ),
       decoration: BoxDecoration(
-        color: _categoryColor(category).withValues(alpha: 0.12),
+        color: voiceNoteCategoryColor(category).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            _categoryIcon(category),
+            voiceNoteCategoryIcon(category),
             size: 16,
-            color: _categoryColor(category),
+            color: voiceNoteCategoryColor(category),
           ),
           const SizedBox(width: 6),
           Text(
-            _categoryLabel(category),
+            voiceNoteCategoryLabel(category),
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: _categoryColor(category),
+                  color: voiceNoteCategoryColor(category),
                   fontWeight: FontWeight.w600,
                 ),
           ),
@@ -1726,101 +1729,8 @@ class _CategoryBadge extends StatelessWidget {
       ),
     );
   }
-
-  IconData _categoryIcon(VoiceNoteCategory category) {
-    return switch (category) {
-      VoiceNoteCategory.idea => Icons.lightbulb_outline,
-      VoiceNoteCategory.task => Icons.check_box_outlined,
-      VoiceNoteCategory.reminder => Icons.alarm,
-      VoiceNoteCategory.meeting => Icons.people_outline,
-      VoiceNoteCategory.note => Icons.note_outlined,
-    };
-  }
-
-  Color _categoryColor(VoiceNoteCategory category) {
-    return switch (category) {
-      VoiceNoteCategory.idea => const Color(0xFFFFA726),
-      VoiceNoteCategory.task => AppTheme.primaryColor,
-      VoiceNoteCategory.reminder => AppTheme.warningColor,
-      VoiceNoteCategory.meeting => const Color(0xFF26A69A),
-      VoiceNoteCategory.note => AppTheme.textSecondary,
-    };
-  }
-
-  String _categoryLabel(VoiceNoteCategory category) {
-    return switch (category) {
-      VoiceNoteCategory.idea => 'Idea',
-      VoiceNoteCategory.task => 'Task',
-      VoiceNoteCategory.reminder => 'Reminder',
-      VoiceNoteCategory.meeting => 'Meeting',
-      VoiceNoteCategory.note => 'Note',
-    };
-  }
 }
 
-class _SyncProgressBar extends StatelessWidget {
-  final VoiceMemoSyncState state;
-
-  const _SyncProgressBar({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    if (!state.isSyncing) {
-      return const SizedBox.shrink();
-    }
-
-    final phaseText = switch (state.phase) {
-      VoiceMemoSyncPhase.fetchingList => 'Fetching recording list...',
-      VoiceMemoSyncPhase.downloading =>
-        'Downloading ${state.currentFilename ?? ''}...',
-      VoiceMemoSyncPhase.verifying => 'Verifying download...',
-      VoiceMemoSyncPhase.deleting => 'Cleaning up watch storage...',
-      _ => 'Syncing...',
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spacingMd,
-        vertical: AppTheme.spacingSm,
-      ),
-      color: AppTheme.primaryColor.withValues(alpha: 0.1),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(width: AppTheme.spacingSm),
-              Expanded(
-                child: Text(
-                  phaseText,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
-              if (state.totalToSync > 0)
-                Text(
-                  '${state.completedCount}/${state.totalToSync}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-            ],
-          ),
-          if (state.phase == VoiceMemoSyncPhase.downloading)
-            Padding(
-              padding: const EdgeInsets.only(top: AppTheme.spacingXs),
-              child: LinearProgressIndicator(
-                value: state.downloadProgress,
-                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.2),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
 
 class _EmptyState extends StatelessWidget {
   final bool hasQuery;
@@ -1906,7 +1816,7 @@ class _VoiceMemoTimeline extends ConsumerWidget {
             ),
           ),
           for (final memo in section.memos)
-            _VoiceNoteCard(
+            VoiceNoteCard(
               memo: memo,
               onOpen: () => onOpenMemo(memo),
             ),
@@ -1915,213 +1825,6 @@ class _VoiceMemoTimeline extends ConsumerWidget {
     );
   }
 }
-
-class _VoiceNoteCard extends ConsumerWidget {
-  final VoiceMemo memo;
-  final VoidCallback onOpen;
-
-  const _VoiceNoteCard({
-    required this.memo,
-    required this.onOpen,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final previewText = _memoPreviewText(memo);
-    final canPlay = _hasLocalAudio(memo);
-    final isProcessing = memo.isAiProcessing;
-
-    return Dismissible(
-      key: ValueKey('voice-note-${memo.id}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        margin: const EdgeInsets.only(bottom: AppTheme.spacingMd),
-        decoration: BoxDecoration(
-          color: AppTheme.errorColor,
-          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-        ),
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppTheme.spacingLg),
-        child: const Icon(Icons.delete_outline, color: Colors.white),
-      ),
-      confirmDismiss: (_) => _confirmDelete(context, memo),
-      onDismissed: (_) {
-        ref.read(voiceMemoActionsProvider.notifier).delete(memo.filename);
-      },
-      child: Card(
-        margin: const EdgeInsets.only(bottom: AppTheme.spacingMd),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onOpen,
-          child: Padding(
-            padding: const EdgeInsets.all(AppTheme.spacingMd),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    if (memo.aiCategory != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: AppTheme.spacingSm),
-                        child: Icon(
-                          _categoryIcon(memo.aiCategory!),
-                          size: 20,
-                          color: _categoryColor(memo.aiCategory!),
-                        ),
-                      ),
-                    Expanded(
-                      child: Text(
-                        _timelineTimestampLabel(memo.timestampUtc.toLocal()),
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
-                      ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppTheme.spacingSm),
-                Text(
-                  previewText,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        height: 1.35,
-                        color: memo.summary != null ||
-                                memo.transcription?.trim().isNotEmpty == true
-                            ? AppTheme.textPrimary
-                            : AppTheme.textSecondary,
-                      ),
-                ),
-                const SizedBox(height: AppTheme.spacingSm),
-                Wrap(
-                  spacing: AppTheme.spacingSm,
-                  runSpacing: AppTheme.spacingSm,
-                  children: [
-                    if (memo.aiCategory != null)
-                      _MetaChip(
-                        icon: _categoryIcon(memo.aiCategory!),
-                        label: _categoryLabel(memo.aiCategory!),
-                        color: _categoryColor(memo.aiCategory!),
-                      ),
-                    if (isProcessing)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                          borderRadius:
-                              BorderRadius.circular(AppTheme.radiusXLarge),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(
-                              width: 10,
-                              height: 10,
-                              child: CircularProgressIndicator(strokeWidth: 1.5),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Processing',
-                              style:
-                                  Theme.of(context).textTheme.labelSmall?.copyWith(
-                                        color: AppTheme.primaryColor,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 10.5,
-                                      ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    _MetaChip(
-                      icon: _syncStatusIcon(memo.syncStatus),
-                      label: _syncStatusLabel(memo),
-                      color: _syncStatusColor(memo.syncStatus),
-                    ),
-                    if (memo.syncedFromWatch)
-                      const _MetaChip(
-                        icon: Icons.smartphone_outlined,
-                        label: 'Phone',
-                        color: AppTheme.primaryColor,
-                      ),
-                    if (!memo.deletedOnWatch)
-                      const _MetaChip(
-                        icon: Icons.watch_outlined,
-                        label: 'On watch',
-                        color: AppTheme.warningColor,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: AppTheme.spacingMd),
-                Row(
-                  children: [
-                    Text(
-                      memo.formattedDuration,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(width: AppTheme.spacingSm),
-                    Text(
-                      memo.formattedSize,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
-                    ),
-                    const Spacer(),
-                    Icon(
-                      canPlay
-                          ? Icons.play_circle_fill_rounded
-                          : Icons.cloud_download_outlined,
-                      color: canPlay
-                          ? AppTheme.primaryColor
-                          : AppTheme.warningColor,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  IconData _categoryIcon(VoiceNoteCategory category) {
-    return switch (category) {
-      VoiceNoteCategory.idea => Icons.lightbulb_outline,
-      VoiceNoteCategory.task => Icons.check_box_outlined,
-      VoiceNoteCategory.reminder => Icons.alarm,
-      VoiceNoteCategory.meeting => Icons.people_outline,
-      VoiceNoteCategory.note => Icons.note_outlined,
-    };
-  }
-
-  Color _categoryColor(VoiceNoteCategory category) {
-    return switch (category) {
-      VoiceNoteCategory.idea => const Color(0xFFFFA726),
-      VoiceNoteCategory.task => AppTheme.primaryColor,
-      VoiceNoteCategory.reminder => AppTheme.warningColor,
-      VoiceNoteCategory.meeting => const Color(0xFF26A69A),
-      VoiceNoteCategory.note => AppTheme.textSecondary,
-    };
-  }
-
-  String _categoryLabel(VoiceNoteCategory category) {
-    return switch (category) {
-      VoiceNoteCategory.idea => 'Idea',
-      VoiceNoteCategory.task => 'Task',
-      VoiceNoteCategory.reminder => 'Reminder',
-      VoiceNoteCategory.meeting => 'Meeting',
-      VoiceNoteCategory.note => 'Note',
-    };
-  }
-}
-
 class _MissingNoteState extends StatelessWidget {
   const _MissingNoteState();
 
@@ -2161,7 +1864,7 @@ class _TopSummarySection extends StatelessWidget {
           builder: (context, constraints) {
             final compactWidth = constraints.maxWidth < 380;
             final rightColumnWidth = compactWidth ? 128.0 : 164.0;
-            final audioWidget = _hasLocalAudio(memo)
+            final audioWidget = hasLocalAudio(memo)
                 ? _AudioPlayerCard(
                     memo: memo,
                     compact: true,
@@ -2230,19 +1933,19 @@ class _VoiceNoteHeaderContent extends StatelessWidget {
           spacing: AppTheme.spacingSm,
           runSpacing: AppTheme.spacingSm,
           children: [
-            _MetaChip(
-              icon: _syncStatusIcon(memo.syncStatus),
-              label: _syncStatusLabel(memo),
-              color: _syncStatusColor(memo.syncStatus),
+            VoiceMemoMetaChip(
+              icon: syncStatusIcon(memo.syncStatus),
+              label: syncStatusLabel(memo),
+              color: syncStatusColor(memo.syncStatus),
             ),
             if (memo.syncedFromWatch)
-              const _MetaChip(
+              const VoiceMemoMetaChip(
                 icon: Icons.smartphone_outlined,
                 label: 'Synced',
                 color: AppTheme.primaryColor,
               ),
             if (!memo.deletedOnWatch)
-              const _MetaChip(
+              const VoiceMemoMetaChip(
                 icon: Icons.watch_outlined,
                 label: 'Still on watch',
                 color: AppTheme.warningColor,
@@ -2683,47 +2386,6 @@ class _SyncPromptCard extends ConsumerWidget {
   }
 }
 
-class _MetaChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _MetaChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 7,
-        vertical: 3,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppTheme.radiusXLarge),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 3),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 10.5,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ButtonBox extends StatelessWidget {
   final bool expand;
   final Widget child;
@@ -2775,7 +2437,7 @@ List<_VoiceMemoTimelineSection> _groupMemosByDay(List<VoiceMemo> memos) {
   return keys.map((key) {
     final firstMemo = grouped[key]!.first;
     return _VoiceMemoTimelineSection(
-      label: _dayGroupLabel(firstMemo.timestampUtc.toLocal()),
+      label: dayGroupLabel(firstMemo.timestampUtc.toLocal()),
       memos: grouped[key]!,
     );
   }).toList();
@@ -2787,109 +2449,13 @@ bool _matchesQuery(VoiceMemo memo, String query) {
     memo.filename,
     memo.transcription ?? '',
     memo.summary ?? '',
-    _dayGroupLabel(local),
-    _timelineTimestampLabel(local),
+    dayGroupLabel(local),
+    timelineTimestampLabel(local),
     DateFormat.yMMMMd().format(local),
     DateFormat('MMMM d yyyy').format(local),
   ].join(' ').toLowerCase();
 
   return haystack.contains(query);
-}
-
-String _memoPreviewText(VoiceMemo memo) {
-  final aiSummary = memo.summary?.trim();
-  if (aiSummary != null && aiSummary.isNotEmpty) {
-    return aiSummary;
-  }
-
-  final transcript = memo.transcription?.trim();
-  if (transcript != null && transcript.isNotEmpty) {
-    final lines = transcript.split('\n');
-    return lines.first;
-  }
-
-  if (memo.syncedFromWatch) {
-    return 'Audio synced. Transcription pending.';
-  }
-
-  return 'On watch only. Sync to download and transcribe this note.';
-}
-
-bool _hasLocalAudio(VoiceMemo memo) {
-  final path = memo.convertedFilePath ?? memo.localFilePath;
-  return path != null && File(path).existsSync();
-}
-
-String _timelineTimestampLabel(DateTime dateTime) {
-  return '${_dayGroupLabel(dateTime)} · ${DateFormat.Hm().format(dateTime)}';
-}
-
-String _dayGroupLabel(DateTime dateTime) {
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final target = DateTime(dateTime.year, dateTime.month, dateTime.day);
-  final difference = today.difference(target).inDays;
-
-  if (difference == 0) {
-    return 'Today';
-  }
-  if (difference == 1) {
-    return 'Yesterday';
-  }
-  return DateFormat.MMMMEEEEd().format(dateTime);
-}
-
-String _syncStatusLabel(VoiceMemo memo) {
-  if (memo.transcription?.trim().isNotEmpty == true) {
-    return 'Ready';
-  }
-  if (memo.syncedFromWatch) {
-    return 'Synced';
-  }
-  return 'On watch';
-}
-
-IconData _syncStatusIcon(VoiceMemoSyncStatus status) {
-  return switch (status) {
-    VoiceMemoSyncStatus.onWatchOnly => Icons.watch_outlined,
-    VoiceMemoSyncStatus.downloading => Icons.downloading_rounded,
-    VoiceMemoSyncStatus.synced => Icons.check_circle_outline,
-    VoiceMemoSyncStatus.downloadFailed => Icons.error_outline,
-    VoiceMemoSyncStatus.transcribed => Icons.text_snippet_outlined,
-  };
-}
-
-Color _syncStatusColor(VoiceMemoSyncStatus status) {
-  return switch (status) {
-    VoiceMemoSyncStatus.onWatchOnly => AppTheme.warningColor,
-    VoiceMemoSyncStatus.downloading => AppTheme.primaryColor,
-    VoiceMemoSyncStatus.synced => AppTheme.successColor,
-    VoiceMemoSyncStatus.downloadFailed => AppTheme.errorColor,
-    VoiceMemoSyncStatus.transcribed => AppTheme.primaryColor,
-  };
-}
-
-Future<bool?> _confirmDelete(BuildContext context, VoiceMemo memo) {
-  return showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Delete recording?'),
-      content: Text(
-        'Transcript and audio will be removed.\n\n${memo.formattedDuration} · ${_timelineTimestampLabel(memo.timestampUtc.toLocal())}',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
-          child: const Text('Delete'),
-        ),
-      ],
-    ),
-  );
 }
 
 String _formatDuration(Duration duration) {
