@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../navigation/app_router.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../../data/database/app_database.dart';
 import '../../../providers/ble_providers.dart' hide bleScannerProvider;
@@ -149,7 +151,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
             backgroundColor: AppTheme.successColor,
           ),
         );
-        context.go('/');
+        context.go(AppRoutes.home);
       }
     } catch (e) {
       if (mounted) {
@@ -178,7 +180,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         title: const Text('Add Watch'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
+          onPressed: () => context.go(AppRoutes.home),
         ),
         actions: const [
           ConnectionStatusPill(compact: true, showIcon: true),

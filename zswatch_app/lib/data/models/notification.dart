@@ -1,3 +1,7 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'notification.freezed.dart';
+
 /// Notification model for phone → watch notification forwarding
 ///
 /// Represents a phone notification that will be forwarded to the watch
@@ -46,61 +50,50 @@ enum NotificationCategory {
 }
 
 /// Phone notification to be forwarded to watch
-class PhoneNotification {
-  /// Stable positive ID (mapped from Android StatusBarNotification.id)
-  final int id;
+@freezed
+abstract class PhoneNotification with _$PhoneNotification {
+  const PhoneNotification._();
 
-  /// Package name of the source app
-  final String packageName;
+  const factory PhoneNotification({
+    /// Stable positive ID (mapped from Android StatusBarNotification.id)
+    required int id,
 
-  /// Human-readable app name
-  final String appName;
+    /// Package name of the source app
+    required String packageName,
 
-  /// Notification title (may be null for some apps)
-  final String? title;
+    /// Human-readable app name
+    required String appName,
 
-  /// Notification body text
-  final String? body;
+    /// Notification title (may be null for some apps)
+    String? title,
 
-  /// Sender name (for messaging apps)
-  final String? sender;
+    /// Notification body text
+    String? body,
 
-  /// Subject (for email apps)
-  final String? subject;
+    /// Sender name (for messaging apps)
+    String? sender,
 
-  /// Phone number (for calls/SMS)
-  final String? phoneNumber;
+    /// Subject (for email apps)
+    String? subject,
 
-  /// Notification category
-  final NotificationCategory category;
+    /// Phone number (for calls/SMS)
+    String? phoneNumber,
 
-  /// Whether this notification supports reply action
-  final bool canReply;
+    /// Notification category
+    @Default(NotificationCategory.other) NotificationCategory category,
 
-  /// Whether this notification is a group summary
-  final bool isGroupSummary;
+    /// Whether this notification supports reply action
+    @Default(false) bool canReply,
 
-  /// Timestamp when the notification was posted
-  final DateTime postedAt;
+    /// Whether this notification is a group summary
+    @Default(false) bool isGroupSummary,
 
-  /// Android notification key for dismissal
-  final String? key;
+    /// Timestamp when the notification was posted
+    required DateTime postedAt,
 
-  const PhoneNotification({
-    required this.id,
-    required this.packageName,
-    required this.appName,
-    this.title,
-    this.body,
-    this.sender,
-    this.subject,
-    this.phoneNumber,
-    this.category = NotificationCategory.other,
-    this.canReply = false,
-    this.isGroupSummary = false,
-    required this.postedAt,
-    this.key,
-  });
+    /// Android notification key for dismissal
+    String? key,
+  }) = _PhoneNotification;
 
   /// Create from Android notification data (via MethodChannel)
   factory PhoneNotification.fromMap(Map<String, dynamic> map) {
@@ -143,44 +136,26 @@ class PhoneNotification {
       'key': key,
     };
   }
-
-  @override
-  String toString() {
-    return 'PhoneNotification(id: $id, app: $appName, title: $title)';
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is PhoneNotification &&
-        other.id == id &&
-        other.packageName == packageName;
-  }
-
-  @override
-  int get hashCode => id.hashCode ^ packageName.hashCode;
 }
 
 /// Notification filter settings for an app
-class AppNotificationFilter {
-  /// Package name of the app
-  final String packageName;
+@freezed
+abstract class AppNotificationFilter with _$AppNotificationFilter {
+  const AppNotificationFilter._();
 
-  /// Human-readable app name
-  final String appName;
+  const factory AppNotificationFilter({
+    /// Package name of the app
+    required String packageName,
 
-  /// Whether notifications from this app should be forwarded
-  final bool enabled;
+    /// Human-readable app name
+    required String appName,
 
-  /// App icon (base64 encoded, if available)
-  final String? iconBase64;
+    /// Whether notifications from this app should be forwarded
+    @Default(true) bool enabled,
 
-  const AppNotificationFilter({
-    required this.packageName,
-    required this.appName,
-    this.enabled = true,
-    this.iconBase64,
-  });
+    /// App icon (base64 encoded, if available)
+    String? iconBase64,
+  }) = _AppNotificationFilter;
 
   factory AppNotificationFilter.fromMap(Map<String, dynamic> map) {
     return AppNotificationFilter(
@@ -199,29 +174,4 @@ class AppNotificationFilter {
       'iconBase64': iconBase64,
     };
   }
-
-  AppNotificationFilter copyWith({
-    String? packageName,
-    String? appName,
-    bool? enabled,
-    String? iconBase64,
-  }) {
-    return AppNotificationFilter(
-      packageName: packageName ?? this.packageName,
-      appName: appName ?? this.appName,
-      enabled: enabled ?? this.enabled,
-      iconBase64: iconBase64 ?? this.iconBase64,
-    );
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is AppNotificationFilter &&
-        other.packageName == packageName;
-  }
-
-  @override
-  int get hashCode => packageName.hashCode;
 }
-

@@ -1,16 +1,18 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'health_sample.freezed.dart';
 
 /// Types of health data that can be stored
 enum HealthType {
   /// Daily/hourly step count
   steps,
-  
+
   /// Heart rate in BPM
   heartRate,
-  
+
   /// Sleep duration in minutes (future)
   sleep,
-  
+
   /// Activity state (walking, running, etc.)
   activity,
 }
@@ -19,16 +21,16 @@ enum HealthType {
 enum Granularity {
   /// Live streaming data
   realtime,
-  
+
   /// Per-hour aggregates
   hourly,
-  
+
   /// Per-day totals
   daily,
-  
+
   /// Per-week totals
   weekly,
-  
+
   /// Per-month totals
   monthly,
 }
@@ -36,7 +38,7 @@ enum Granularity {
 /// Extension methods for HealthType enum
 extension HealthTypeExtension on HealthType {
   /// Convert to database string
-  String get name {
+  String get dbName {
     switch (this) {
       case HealthType.steps:
         return 'steps';
@@ -97,7 +99,7 @@ extension HealthTypeExtension on HealthType {
 /// Extension methods for Granularity enum
 extension GranularityExtension on Granularity {
   /// Convert to database string
-  String get name {
+  String get dbName {
     switch (this) {
       case Granularity.realtime:
         return 'realtime';
@@ -152,37 +154,32 @@ extension GranularityExtension on Granularity {
 /// Used to store and retrieve health metrics like steps, heart rate,
 /// and sleep data. Samples are stored in the local SQLite database
 /// with 60-day retention.
-class HealthSample extends Equatable {
-  /// Database row identifier (null for new samples)
-  final int? id;
+@freezed
+abstract class HealthSample with _$HealthSample {
+  const HealthSample._();
 
-  /// Foreign key to source watch
-  final String watchId;
+  const factory HealthSample({
+    /// Database row identifier (null for new samples)
+    int? id,
 
-  /// Type of health data
-  final HealthType type;
+    /// Foreign key to source watch
+    required String watchId,
 
-  /// Measured value (steps count, BPM, minutes, etc.)
-  final double value;
+    /// Type of health data
+    required HealthType type,
 
-  /// When the measurement was taken on the watch
-  final DateTime timestamp;
+    /// Measured value (steps count, BPM, minutes, etc.)
+    required double value,
 
-  /// Time granularity of this sample
-  final Granularity granularity;
+    /// When the measurement was taken on the watch
+    required DateTime timestamp,
 
-  /// When the data was received by the app
-  final DateTime syncedAt;
+    /// Time granularity of this sample
+    required Granularity granularity,
 
-  const HealthSample({
-    this.id,
-    required this.watchId,
-    required this.type,
-    required this.value,
-    required this.timestamp,
-    required this.granularity,
-    required this.syncedAt,
-  });
+    /// When the data was received by the app
+    required DateTime syncedAt,
+  }) = _HealthSample;
 
   /// Create a new health sample (not yet persisted)
   factory HealthSample.create({
@@ -237,7 +234,7 @@ class HealthSample extends Equatable {
   }
 
   /// Create an activity state sample
-  /// 
+  ///
   /// The value stores the activity state as an integer:
   /// 0=unknown, 1=notWorn, 2=deepSleep, 3=lightSleep, 4=remSleep,
   /// 5=still(activity), 6=running, 7=walking, 8=swimming, 9=cycling, 10=exercise
@@ -254,27 +251,6 @@ class HealthSample extends Equatable {
       timestamp: now,
       granularity: Granularity.realtime,
       syncedAt: DateTime.now(),
-    );
-  }
-
-  /// Copy with modified fields
-  HealthSample copyWith({
-    int? id,
-    String? watchId,
-    HealthType? type,
-    double? value,
-    DateTime? timestamp,
-    Granularity? granularity,
-    DateTime? syncedAt,
-  }) {
-    return HealthSample(
-      id: id ?? this.id,
-      watchId: watchId ?? this.watchId,
-      type: type ?? this.type,
-      value: value ?? this.value,
-      timestamp: timestamp ?? this.timestamp,
-      granularity: granularity ?? this.granularity,
-      syncedAt: syncedAt ?? this.syncedAt,
     );
   }
 
@@ -311,67 +287,44 @@ class HealthSample extends Equatable {
     if (type != HealthType.steps) return true;
     return value >= 0;
   }
-
-  @override
-  List<Object?> get props => [
-        id,
-        watchId,
-        type,
-        value,
-        timestamp,
-        granularity,
-        syncedAt,
-      ];
-
-  @override
-  String toString() {
-    return 'HealthSample(type: ${type.name}, value: $value, timestamp: $timestamp)';
-  }
 }
 
 /// Aggregated health data for a time period
-class HealthAggregate extends Equatable {
-  /// Type of health data
-  final HealthType type;
+@freezed
+abstract class HealthAggregate with _$HealthAggregate {
+  const HealthAggregate._();
 
-  /// Start of the period
-  final DateTime periodStart;
+  const factory HealthAggregate({
+    /// Type of health data
+    required HealthType type,
 
-  /// End of the period
-  final DateTime periodEnd;
+    /// Start of the period
+    required DateTime periodStart,
 
-  /// Granularity of the aggregate
-  final Granularity granularity;
+    /// End of the period
+    required DateTime periodEnd,
 
-  /// Total/sum value (for steps)
-  final double total;
+    /// Granularity of the aggregate
+    required Granularity granularity,
 
-  /// Average value (for heart rate)
-  final double average;
+    /// Total/sum value (for steps)
+    required double total,
 
-  /// Minimum value in the period
-  final double min;
+    /// Average value (for heart rate)
+    required double average,
 
-  /// Maximum value in the period
-  final double max;
+    /// Minimum value in the period
+    required double min,
 
-  /// Number of samples in the aggregate
-  final int sampleCount;
+    /// Maximum value in the period
+    required double max,
 
-  const HealthAggregate({
-    required this.type,
-    required this.periodStart,
-    required this.periodEnd,
-    required this.granularity,
-    required this.total,
-    required this.average,
-    required this.min,
-    required this.max,
-    required this.sampleCount,
-  });
+    /// Number of samples in the aggregate
+    required int sampleCount,
+  }) = _HealthAggregate;
 
   /// Create from a list of samples
-  /// 
+  ///
   /// Note: For steps, we use the maximum value since the watch sends cumulative
   /// daily steps, not incremental counts.
   factory HealthAggregate.fromSamples({
@@ -381,7 +334,7 @@ class HealthAggregate extends Equatable {
     required Granularity granularity,
   }) {
     if (samples.isEmpty) {
-      final type = HealthType.steps; // Default
+      const type = HealthType.steps; // Default
       return HealthAggregate(
         type: type,
         periodStart: periodStart,
@@ -401,7 +354,7 @@ class HealthAggregate extends Equatable {
     final average = sum / values.length;
     final min = values.reduce((a, b) => a < b ? a : b);
     final max = values.reduce((a, b) => a > b ? a : b);
-    
+
     // For steps, use max value (cumulative) instead of sum
     final total = type == HealthType.steps ? max : sum;
 
@@ -447,20 +400,7 @@ class HealthAggregate extends Equatable {
         }
         return '${minutes}m';
       case HealthType.activity:
-        return '${sampleCount} samples';
+        return '$sampleCount samples';
     }
   }
-
-  @override
-  List<Object?> get props => [
-        type,
-        periodStart,
-        periodEnd,
-        granularity,
-        total,
-        average,
-        min,
-        max,
-        sampleCount,
-      ];
 }

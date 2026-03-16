@@ -1,37 +1,35 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show immutable;
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'sensor_fusion_data.freezed.dart';
 
 /// Sensor fusion data from the watch's onboard IMU fusion algorithm
 ///
 /// The watch performs sensor fusion onboard using Madgwick/Mahony algorithm,
 /// outputting a quaternion (w, x, y, z) representing the device orientation.
 /// This data is streamed via GATT characteristic ADAFRUIT_CHAR_3D at ~5Hz.
-@immutable
-class SensorFusionData {
-  /// Quaternion w component (scalar part)
-  final double w;
+@freezed
+abstract class SensorFusionData with _$SensorFusionData {
+  const SensorFusionData._();
 
-  /// Quaternion x component (vector i)
-  final double x;
+  const factory SensorFusionData({
+    /// Quaternion w component (scalar part)
+    required double w,
 
-  /// Quaternion y component (vector j)
-  final double y;
+    /// Quaternion x component (vector i)
+    required double x,
 
-  /// Quaternion z component (vector k)
-  final double z;
+    /// Quaternion y component (vector j)
+    required double y,
 
-  /// Timestamp when the data was received
-  final DateTime timestamp;
+    /// Quaternion z component (vector k)
+    required double z,
 
-  const SensorFusionData({
-    required this.w,
-    required this.x,
-    required this.y,
-    required this.z,
-    required this.timestamp,
-  });
+    /// Timestamp when the data was received
+    required DateTime timestamp,
+  }) = _SensorFusionData;
 
   /// Create from BLE notification data (16 bytes = 4 floats, little-endian)
   ///
@@ -121,7 +119,7 @@ class SensorFusionData {
   /// This gives the relative rotation from the offset orientation
   SensorFusionData applyOffset(SensorFusionData offset) {
     // To get rotation relative to offset: q_relative = q_current * q_offset^-1
-    return this.multiply(offset.inverse);
+    return multiply(offset.inverse);
   }
 
   /// Convert quaternion to Euler angles (roll, pitch, yaw) in radians
@@ -155,24 +153,6 @@ class SensorFusionData {
     );
   }
 
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is SensorFusionData &&
-          runtimeType == other.runtimeType &&
-          w == other.w &&
-          x == other.x &&
-          y == other.y &&
-          z == other.z;
-
-  @override
-  int get hashCode => Object.hash(w, x, y, z);
-
-  @override
-  String toString() =>
-      'SensorFusionData(w: ${w.toStringAsFixed(4)}, x: ${x.toStringAsFixed(4)}, '
-      'y: ${y.toStringAsFixed(4)}, z: ${z.toStringAsFixed(4)})';
-
   /// Format for display with specified decimal places
   String toDisplayString([int decimals = 3]) {
     return 'w: ${w.toStringAsFixed(decimals)}, '
@@ -183,22 +163,20 @@ class SensorFusionData {
 }
 
 /// Euler angles representation (roll, pitch, yaw)
-@immutable
-class EulerAngles {
-  /// Roll (rotation around X-axis) in radians
-  final double roll;
+@freezed
+abstract class EulerAngles with _$EulerAngles {
+  const EulerAngles._();
 
-  /// Pitch (rotation around Y-axis) in radians
-  final double pitch;
+  const factory EulerAngles({
+    /// Roll (rotation around X-axis) in radians
+    required double roll,
 
-  /// Yaw (rotation around Z-axis) in radians
-  final double yaw;
+    /// Pitch (rotation around Y-axis) in radians
+    required double pitch,
 
-  const EulerAngles({
-    required this.roll,
-    required this.pitch,
-    required this.yaw,
-  });
+    /// Yaw (rotation around Z-axis) in radians
+    required double yaw,
+  }) = _EulerAngles;
 
   /// Roll in degrees
   double get rollDegrees => roll * 180 / math.pi;
@@ -208,12 +186,6 @@ class EulerAngles {
 
   /// Yaw in degrees
   double get yawDegrees => yaw * 180 / math.pi;
-
-  @override
-  String toString() =>
-      'EulerAngles(roll: ${rollDegrees.toStringAsFixed(1)}°, '
-      'pitch: ${pitchDegrees.toStringAsFixed(1)}°, '
-      'yaw: ${yawDegrees.toStringAsFixed(1)}°)';
 
   /// Format for display
   String toDisplayString([int decimals = 1]) {

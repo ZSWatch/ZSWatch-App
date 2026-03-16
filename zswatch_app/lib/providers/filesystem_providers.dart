@@ -19,7 +19,7 @@ final filesystemUploadStateStreamProvider = StreamProvider<FilesystemUploadState
 /// Provider for current filesystem upload state
 final filesystemUploadStateProvider = Provider<FilesystemUploadState>((ref) {
   final asyncValue = ref.watch(filesystemUploadStateStreamProvider);
-  return asyncValue.valueOrNull ?? FilesystemUploadState.idle;
+  return asyncValue.valueOrNull ?? const FilesystemUploadState();
 });
 
 /// Provider for filesystem upload status

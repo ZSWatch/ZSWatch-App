@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../navigation/app_router.dart';
+
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/developer_providers.dart';
 import '../../../providers/permission_providers.dart';
@@ -82,20 +84,20 @@ class DeveloperScreen extends ConsumerWidget {
                 icon: Icons.article_outlined,
                 title: 'Log Viewer',
                 subtitle: 'All BLE data',
-                onTap: () => context.push('/developer/logs'),
+                onTap: () => context.push(AppRoutes.logViewer),
               ),
               _ToolCard(
                 icon: Icons.sensors,
                 title: 'Sensors',
                 subtitle: 'Real-time data',
-                onTap: () => context.push('/developer/sensors'),
+                onTap: () => context.push(AppRoutes.sensors),
                 enabled: connection.isConnected,
               ),
               _ToolCard(
                 icon: Icons.swap_horiz,
                 title: 'Comm Log',
                 subtitle: 'TX/RX traffic',
-                onTap: () => context.push('/developer/comm-log'),
+                onTap: () => context.push(AppRoutes.commLog),
               ),
               _ToolCard(
                 icon: Icons.terminal,

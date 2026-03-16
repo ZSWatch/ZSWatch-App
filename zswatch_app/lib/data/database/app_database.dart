@@ -29,44 +29,22 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
-  /// Database schema version - increment when making schema changes
+  /// Database schema version
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 1;
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
-      onCreate: (Migrator m) async {
-        await m.createAll();
-      },
+      onCreate: (Migrator m) => m.createAll(),
+      // No migration path is provided intentionally — all data is derived from
+      // the watch over BLE and can be re-fetched. Drop and recreate on upgrade.
       onUpgrade: (Migrator m, int from, int to) async {
-        // Handle migrations here when schema changes
-        if (from < 2) {
-          // Add custom_name column for watch rename feature (FR-099 to FR-102)
-          await m.addColumn(watches, watches.customName);
+        await m.recreateAllViews();
+        for (final table in allTables) {
+          await m.deleteTable(table.actualTableName);
         }
-        if (from < 3) {
-          // Add connection events table for analytics (US9)
-          await m.createTable(connectionEvents);
-        }
-        if (from < 4) {
-          // Add voice memos table for voice recording sync
-          await m.createTable(voiceMemos);
-        }
-        if (from < 5) {
-          // Add AI-enhanced voice notes fields and extracted actions table
-          await m.createTable(extractedActions);
-          if (from == 4) {
-            await m.addColumn(voiceMemos, voiceMemos.summary);
-            await m.addColumn(voiceMemos, voiceMemos.category);
-            await m.addColumn(voiceMemos, voiceMemos.processingStatus);
-            await m.addColumn(voiceMemos, voiceMemos.aiModel);
-            await m.addColumn(voiceMemos, voiceMemos.aiProcessedAt);
-            await m.addColumn(voiceMemos, voiceMemos.taskCreated);
-            await m.addColumn(voiceMemos, voiceMemos.calendarEventCreated);
-            await m.addColumn(voiceMemos, voiceMemos.actionReviewState);
-          }
-        }
+        await m.createAll();
       },
     );
   }
@@ -306,10 +284,31 @@ class AppDatabase extends _$AppDatabase {
     return result.read(connectionEvents.id.count()) ?? 0;
   }
 
+  /// Get the last connection event for a watch strictly before [before]
+  Future<ConnectionEventEntity?> getLastConnectionEventBefore({
+    required String watchId,
+    required DateTime before,
+  }) {
+    return (select(connectionEvents)
+          ..where((e) =>
+              e.watchId.equals(watchId) &
+              e.timestamp.isSmallerThanValue(before))
+          ..orderBy([(e) => OrderingTerm.desc(e.timestamp)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   /// Delete connection events older than specified date
   Future<int> deleteOldConnectionEvents(DateTime cutoff) {
     return (delete(connectionEvents)
           ..where((e) => e.timestamp.isSmallerThanValue(cutoff)))
+        .go();
+  }
+
+  /// Delete all connection events for a specific watch
+  Future<int> deleteAllConnectionEventsForWatch(String watchId) {
+    return (delete(connectionEvents)
+          ..where((e) => e.watchId.equals(watchId)))
         .go();
   }
 

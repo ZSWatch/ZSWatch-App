@@ -85,7 +85,10 @@ class DfuService {
         try {
           final existingManager = await DeviceUpdateManager.getInstance(device.remoteId.str);
           await existingManager.kill();
-        } catch (_) {}
+        } catch (e) {
+          // kill() may fail if the manager is in a bad state — non-fatal, we'll retry.
+          _log('Cleanup of existing manager failed (ignored): $e');
+        }
         // Retry after small delay
         await Future<void>.delayed(const Duration(milliseconds: 500));
         try {

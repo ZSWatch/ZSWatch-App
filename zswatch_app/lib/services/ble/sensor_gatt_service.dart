@@ -214,7 +214,10 @@ class SensorGattService {
     _tempSubscription = null;
     try {
       await _tempChar?.setNotifyValue(false);
-    } catch (_) {}
+    } catch (e) {
+      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
+      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+    }
   }
 
   void _handleTempData(List<int> data) {
@@ -253,7 +256,10 @@ class SensorGattService {
     _accelSubscription = null;
     try {
       await _accelChar?.setNotifyValue(false);
-    } catch (_) {}
+    } catch (e) {
+      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
+      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+    }
   }
 
   void _handleAccelData(List<int> data) {
@@ -294,7 +300,10 @@ class SensorGattService {
     _lightSubscription = null;
     try {
       await _lightChar?.setNotifyValue(false);
-    } catch (_) {}
+    } catch (e) {
+      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
+      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+    }
   }
 
   void _handleLightData(List<int> data) {
@@ -333,7 +342,10 @@ class SensorGattService {
     _gyroSubscription = null;
     try {
       await _gyroChar?.setNotifyValue(false);
-    } catch (_) {}
+    } catch (e) {
+      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
+      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+    }
   }
 
   void _handleGyroData(List<int> data) {
@@ -374,7 +386,10 @@ class SensorGattService {
     _magSubscription = null;
     try {
       await _magChar?.setNotifyValue(false);
-    } catch (_) {}
+    } catch (e) {
+      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
+      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+    }
   }
 
   void _handleMagData(List<int> data) {
@@ -416,7 +431,10 @@ class SensorGattService {
     _humiditySubscription = null;
     try {
       await _humidityChar?.setNotifyValue(false);
-    } catch (_) {}
+    } catch (e) {
+      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
+      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+    }
   }
 
   void _handleHumidityData(List<int> data) {
@@ -456,7 +474,10 @@ class SensorGattService {
     _pressureSubscription = null;
     try {
       await _pressureChar?.setNotifyValue(false);
-    } catch (_) {}
+    } catch (e) {
+      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
+      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+    }
   }
 
   void _handlePressureData(List<int> data) {
@@ -496,7 +517,10 @@ class SensorGattService {
     _fusionSubscription = null;
     try {
       await _fusionChar?.setNotifyValue(false);
-    } catch (_) {}
+    } catch (e) {
+      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
+      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+    }
   }
 
   void _handleFusionData(List<int> data) {
