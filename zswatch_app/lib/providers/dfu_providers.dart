@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mcumgr_flutter/mcumgr_flutter.dart';
@@ -13,6 +14,8 @@ import '../services/dfu/dfu_service.dart';
 import '../services/dfu/firmware_manager.dart';
 import 'filesystem_providers.dart';
 import 'watch_service_provider.dart';
+
+part 'dfu_providers.freezed.dart';
 
 /// Provider for the DFU service singleton
 final dfuServiceProvider = Provider<DfuService>((ref) {
@@ -441,54 +444,44 @@ final dfuNotifierProvider =
 });
 
 /// State for DFU operations
-class DfuOperationState {
-  final GitHubRelease? selectedRelease;
-  final WorkflowRun? selectedWorkflowRun;
-  final WorkflowArtifact? selectedArtifact;
-  final FirmwareImage? downloadedImage;
-  final FilesystemImage? filesystemImage;
-  final List<FirmwareImage> preparedImages;
-  final bool isDownloading;
-  final bool isUpdating;
-  final bool isFilesystemUploading;
-  final bool isBothUpdating;
-  final int currentStep;
-  final int totalSteps;
-  final String? error;
+@freezed
+abstract class DfuOperationState with _$DfuOperationState {
+  const DfuOperationState._();
 
-  const DfuOperationState({
-    this.selectedRelease,
-    this.selectedWorkflowRun,
-    this.selectedArtifact,
-    this.downloadedImage,
-    this.filesystemImage,
-    this.preparedImages = const [],
-    this.isDownloading = false,
-    this.isUpdating = false,
-    this.isFilesystemUploading = false,
-    this.isBothUpdating = false,
-    this.currentStep = 0,
-    this.totalSteps = 0,
-    this.error,
-  });
+  const factory DfuOperationState({
+    GitHubRelease? selectedRelease,
+    WorkflowRun? selectedWorkflowRun,
+    WorkflowArtifact? selectedArtifact,
+    FirmwareImage? downloadedImage,
+    FilesystemImage? filesystemImage,
+    @Default(<FirmwareImage>[]) List<FirmwareImage> preparedImages,
+    @Default(false) bool isDownloading,
+    @Default(false) bool isUpdating,
+    @Default(false) bool isFilesystemUploading,
+    @Default(false) bool isBothUpdating,
+    @Default(0) int currentStep,
+    @Default(0) int totalSteps,
+    String? error,
+  }) = _DfuOperationState;
 
   bool get hasError => error != null;
   bool get hasFirmware => downloadedImage != null;
   bool get hasFilesystem => filesystemImage != null;
   bool get hasBoth => hasFirmware && hasFilesystem;
-  
+
   /// Whether any operation is in progress
-  bool get isAnyInProgress => isDownloading || isUpdating || isFilesystemUploading || isBothUpdating;
-  
+  bool get isAnyInProgress =>
+      isDownloading || isUpdating || isFilesystemUploading || isBothUpdating;
+
   /// Whether user can start firmware update
   bool get canStartFirmwareUpdate => hasFirmware && !isAnyInProgress;
-  
+
   /// Whether user can start filesystem upload
   bool get canStartFilesystemUpload => hasFilesystem && !isAnyInProgress;
-  
+
   /// Whether user can start both updates
   bool get canStartBoth => hasBoth && !isAnyInProgress;
-  
+
   /// Legacy: alias for canStartFirmwareUpdate
   bool get canStartUpdate => canStartFirmwareUpdate;
 
@@ -521,38 +514,6 @@ class DfuOperationState {
     if (currentStep == 1) return 'Step 1/$totalSteps: Uploading filesystem...';
     if (currentStep == 2) return 'Step 2/$totalSteps: Updating firmware...';
     return 'Step $currentStep/$totalSteps';
-  }
-
-  DfuOperationState copyWith({
-    GitHubRelease? selectedRelease,
-    WorkflowRun? selectedWorkflowRun,
-    WorkflowArtifact? selectedArtifact,
-    FirmwareImage? downloadedImage,
-    FilesystemImage? filesystemImage,
-    List<FirmwareImage>? preparedImages,
-    bool? isDownloading,
-    bool? isUpdating,
-    bool? isFilesystemUploading,
-    bool? isBothUpdating,
-    int? currentStep,
-    int? totalSteps,
-    String? error,
-  }) {
-    return DfuOperationState(
-      selectedRelease: selectedRelease ?? this.selectedRelease,
-      selectedWorkflowRun: selectedWorkflowRun ?? this.selectedWorkflowRun,
-      selectedArtifact: selectedArtifact ?? this.selectedArtifact,
-      downloadedImage: downloadedImage ?? this.downloadedImage,
-      filesystemImage: filesystemImage ?? this.filesystemImage,
-      preparedImages: preparedImages ?? this.preparedImages,
-      isDownloading: isDownloading ?? this.isDownloading,
-      isUpdating: isUpdating ?? this.isUpdating,
-      isFilesystemUploading: isFilesystemUploading ?? this.isFilesystemUploading,
-      isBothUpdating: isBothUpdating ?? this.isBothUpdating,
-      currentStep: currentStep ?? this.currentStep,
-      totalSteps: totalSteps ?? this.totalSteps,
-      error: error,
-    );
   }
 }
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../navigation/app_router.dart';
 import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -77,7 +79,7 @@ class DashboardScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => context.push('/settings'),
+            onPressed: () => context.push(AppRoutes.settings),
           ),
         ],
       ),
@@ -112,12 +114,12 @@ class DashboardScreen extends ConsumerWidget {
 
             // Quick actions
             _QuickActionsSection(
-              onFirmwareUpdate: () => context.push('/firmware'),
+              onFirmwareUpdate: () => context.push(AppRoutes.firmware),
               onDisconnect: () async {
                 // In demo mode, just turn off the flag
                 if (ref.read(demoModeProvider)) {
                   ref.read(demoModeProvider.notifier).state = false;
-                  if (context.mounted) context.go('/');
+                  if (context.mounted) context.go(AppRoutes.home);
                   return;
                 }
                 // Suppress auto-reconnect when user manually disconnects
@@ -127,7 +129,7 @@ class DashboardScreen extends ConsumerWidget {
                 final notifier = ref.read(watchNotifierProvider.notifier);
                 await notifier.disconnect();
                 if (context.mounted) {
-                  context.go('/');
+                  context.go(AppRoutes.home);
                 }
               },
               onRestartWatch: ref.watch(hasSmpServiceProvider)
@@ -538,32 +540,32 @@ class _FeatureShortcuts extends StatelessWidget {
             _FeatureTile(
               icon: Icons.favorite,
               label: 'Health',
-              onTap: () => context.push('/health'),
+              onTap: () => context.push(AppRoutes.health),
             ),
             _FeatureTile(
               icon: Icons.notifications,
               label: 'Notifications',
-              onTap: () => context.push('/notifications'),
+              onTap: () => context.push(AppRoutes.notifications),
             ),
             _FeatureTile(
               icon: Icons.analytics,
               label: 'Analytics',
-              onTap: () => context.push('/analytics'),
+              onTap: () => context.push(AppRoutes.analytics),
             ),
             _FeatureTile(
               icon: Icons.code,
               label: 'Developer',
-              onTap: () => context.push('/developer'),
+              onTap: () => context.push(AppRoutes.developer),
             ),
             _FeatureTile(
               icon: Icons.mic,
               label: 'Voice',
-              onTap: () => context.push('/voice-memos'),
+              onTap: () => context.push(AppRoutes.voiceMemos),
             ),
             _FeatureTile(
               icon: Icons.settings,
               label: 'Settings',
-              onTap: () => context.push('/settings'),
+              onTap: () => context.push(AppRoutes.settings),
             ),
           ],
         ),

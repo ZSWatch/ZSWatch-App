@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -9,43 +10,23 @@ import '../services/protocol/protocol_service.dart';
 import '../services/watch_service.dart';
 import 'watch_service_provider.dart';
 
+part 'gps_providers.freezed.dart';
+
 /// GPS service provider
 final gpsServiceProvider = Provider<GpsService>((ref) {
   return GpsService();
 });
 
 /// State for GPS tracking
-class GpsState {
-  final bool isActive;
-  final bool isRequesting;
-  final Position? lastPosition;
-  final GpsError? lastError;
-  final DateTime? lastUpdateTime;
-
-  const GpsState({
-    this.isActive = false,
-    this.isRequesting = false,
-    this.lastPosition,
-    this.lastError,
-    this.lastUpdateTime,
-  });
-
-  GpsState copyWith({
-    bool? isActive,
-    bool? isRequesting,
+@freezed
+abstract class GpsState with _$GpsState {
+  const factory GpsState({
+    @Default(false) bool isActive,
+    @Default(false) bool isRequesting,
     Position? lastPosition,
     GpsError? lastError,
     DateTime? lastUpdateTime,
-    bool clearError = false,
-  }) {
-    return GpsState(
-      isActive: isActive ?? this.isActive,
-      isRequesting: isRequesting ?? this.isRequesting,
-      lastPosition: lastPosition ?? this.lastPosition,
-      lastError: clearError ? null : (lastError ?? this.lastError),
-      lastUpdateTime: lastUpdateTime ?? this.lastUpdateTime,
-    );
-  }
+  }) = _GpsState;
 }
 
 /// GPS notifier that handles GPS power requests from watch
@@ -95,7 +76,7 @@ class GpsNotifier extends StateNotifier<GpsState> {
     }
 
     debugPrint('[GpsNotifier] Starting GPS updates');
-    state = state.copyWith(isActive: true, clearError: true);
+    state = state.copyWith(isActive: true, lastError: null);
 
     // Send initial location immediately
     await _sendCurrentLocation();
@@ -133,7 +114,7 @@ class GpsNotifier extends StateNotifier<GpsState> {
           isRequesting: false,
           lastPosition: position,
           lastUpdateTime: DateTime.now(),
-          clearError: true,
+          lastError: null,
         );
 
         // Send to watch

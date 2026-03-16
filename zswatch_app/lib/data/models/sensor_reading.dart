@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'sensor_reading.freezed.dart';
 
 /// Type of sensor data
 enum SensorType {
@@ -25,34 +27,29 @@ enum SensorType {
 }
 
 /// A single sensor reading from the watch
-@immutable
-class SensorReading {
-  /// Timestamp when the reading was received
-  final DateTime timestamp;
+@freezed
+abstract class SensorReading with _$SensorReading {
+  const SensorReading._();
 
-  /// Type of sensor
-  final SensorType type;
+  const factory SensorReading({
+    /// Timestamp when the reading was received
+    required DateTime timestamp,
 
-  /// X-axis value (for multi-axis sensors) or primary value
-  final double x;
+    /// Type of sensor
+    required SensorType type,
 
-  /// Y-axis value (for multi-axis sensors)
-  final double? y;
+    /// X-axis value (for multi-axis sensors) or primary value
+    required double x,
 
-  /// Z-axis value (for multi-axis sensors)
-  final double? z;
+    /// Y-axis value (for multi-axis sensors)
+    double? y,
 
-  /// Raw integer value (for PPG)
-  final int? rawValue;
+    /// Z-axis value (for multi-axis sensors)
+    double? z,
 
-  const SensorReading({
-    required this.timestamp,
-    required this.type,
-    required this.x,
-    this.y,
-    this.z,
-    this.rawValue,
-  });
+    /// Raw integer value (for PPG)
+    int? rawValue,
+  }) = _SensorReading;
 
   /// Create an accelerometer reading
   factory SensorReading.accelerometer({
@@ -201,23 +198,6 @@ class SensorReading {
     }
     return '${x.toStringAsFixed(2)} $unit';
   }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is SensorReading &&
-          runtimeType == other.runtimeType &&
-          timestamp == other.timestamp &&
-          type == other.type &&
-          x == other.x &&
-          y == other.y &&
-          z == other.z;
-
-  @override
-  int get hashCode => Object.hash(timestamp, type, x, y, z);
-
-  @override
-  String toString() => 'SensorReading($typeName: $formatted)';
 }
 
 /// Buffer for storing recent sensor readings for real-time display

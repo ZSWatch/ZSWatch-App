@@ -461,10 +461,12 @@ class FirmwareManager {
               run.shortSha,
               run.branch,
             );
-            // Clean up the outer zip
+            // Clean up the outer zip — ignore errors (file may already be gone).
             try {
               await file.delete();
-            } catch (_) {}
+            } catch (e) {
+              _log('Temp zip cleanup failed (ignored): $e');
+            }
             return result;
           }
         } catch (e) {
@@ -590,10 +592,12 @@ class FirmwareManager {
         release.tagName,
       );
 
-      // Clean up outer zip
+      // Clean up outer zip — ignore errors (file may already be gone).
       try {
         await outerZipFile.delete();
-      } catch (_) {}
+      } catch (e) {
+        _log('Outer zip cleanup failed (ignored): $e');
+      }
 
       _updateProgress(DownloadProgress(totalBytes, totalBytes, DownloadStatus.completed));
 

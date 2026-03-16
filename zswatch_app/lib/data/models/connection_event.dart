@@ -1,4 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'connection_event.freezed.dart';
 
 /// Type of connection event
 enum ConnectionEventType {
@@ -128,38 +131,32 @@ extension DisconnectReasonExtension on DisconnectReason {
 }
 
 /// A connection event record for analytics
-@immutable
-class ConnectionEvent {
-  /// Unique identifier
-  final int? id;
+@freezed
+abstract class ConnectionEvent with _$ConnectionEvent {
+  const ConnectionEvent._();
 
-  /// Watch device ID
-  final String watchId;
+  const factory ConnectionEvent({
+    /// Unique identifier
+    int? id,
 
-  /// Type of event
-  final ConnectionEventType eventType;
+    /// Watch device ID
+    required String watchId,
 
-  /// When the event occurred
-  final DateTime timestamp;
+    /// Type of event
+    required ConnectionEventType eventType,
 
-  /// Reason for disconnection (only for disconnect events)
-  final DisconnectReason? reason;
+    /// When the event occurred
+    required DateTime timestamp,
 
-  /// Additional details (e.g., error message)
-  final String? details;
+    /// Reason for disconnection (only for disconnect events)
+    DisconnectReason? reason,
 
-  /// Session ID to group connect/disconnect pairs
-  final String? sessionId;
+    /// Additional details (e.g., error message)
+    String? details,
 
-  const ConnectionEvent({
-    this.id,
-    required this.watchId,
-    required this.eventType,
-    required this.timestamp,
-    this.reason,
-    this.details,
-    this.sessionId,
-  });
+    /// Session ID to group connect/disconnect pairs
+    String? sessionId,
+  }) = _ConnectionEvent;
 
   /// Create a connected event
   factory ConnectionEvent.connected({
@@ -221,57 +218,5 @@ class ConnectionEvent {
       details: details,
       sessionId: sessionId,
     );
-  }
-
-  ConnectionEvent copyWith({
-    int? id,
-    String? watchId,
-    ConnectionEventType? eventType,
-    DateTime? timestamp,
-    DisconnectReason? reason,
-    String? details,
-    String? sessionId,
-  }) {
-    return ConnectionEvent(
-      id: id ?? this.id,
-      watchId: watchId ?? this.watchId,
-      eventType: eventType ?? this.eventType,
-      timestamp: timestamp ?? this.timestamp,
-      reason: reason ?? this.reason,
-      details: details ?? this.details,
-      sessionId: sessionId ?? this.sessionId,
-    );
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-    return other is ConnectionEvent &&
-        other.id == id &&
-        other.watchId == watchId &&
-        other.eventType == eventType &&
-        other.timestamp == timestamp &&
-        other.reason == reason &&
-        other.details == details &&
-        other.sessionId == sessionId;
-  }
-
-  @override
-  int get hashCode {
-    return Object.hash(
-      id,
-      watchId,
-      eventType,
-      timestamp,
-      reason,
-      details,
-      sessionId,
-    );
-  }
-
-  @override
-  String toString() {
-    return 'ConnectionEvent(id: $id, watchId: $watchId, eventType: $eventType, '
-        'timestamp: $timestamp, reason: $reason, sessionId: $sessionId)';
   }
 }

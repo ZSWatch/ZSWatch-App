@@ -1,10 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/database/app_database.dart';
-import '../../../data/repositories/connection_analytics_repository.dart';
 import '../../../providers/analytics_providers.dart';
 
 /// Analytics screen showing Battery and Connection analytics
@@ -462,6 +463,7 @@ class _ConnectionAnalyticsTab extends ConsumerWidget {
       onRefresh: () async {
         ref.invalidate(connectionStats24HoursProvider(watchId));
         ref.invalidate(connectionStats7DaysProvider(watchId));
+        ref.invalidate(connectionTimelineProvider(watchId));
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -483,6 +485,11 @@ class _ConnectionAnalyticsTab extends ConsumerWidget {
               stats: stats24h.valueOrNull,
               isLoading: stats24h.isLoading,
             ),
+
+            const SizedBox(height: AppTheme.spacingMd),
+
+            // Connection Timeline Chart (auto-sized window + clear button)
+            _ConnectionTimelineCard(watchId: watchId),
 
             const SizedBox(height: AppTheme.spacingMd),
 
@@ -843,6 +850,315 @@ class _EventListTile extends StatelessWidget {
       return '${diff.inDays}d ago';
     } else {
       return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
+    }
+  }
+}
+
+// ============================================================================
+// Connection Timeline Chart
+// ============================================================================
+
+/// Horizontal bar showing connected / disconnected / app-not-running segments.
+/// The time window auto-adjusts to the oldest recorded event (capped at 7 days).
+/// Includes a clear button to wipe all events and start a fresh sample.
+class _ConnectionTimelineCard extends ConsumerWidget {
+  final String watchId;
+
+  const _ConnectionTimelineCard({required this.watchId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final timelineAsync = ref.watch(connectionTimelineProvider(watchId));
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title row with clear button
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _windowTitle(timelineAsync.valueOrNull?.windowStart,
+                        timelineAsync.valueOrNull?.windowEnd),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_sweep_outlined),
+                  iconSize: 20,
+                  tooltip: 'Clear connection history',
+                  visualDensity: VisualDensity.compact,
+                  color: colorScheme.outline,
+                  onPressed: () => _confirmClear(context, ref),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spacingXs),
+            // Legend
+            Row(
+              children: [
+                _LegendDot(color: _segmentColor(ConnectionSegmentType.connected)),
+                const SizedBox(width: 4),
+                Text('Connected', style: Theme.of(context).textTheme.labelSmall),
+                const SizedBox(width: AppTheme.spacingMd),
+                _LegendDot(color: _segmentColor(ConnectionSegmentType.disconnected)),
+                const SizedBox(width: 4),
+                Text('Disconnected', style: Theme.of(context).textTheme.labelSmall),
+                const SizedBox(width: AppTheme.spacingMd),
+                _LegendDot(color: _segmentColor(ConnectionSegmentType.appNotRunning)),
+                const SizedBox(width: 4),
+                Text('App not running', style: Theme.of(context).textTheme.labelSmall),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spacingMd),
+            if (timelineAsync.isLoading)
+              const SizedBox(
+                height: 48,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (timelineAsync.valueOrNull?.segments.isEmpty ?? true)
+              SizedBox(
+                height: 48,
+                child: Center(
+                  child: Text(
+                    'No connection data yet',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.outline,
+                        ),
+                  ),
+                ),
+              )
+            else ...[
+              SizedBox(
+                height: 36,
+                child: _TimelineBar(
+                  segments: timelineAsync.value!.segments,
+                  windowStart: timelineAsync.value!.windowStart,
+                  windowEnd: timelineAsync.value!.windowEnd,
+                ),
+              ),
+              const SizedBox(height: 6),
+              _TimelineLabels(
+                windowStart: timelineAsync.value!.windowStart,
+                windowEnd: timelineAsync.value!.windowEnd,
+                colorScheme: colorScheme,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _windowTitle(DateTime? start, DateTime? end) {
+    if (start == null || end == null) return 'Connection Timeline';
+    final duration = end.difference(start);
+    if (duration.inDays >= 1) {
+      return 'Connection Timeline (${duration.inDays}d ${duration.inHours % 24}h)';
+    } else if (duration.inHours >= 1) {
+      return 'Connection Timeline (${duration.inHours}h ${duration.inMinutes % 60}m)';
+    } else {
+      return 'Connection Timeline (${duration.inMinutes}m)';
+    }
+  }
+
+  Future<void> _confirmClear(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear connection history?'),
+        content: const Text(
+          'This will delete all recorded connection events for this watch. '
+          'Use this to start a fresh sample after making changes.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final repository = ref.read(connectionAnalyticsRepositoryProvider);
+    await repository.clearAllEvents(watchId);
+
+    // Invalidate all connection-related providers so every card refreshes
+    ref.invalidate(connectionTimelineProvider(watchId));
+    ref.invalidate(connectionStats24HoursProvider(watchId));
+    ref.invalidate(connectionStats7DaysProvider(watchId));
+    ref.invalidate(connectionEventsStreamProvider(watchId));
+  }
+}
+
+Color _segmentColor(ConnectionSegmentType type) {
+  switch (type) {
+    case ConnectionSegmentType.connected:
+      return Colors.green;
+    case ConnectionSegmentType.disconnected:
+      return Colors.red;
+    case ConnectionSegmentType.appNotRunning:
+      return Colors.grey.shade500;
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  const _LegendDot({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
+
+class _TimelineBar extends StatelessWidget {
+  final List<ConnectionSegment> segments;
+  final DateTime windowStart;
+  final DateTime windowEnd;
+
+  const _TimelineBar({
+    required this.segments,
+    required this.windowStart,
+    required this.windowEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalMs = windowEnd.difference(windowStart).inMilliseconds.toDouble();
+        if (totalMs <= 0) return const SizedBox.shrink();
+
+        final barWidth = constraints.maxWidth;
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Stack(
+            children: [
+              // Background = app-not-running for the whole window
+              Container(
+                width: barWidth,
+                height: 36,
+                color: _segmentColor(ConnectionSegmentType.appNotRunning).withOpacity(0.3),
+              ),
+              // Segments
+              for (final seg in segments)
+                Positioned(
+                  left: math.max(0.0, _xFor(seg.start, totalMs, barWidth)),
+                  width: math.max(
+                    2.0,
+                    _xFor(seg.end, totalMs, barWidth) - _xFor(seg.start, totalMs, barWidth),
+                  ),
+                  top: 0,
+                  bottom: 0,
+                  child: Tooltip(
+                    message: _segmentTooltip(seg),
+                    child: Container(
+                      color: _segmentColor(seg.type),
+                    ),
+                  ),
+                ),
+              // Current time indicator (right edge tick)
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(width: 2, color: Colors.white.withOpacity(0.8)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  double _xFor(DateTime dt, double totalMs, double barWidth) {
+    final offsetMs = dt.difference(windowStart).inMilliseconds.toDouble();
+    return (offsetMs / totalMs) * barWidth;
+  }
+
+  String _segmentTooltip(ConnectionSegment seg) {
+    final start = '${seg.start.hour.toString().padLeft(2, '0')}:${seg.start.minute.toString().padLeft(2, '0')}';
+    final end = '${seg.end.hour.toString().padLeft(2, '0')}:${seg.end.minute.toString().padLeft(2, '0')}';
+    final durationStr = _fmtDuration(seg.duration);
+    switch (seg.type) {
+      case ConnectionSegmentType.connected:
+        return 'Connected $start–$end ($durationStr)';
+      case ConnectionSegmentType.disconnected:
+        return 'Disconnected $start–$end ($durationStr)';
+      case ConnectionSegmentType.appNotRunning:
+        return 'App not running $start–$end ($durationStr)';
+    }
+  }
+
+  String _fmtDuration(Duration d) {
+    if (d.inHours > 0) return '${d.inHours}h ${d.inMinutes % 60}m';
+    if (d.inMinutes > 0) return '${d.inMinutes}m';
+    return '${d.inSeconds}s';
+  }
+}
+
+/// Adaptive time-axis labels beneath the timeline bar.
+/// Chooses a sensible tick interval based on the window duration.
+class _TimelineLabels extends StatelessWidget {
+  final DateTime windowStart;
+  final DateTime windowEnd;
+  final ColorScheme colorScheme;
+
+  const _TimelineLabels({
+    required this.windowStart,
+    required this.windowEnd,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: colorScheme.outline,
+        );
+    final ticks = _buildTicks();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        for (final tick in ticks)
+          Text(_label(tick), style: style),
+      ],
+    );
+  }
+
+  /// Pick 5 evenly-spaced tick positions across the window.
+  List<DateTime> _buildTicks() {
+    const tickCount = 5;
+    final totalMs = windowEnd.difference(windowStart).inMilliseconds;
+    return List.generate(tickCount, (i) {
+      return windowStart.add(Duration(milliseconds: (totalMs * i ~/ (tickCount - 1))));
+    });
+  }
+
+  String _label(DateTime dt) {
+    final duration = windowEnd.difference(windowStart);
+    if (duration.inDays >= 2) {
+      // Show day + hour
+      return '${dt.month}/${dt.day} ${dt.hour.toString().padLeft(2, '0')}h';
+    } else {
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     }
   }
 }

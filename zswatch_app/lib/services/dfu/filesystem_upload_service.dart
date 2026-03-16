@@ -20,7 +20,7 @@ class FilesystemUploadService {
   DateTime? _lastSpeedUpdate;
 
   final _stateController = BehaviorSubject<FilesystemUploadState>.seeded(
-    FilesystemUploadState.idle,
+    const FilesystemUploadState(),
   );
   final _logController = StreamController<String>.broadcast();
 
@@ -234,7 +234,7 @@ class FilesystemUploadService {
   /// Reset to idle state
   void reset() {
     if (isInProgress) return;
-    _updateState(FilesystemUploadState.idle);
+    _updateState(const FilesystemUploadState());
   }
 
   /// Dispose resources

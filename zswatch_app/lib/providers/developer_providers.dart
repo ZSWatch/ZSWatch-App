@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/comm_log_entry.dart';
@@ -11,6 +11,8 @@ import '../data/repositories/comm_log_repository.dart';
 import '../services/ble/sensor_gatt_service.dart';
 import '../services/watch_service.dart';
 import 'watch_service_provider.dart';
+
+part 'developer_providers.freezed.dart';
 
 // ============================================================================
 // Log Viewer Providers (T105a)
@@ -31,7 +33,7 @@ final logStreamingStateProvider = StateNotifierProvider<LogStreamingStateNotifie
 class LogStreamingStateNotifier extends StateNotifier<LogStreamingState> {
   final WatchService _watchService;
 
-  LogStreamingStateNotifier(this._watchService) : super(const LogStreamingState.initial());
+  LogStreamingStateNotifier(this._watchService) : super(const LogStreamingState());
 
   Future<void> enable() async {
     state = state.copyWith(pending: true, error: null);
@@ -394,32 +396,16 @@ final sensorStreamingStateProvider = StateProvider<SensorStreamingState>((ref) {
 });
 
 /// State for which sensors are currently streaming
-class SensorStreamingState {
-  final bool accelerometer;
-  final bool gyroscope;
-  final bool ppg;
-  final bool temperature;
+@freezed
+abstract class SensorStreamingState with _$SensorStreamingState {
+  const SensorStreamingState._();
 
-  const SensorStreamingState({
-    this.accelerometer = false,
-    this.gyroscope = false,
-    this.ppg = false,
-    this.temperature = false,
-  });
-
-  SensorStreamingState copyWith({
-    bool? accelerometer,
-    bool? gyroscope,
-    bool? ppg,
-    bool? temperature,
-  }) {
-    return SensorStreamingState(
-      accelerometer: accelerometer ?? this.accelerometer,
-      gyroscope: gyroscope ?? this.gyroscope,
-      ppg: ppg ?? this.ppg,
-      temperature: temperature ?? this.temperature,
-    );
-  }
+  const factory SensorStreamingState({
+    @Default(false) bool accelerometer,
+    @Default(false) bool gyroscope,
+    @Default(false) bool ppg,
+    @Default(false) bool temperature,
+  }) = _SensorStreamingState;
 
   bool get any => accelerometer || gyroscope || ppg || temperature;
 }

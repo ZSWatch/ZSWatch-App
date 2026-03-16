@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'comm_log_entry.freezed.dart';
 
 /// Direction of BLE communication
 enum CommDirection {
@@ -10,42 +12,35 @@ enum CommDirection {
 }
 
 /// A single communication log entry for debugging BLE traffic
-@immutable
-class CommLogEntry {
-  /// Unique identifier for this entry
-  final int id;
+@freezed
+abstract class CommLogEntry with _$CommLogEntry {
+  const CommLogEntry._();
 
-  /// Timestamp when the entry was recorded
-  final DateTime timestamp;
+  const factory CommLogEntry({
+    /// Unique identifier for this entry
+    required int id,
 
-  /// The raw data content
-  final String data;
+    /// Timestamp when the entry was recorded
+    required DateTime timestamp,
 
-  /// Direction of communication
-  final CommDirection direction;
+    /// The raw data content
+    required String data,
 
-  /// Size in bytes
-  final int sizeBytes;
+    /// Direction of communication
+    required CommDirection direction,
 
-  /// Optional parsed message type (from 't' field in JSON)
-  final String? messageType;
+    /// Size in bytes
+    required int sizeBytes,
 
-  /// Whether the data was chunked across multiple BLE packets
-  final bool wasChunked;
+    /// Optional parsed message type (from 't' field in JSON)
+    String? messageType,
 
-  /// Number of chunks if chunked
-  final int? chunkCount;
+    /// Whether the data was chunked across multiple BLE packets
+    @Default(false) bool wasChunked,
 
-  const CommLogEntry({
-    required this.id,
-    required this.timestamp,
-    required this.data,
-    required this.direction,
-    required this.sizeBytes,
-    this.messageType,
-    this.wasChunked = false,
-    this.chunkCount,
-  });
+    /// Number of chunks if chunked
+    int? chunkCount,
+  }) = _CommLogEntry;
 
   /// Create a TX (outgoing) entry
   factory CommLogEntry.tx({
@@ -109,56 +104,35 @@ class CommLogEntry {
     if (sizeBytes < 1024) return '$sizeBytes B';
     return '${(sizeBytes / 1024).toStringAsFixed(1)} KB';
   }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is CommLogEntry &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          timestamp == other.timestamp;
-
-  @override
-  int get hashCode => Object.hash(id, timestamp);
-
-  @override
-  String toString() =>
-      'CommLogEntry(id: $id, direction: $direction, size: $sizeBytes, type: $messageType)';
 }
 
 /// Statistics for communication log
-@immutable
-class CommLogStats {
-  /// Total entries in the log
-  final int totalEntries;
+@freezed
+abstract class CommLogStats with _$CommLogStats {
+  const CommLogStats._();
 
-  /// Total TX entries
-  final int txCount;
+  const factory CommLogStats({
+    /// Total entries in the log
+    @Default(0) int totalEntries,
 
-  /// Total RX entries
-  final int rxCount;
+    /// Total TX entries
+    @Default(0) int txCount,
 
-  /// Total bytes sent
-  final int totalTxBytes;
+    /// Total RX entries
+    @Default(0) int rxCount,
 
-  /// Total bytes received
-  final int totalRxBytes;
+    /// Total bytes sent
+    @Default(0) int totalTxBytes,
 
-  /// Oldest entry timestamp
-  final DateTime? oldestEntry;
+    /// Total bytes received
+    @Default(0) int totalRxBytes,
 
-  /// Newest entry timestamp
-  final DateTime? newestEntry;
+    /// Oldest entry timestamp
+    DateTime? oldestEntry,
 
-  const CommLogStats({
-    this.totalEntries = 0,
-    this.txCount = 0,
-    this.rxCount = 0,
-    this.totalTxBytes = 0,
-    this.totalRxBytes = 0,
-    this.oldestEntry,
-    this.newestEntry,
-  });
+    /// Newest entry timestamp
+    DateTime? newestEntry,
+  }) = _CommLogStats;
 
   /// Total bytes (TX + RX)
   int get totalBytes => totalTxBytes + totalRxBytes;
@@ -177,16 +151,4 @@ class CommLogStats {
     if (oldestEntry == null || newestEntry == null) return null;
     return newestEntry!.difference(oldestEntry!);
   }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is CommLogStats &&
-          runtimeType == other.runtimeType &&
-          totalEntries == other.totalEntries &&
-          totalTxBytes == other.totalTxBytes &&
-          totalRxBytes == other.totalRxBytes;
-
-  @override
-  int get hashCode => Object.hash(totalEntries, totalTxBytes, totalRxBytes);
 }

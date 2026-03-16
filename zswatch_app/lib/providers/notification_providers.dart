@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,6 +13,8 @@ import '../services/media/media_service.dart';
 import '../services/protocol/protocol_service.dart';
 import '../services/watch_service.dart';
 import 'watch_service_provider.dart';
+
+part 'notification_providers.freezed.dart';
 
 // Keys for SharedPreferences
 const _notificationForwardingEnabledKey = 'notification_forwarding_enabled';
@@ -32,40 +35,16 @@ final mediaServiceProvider = Provider<MediaService>((ref) {
 });
 
 /// State class for notification forwarding
-class NotificationForwardingState {
-  final bool isEnabled;
-  final bool hasPermission;
-  final bool isServiceRunning;
-  final Set<String> blockedApps;
-  final int forwardedCount;
-  final int dismissedCount;
-
-  const NotificationForwardingState({
-    this.isEnabled = false,
-    this.hasPermission = false,
-    this.isServiceRunning = false,
-    this.blockedApps = const {},
-    this.forwardedCount = 0,
-    this.dismissedCount = 0,
-  });
-
-  NotificationForwardingState copyWith({
-    bool? isEnabled,
-    bool? hasPermission,
-    bool? isServiceRunning,
-    Set<String>? blockedApps,
-    int? forwardedCount,
-    int? dismissedCount,
-  }) {
-    return NotificationForwardingState(
-      isEnabled: isEnabled ?? this.isEnabled,
-      hasPermission: hasPermission ?? this.hasPermission,
-      isServiceRunning: isServiceRunning ?? this.isServiceRunning,
-      blockedApps: blockedApps ?? this.blockedApps,
-      forwardedCount: forwardedCount ?? this.forwardedCount,
-      dismissedCount: dismissedCount ?? this.dismissedCount,
-    );
-  }
+@freezed
+abstract class NotificationForwardingState with _$NotificationForwardingState {
+  const factory NotificationForwardingState({
+    @Default(false) bool isEnabled,
+    @Default(false) bool hasPermission,
+    @Default(false) bool isServiceRunning,
+    @Default(<String>{}) Set<String> blockedApps,
+    @Default(0) int forwardedCount,
+    @Default(0) int dismissedCount,
+  }) = _NotificationForwardingState;
 }
 
 /// Notifier for notification forwarding state and actions
@@ -374,47 +353,22 @@ final notificationForwardingProvider =
 });
 
 /// State class for media control
-class MediaControlState {
-  final bool isInitialized;
-  final String? playbackState; // play, pause, stop
-  final int positionSeconds;
-  final String? artist;
-  final String? album;
-  final String? track;
-  final int? durationSeconds;
+@freezed
+abstract class MediaControlState with _$MediaControlState {
+  const MediaControlState._();
 
-  const MediaControlState({
-    this.isInitialized = false,
-    this.playbackState,
-    this.positionSeconds = 0,
-    this.artist,
-    this.album,
-    this.track,
-    this.durationSeconds,
-  });
-
-  bool get isPlaying => playbackState == 'play';
-  bool get hasMedia => track != null;
-
-  MediaControlState copyWith({
-    bool? isInitialized,
-    String? playbackState,
-    int? positionSeconds,
+  const factory MediaControlState({
+    @Default(false) bool isInitialized,
+    String? playbackState, // play, pause, stop
+    @Default(0) int positionSeconds,
     String? artist,
     String? album,
     String? track,
     int? durationSeconds,
-  }) {
-    return MediaControlState(
-      isInitialized: isInitialized ?? this.isInitialized,
-      playbackState: playbackState ?? this.playbackState,
-      positionSeconds: positionSeconds ?? this.positionSeconds,
-      artist: artist ?? this.artist,
-      album: album ?? this.album,
-      track: track ?? this.track,
-      durationSeconds: durationSeconds ?? this.durationSeconds,
-    );
-  }
+  }) = _MediaControlState;
+
+  bool get isPlaying => playbackState == 'play';
+  bool get hasMedia => track != null;
 }
 
 /// Notifier for media control state and actions

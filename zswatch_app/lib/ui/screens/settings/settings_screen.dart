@@ -166,7 +166,7 @@ class SettingsScreen extends ConsumerWidget {
               onChanged: (value) {
                 ref.read(demoModeProvider.notifier).state = value;
                 if (value) {
-                  context.go('/');
+                  context.go(AppRoutes.home);
                 }
               },
             ),

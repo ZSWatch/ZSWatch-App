@@ -3,12 +3,13 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../database/app_database.dart';
 import '../models/watch.dart';
+import 'base_repository.dart';
 
 /// Repository for Watch data operations
 ///
 /// Provides a clean interface for CRUD operations on watches,
 /// abstracting the database layer from the rest of the app.
-class WatchRepository {
+class WatchRepository extends BaseRepository<Watch, WatchEntity> {
   final AppDatabase _db;
 
   WatchRepository(this._db);
@@ -187,6 +188,9 @@ class WatchRepository {
   }
 
   // ==================== Mapping ====================
+
+  @override
+  Watch fromEntity(WatchEntity entity) => _entityToModel(entity);
 
   Watch _entityToModel(WatchEntity entity) {
     return Watch(

@@ -10,7 +10,7 @@ import 'watch_service_provider.dart';
 
 // Re-export repository providers for convenient access
 export '../data/repositories/battery_repository.dart' show batteryRepositoryProvider;
-export '../data/repositories/connection_analytics_repository.dart' show connectionAnalyticsRepositoryProvider;
+export '../data/repositories/connection_analytics_repository.dart' show connectionAnalyticsRepositoryProvider, ConnectionSegment, ConnectionSegmentType, ConnectionStats;
 export '../services/analytics/battery_storage_service.dart' show batteryStorageServiceProvider;
 export '../services/analytics/connection_analytics_service.dart' show connectionAnalyticsServiceProvider;
 
@@ -177,6 +177,36 @@ final connectionEventsStreamProvider = StreamProvider.autoDispose
     .family<List<ConnectionEventEntity>, String>((ref, watchId) {
   final db = ref.watch(databaseProvider);
   return db.watchConnectionEvents(watchId: watchId, limit: 50);
+});
+
+/// Provider for the oldest connection event timestamp for a watch.
+/// Used to auto-size the timeline window.
+final oldestConnectionEventTimeProvider = FutureProvider.autoDispose
+    .family<DateTime?, String>((ref, watchId) async {
+  final repository = ref.watch(connectionAnalyticsRepositoryProvider);
+  return repository.getOldestEventTime(watchId);
+});
+
+/// Provider for the connection timeline segments.
+/// The window spans from the oldest recorded event (or up to 24h back) to now.
+final connectionTimelineProvider = FutureProvider.autoDispose
+    .family<({List<ConnectionSegment> segments, DateTime windowStart, DateTime windowEnd}), String>(
+        (ref, watchId) async {
+  final repository = ref.watch(connectionAnalyticsRepositoryProvider);
+  final now = DateTime.now();
+  final oldest = await repository.getOldestEventTime(watchId);
+  // Use oldest event as window start, but cap at 7 days to avoid an absurdly wide chart.
+  final windowStart = oldest != null
+      ? (now.difference(oldest) > const Duration(days: 7)
+          ? now.subtract(const Duration(days: 7))
+          : oldest)
+      : now.subtract(const Duration(hours: 1));
+  final segments = await repository.getConnectionTimeline(
+    watchId: watchId,
+    from: windowStart,
+    to: now,
+  );
+  return (segments: segments, windowStart: windowStart, windowEnd: now);
 });
 
 /// Provider for current watch connection events stream

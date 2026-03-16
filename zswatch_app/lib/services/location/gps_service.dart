@@ -63,17 +63,14 @@ class GpsService {
         return GpsResult.failure(GpsError.serviceDisabled);
       }
 
-      // Check permission
-      var permission = await checkPermission();
+      // Check permission — never request here.
+      // Permission must be granted during onboarding, because this method can
+      // be triggered from the background when the watch requests GPS.
+      final permission = await checkPermission();
       if (permission == LocationPermission.denied) {
-        // Request permission
-        permission = await requestPermission();
-        if (permission == LocationPermission.denied) {
-          debugPrint('[GpsService] Location permission denied');
-          return GpsResult.failure(GpsError.permissionDenied);
-        }
+        debugPrint('[GpsService] Location permission denied');
+        return GpsResult.failure(GpsError.permissionDenied);
       }
-
       if (permission == LocationPermission.deniedForever) {
         debugPrint('[GpsService] Location permission denied forever');
         return GpsResult.failure(GpsError.permissionDeniedForever);
