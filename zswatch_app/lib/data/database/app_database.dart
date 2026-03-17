@@ -31,20 +31,20 @@ class AppDatabase extends _$AppDatabase {
 
   /// Database schema version
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (Migrator m) => m.createAll(),
-      // No migration path is provided intentionally — all data is derived from
-      // the watch over BLE and can be re-fetched. Drop and recreate on upgrade.
       onUpgrade: (Migrator m, int from, int to) async {
-        await m.recreateAllViews();
-        for (final table in allTables) {
-          await m.deleteTable(table.actualTableName);
+        if (from < 2) {
+          // v1 → v2: added ConnectionEvents, VoiceMemos, ExtractedActions tables.
+          // Create only the new tables — preserve existing data.
+          await m.createTable(connectionEvents);
+          await m.createTable(voiceMemos);
+          await m.createTable(extractedActions);
         }
-        await m.createAll();
       },
     );
   }

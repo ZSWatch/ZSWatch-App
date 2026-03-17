@@ -71,7 +71,6 @@ class GpsNotifier extends StateNotifier<GpsState> {
   /// Start sending GPS updates to the watch
   Future<void> _startGpsUpdates() async {
     if (state.isActive) {
-      debugPrint('[GpsNotifier] GPS already active');
       return;
     }
 
@@ -98,8 +97,11 @@ class GpsNotifier extends StateNotifier<GpsState> {
 
   /// Get current location and send to watch
   Future<void> _sendCurrentLocation() async {
+    if (!_watchService.isConnected) {
+      _stopGpsUpdates();
+      return;
+    }
     if (state.isRequesting) {
-      debugPrint('[GpsNotifier] Already requesting location, skipping');
       return;
     }
 
