@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/models/extracted_action.dart';
 import '../data/models/voice_memo.dart';
 import '../data/repositories/voice_memo_repository.dart';
 import '../services/ai/extracted_action_creation_service.dart';
@@ -234,6 +235,16 @@ Future<void> _autoCreateActionsForMemo({
     final selectedCalendarId = ref.read(selectedProductivityCalendarIdProvider);
 
     for (final action in pending) {
+      // Tasks and reminders require a scheduled time on Android — skip
+      // auto-creation if there's no date, the user can create manually.
+      final requiresDate = action.actionType == ExtractedActionType.task ||
+          action.actionType == ExtractedActionType.reminder;
+      if (requiresDate && action.startTime == null && action.dueDate == null) {
+        debugPrint(
+            '[VoiceMemoProviders] Skipping auto-create for action ${action.id} '
+            '(${action.actionType}) — no scheduled time');
+        continue;
+      }
       try {
         final draft = ActionCreationDraft.fromAction(action).copyWith(
           platformCalendarId: Platform.isAndroid ? selectedCalendarId : null,

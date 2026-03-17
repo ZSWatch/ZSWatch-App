@@ -105,6 +105,10 @@ class ExtractedActionOperations {
       actionId: action.id,
       platformTargetId: created.platformId,
     );
+    final warning = created.syncWarningMessage;
+    if (warning != null) {
+      return '${created.successMessage} (⚠ $warning)';
+    }
     return created.successMessage;
   }
 

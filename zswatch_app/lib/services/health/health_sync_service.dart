@@ -387,7 +387,6 @@ class HealthSyncService {
     final activityString = message['act'] as String?;
 
     if (steps != null) {
-      debugPrint('[HealthSync] Activity update - steps: $steps, ts: $timestamp');
       _stepsController.add(steps);
       _persistSteps(watchId, steps, timestamp);
     }
@@ -401,7 +400,6 @@ class HealthSyncService {
     // Track activity state
     if (activityString != null) {
       final newState = ActivityState.fromString(activityString);
-      debugPrint('[HealthSync] Activity update - state: $activityString -> $newState, ts: $timestamp');
       _persistAndUpdateActivityState(watchId, newState, timestamp);
     }
   }

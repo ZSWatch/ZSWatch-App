@@ -110,7 +110,6 @@ class ForegroundService {
         'watchName': watchName,
         'connectionState': _stateToString(state),
       });
-      debugPrint('[ForegroundService] Notification updated: $watchName, $state');
     } on PlatformException catch (e) {
       debugPrint('[ForegroundService] Failed to update notification: ${e.message}');
     }

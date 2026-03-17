@@ -103,8 +103,6 @@ class CommLogRepository {
     _entries.add(entry);
     _totalBytes += entry.sizeBytes;
 
-    debugPrint('[CommLog] Added entry ${entry.id} (${entry.directionDisplay}), '
-        'total: ${_entries.length} entries, ${_formatBytes(_totalBytes)}');
   }
 
   bool _shouldRotate(int newEntrySize) {

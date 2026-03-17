@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
+import 'providers/analytics_providers.dart';
 import 'providers/ble_providers.dart';
 import 'providers/developer_providers.dart';
 import 'providers/foreground_service_providers.dart';
@@ -63,6 +64,9 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       // Initialize voice memo sync service to handle recording sync from watch
       // This subscribes to watch messages for new recording notifications
       ref.read(voiceMemoSyncServiceProvider);
+      // Initialize analytics services (connection tracking, battery storage)
+      // so events are recorded from app startup, not just when analytics screen is opened
+      ref.read(analyticsServicesInitializedProvider);
     } catch (e) {
       debugPrint('BLE initialization error: $e');
     }

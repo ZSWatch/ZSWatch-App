@@ -45,6 +45,7 @@ class BleConnectionForegroundService : Service() {
         const val STATE_CONNECTED = "connected"
         const val STATE_RECONNECTING = "reconnecting"
         const val STATE_DISCONNECTED = "disconnected"
+        const val STATE_APP_KILLED = "app_killed"
 
         private var instance: BleConnectionForegroundService? = null
 
@@ -213,6 +214,11 @@ class BleConnectionForegroundService : Service() {
                 "Waiting for watch to be in range",
                 android.R.drawable.stat_notify_sync
             )
+            STATE_APP_KILLED -> Triple(
+                "App killed — restart needed",
+                "Connection lost, tap to reopen",
+                android.R.drawable.stat_notify_error
+            )
             else -> Triple(
                 "ZSWatch Companion",
                 "Background service running",
@@ -245,6 +251,15 @@ class BleConnectionForegroundService : Service() {
         Log.d(TAG, "Stopping foreground service")
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Log.d(TAG, "App task removed (swiped away), updating notification warning")
+        // Flutter engine is dead at this point — BLE connection is lost.
+        // Keep notification visible as a warning so the user knows.
+        currentState = STATE_APP_KILLED
+        updateNotificationContent()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {

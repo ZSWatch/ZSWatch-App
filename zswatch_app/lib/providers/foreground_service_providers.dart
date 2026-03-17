@@ -68,8 +68,6 @@ class ForegroundServiceNotifier extends StateNotifier<bool> {
   void _handleConnectionChange(Connection connection) {
     final backgroundEnabled = _ref.read(backgroundConnectionEnabledProvider);
     
-    debugPrint('[ForegroundServiceNotifier] Connection changed: ${connection.state}, backgroundEnabled=$backgroundEnabled');
-    
     // Only manage foreground service on Android
     if (!Platform.isAndroid) return;
 

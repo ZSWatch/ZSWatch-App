@@ -826,7 +826,7 @@ class _EventListTile extends StatelessWidget {
       case 'connected':
         return (Icons.bluetooth_connected, Colors.green, 'Connected');
       case 'disconnected':
-        return (Icons.bluetooth_disabled, Colors.red, 'Disconnected');
+        return (Icons.bluetooth_disabled, Colors.orange, 'Disconnected');
       case 'reconnect_attempt':
         return (Icons.replay, Colors.orange, 'Reconnecting...');
       case 'reconnect_failed':
@@ -1007,7 +1007,7 @@ Color _segmentColor(ConnectionSegmentType type) {
     case ConnectionSegmentType.connected:
       return Colors.green;
     case ConnectionSegmentType.disconnected:
-      return Colors.red;
+      return Colors.orange;
     case ConnectionSegmentType.appNotRunning:
       return Colors.grey.shade500;
   }

@@ -46,6 +46,7 @@ class BleConnectionService {
   // Minimal flags that can't be expressed in ConnectionPhase:
   bool _isCancelled = false; // User requested cancellation
   bool _autoReconnect = true;
+  bool _setupInProgress = false; // Guards against concurrent _runSetup calls
   String _watchId = '';
   String _watchName = '';
 
@@ -71,6 +72,11 @@ class BleConnectionService {
 
   /// Whether fully connected and operational.
   bool get isConnected => currentPhase is Connected;
+
+  /// Whether the underlying BLE device has an active GATT connection,
+  /// regardless of the app-level phase (e.g. still in SettingUp).
+  /// Use this for guarding NUS writes that happen during setup.
+  bool get isDeviceConnected => _device?.isConnected ?? false;
 
   /// The watch ID we're connected/connecting to.
   String get watchId => _watchId;
@@ -105,7 +111,7 @@ class BleConnectionService {
     _reconnectTimer?.cancel();
 
     final phase = currentPhase;
-    if (phase.isTryingToConnect) {
+    if (phase.isTryingToConnect || phase is PhaseError) {
       final device = _device;
       if (device != null) {
         device.disconnect();
@@ -165,6 +171,8 @@ class BleConnectionService {
       _updateConnectionModel(currentConnection.copyWith(rssi: rssi));
     } catch (e) {
       debugPrint('[BleConnectionService] Failed to read RSSI: $e');
+      // Device likely disconnected — stop polling to avoid spam
+      _stopRssiUpdates();
     }
   }
 
@@ -209,14 +217,33 @@ class BleConnectionService {
     try {
       _setPhase(const ConnectionPhase.connecting());
 
+      // Cancel old subscription before creating a new one to avoid
+      // reacting to stale events from a previous connection.
       await _connectionSubscription?.cancel();
-      _connectionSubscription = device.connectionState.listen(
-        (state) => _handleBleStateChange(state, watchId, name),
-      );
+      _connectionSubscription = null;
+
+      // Force-close any stale GATT handle from a previous connection.
+      // This handles: (1) autoConnect GATT handles that survive disconnect
+      // events, (2) stale connections left after setup errors (e.g. MTU
+      // timeout where GATT stays connected but app phase is error).
+      try {
+        await device.disconnect();
+      } catch (e) {
+        debugPrint(
+            '[BleConnectionService] Pre-connect disconnect (ignored): $e');
+      }
+
       _device = device;
 
       if (autoConnect) {
         if (_isCancelled) return;
+        // For autoConnect, set up the listener first — connect() is
+        // fire-and-forget and we rely on the listener for state changes.
+        _connectionSubscription = device.connectionState
+            .skip(1) // Skip initial state emission from FBP
+            .listen(
+          (state) => _handleBleStateChange(state, watchId, name),
+        );
         unawaited(device
             .connect(
           license: License.free,
@@ -230,6 +257,14 @@ class BleConnectionService {
         }));
       } else {
         if (_isCancelled) return;
+        // For direct connect, set up the listener with skip(1) to avoid
+        // the initial disconnected state emission triggering a false
+        // _handleDisconnect while connect() is still in progress.
+        _connectionSubscription = device.connectionState
+            .skip(1) // Skip initial state emission from FBP
+            .listen(
+          (state) => _handleBleStateChange(state, watchId, name),
+        );
         final timeout = isReconnectAttempt
             ? const Duration(seconds: 10)
             : BleConfig.connectionTimeout;
@@ -253,6 +288,11 @@ class BleConnectionService {
   /// hand off to WatchService for NUS/battery/sync via callback).
   Future<void> _runSetup(String watchId, String name) async {
     if (_isCancelled || _device == null || !_device!.isConnected) return;
+
+    // Prevent concurrent setup calls — both _connectToDevice (await path)
+    // and _handleBleStateChange(connected) can trigger _runSetup.
+    if (_setupInProgress) return;
+    _setupInProgress = true;
 
     _setPhase(const ConnectionPhase.settingUp(step: SetupStep.bonding));
 
@@ -313,14 +353,17 @@ class BleConnectionService {
       debugPrint('[BleConnectionService] Setup error: $e');
       if (_device != null && _device!.isConnected) {
         // Device still connected but setup failed — disconnect and let
-        // reconnect handle it
+        // the BLE state listener trigger _handleDisconnect → reconnect
         try {
           await _device!.disconnect();
         } catch (_) {}
-      } else if (_autoReconnect && !_isCancelled) {
-        // Device already disconnected during setup — schedule reconnect
-        _scheduleReconnect(watchId, name);
       }
+      // If device already disconnected, the BLE state listener has already
+      // fired _handleDisconnect which handles reconnection. Don't schedule
+      // a duplicate reconnect here — it races with _handleDisconnect and
+      // causes the reconnect timer to be overwritten.
+    } finally {
+      _setupInProgress = false;
     }
   }
 
@@ -389,24 +432,24 @@ class BleConnectionService {
 
     final phase = currentPhase;
 
-    // If we're in background reconnect, stay in reconnecting state
+    // If we're in background reconnect, stay in reconnecting state.
+    // The background attempt's catch block handles rescheduling.
     if (phase is Reconnecting && phase.isBackground) {
       return;
     }
 
-    // If we're in connecting/autoConnect phase, this may be the initial
-    // spurious disconnect notification — ignore it
+    // If we're in Connecting phase, the connect() call is still in progress.
+    // Don't interfere — let connect() resolve or timeout on its own.
+    // Its error will be caught by the caller (_scheduleReconnect or
+    // _connectToDevice) which will handle the next reconnect attempt.
     if (phase is Connecting) {
       return;
     }
 
-    // If setup is in progress, let setup detect via _shouldContinue()
-    if (phase is SettingUp) {
-      // Setup will fail and trigger reconnect from its catch block
-      return;
-    }
+    // Stop RSSI timer on any real disconnect
+    _stopRssiUpdates();
 
-    // Was previously connected or in a connecting state
+    // Was previously connected, setting up, or in a connecting state
     final shouldReconnect = _autoReconnect &&
         (phase is Connected ||
             phase is SettingUp ||
@@ -435,12 +478,8 @@ class BleConnectionService {
       if (!_autoReconnect) return;
 
       try {
-        _device = BluetoothDevice.fromId(watchId);
-        await _connectionSubscription?.cancel();
-        _connectionSubscription = _device!.connectionState.listen(
-          (state) => _handleBleStateChange(state, watchId, name),
-        );
-        await _connectToDevice(_device!, watchId, name,
+        final device = BluetoothDevice.fromId(watchId);
+        await _connectToDevice(device, watchId, name,
             isReconnectAttempt: true);
       } catch (e) {
         debugPrint(
@@ -487,19 +526,39 @@ class BleConnectionService {
       debugPrint(
           '[BleConnectionService] Background reconnect attempt $_reconnectAttempts');
 
-      _device = BluetoothDevice.fromId(watchId);
+      // Cancel old subscription — we create a new one below.
       await _connectionSubscription?.cancel();
-      _connectionSubscription = _device!.connectionState.listen(
+      _connectionSubscription = null;
+
+      final device = BluetoothDevice.fromId(watchId);
+
+      // Force-close any stale autoConnect GATT handle (see comment in
+      // _connectToDevice for details).
+      try {
+        await device.disconnect();
+      } catch (e) {
+        debugPrint(
+            '[BleConnectionService] Background pre-reconnect disconnect (ignored): $e');
+      }
+
+      _device = device;
+
+      // Set up listener with skip(1) to avoid initial state emission
+      _connectionSubscription = device.connectionState
+          .skip(1)
+          .listen(
         (state) => _handleBleStateChange(state, watchId, name),
       );
 
       try {
-        await _device!.connect(
+        await device.connect(
           license: License.free,
           timeout: const Duration(seconds: 10),
           autoConnect: false,
         );
-        // Connection succeeded — handleBleStateChange will trigger setup
+        // Connection succeeded — run setup directly since we own the
+        // connect() call here (not going through _connectToDevice).
+        await _runSetup(watchId, name);
       } catch (e) {
         debugPrint(
             '[BleConnectionService] Background reconnect failed: $e');
@@ -530,6 +589,7 @@ class BleConnectionService {
     _connectionSubscription = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _setupInProgress = false;
     _stopRssiUpdates();
     _device = null;
     _services = null;
