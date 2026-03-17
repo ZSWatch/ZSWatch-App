@@ -83,7 +83,6 @@ class BatteryStorageService {
       _lastStoredLevel = level;
       _lastStoredTime = now;
       
-      debugPrint('[BatteryStorage] Stored: level=$level%, charging=$isCharging');
     } catch (e) {
       debugPrint('[BatteryStorage] Failed to store: $e');
     }

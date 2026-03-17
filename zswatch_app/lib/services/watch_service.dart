@@ -37,7 +37,9 @@ class WatchService {
 
   StreamSubscription<ConnectionPhase>? _phaseSubscription;
   StreamSubscription<List<int>>? _nusSubscription;
+  BluetoothCharacteristic? _nusRxChar;
   StreamSubscription<List<int>>? _batterySubscription;
+  BluetoothCharacteristic? _batteryLevelChar;
 
   final _watchInfoController = BehaviorSubject<Watch?>.seeded(null);
   final _batteryController = BehaviorSubject<int>.seeded(0);
@@ -306,10 +308,20 @@ class WatchService {
     // Subscribe to battery service
     await _setupBatteryNotifications(services);
 
-    // Fire-and-forget: time sync + device info request.
-    // These are fast NUS writes; no need to block the Connected transition.
-    unawaited(syncTime());
-    unawaited(requestDeviceInfo());
+    // Time sync + device info — await these before returning so they
+    // complete while the connection is still being set up.  Previously
+    // these were fire-and-forget, but that caused silent failures
+    // (e.g. time never synced on reconnect).
+    try {
+      await syncTime();
+    } catch (e) {
+      debugPrint('[WatchService] syncTime failed: $e');
+    }
+    try {
+      await requestDeviceInfo();
+    } catch (e) {
+      debugPrint('[WatchService] requestDeviceInfo failed: $e');
+    }
   }
 
   // --- Phase change handler ---
@@ -325,6 +337,8 @@ class WatchService {
   Future<void> _setupNus(List<BluetoothService> services) async {
     await _nusSubscription?.cancel();
     _nusSubscription = null;
+    try { await _nusRxChar?.setNotifyValue(false); } catch (_) {}
+    _nusRxChar = null;
 
     final nusService = _findServiceIn(services, _guid(NusUuids.service));
     if (nusService == null) return;
@@ -333,6 +347,7 @@ class WatchService {
         _findCharacteristic(nusService, _guid(NusUuids.rxCharacteristic));
     if (rxChar == null) return;
 
+    _nusRxChar = rxChar;
     await rxChar.setNotifyValue(true);
     _nusSubscription = rxChar.onValueReceived.listen(_handleNusData);
   }
@@ -341,8 +356,6 @@ class WatchService {
     try {
       final chunk = utf8.decode(data);
       if (chunk.isEmpty) return;
-
-      debugPrint('[BLE RX] $chunk');
 
       // Emit to raw data stream for log viewer (FR-035a)
       _rawIncomingDataController.add(chunk);
@@ -445,7 +458,6 @@ class WatchService {
       final jsonStr = _messageBuffer.substring(0, jsonEnd);
       _messageBuffer = _messageBuffer.substring(jsonEnd);
 
-      debugPrint('[BLE RX] Complete message: ${jsonStr.length} bytes');
       _parseAndHandleJson(jsonStr);
     }
   }
@@ -549,6 +561,8 @@ class WatchService {
       List<BluetoothService> services) async {
     await _batterySubscription?.cancel();
     _batterySubscription = null;
+    try { await _batteryLevelChar?.setNotifyValue(false); } catch (_) {}
+    _batteryLevelChar = null;
 
     final batteryService =
         _findServiceIn(services, _guid(BatteryUuids.service));
@@ -576,6 +590,7 @@ class WatchService {
 
     // Subscribe to notifications
     try {
+      _batteryLevelChar = levelChar;
       await levelChar.setNotifyValue(true);
       _batterySubscription = levelChar.onValueReceived.listen((data) {
         if (data.isNotEmpty) {
@@ -601,6 +616,7 @@ class WatchService {
   }
 
   Future<void> _sendNus(String data) async {
+    if (!_ble.isDeviceConnected) return;
     final services = _ble.services;
     if (services == null) return;
 
@@ -659,8 +675,12 @@ class WatchService {
   void _cleanupProtocol() {
     _nusSubscription?.cancel();
     _nusSubscription = null;
+    _nusRxChar?.setNotifyValue(false).catchError((_) => false);
+    _nusRxChar = null;
     _batterySubscription?.cancel();
     _batterySubscription = null;
+    _batteryLevelChar?.setNotifyValue(false).catchError((_) => false);
+    _batteryLevelChar = null;
     _messageBuffer = '';
     _inBleLog = false;
   }
