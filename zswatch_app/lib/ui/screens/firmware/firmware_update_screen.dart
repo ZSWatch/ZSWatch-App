@@ -151,9 +151,9 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                         onReconnect: () => context.go(AppRoutes.scan),
                       ),
 
-                    // SMP service not available warning
+                    // SMP auto-enable info (non-blocking)
                     if (isConnected && !hasSmp)
-                      const _SmpWarningCard(),
+                      const _SmpInfoCard(),
 
                     // Firmware selection sections (shown when idle)
                     if (dfuState.status == DfuStatus.idle &&
@@ -452,93 +452,24 @@ class _ConnectionWarningCard extends StatelessWidget {
   }
 }
 
-class _SmpWarningCard extends ConsumerStatefulWidget {
-  const _SmpWarningCard();
-
-  @override
-  ConsumerState<_SmpWarningCard> createState() => _SmpWarningCardState();
-}
-
-class _SmpWarningCardState extends ConsumerState<_SmpWarningCard> {
-  bool _isChecking = false;
-  bool _recheckFailed = false;
-
-  Future<void> _recheck() async {
-    setState(() {
-      _isChecking = true;
-      _recheckFailed = false;
-    });
-    try {
-      final service = ref.read(watchServiceProvider);
-      final found = await service.rediscoverServices();
-      if (mounted) {
-        if (found) {
-          // Force the provider to re-evaluate with updated services
-          ref.invalidate(hasSmpServiceProvider);
-        } else {
-          setState(() => _recheckFailed = true);
-        }
-      }
-    } finally {
-      if (mounted) setState(() => _isChecking = false);
-    }
-  }
+class _SmpInfoCard extends StatelessWidget {
+  const _SmpInfoCard();
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: AppTheme.warningColor.withValues(alpha: 0.1),
+      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
       child: Padding(
         padding: const EdgeInsets.all(AppTheme.spacingMd),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                const Icon(Icons.warning_amber, color: AppTheme.warningColor),
-                const SizedBox(width: AppTheme.spacingSm),
-                Expanded(
-                  child: Text(
-                    'Update Mode Not Enabled',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppTheme.warningColor,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppTheme.spacingSm),
-            Text(
-              'The SMP service is not available on this watch. '
-              'To enable firmware updates:\n'
-              '1. On the watch, go to Apps → Update\n'
-              '2. Set USB and/or BLE to ON\n'
-              '3. Tap "Re-check" below',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            if (_recheckFailed) ...[
-              const SizedBox(height: AppTheme.spacingSm),
-              Text(
-                'SMP still not detected. Try disconnecting and reconnecting '
-                'after enabling update mode on the watch.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.errorColor,
-                    ),
-              ),
-            ],
-            const SizedBox(height: AppTheme.spacingSm),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: _isChecking ? null : _recheck,
-                icon: _isChecking
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh, size: 18),
-                label: Text(_isChecking ? 'Checking...' : 'Re-check'),
+            Icon(Icons.info_outline,
+                color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: AppTheme.spacingSm),
+            Expanded(
+              child: Text(
+                'Update mode will be enabled automatically when you start the update.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
           ],
@@ -547,7 +478,6 @@ class _SmpWarningCardState extends ConsumerState<_SmpWarningCard> {
     );
   }
 }
-
 class _StatusCard extends ConsumerWidget {
   final DfuState dfuState;
   final DownloadProgress downloadProgress;
@@ -1709,7 +1639,7 @@ class _ActionButtons extends ConsumerWidget {
         // Start Both button (shown when both are available)
         if (operationState.hasBoth) ...[
           FilledButton.icon(
-            onPressed: operationState.canStartBoth && isConnected && hasSmpService ? onStartBoth : null,
+            onPressed: operationState.canStartBoth && isConnected ? onStartBoth : null,
             icon: const Icon(Icons.playlist_play),
             label: const Text('Start Both (FS + FW)'),
             style: FilledButton.styleFrom(
@@ -1742,7 +1672,7 @@ class _ActionButtons extends ConsumerWidget {
             // Firmware Update button
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: operationState.canStartFirmwareUpdate && isConnected && hasSmpService
+                onPressed: operationState.canStartFirmwareUpdate && isConnected
                     ? onStartFirmware
                     : null,
                 icon: const Icon(Icons.system_update, size: 18),
@@ -1756,7 +1686,7 @@ class _ActionButtons extends ConsumerWidget {
             // Filesystem Upload button
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: operationState.canStartFilesystemUpload && isConnected && hasSmpService
+                onPressed: operationState.canStartFilesystemUpload && isConnected
                     ? onStartFilesystem
                     : null,
                 icon: const Icon(Icons.storage, size: 18),

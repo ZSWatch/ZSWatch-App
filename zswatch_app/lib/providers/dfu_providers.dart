@@ -203,6 +203,29 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     }
   }
 
+  /// Ensure SMP is enabled on the watch before DFU/FS operations.
+  ///
+  /// Sends the GadgetBridge `smp_enable` command, waits for the watch to
+  /// register the SMP BT transport, then re-discovers services so the
+  /// MCUmgr GATT service appears.
+  Future<void> _ensureSmpEnabled() async {
+    final watchService = _ref.read(watchServiceProvider);
+    if (watchService.hasSmpService) return;
+
+    debugPrint('[DfuNotifier] SMP not available, sending smp_enable…');
+    await watchService.enableSmp();
+    await Future<void>.delayed(const Duration(seconds: 2));
+    final ready = await watchService.rediscoverServices();
+    if (!ready) {
+      throw Exception(
+        'SMP service did not become available after enabling it on the watch. '
+        'Try disconnecting and reconnecting.',
+      );
+    }
+    _ref.invalidate(hasSmpServiceProvider);
+    debugPrint('[DfuNotifier] SMP enabled and discovered');
+  }
+
   /// Start the DFU process (firmware only)
   Future<void> startUpdate() async {
     final image = state.downloadedImage;
@@ -227,6 +250,9 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
         throw Exception('Watch not connected');
       }
 
+      // Auto-enable SMP on the watch if needed
+      await _ensureSmpEnabled();
+
       // The device ID is needed to create a BluetoothDevice
       final connection = watchService.currentConnection;
       final deviceId = connection.watchId;
@@ -236,7 +262,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 
       // Create a BluetoothDevice from the ID
       final bluetoothDevice = BluetoothDevice.fromId(deviceId);
-      
+
       // Start the DFU
       await _dfuService.startUpdate(
         device: bluetoothDevice,
@@ -272,6 +298,9 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       if (!watchService.isConnected) {
         throw Exception('Watch not connected');
       }
+
+      // Auto-enable SMP on the watch if needed
+      await _ensureSmpEnabled();
 
       final connection = watchService.currentConnection;
       final deviceId = connection.watchId;
@@ -337,6 +366,9 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       if (!watchService.isConnected) {
         throw Exception('Watch not connected');
       }
+
+      // Auto-enable SMP on the watch if needed
+      await _ensureSmpEnabled();
 
       final connection = watchService.currentConnection;
       final deviceId = connection.watchId;
