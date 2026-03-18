@@ -11,6 +11,7 @@ import '../../providers/permission_providers.dart';
 import '../../providers/watch_service_provider.dart';
 import '../screens/analytics/analytics_screen.dart';
 import '../screens/connection/scan_screen.dart';
+import '../screens/crash_report/crash_report_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/developer/comm_log_screen.dart';
 import '../screens/developer/developer_screen.dart';
@@ -54,6 +55,9 @@ abstract final class AppRoutes {
 
   // Settings sub-routes
   static const String aiModels = '/settings/ai-models';
+
+  // Crash report
+  static const String crashReport = '/crash-report';
 
   // Voice routes (placeholder)
   static const String voiceMemos = '/voice-memos';
@@ -180,6 +184,13 @@ class AppRouter {
             builder: (context, state) => const CommLogScreen(),
           ),
         ],
+      ),
+
+      // Crash report
+      GoRoute(
+        path: AppRoutes.crashReport,
+        name: 'crash-report',
+        builder: (context, state) => const CrashReportScreen(),
       ),
 
       // Voice memos

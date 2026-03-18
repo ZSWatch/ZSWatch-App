@@ -11,6 +11,7 @@ import '../../../data/models/watch.dart';
 import '../../../providers/auto_reconnect_provider.dart';
 import '../../../providers/demo_mode_provider.dart';
 import '../../../providers/health_providers.dart';
+import '../../../data/models/crash_summary.dart';
 import '../../../providers/watch_service_provider.dart';
 
 /// Dashboard screen showing connected watch information
@@ -72,6 +73,8 @@ class DashboardScreen extends ConsumerWidget {
     final watch = ref.watch(currentWatchProvider);
     final connection = ref.watch(watchConnectionProvider);
     final healthSummary = ref.watch(healthSummaryProvider);
+    final crashSummary = ref.watch(crashSummaryProvider);
+    final showCrash = ref.watch(showCrashIndicatorProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -94,6 +97,17 @@ class DashboardScreen extends ConsumerWidget {
               rssi: connection.rssi,
               mtu: connection.mtu,
             ),
+
+            // Crash indicator (between connection and stats)
+            if (showCrash && crashSummary != null) ...[
+              const SizedBox(height: AppTheme.spacingMd),
+              _CrashDetectedCard(
+                summary: crashSummary,
+                onDismiss: () =>
+                    ref.read(showCrashIndicatorProvider.notifier).state = false,
+                onTap: () => context.push(AppRoutes.crashReport),
+              ),
+            ],
 
             const SizedBox(height: AppTheme.spacingMd),
 
@@ -570,6 +584,61 @@ class _FeatureShortcuts extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _CrashDetectedCard extends StatelessWidget {
+  final CrashSummary summary;
+  final VoidCallback onDismiss;
+  final VoidCallback onTap;
+
+  const _CrashDetectedCard({
+    required this.summary,
+    required this.onDismiss,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: AppTheme.errorColor.withValues(alpha: 0.1),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+        child: Padding(
+          padding: const EdgeInsets.all(AppTheme.spacingMd),
+          child: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  color: AppTheme.errorColor, size: 32),
+              const SizedBox(width: AppTheme.spacingMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Crash Detected',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: AppTheme.errorColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    Text(
+                      '${summary.file}:${summary.line} — ${summary.time}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: onDismiss,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
