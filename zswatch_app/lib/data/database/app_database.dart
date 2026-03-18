@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'tables/battery_readings_table.dart';
 import 'tables/comm_log_entries_table.dart';
 import 'tables/connection_events_table.dart';
+import 'tables/crash_reports_table.dart';
 import 'tables/extracted_actions_table.dart';
 import 'tables/health_samples_table.dart';
 import 'tables/voice_memos_table.dart';
@@ -24,14 +25,14 @@ part 'app_database.g.dart';
 /// - CommLogEntries: BLE communication logs for debugging
 /// - ConnectionEvents: Connection/disconnection events for analytics
 @DriftDatabase(
-  tables: [Watches, HealthSamples, BatteryReadings, CommLogEntries, ConnectionEvents, VoiceMemos, ExtractedActions],
+  tables: [Watches, HealthSamples, BatteryReadings, CommLogEntries, ConnectionEvents, VoiceMemos, ExtractedActions, CrashReports],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   /// Database schema version
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -40,10 +41,13 @@ class AppDatabase extends _$AppDatabase {
       onUpgrade: (Migrator m, int from, int to) async {
         if (from < 2) {
           // v1 → v2: added ConnectionEvents, VoiceMemos, ExtractedActions tables.
-          // Create only the new tables — preserve existing data.
           await m.createTable(connectionEvents);
           await m.createTable(voiceMemos);
           await m.createTable(extractedActions);
+        }
+        if (from < 3) {
+          // v2 → v3: added CrashReports table.
+          await m.createTable(crashReports);
         }
       },
     );
@@ -549,6 +553,116 @@ class AppDatabase extends _$AppDatabase {
         .get();
   }
 
+  // ==================== Crash Report Operations ====================
+
+  /// Insert a crash report
+  Future<int> insertCrashReport(CrashReportsCompanion report) {
+    return into(crashReports).insert(report);
+  }
+
+  /// Get all crash reports for a watch, newest first
+  Future<List<CrashReportEntity>> getCrashReports({
+    required String watchId,
+    int limit = 50,
+  }) {
+    return (select(crashReports)
+          ..where((c) => c.watchId.equals(watchId))
+          ..orderBy([(c) => OrderingTerm.desc(c.receivedAt)])
+          ..limit(limit))
+        .get();
+  }
+
+  /// Watch crash reports for a watch (reactive stream), newest first
+  Stream<List<CrashReportEntity>> watchCrashReports({
+    required String watchId,
+    int limit = 50,
+  }) {
+    return (select(crashReports)
+          ..where((c) => c.watchId.equals(watchId))
+          ..orderBy([(c) => OrderingTerm.desc(c.receivedAt)])
+          ..limit(limit))
+        .watch();
+  }
+
+  /// Get all crash reports across all watches, newest first
+  Stream<List<CrashReportEntity>> watchAllCrashReports({int limit = 50}) {
+    return (select(crashReports)
+          ..orderBy([(c) => OrderingTerm.desc(c.receivedAt)])
+          ..limit(limit))
+        .watch();
+  }
+
+  /// Update a crash report with analysis results
+  Future<void> updateCrashReportAnalysis({
+    required int reportId,
+    required bool success,
+    String? backtrace,
+    String? registers,
+    String? rawOutput,
+    String? error,
+    bool elfAvailable = false,
+  }) {
+    return (update(crashReports)..where((c) => c.id.equals(reportId))).write(
+      CrashReportsCompanion(
+        analyzed: const Value(true),
+        backtrace: Value(backtrace),
+        registers: Value(registers),
+        rawOutput: Value(rawOutput),
+        analysisError: Value(error),
+        elfAvailable: Value(elfAvailable),
+      ),
+    );
+  }
+
+  /// Check if a crash report already exists (dedup by file+line+crashTime+watchId)
+  Future<CrashReportEntity?> findExistingCrashReport({
+    required String watchId,
+    required String file,
+    required int line,
+    required String crashTime,
+  }) {
+    return (select(crashReports)
+          ..where((c) =>
+              c.watchId.equals(watchId) &
+              c.file.equals(file) &
+              c.line.equals(line) &
+              c.crashTime.equals(crashTime))
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
+  /// Get crash count per file (top crashers)
+  Future<List<CrashFileStats>> getCrashFileStats({String? watchId}) async {
+    final query = customSelect(
+      'SELECT file, COUNT(*) as crash_count, MAX(received_at) as last_crash '
+      'FROM crash_reports '
+      '${watchId != null ? "WHERE watch_id = ?" : ""} '
+      'GROUP BY file ORDER BY crash_count DESC LIMIT 10',
+      variables: [if (watchId != null) Variable.withString(watchId)],
+      readsFrom: {crashReports},
+    );
+    final rows = await query.get();
+    return rows.map((row) => CrashFileStats(
+      file: row.read<String>('file'),
+      count: row.read<int>('crash_count'),
+      lastCrash: row.read<DateTime>('last_crash'),
+    )).toList();
+  }
+
+  /// Delete all crash reports.
+  Future<int> deleteAllCrashReports() {
+    return delete(crashReports).go();
+  }
+
+  /// Delete old crash reports (keep last N)
+  Future<void> deleteOldCrashReports({int keep = 100}) async {
+    await customStatement(
+      'DELETE FROM crash_reports WHERE id NOT IN '
+      '(SELECT id FROM crash_reports ORDER BY received_at DESC LIMIT ?)',
+      [keep],
+    );
+  }
+
   // ==================== Data Retention ====================
 
   /// Clean up old data (60-day retention)
@@ -558,6 +672,19 @@ class AppDatabase extends _$AppDatabase {
     await deleteOldBatteryReadings(cutoff);
     await deleteOldConnectionEvents(cutoff);
   }
+}
+
+/// Stats for crash frequency per file
+class CrashFileStats {
+  final String file;
+  final int count;
+  final DateTime lastCrash;
+
+  const CrashFileStats({
+    required this.file,
+    required this.count,
+    required this.lastCrash,
+  });
 }
 
 /// Opens the database connection

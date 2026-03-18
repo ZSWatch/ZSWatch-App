@@ -325,10 +325,18 @@ class WatchService {
     _watchInfoController.add(watch);
 
     // Setup NUS for Gadgetbridge protocol
-    await _setupNus(services);
+    try {
+      await _setupNus(services);
+    } catch (e) {
+      debugPrint('[WatchService] NUS setup failed: $e');
+    }
 
     // Subscribe to battery service
-    await _setupBatteryNotifications(services);
+    try {
+      await _setupBatteryNotifications(services);
+    } catch (e) {
+      debugPrint('[WatchService] Battery setup failed: $e');
+    }
 
     // Time sync + device info — await these before returning so they
     // complete while the connection is still being set up.  Previously
@@ -361,6 +369,13 @@ class WatchService {
     _nusSubscription = null;
     try { await _nusRxChar?.setNotifyValue(false); } catch (_) {}
     _nusRxChar = null;
+
+    // Reset protocol state — critical for auto-reconnect where
+    // _cleanupProtocol() is not called (phase goes Reconnecting, not
+    // Disconnected). Without this, a crash mid-BLE-log-send leaves
+    // _inBleLog=true, silently filtering all subsequent NUS data.
+    _messageBuffer = '';
+    _inBleLog = false;
 
     final nusService = _findServiceIn(services, _guid(NusUuids.service));
     if (nusService == null) return;
@@ -545,6 +560,7 @@ class WatchService {
 
     switch (type) {
       case 'ver':
+        debugPrint('[WatchService] Ver response: sha=${message['sha']}, dbg=${message['dbg']}');
         final fw = message['fw'] as String?;
         final hw = message['hw'] as String?;
         _fwCommitSha = message['sha'] as String?;
@@ -559,6 +575,7 @@ class WatchService {
         break;
 
       case 'coredump':
+        debugPrint('[WatchService] Coredump message: $message');
         final available = message['available'] == true;
         if (available) {
           _crashSummaryController.add(CrashSummary(

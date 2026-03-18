@@ -624,6 +624,9 @@ class FirmwareManager {
     final bytes = await outerZipFile.readAsBytes();
     final archive = ZipDecoder().decodeBytes(bytes);
 
+    // Cache ELF from archive if manifest.json + zephyr.elf.gz are present
+    await _cacheElfFromArchive(archive);
+
     final downloadDir = await _getDownloadDirectory();
 
     FirmwareImage? standardFirmwareImage;
@@ -1084,6 +1087,100 @@ class FirmwareManager {
   /// Reset progress to idle
   void resetProgress() {
     _updateProgress(const DownloadProgress(0, 0, DownloadStatus.idle));
+  }
+
+  // ==================== ELF Cache for Coredump Analysis ====================
+
+  static const String _elfCacheDir = 'elf_cache';
+  static const int _maxCachedElfs = 5;
+
+  /// Get the ELF cache directory.
+  Future<Directory> _getElfCacheDirectory() async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final dir = Directory(path.join(appDir.path, _elfCacheDir));
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  /// Cache an ELF (gzipped bytes) keyed by commit SHA.
+  Future<void> cacheElf(String commitSha, List<int> elfGzBytes) async {
+    final dir = await _getElfCacheDirectory();
+    final file = File(path.join(dir.path, '$commitSha.elf.gz'));
+    await file.writeAsBytes(elfGzBytes);
+    _log('Cached ELF for commit $commitSha (${elfGzBytes.length} bytes)');
+
+    // Evict old entries (keep last N by modification time)
+    final entries = dir.listSync().whereType<File>().toList()
+      ..sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+    for (var i = _maxCachedElfs; i < entries.length; i++) {
+      _log('Evicting old ELF cache entry: ${entries[i].path}');
+      await entries[i].delete();
+    }
+  }
+
+  /// Get a cached ELF file for the given commit SHA (gzipped).
+  /// Returns null if not cached.
+  Future<File?> getCachedElf(String commitSha) async {
+    final dir = await _getElfCacheDirectory();
+    final file = File(path.join(dir.path, '$commitSha.elf.gz'));
+    if (await file.exists()) {
+      _log('ELF cache hit for commit $commitSha');
+      return file;
+    }
+    return null;
+  }
+
+  /// Get the cached elf_hash for a given commit SHA, if known from manifest.
+  Future<String?> getCachedElfHash(String commitSha) async {
+    final dir = await _getElfCacheDirectory();
+    final metaFile = File(path.join(dir.path, '$commitSha.meta'));
+    if (await metaFile.exists()) {
+      return (await metaFile.readAsString()).trim();
+    }
+    return null;
+  }
+
+  /// Extract and cache ELF from a release/CI artifact zip if manifest.json
+  /// and zephyr.elf.gz are present.
+  Future<void> _cacheElfFromArchive(Archive archive) async {
+    // Look for manifest.json to get commit_sha and elf_hash
+    String? commitSha;
+    String? elfHash;
+    List<int>? elfGzBytes;
+
+    for (final file in archive) {
+      if (!file.isFile) continue;
+      final baseName = path.basename(file.name).toLowerCase();
+
+      if (baseName == 'manifest.json') {
+        try {
+          final content = utf8.decode(file.content as List<int>);
+          final manifest = jsonDecode(content) as Map<String, dynamic>;
+          commitSha = manifest['commit_sha'] as String?;
+          elfHash = manifest['elf_hash'] as String?;
+          _log('Found manifest.json: commit_sha=$commitSha elf_hash=$elfHash');
+        } catch (e) {
+          _log('Failed to parse manifest.json: $e');
+        }
+      }
+
+      if (baseName == 'zephyr.elf.gz') {
+        elfGzBytes = file.content as List<int>;
+        _log('Found zephyr.elf.gz (${elfGzBytes.length} bytes)');
+      }
+    }
+
+    if (commitSha != null && commitSha.isNotEmpty && elfGzBytes != null) {
+      await cacheElf(commitSha, elfGzBytes);
+      // Store elf_hash metadata alongside the cached ELF
+      if (elfHash != null && elfHash.isNotEmpty) {
+        final dir = await _getElfCacheDirectory();
+        final metaFile = File(path.join(dir.path, '$commitSha.meta'));
+        await metaFile.writeAsString(elfHash);
+      }
+    }
   }
 
   /// Dispose resources
