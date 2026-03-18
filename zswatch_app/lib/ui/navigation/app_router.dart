@@ -17,6 +17,7 @@ import '../screens/developer/comm_log_screen.dart';
 import '../screens/developer/developer_screen.dart';
 import '../screens/developer/log_viewer_screen.dart';
 import '../screens/developer/sensor_debug_screen.dart';
+import '../screens/developer/shell_screen.dart';
 import '../screens/firmware/firmware_update_screen.dart';
 import '../screens/health/health_screen.dart';
 import '../screens/health/heart_rate_screen.dart';
@@ -170,8 +171,7 @@ class AppRouter {
           GoRoute(
             path: 'shell',
             name: 'shell',
-            builder: (context, state) =>
-                const _PlaceholderScreen(title: 'Shell Terminal (Not Available)'),
+            builder: (context, state) => const ShellScreen(),
           ),
           GoRoute(
             path: 'sensors',

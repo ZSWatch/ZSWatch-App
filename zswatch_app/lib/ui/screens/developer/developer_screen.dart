@@ -18,7 +18,7 @@ import '../../widgets/developer/notification_debug_section.dart';
 /// - Log viewer (all incoming BLE NUS data)
 /// - Sensor debug (real-time sensor charts)
 /// - Communication log (TX/RX traffic)
-/// - Shell terminal (not implemented - mcumgr doesn't support it)
+/// - Shell terminal (SMP shell over BLE)
 class DeveloperScreen extends ConsumerWidget {
   const DeveloperScreen({super.key});
 
@@ -26,6 +26,7 @@ class DeveloperScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final diagnostics = ref.watch(bleDiagnosticsProvider);
     final connection = ref.watch(watchConnectionProvider);
+    final crashSummary = ref.watch(crashSummaryProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -102,16 +103,17 @@ class DeveloperScreen extends ConsumerWidget {
               _ToolCard(
                 icon: Icons.terminal,
                 title: 'Shell',
-                subtitle: 'Not available',
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Shell commands not supported by mcumgr library'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                },
-                enabled: false,
+                subtitle: 'SMP commands',
+                onTap: () => context.push(AppRoutes.shell),
+                enabled: connection.isConnected,
+              ),
+              _ToolCard(
+                icon: Icons.bug_report_outlined,
+                title: 'Crash Reports',
+                subtitle: crashSummary != null
+                    ? '${crashSummary.file}:${crashSummary.line}'
+                    : 'History & stats',
+                onTap: () => context.push(AppRoutes.crashReport),
               ),
             ],
           ),

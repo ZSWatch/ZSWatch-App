@@ -4521,6 +4521,946 @@ class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
   }
 }
 
+class $CrashReportsTable extends CrashReports
+    with TableInfo<$CrashReportsTable, CrashReportEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CrashReportsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _watchIdMeta = const VerificationMeta(
+    'watchId',
+  );
+  @override
+  late final GeneratedColumn<String> watchId = GeneratedColumn<String>(
+    'watch_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES watches (id)',
+    ),
+  );
+  static const VerificationMeta _fileMeta = const VerificationMeta('file');
+  @override
+  late final GeneratedColumn<String> file = GeneratedColumn<String>(
+    'file',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineMeta = const VerificationMeta('line');
+  @override
+  late final GeneratedColumn<int> line = GeneratedColumn<int>(
+    'line',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _crashTimeMeta = const VerificationMeta(
+    'crashTime',
+  );
+  @override
+  late final GeneratedColumn<String> crashTime = GeneratedColumn<String>(
+    'crash_time',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fwVersionMeta = const VerificationMeta(
+    'fwVersion',
+  );
+  @override
+  late final GeneratedColumn<String> fwVersion = GeneratedColumn<String>(
+    'fw_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fwCommitShaMeta = const VerificationMeta(
+    'fwCommitSha',
+  );
+  @override
+  late final GeneratedColumn<String> fwCommitSha = GeneratedColumn<String>(
+    'fw_commit_sha',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _boardMeta = const VerificationMeta('board');
+  @override
+  late final GeneratedColumn<String> board = GeneratedColumn<String>(
+    'board',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _buildTypeMeta = const VerificationMeta(
+    'buildType',
+  );
+  @override
+  late final GeneratedColumn<String> buildType = GeneratedColumn<String>(
+    'build_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _receivedAtMeta = const VerificationMeta(
+    'receivedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> receivedAt = GeneratedColumn<DateTime>(
+    'received_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _analyzedMeta = const VerificationMeta(
+    'analyzed',
+  );
+  @override
+  late final GeneratedColumn<bool> analyzed = GeneratedColumn<bool>(
+    'analyzed',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("analyzed" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _backtraceMeta = const VerificationMeta(
+    'backtrace',
+  );
+  @override
+  late final GeneratedColumn<String> backtrace = GeneratedColumn<String>(
+    'backtrace',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _registersMeta = const VerificationMeta(
+    'registers',
+  );
+  @override
+  late final GeneratedColumn<String> registers = GeneratedColumn<String>(
+    'registers',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _rawOutputMeta = const VerificationMeta(
+    'rawOutput',
+  );
+  @override
+  late final GeneratedColumn<String> rawOutput = GeneratedColumn<String>(
+    'raw_output',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _analysisErrorMeta = const VerificationMeta(
+    'analysisError',
+  );
+  @override
+  late final GeneratedColumn<String> analysisError = GeneratedColumn<String>(
+    'analysis_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _elfAvailableMeta = const VerificationMeta(
+    'elfAvailable',
+  );
+  @override
+  late final GeneratedColumn<bool> elfAvailable = GeneratedColumn<bool>(
+    'elf_available',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("elf_available" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    watchId,
+    file,
+    line,
+    crashTime,
+    fwVersion,
+    fwCommitSha,
+    board,
+    buildType,
+    receivedAt,
+    analyzed,
+    backtrace,
+    registers,
+    rawOutput,
+    analysisError,
+    elfAvailable,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'crash_reports';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CrashReportEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('watch_id')) {
+      context.handle(
+        _watchIdMeta,
+        watchId.isAcceptableOrUnknown(data['watch_id']!, _watchIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_watchIdMeta);
+    }
+    if (data.containsKey('file')) {
+      context.handle(
+        _fileMeta,
+        file.isAcceptableOrUnknown(data['file']!, _fileMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fileMeta);
+    }
+    if (data.containsKey('line')) {
+      context.handle(
+        _lineMeta,
+        line.isAcceptableOrUnknown(data['line']!, _lineMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineMeta);
+    }
+    if (data.containsKey('crash_time')) {
+      context.handle(
+        _crashTimeMeta,
+        crashTime.isAcceptableOrUnknown(data['crash_time']!, _crashTimeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_crashTimeMeta);
+    }
+    if (data.containsKey('fw_version')) {
+      context.handle(
+        _fwVersionMeta,
+        fwVersion.isAcceptableOrUnknown(data['fw_version']!, _fwVersionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_fwVersionMeta);
+    }
+    if (data.containsKey('fw_commit_sha')) {
+      context.handle(
+        _fwCommitShaMeta,
+        fwCommitSha.isAcceptableOrUnknown(
+          data['fw_commit_sha']!,
+          _fwCommitShaMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_fwCommitShaMeta);
+    }
+    if (data.containsKey('board')) {
+      context.handle(
+        _boardMeta,
+        board.isAcceptableOrUnknown(data['board']!, _boardMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_boardMeta);
+    }
+    if (data.containsKey('build_type')) {
+      context.handle(
+        _buildTypeMeta,
+        buildType.isAcceptableOrUnknown(data['build_type']!, _buildTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_buildTypeMeta);
+    }
+    if (data.containsKey('received_at')) {
+      context.handle(
+        _receivedAtMeta,
+        receivedAt.isAcceptableOrUnknown(data['received_at']!, _receivedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_receivedAtMeta);
+    }
+    if (data.containsKey('analyzed')) {
+      context.handle(
+        _analyzedMeta,
+        analyzed.isAcceptableOrUnknown(data['analyzed']!, _analyzedMeta),
+      );
+    }
+    if (data.containsKey('backtrace')) {
+      context.handle(
+        _backtraceMeta,
+        backtrace.isAcceptableOrUnknown(data['backtrace']!, _backtraceMeta),
+      );
+    }
+    if (data.containsKey('registers')) {
+      context.handle(
+        _registersMeta,
+        registers.isAcceptableOrUnknown(data['registers']!, _registersMeta),
+      );
+    }
+    if (data.containsKey('raw_output')) {
+      context.handle(
+        _rawOutputMeta,
+        rawOutput.isAcceptableOrUnknown(data['raw_output']!, _rawOutputMeta),
+      );
+    }
+    if (data.containsKey('analysis_error')) {
+      context.handle(
+        _analysisErrorMeta,
+        analysisError.isAcceptableOrUnknown(
+          data['analysis_error']!,
+          _analysisErrorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('elf_available')) {
+      context.handle(
+        _elfAvailableMeta,
+        elfAvailable.isAcceptableOrUnknown(
+          data['elf_available']!,
+          _elfAvailableMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CrashReportEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CrashReportEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      watchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}watch_id'],
+      )!,
+      file: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file'],
+      )!,
+      line: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}line'],
+      )!,
+      crashTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}crash_time'],
+      )!,
+      fwVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fw_version'],
+      )!,
+      fwCommitSha: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fw_commit_sha'],
+      )!,
+      board: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}board'],
+      )!,
+      buildType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}build_type'],
+      )!,
+      receivedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}received_at'],
+      )!,
+      analyzed: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}analyzed'],
+      )!,
+      backtrace: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}backtrace'],
+      ),
+      registers: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}registers'],
+      ),
+      rawOutput: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}raw_output'],
+      ),
+      analysisError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}analysis_error'],
+      ),
+      elfAvailable: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}elf_available'],
+      )!,
+    );
+  }
+
+  @override
+  $CrashReportsTable createAlias(String alias) {
+    return $CrashReportsTable(attachedDatabase, alias);
+  }
+}
+
+class CrashReportEntity extends DataClass
+    implements Insertable<CrashReportEntity> {
+  /// Auto-incrementing row identifier
+  final int id;
+
+  /// Foreign key to source watch
+  final String watchId;
+
+  /// Source file that crashed
+  final String file;
+
+  /// Line number of the crash
+  final int line;
+
+  /// Crash timestamp as reported by the watch
+  final String crashTime;
+
+  /// Firmware version at time of crash
+  final String fwVersion;
+
+  /// Firmware commit SHA at time of crash
+  final String fwCommitSha;
+
+  /// Board identifier
+  final String board;
+
+  /// Build type (debug/release)
+  final String buildType;
+
+  /// When this crash was first received by the app
+  final DateTime receivedAt;
+
+  /// Whether analysis has been performed
+  final bool analyzed;
+
+  /// Decoded backtrace from server (null if not analyzed)
+  final String? backtrace;
+
+  /// Decoded registers from server (null if not analyzed)
+  final String? registers;
+
+  /// Raw GDB output from server (null if not analyzed)
+  final String? rawOutput;
+
+  /// Error message if analysis failed
+  final String? analysisError;
+
+  /// Whether ELF was available for analysis
+  final bool elfAvailable;
+  const CrashReportEntity({
+    required this.id,
+    required this.watchId,
+    required this.file,
+    required this.line,
+    required this.crashTime,
+    required this.fwVersion,
+    required this.fwCommitSha,
+    required this.board,
+    required this.buildType,
+    required this.receivedAt,
+    required this.analyzed,
+    this.backtrace,
+    this.registers,
+    this.rawOutput,
+    this.analysisError,
+    required this.elfAvailable,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['watch_id'] = Variable<String>(watchId);
+    map['file'] = Variable<String>(file);
+    map['line'] = Variable<int>(line);
+    map['crash_time'] = Variable<String>(crashTime);
+    map['fw_version'] = Variable<String>(fwVersion);
+    map['fw_commit_sha'] = Variable<String>(fwCommitSha);
+    map['board'] = Variable<String>(board);
+    map['build_type'] = Variable<String>(buildType);
+    map['received_at'] = Variable<DateTime>(receivedAt);
+    map['analyzed'] = Variable<bool>(analyzed);
+    if (!nullToAbsent || backtrace != null) {
+      map['backtrace'] = Variable<String>(backtrace);
+    }
+    if (!nullToAbsent || registers != null) {
+      map['registers'] = Variable<String>(registers);
+    }
+    if (!nullToAbsent || rawOutput != null) {
+      map['raw_output'] = Variable<String>(rawOutput);
+    }
+    if (!nullToAbsent || analysisError != null) {
+      map['analysis_error'] = Variable<String>(analysisError);
+    }
+    map['elf_available'] = Variable<bool>(elfAvailable);
+    return map;
+  }
+
+  CrashReportsCompanion toCompanion(bool nullToAbsent) {
+    return CrashReportsCompanion(
+      id: Value(id),
+      watchId: Value(watchId),
+      file: Value(file),
+      line: Value(line),
+      crashTime: Value(crashTime),
+      fwVersion: Value(fwVersion),
+      fwCommitSha: Value(fwCommitSha),
+      board: Value(board),
+      buildType: Value(buildType),
+      receivedAt: Value(receivedAt),
+      analyzed: Value(analyzed),
+      backtrace: backtrace == null && nullToAbsent
+          ? const Value.absent()
+          : Value(backtrace),
+      registers: registers == null && nullToAbsent
+          ? const Value.absent()
+          : Value(registers),
+      rawOutput: rawOutput == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rawOutput),
+      analysisError: analysisError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(analysisError),
+      elfAvailable: Value(elfAvailable),
+    );
+  }
+
+  factory CrashReportEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CrashReportEntity(
+      id: serializer.fromJson<int>(json['id']),
+      watchId: serializer.fromJson<String>(json['watchId']),
+      file: serializer.fromJson<String>(json['file']),
+      line: serializer.fromJson<int>(json['line']),
+      crashTime: serializer.fromJson<String>(json['crashTime']),
+      fwVersion: serializer.fromJson<String>(json['fwVersion']),
+      fwCommitSha: serializer.fromJson<String>(json['fwCommitSha']),
+      board: serializer.fromJson<String>(json['board']),
+      buildType: serializer.fromJson<String>(json['buildType']),
+      receivedAt: serializer.fromJson<DateTime>(json['receivedAt']),
+      analyzed: serializer.fromJson<bool>(json['analyzed']),
+      backtrace: serializer.fromJson<String?>(json['backtrace']),
+      registers: serializer.fromJson<String?>(json['registers']),
+      rawOutput: serializer.fromJson<String?>(json['rawOutput']),
+      analysisError: serializer.fromJson<String?>(json['analysisError']),
+      elfAvailable: serializer.fromJson<bool>(json['elfAvailable']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'watchId': serializer.toJson<String>(watchId),
+      'file': serializer.toJson<String>(file),
+      'line': serializer.toJson<int>(line),
+      'crashTime': serializer.toJson<String>(crashTime),
+      'fwVersion': serializer.toJson<String>(fwVersion),
+      'fwCommitSha': serializer.toJson<String>(fwCommitSha),
+      'board': serializer.toJson<String>(board),
+      'buildType': serializer.toJson<String>(buildType),
+      'receivedAt': serializer.toJson<DateTime>(receivedAt),
+      'analyzed': serializer.toJson<bool>(analyzed),
+      'backtrace': serializer.toJson<String?>(backtrace),
+      'registers': serializer.toJson<String?>(registers),
+      'rawOutput': serializer.toJson<String?>(rawOutput),
+      'analysisError': serializer.toJson<String?>(analysisError),
+      'elfAvailable': serializer.toJson<bool>(elfAvailable),
+    };
+  }
+
+  CrashReportEntity copyWith({
+    int? id,
+    String? watchId,
+    String? file,
+    int? line,
+    String? crashTime,
+    String? fwVersion,
+    String? fwCommitSha,
+    String? board,
+    String? buildType,
+    DateTime? receivedAt,
+    bool? analyzed,
+    Value<String?> backtrace = const Value.absent(),
+    Value<String?> registers = const Value.absent(),
+    Value<String?> rawOutput = const Value.absent(),
+    Value<String?> analysisError = const Value.absent(),
+    bool? elfAvailable,
+  }) => CrashReportEntity(
+    id: id ?? this.id,
+    watchId: watchId ?? this.watchId,
+    file: file ?? this.file,
+    line: line ?? this.line,
+    crashTime: crashTime ?? this.crashTime,
+    fwVersion: fwVersion ?? this.fwVersion,
+    fwCommitSha: fwCommitSha ?? this.fwCommitSha,
+    board: board ?? this.board,
+    buildType: buildType ?? this.buildType,
+    receivedAt: receivedAt ?? this.receivedAt,
+    analyzed: analyzed ?? this.analyzed,
+    backtrace: backtrace.present ? backtrace.value : this.backtrace,
+    registers: registers.present ? registers.value : this.registers,
+    rawOutput: rawOutput.present ? rawOutput.value : this.rawOutput,
+    analysisError: analysisError.present
+        ? analysisError.value
+        : this.analysisError,
+    elfAvailable: elfAvailable ?? this.elfAvailable,
+  );
+  CrashReportEntity copyWithCompanion(CrashReportsCompanion data) {
+    return CrashReportEntity(
+      id: data.id.present ? data.id.value : this.id,
+      watchId: data.watchId.present ? data.watchId.value : this.watchId,
+      file: data.file.present ? data.file.value : this.file,
+      line: data.line.present ? data.line.value : this.line,
+      crashTime: data.crashTime.present ? data.crashTime.value : this.crashTime,
+      fwVersion: data.fwVersion.present ? data.fwVersion.value : this.fwVersion,
+      fwCommitSha: data.fwCommitSha.present
+          ? data.fwCommitSha.value
+          : this.fwCommitSha,
+      board: data.board.present ? data.board.value : this.board,
+      buildType: data.buildType.present ? data.buildType.value : this.buildType,
+      receivedAt: data.receivedAt.present
+          ? data.receivedAt.value
+          : this.receivedAt,
+      analyzed: data.analyzed.present ? data.analyzed.value : this.analyzed,
+      backtrace: data.backtrace.present ? data.backtrace.value : this.backtrace,
+      registers: data.registers.present ? data.registers.value : this.registers,
+      rawOutput: data.rawOutput.present ? data.rawOutput.value : this.rawOutput,
+      analysisError: data.analysisError.present
+          ? data.analysisError.value
+          : this.analysisError,
+      elfAvailable: data.elfAvailable.present
+          ? data.elfAvailable.value
+          : this.elfAvailable,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CrashReportEntity(')
+          ..write('id: $id, ')
+          ..write('watchId: $watchId, ')
+          ..write('file: $file, ')
+          ..write('line: $line, ')
+          ..write('crashTime: $crashTime, ')
+          ..write('fwVersion: $fwVersion, ')
+          ..write('fwCommitSha: $fwCommitSha, ')
+          ..write('board: $board, ')
+          ..write('buildType: $buildType, ')
+          ..write('receivedAt: $receivedAt, ')
+          ..write('analyzed: $analyzed, ')
+          ..write('backtrace: $backtrace, ')
+          ..write('registers: $registers, ')
+          ..write('rawOutput: $rawOutput, ')
+          ..write('analysisError: $analysisError, ')
+          ..write('elfAvailable: $elfAvailable')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    watchId,
+    file,
+    line,
+    crashTime,
+    fwVersion,
+    fwCommitSha,
+    board,
+    buildType,
+    receivedAt,
+    analyzed,
+    backtrace,
+    registers,
+    rawOutput,
+    analysisError,
+    elfAvailable,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CrashReportEntity &&
+          other.id == this.id &&
+          other.watchId == this.watchId &&
+          other.file == this.file &&
+          other.line == this.line &&
+          other.crashTime == this.crashTime &&
+          other.fwVersion == this.fwVersion &&
+          other.fwCommitSha == this.fwCommitSha &&
+          other.board == this.board &&
+          other.buildType == this.buildType &&
+          other.receivedAt == this.receivedAt &&
+          other.analyzed == this.analyzed &&
+          other.backtrace == this.backtrace &&
+          other.registers == this.registers &&
+          other.rawOutput == this.rawOutput &&
+          other.analysisError == this.analysisError &&
+          other.elfAvailable == this.elfAvailable);
+}
+
+class CrashReportsCompanion extends UpdateCompanion<CrashReportEntity> {
+  final Value<int> id;
+  final Value<String> watchId;
+  final Value<String> file;
+  final Value<int> line;
+  final Value<String> crashTime;
+  final Value<String> fwVersion;
+  final Value<String> fwCommitSha;
+  final Value<String> board;
+  final Value<String> buildType;
+  final Value<DateTime> receivedAt;
+  final Value<bool> analyzed;
+  final Value<String?> backtrace;
+  final Value<String?> registers;
+  final Value<String?> rawOutput;
+  final Value<String?> analysisError;
+  final Value<bool> elfAvailable;
+  const CrashReportsCompanion({
+    this.id = const Value.absent(),
+    this.watchId = const Value.absent(),
+    this.file = const Value.absent(),
+    this.line = const Value.absent(),
+    this.crashTime = const Value.absent(),
+    this.fwVersion = const Value.absent(),
+    this.fwCommitSha = const Value.absent(),
+    this.board = const Value.absent(),
+    this.buildType = const Value.absent(),
+    this.receivedAt = const Value.absent(),
+    this.analyzed = const Value.absent(),
+    this.backtrace = const Value.absent(),
+    this.registers = const Value.absent(),
+    this.rawOutput = const Value.absent(),
+    this.analysisError = const Value.absent(),
+    this.elfAvailable = const Value.absent(),
+  });
+  CrashReportsCompanion.insert({
+    this.id = const Value.absent(),
+    required String watchId,
+    required String file,
+    required int line,
+    required String crashTime,
+    required String fwVersion,
+    required String fwCommitSha,
+    required String board,
+    required String buildType,
+    required DateTime receivedAt,
+    this.analyzed = const Value.absent(),
+    this.backtrace = const Value.absent(),
+    this.registers = const Value.absent(),
+    this.rawOutput = const Value.absent(),
+    this.analysisError = const Value.absent(),
+    this.elfAvailable = const Value.absent(),
+  }) : watchId = Value(watchId),
+       file = Value(file),
+       line = Value(line),
+       crashTime = Value(crashTime),
+       fwVersion = Value(fwVersion),
+       fwCommitSha = Value(fwCommitSha),
+       board = Value(board),
+       buildType = Value(buildType),
+       receivedAt = Value(receivedAt);
+  static Insertable<CrashReportEntity> custom({
+    Expression<int>? id,
+    Expression<String>? watchId,
+    Expression<String>? file,
+    Expression<int>? line,
+    Expression<String>? crashTime,
+    Expression<String>? fwVersion,
+    Expression<String>? fwCommitSha,
+    Expression<String>? board,
+    Expression<String>? buildType,
+    Expression<DateTime>? receivedAt,
+    Expression<bool>? analyzed,
+    Expression<String>? backtrace,
+    Expression<String>? registers,
+    Expression<String>? rawOutput,
+    Expression<String>? analysisError,
+    Expression<bool>? elfAvailable,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (watchId != null) 'watch_id': watchId,
+      if (file != null) 'file': file,
+      if (line != null) 'line': line,
+      if (crashTime != null) 'crash_time': crashTime,
+      if (fwVersion != null) 'fw_version': fwVersion,
+      if (fwCommitSha != null) 'fw_commit_sha': fwCommitSha,
+      if (board != null) 'board': board,
+      if (buildType != null) 'build_type': buildType,
+      if (receivedAt != null) 'received_at': receivedAt,
+      if (analyzed != null) 'analyzed': analyzed,
+      if (backtrace != null) 'backtrace': backtrace,
+      if (registers != null) 'registers': registers,
+      if (rawOutput != null) 'raw_output': rawOutput,
+      if (analysisError != null) 'analysis_error': analysisError,
+      if (elfAvailable != null) 'elf_available': elfAvailable,
+    });
+  }
+
+  CrashReportsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? watchId,
+    Value<String>? file,
+    Value<int>? line,
+    Value<String>? crashTime,
+    Value<String>? fwVersion,
+    Value<String>? fwCommitSha,
+    Value<String>? board,
+    Value<String>? buildType,
+    Value<DateTime>? receivedAt,
+    Value<bool>? analyzed,
+    Value<String?>? backtrace,
+    Value<String?>? registers,
+    Value<String?>? rawOutput,
+    Value<String?>? analysisError,
+    Value<bool>? elfAvailable,
+  }) {
+    return CrashReportsCompanion(
+      id: id ?? this.id,
+      watchId: watchId ?? this.watchId,
+      file: file ?? this.file,
+      line: line ?? this.line,
+      crashTime: crashTime ?? this.crashTime,
+      fwVersion: fwVersion ?? this.fwVersion,
+      fwCommitSha: fwCommitSha ?? this.fwCommitSha,
+      board: board ?? this.board,
+      buildType: buildType ?? this.buildType,
+      receivedAt: receivedAt ?? this.receivedAt,
+      analyzed: analyzed ?? this.analyzed,
+      backtrace: backtrace ?? this.backtrace,
+      registers: registers ?? this.registers,
+      rawOutput: rawOutput ?? this.rawOutput,
+      analysisError: analysisError ?? this.analysisError,
+      elfAvailable: elfAvailable ?? this.elfAvailable,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (watchId.present) {
+      map['watch_id'] = Variable<String>(watchId.value);
+    }
+    if (file.present) {
+      map['file'] = Variable<String>(file.value);
+    }
+    if (line.present) {
+      map['line'] = Variable<int>(line.value);
+    }
+    if (crashTime.present) {
+      map['crash_time'] = Variable<String>(crashTime.value);
+    }
+    if (fwVersion.present) {
+      map['fw_version'] = Variable<String>(fwVersion.value);
+    }
+    if (fwCommitSha.present) {
+      map['fw_commit_sha'] = Variable<String>(fwCommitSha.value);
+    }
+    if (board.present) {
+      map['board'] = Variable<String>(board.value);
+    }
+    if (buildType.present) {
+      map['build_type'] = Variable<String>(buildType.value);
+    }
+    if (receivedAt.present) {
+      map['received_at'] = Variable<DateTime>(receivedAt.value);
+    }
+    if (analyzed.present) {
+      map['analyzed'] = Variable<bool>(analyzed.value);
+    }
+    if (backtrace.present) {
+      map['backtrace'] = Variable<String>(backtrace.value);
+    }
+    if (registers.present) {
+      map['registers'] = Variable<String>(registers.value);
+    }
+    if (rawOutput.present) {
+      map['raw_output'] = Variable<String>(rawOutput.value);
+    }
+    if (analysisError.present) {
+      map['analysis_error'] = Variable<String>(analysisError.value);
+    }
+    if (elfAvailable.present) {
+      map['elf_available'] = Variable<bool>(elfAvailable.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CrashReportsCompanion(')
+          ..write('id: $id, ')
+          ..write('watchId: $watchId, ')
+          ..write('file: $file, ')
+          ..write('line: $line, ')
+          ..write('crashTime: $crashTime, ')
+          ..write('fwVersion: $fwVersion, ')
+          ..write('fwCommitSha: $fwCommitSha, ')
+          ..write('board: $board, ')
+          ..write('buildType: $buildType, ')
+          ..write('receivedAt: $receivedAt, ')
+          ..write('analyzed: $analyzed, ')
+          ..write('backtrace: $backtrace, ')
+          ..write('registers: $registers, ')
+          ..write('rawOutput: $rawOutput, ')
+          ..write('analysisError: $analysisError, ')
+          ..write('elfAvailable: $elfAvailable')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4537,6 +5477,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ExtractedActionsTable extractedActions = $ExtractedActionsTable(
     this,
   );
+  late final $CrashReportsTable crashReports = $CrashReportsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4549,6 +5490,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     connectionEvents,
     voiceMemos,
     extractedActions,
+    crashReports,
   ];
 }
 
@@ -4641,6 +5583,24 @@ final class $$WatchesTableReferences
     final cache = $_typedResult.readTableOrNull(
       _connectionEventsRefsTable($_db),
     );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$CrashReportsTable, List<CrashReportEntity>>
+  _crashReportsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.crashReports,
+    aliasName: $_aliasNameGenerator(db.watches.id, db.crashReports.watchId),
+  );
+
+  $$CrashReportsTableProcessedTableManager get crashReportsRefs {
+    final manager = $$CrashReportsTableTableManager(
+      $_db,
+      $_db.crashReports,
+    ).filter((f) => f.watchId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_crashReportsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -4772,6 +5732,31 @@ class $$WatchesTableFilterComposer
           }) => $$ConnectionEventsTableFilterComposer(
             $db: $db,
             $table: $db.connectionEvents,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> crashReportsRefs(
+    Expression<bool> Function($$CrashReportsTableFilterComposer f) f,
+  ) {
+    final $$CrashReportsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.crashReports,
+      getReferencedColumn: (t) => t.watchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CrashReportsTableFilterComposer(
+            $db: $db,
+            $table: $db.crashReports,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -4967,6 +5952,31 @@ class $$WatchesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> crashReportsRefs<T extends Object>(
+    Expression<T> Function($$CrashReportsTableAnnotationComposer a) f,
+  ) {
+    final $$CrashReportsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.crashReports,
+      getReferencedColumn: (t) => t.watchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CrashReportsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.crashReports,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$WatchesTableTableManager
@@ -4986,6 +5996,7 @@ class $$WatchesTableTableManager
             bool healthSamplesRefs,
             bool batteryReadingsRefs,
             bool connectionEventsRefs,
+            bool crashReportsRefs,
           })
         > {
   $$WatchesTableTableManager(_$AppDatabase db, $WatchesTable table)
@@ -5064,6 +6075,7 @@ class $$WatchesTableTableManager
                 healthSamplesRefs = false,
                 batteryReadingsRefs = false,
                 connectionEventsRefs = false,
+                crashReportsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -5071,6 +6083,7 @@ class $$WatchesTableTableManager
                     if (healthSamplesRefs) db.healthSamples,
                     if (batteryReadingsRefs) db.batteryReadings,
                     if (connectionEventsRefs) db.connectionEvents,
+                    if (crashReportsRefs) db.crashReports,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -5138,6 +6151,27 @@ class $$WatchesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (crashReportsRefs)
+                        await $_getPrefetchedData<
+                          WatchEntity,
+                          $WatchesTable,
+                          CrashReportEntity
+                        >(
+                          currentTable: table,
+                          referencedTable: $$WatchesTableReferences
+                              ._crashReportsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$WatchesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).crashReportsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.watchId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -5162,6 +6196,7 @@ typedef $$WatchesTableProcessedTableManager =
         bool healthSamplesRefs,
         bool batteryReadingsRefs,
         bool connectionEventsRefs,
+        bool crashReportsRefs,
       })
     >;
 typedef $$HealthSamplesTableCreateCompanionBuilder =
@@ -7344,6 +8379,537 @@ typedef $$ExtractedActionsTableProcessedTableManager =
       ExtractedActionEntity,
       PrefetchHooks Function()
     >;
+typedef $$CrashReportsTableCreateCompanionBuilder =
+    CrashReportsCompanion Function({
+      Value<int> id,
+      required String watchId,
+      required String file,
+      required int line,
+      required String crashTime,
+      required String fwVersion,
+      required String fwCommitSha,
+      required String board,
+      required String buildType,
+      required DateTime receivedAt,
+      Value<bool> analyzed,
+      Value<String?> backtrace,
+      Value<String?> registers,
+      Value<String?> rawOutput,
+      Value<String?> analysisError,
+      Value<bool> elfAvailable,
+    });
+typedef $$CrashReportsTableUpdateCompanionBuilder =
+    CrashReportsCompanion Function({
+      Value<int> id,
+      Value<String> watchId,
+      Value<String> file,
+      Value<int> line,
+      Value<String> crashTime,
+      Value<String> fwVersion,
+      Value<String> fwCommitSha,
+      Value<String> board,
+      Value<String> buildType,
+      Value<DateTime> receivedAt,
+      Value<bool> analyzed,
+      Value<String?> backtrace,
+      Value<String?> registers,
+      Value<String?> rawOutput,
+      Value<String?> analysisError,
+      Value<bool> elfAvailable,
+    });
+
+final class $$CrashReportsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $CrashReportsTable, CrashReportEntity> {
+  $$CrashReportsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $WatchesTable _watchIdTable(_$AppDatabase db) =>
+      db.watches.createAlias(
+        $_aliasNameGenerator(db.crashReports.watchId, db.watches.id),
+      );
+
+  $$WatchesTableProcessedTableManager get watchId {
+    final $_column = $_itemColumn<String>('watch_id')!;
+
+    final manager = $$WatchesTableTableManager(
+      $_db,
+      $_db.watches,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_watchIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$CrashReportsTableFilterComposer
+    extends Composer<_$AppDatabase, $CrashReportsTable> {
+  $$CrashReportsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get file => $composableBuilder(
+    column: $table.file,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get line => $composableBuilder(
+    column: $table.line,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get crashTime => $composableBuilder(
+    column: $table.crashTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fwVersion => $composableBuilder(
+    column: $table.fwVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fwCommitSha => $composableBuilder(
+    column: $table.fwCommitSha,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get board => $composableBuilder(
+    column: $table.board,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get buildType => $composableBuilder(
+    column: $table.buildType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get receivedAt => $composableBuilder(
+    column: $table.receivedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get analyzed => $composableBuilder(
+    column: $table.analyzed,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get backtrace => $composableBuilder(
+    column: $table.backtrace,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get registers => $composableBuilder(
+    column: $table.registers,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rawOutput => $composableBuilder(
+    column: $table.rawOutput,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get analysisError => $composableBuilder(
+    column: $table.analysisError,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get elfAvailable => $composableBuilder(
+    column: $table.elfAvailable,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$WatchesTableFilterComposer get watchId {
+    final $$WatchesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.watchId,
+      referencedTable: $db.watches,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WatchesTableFilterComposer(
+            $db: $db,
+            $table: $db.watches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CrashReportsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CrashReportsTable> {
+  $$CrashReportsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get file => $composableBuilder(
+    column: $table.file,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get line => $composableBuilder(
+    column: $table.line,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get crashTime => $composableBuilder(
+    column: $table.crashTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fwVersion => $composableBuilder(
+    column: $table.fwVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fwCommitSha => $composableBuilder(
+    column: $table.fwCommitSha,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get board => $composableBuilder(
+    column: $table.board,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get buildType => $composableBuilder(
+    column: $table.buildType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get receivedAt => $composableBuilder(
+    column: $table.receivedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get analyzed => $composableBuilder(
+    column: $table.analyzed,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get backtrace => $composableBuilder(
+    column: $table.backtrace,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get registers => $composableBuilder(
+    column: $table.registers,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rawOutput => $composableBuilder(
+    column: $table.rawOutput,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get analysisError => $composableBuilder(
+    column: $table.analysisError,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get elfAvailable => $composableBuilder(
+    column: $table.elfAvailable,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$WatchesTableOrderingComposer get watchId {
+    final $$WatchesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.watchId,
+      referencedTable: $db.watches,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WatchesTableOrderingComposer(
+            $db: $db,
+            $table: $db.watches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CrashReportsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CrashReportsTable> {
+  $$CrashReportsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get file =>
+      $composableBuilder(column: $table.file, builder: (column) => column);
+
+  GeneratedColumn<int> get line =>
+      $composableBuilder(column: $table.line, builder: (column) => column);
+
+  GeneratedColumn<String> get crashTime =>
+      $composableBuilder(column: $table.crashTime, builder: (column) => column);
+
+  GeneratedColumn<String> get fwVersion =>
+      $composableBuilder(column: $table.fwVersion, builder: (column) => column);
+
+  GeneratedColumn<String> get fwCommitSha => $composableBuilder(
+    column: $table.fwCommitSha,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get board =>
+      $composableBuilder(column: $table.board, builder: (column) => column);
+
+  GeneratedColumn<String> get buildType =>
+      $composableBuilder(column: $table.buildType, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get receivedAt => $composableBuilder(
+    column: $table.receivedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get analyzed =>
+      $composableBuilder(column: $table.analyzed, builder: (column) => column);
+
+  GeneratedColumn<String> get backtrace =>
+      $composableBuilder(column: $table.backtrace, builder: (column) => column);
+
+  GeneratedColumn<String> get registers =>
+      $composableBuilder(column: $table.registers, builder: (column) => column);
+
+  GeneratedColumn<String> get rawOutput =>
+      $composableBuilder(column: $table.rawOutput, builder: (column) => column);
+
+  GeneratedColumn<String> get analysisError => $composableBuilder(
+    column: $table.analysisError,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get elfAvailable => $composableBuilder(
+    column: $table.elfAvailable,
+    builder: (column) => column,
+  );
+
+  $$WatchesTableAnnotationComposer get watchId {
+    final $$WatchesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.watchId,
+      referencedTable: $db.watches,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WatchesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.watches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CrashReportsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CrashReportsTable,
+          CrashReportEntity,
+          $$CrashReportsTableFilterComposer,
+          $$CrashReportsTableOrderingComposer,
+          $$CrashReportsTableAnnotationComposer,
+          $$CrashReportsTableCreateCompanionBuilder,
+          $$CrashReportsTableUpdateCompanionBuilder,
+          (CrashReportEntity, $$CrashReportsTableReferences),
+          CrashReportEntity,
+          PrefetchHooks Function({bool watchId})
+        > {
+  $$CrashReportsTableTableManager(_$AppDatabase db, $CrashReportsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CrashReportsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CrashReportsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CrashReportsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> watchId = const Value.absent(),
+                Value<String> file = const Value.absent(),
+                Value<int> line = const Value.absent(),
+                Value<String> crashTime = const Value.absent(),
+                Value<String> fwVersion = const Value.absent(),
+                Value<String> fwCommitSha = const Value.absent(),
+                Value<String> board = const Value.absent(),
+                Value<String> buildType = const Value.absent(),
+                Value<DateTime> receivedAt = const Value.absent(),
+                Value<bool> analyzed = const Value.absent(),
+                Value<String?> backtrace = const Value.absent(),
+                Value<String?> registers = const Value.absent(),
+                Value<String?> rawOutput = const Value.absent(),
+                Value<String?> analysisError = const Value.absent(),
+                Value<bool> elfAvailable = const Value.absent(),
+              }) => CrashReportsCompanion(
+                id: id,
+                watchId: watchId,
+                file: file,
+                line: line,
+                crashTime: crashTime,
+                fwVersion: fwVersion,
+                fwCommitSha: fwCommitSha,
+                board: board,
+                buildType: buildType,
+                receivedAt: receivedAt,
+                analyzed: analyzed,
+                backtrace: backtrace,
+                registers: registers,
+                rawOutput: rawOutput,
+                analysisError: analysisError,
+                elfAvailable: elfAvailable,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String watchId,
+                required String file,
+                required int line,
+                required String crashTime,
+                required String fwVersion,
+                required String fwCommitSha,
+                required String board,
+                required String buildType,
+                required DateTime receivedAt,
+                Value<bool> analyzed = const Value.absent(),
+                Value<String?> backtrace = const Value.absent(),
+                Value<String?> registers = const Value.absent(),
+                Value<String?> rawOutput = const Value.absent(),
+                Value<String?> analysisError = const Value.absent(),
+                Value<bool> elfAvailable = const Value.absent(),
+              }) => CrashReportsCompanion.insert(
+                id: id,
+                watchId: watchId,
+                file: file,
+                line: line,
+                crashTime: crashTime,
+                fwVersion: fwVersion,
+                fwCommitSha: fwCommitSha,
+                board: board,
+                buildType: buildType,
+                receivedAt: receivedAt,
+                analyzed: analyzed,
+                backtrace: backtrace,
+                registers: registers,
+                rawOutput: rawOutput,
+                analysisError: analysisError,
+                elfAvailable: elfAvailable,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$CrashReportsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({watchId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (watchId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.watchId,
+                                referencedTable: $$CrashReportsTableReferences
+                                    ._watchIdTable(db),
+                                referencedColumn: $$CrashReportsTableReferences
+                                    ._watchIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$CrashReportsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CrashReportsTable,
+      CrashReportEntity,
+      $$CrashReportsTableFilterComposer,
+      $$CrashReportsTableOrderingComposer,
+      $$CrashReportsTableAnnotationComposer,
+      $$CrashReportsTableCreateCompanionBuilder,
+      $$CrashReportsTableUpdateCompanionBuilder,
+      (CrashReportEntity, $$CrashReportsTableReferences),
+      CrashReportEntity,
+      PrefetchHooks Function({bool watchId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7362,4 +8928,6 @@ class $AppDatabaseManager {
       $$VoiceMemosTableTableManager(_db, _db.voiceMemos);
   $$ExtractedActionsTableTableManager get extractedActions =>
       $$ExtractedActionsTableTableManager(_db, _db.extractedActions);
+  $$CrashReportsTableTableManager get crashReports =>
+      $$CrashReportsTableTableManager(_db, _db.crashReports);
 }

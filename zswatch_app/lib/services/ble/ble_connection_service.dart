@@ -392,10 +392,16 @@ class BleConnectionService {
     switch (state) {
       case BluetoothConnectionState.connected:
         final phase = currentPhase;
-        // For autoConnect or background reconnect — BLE layer reports connected,
-        // we need to run setup.
+        // For autoConnect (initial connect) or quick reconnect — BLE layer
+        // reports connected and we need to kick off setup.
+        // Background reconnect is excluded here: _scheduleBackgroundAttempt
+        // awaits _runSetup() directly after device.connect() returns, so
+        // triggering it here too would cause two concurrent setup passes.
+        final isBackgroundReconnect =
+            phase is Reconnecting && phase.isBackground;
         if ((phase is Connecting || phase is Reconnecting) &&
-            phase is! SettingUp) {
+            phase is! SettingUp &&
+            !isBackgroundReconnect) {
           if (!_autoReconnect) {
             _device?.disconnect();
             _cleanup();
@@ -531,15 +537,11 @@ class BleConnectionService {
       _connectionSubscription = null;
 
       final device = BluetoothDevice.fromId(watchId);
-
-      // Force-close any stale autoConnect GATT handle (see comment in
-      // _connectToDevice for details).
-      try {
-        await device.disconnect();
-      } catch (e) {
-        debugPrint(
-            '[BleConnectionService] Background pre-reconnect disconnect (ignored): $e');
-      }
+      // Note: no pre-reconnect disconnect here (unlike _connectToDevice).
+      // By the time we're in background reconnect the stale autoConnect GATT
+      // handle from the initial connection is long gone, and calling
+      // disconnect() unnecessarily triggers FBP's 2000ms disconnect gap which
+      // delays setup cleanup when the watch drops during service discovery.
 
       _device = device;
 

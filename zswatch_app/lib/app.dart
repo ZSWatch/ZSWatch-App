@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/analytics_providers.dart';
 import 'providers/ble_providers.dart';
+import 'providers/coredump_providers.dart';
 import 'providers/developer_providers.dart';
 import 'providers/foreground_service_providers.dart';
 import 'providers/gps_providers.dart';
@@ -67,6 +68,8 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       // Initialize analytics services (connection tracking, battery storage)
       // so events are recorded from app startup, not just when analytics screen is opened
       ref.read(analyticsServicesInitializedProvider);
+      // Initialize crash report persistence to save crash summaries to DB
+      ref.read(crashReportPersistenceProvider);
     } catch (e) {
       debugPrint('BLE initialization error: $e');
     }

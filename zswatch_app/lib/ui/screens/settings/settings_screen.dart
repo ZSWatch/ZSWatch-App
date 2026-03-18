@@ -171,6 +171,13 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ),
+          _SettingsTile(
+            leading: const Icon(Icons.dns_outlined, color: AppTheme.textSecondary),
+            title: 'Coredump Server',
+            subtitle: ref.watch(coredumpServerUrlProvider),
+            trailing: const Icon(Icons.edit, size: 20),
+            onTap: () => _showCoredumpServerUrlDialog(context, ref),
+          ),
 
           const SizedBox(height: 32),
 
@@ -254,6 +261,50 @@ class SettingsScreen extends ConsumerWidget {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  void _showCoredumpServerUrlDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController(
+      text: ref.read(coredumpServerUrlProvider),
+    );
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Coredump Server URL'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'http://192.168.1.77:8000',
+            labelText: 'Server URL',
+          ),
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ref.read(coredumpServerUrlProvider.notifier).reset();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Reset'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final url = controller.text.trim();
+              if (url.isNotEmpty) {
+                ref.read(coredumpServerUrlProvider.notifier).setUrl(url);
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showPersistentConnectionDisabledDialog(BuildContext context) {
