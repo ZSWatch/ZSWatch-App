@@ -114,6 +114,17 @@ class GadgetbridgeProtocol implements ProtocolService {
           rawMessage: rawMessage,
           firmwareVersion: json['fw'] as String? ?? 'unknown',
           hardwareVersion: json['hw'] as String?,
+          commitSha: json['sha'] as String?,
+          isDebug: json['dbg'] == 1,
+        );
+
+      case 'coredump':
+        return CoredumpMessage(
+          rawMessage: rawMessage,
+          available: json['available'] == true,
+          file: json['file'] as String? ?? '',
+          line: json['line'] as int? ?? 0,
+          time: json['time'] as String? ?? '',
         );
 
       case 'status':

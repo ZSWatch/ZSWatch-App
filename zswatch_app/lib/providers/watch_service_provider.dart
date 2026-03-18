@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/connection.dart';
 import '../data/models/connection_phase.dart';
 import '../data/models/connection_state.dart';
+import '../data/models/crash_summary.dart';
 import '../data/models/watch.dart';
 import '../data/repositories/watch_repository.dart';
 import '../services/ble/ble_connection_service.dart';
@@ -137,6 +138,24 @@ final hasSmpServiceProvider = Provider<bool>((ref) {
   if (!isConnected) return false;
   final ble = ref.watch(bleConnectionServiceProvider);
   return ble.hasSmpService;
+});
+
+/// Provider for crash summary stream (null if no crash available).
+final crashSummaryStreamProvider = StreamProvider<CrashSummary?>((ref) {
+  final service = ref.watch(watchServiceProvider);
+  return service.crashSummaryStream;
+});
+
+/// Provider for current crash summary.
+final crashSummaryProvider = Provider<CrashSummary?>((ref) {
+  final asyncValue = ref.watch(crashSummaryStreamProvider);
+  return asyncValue.valueOrNull;
+});
+
+/// Whether to show the crash indicator on the dashboard.
+final showCrashIndicatorProvider = StateProvider<bool>((ref) {
+  final summary = ref.watch(crashSummaryProvider);
+  return summary != null;
 });
 
 /// Provider that syncs watch info changes to the database.

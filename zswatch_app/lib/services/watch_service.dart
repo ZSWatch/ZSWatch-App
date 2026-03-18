@@ -8,6 +8,7 @@ import 'package:rxdart/rxdart.dart';
 import '../core/constants/ble_constants.dart';
 import '../data/models/connection.dart';
 import '../data/models/connection_phase.dart';
+import '../data/models/crash_summary.dart';
 import '../data/models/watch.dart';
 import 'ble/ble_connection_service.dart';
 import 'ble/ble_scanner.dart';
@@ -43,6 +44,7 @@ class WatchService {
 
   final _watchInfoController = BehaviorSubject<Watch?>.seeded(null);
   final _batteryController = BehaviorSubject<int>.seeded(0);
+  final _crashSummaryController = BehaviorSubject<CrashSummary?>.seeded(null);
   final _incomingMessageController =
       StreamController<Map<String, dynamic>>.broadcast();
 
@@ -79,6 +81,20 @@ class WatchService {
 
   /// Stream of ALL raw outgoing BLE NUS data for log viewer.
   Stream<String> get rawOutgoingData => _rawOutgoingDataController.stream;
+
+  /// Stream of crash summary received on BLE connect (null if no crash).
+  Stream<CrashSummary?> get crashSummaryStream =>
+      _crashSummaryController.stream;
+
+  /// Current crash summary.
+  CrashSummary? get currentCrashSummary => _crashSummaryController.value;
+
+  // Firmware identity from last 'ver' message
+  String? _fwCommitSha;
+  bool _fwIsDebug = false;
+
+  /// Commit SHA from last firmware version message.
+  String? get fwCommitSha => _fwCommitSha;
 
   // --- Public API: getters ---
 
@@ -285,6 +301,12 @@ class WatchService {
 
   /// Request the watch to perform a cold reboot.
   Future<void> resetWatch() => _sendGb({'t': 'reset'});
+
+  /// Erase the coredump on the watch.
+  Future<void> eraseCoredump() async {
+    await _sendGb({'t': 'coredump_erase'});
+    _crashSummaryController.add(null);
+  }
 
   // --- Setup callback (called by BleConnectionService) ---
 
@@ -525,12 +547,31 @@ class WatchService {
       case 'ver':
         final fw = message['fw'] as String?;
         final hw = message['hw'] as String?;
+        _fwCommitSha = message['sha'] as String?;
+        _fwIsDebug = message['dbg'] == 1;
         final watch = currentWatch;
         if (watch != null) {
           _watchInfoController.add(watch.copyWith(
             firmwareVersion: fw,
             hardwareVersion: hw,
           ));
+        }
+        break;
+
+      case 'coredump':
+        final available = message['available'] == true;
+        if (available) {
+          _crashSummaryController.add(CrashSummary(
+            file: message['file'] as String? ?? '',
+            line: message['line'] as int? ?? 0,
+            time: message['time'] as String? ?? '',
+            fwVersion: currentWatch?.firmwareVersion ?? '',
+            fwCommitSha: _fwCommitSha ?? '',
+            board: currentWatch?.hardwareVersion ?? 'watchdk',
+            buildType: _fwIsDebug ? 'debug' : 'release',
+          ));
+        } else {
+          _crashSummaryController.add(null);
         }
         break;
 
@@ -692,6 +733,7 @@ class WatchService {
     // Don't dispose _ble here — it's owned by the provider that created it
     await _watchInfoController.close();
     await _batteryController.close();
+    await _crashSummaryController.close();
     await _incomingMessageController.close();
     await _rawIncomingDataController.close();
     await _rawOutgoingDataController.close();

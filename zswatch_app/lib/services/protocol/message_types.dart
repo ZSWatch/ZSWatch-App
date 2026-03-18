@@ -56,6 +56,7 @@ enum GadgetbridgeIncomingType {
   httpRequest,
   intent,
   fileWrite,
+  coredump,
   info,
   warning,
   error,
@@ -158,15 +159,35 @@ abstract class GadgetbridgeMessage {
   }) : receivedAt = receivedAt ?? DateTime.now();
 }
 
-/// Version message from watch
+/// Version message from watch (includes fw_info fields: sha, dbg)
 class VersionMessage extends GadgetbridgeMessage {
   final String firmwareVersion;
   final String? hardwareVersion;
+  final String? commitSha;
+  final bool isDebug;
 
   VersionMessage({
     required super.rawMessage,
     required this.firmwareVersion,
     this.hardwareVersion,
+    this.commitSha,
+    this.isDebug = false,
+  });
+}
+
+/// Coredump availability message from watch
+class CoredumpMessage extends GadgetbridgeMessage {
+  final bool available;
+  final String file;
+  final int line;
+  final String time;
+
+  CoredumpMessage({
+    required super.rawMessage,
+    required this.available,
+    required this.file,
+    required this.line,
+    required this.time,
   });
 }
 
