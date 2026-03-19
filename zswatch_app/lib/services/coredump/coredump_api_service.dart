@@ -13,7 +13,7 @@ import '../../data/models/crash_summary.dart';
 /// Endpoints:
 /// - POST /api/coredump/analyze  — analyze a coredump.txt with the matching ELF
 class CoredumpApiService {
-  static const String _defaultBaseUrl = 'http://192.168.1.77:8000';
+  static const String _defaultBaseUrl = 'https://zswatch-production.up.railway.app';
   static const Duration _analyzeTimeout = Duration(seconds: 60);
 
   final String baseUrl;

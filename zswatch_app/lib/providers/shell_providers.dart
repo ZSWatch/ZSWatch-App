@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/models/thread_monitor_data.dart';
 import '../services/shell/shell_service.dart';
 import 'watch_service_provider.dart';
 
@@ -163,36 +164,44 @@ final shellTerminalProvider =
 /// State for the live monitor.
 class LiveMonitorState {
   final bool isEnabled;
-  final String? powerData;
-  final String? cpuData;
-  final String? threadData;
+  final String? cpuFreq;
+  final PowerInfo? powerInfo;
+  final Map<String, ThreadHistory> threadHistories;
+  final int? schedulerCycles;
   final DateTime? lastUpdate;
   final String? error;
+  final int pollCount;
 
   const LiveMonitorState({
     this.isEnabled = false,
-    this.powerData,
-    this.cpuData,
-    this.threadData,
+    this.cpuFreq,
+    this.powerInfo,
+    this.threadHistories = const {},
+    this.schedulerCycles,
     this.lastUpdate,
     this.error,
+    this.pollCount = 0,
   });
 
   LiveMonitorState copyWith({
     bool? isEnabled,
-    String? powerData,
-    String? cpuData,
-    String? threadData,
+    String? cpuFreq,
+    PowerInfo? powerInfo,
+    Map<String, ThreadHistory>? threadHistories,
+    int? schedulerCycles,
     DateTime? lastUpdate,
     String? error,
+    int? pollCount,
   }) {
     return LiveMonitorState(
       isEnabled: isEnabled ?? this.isEnabled,
-      powerData: powerData ?? this.powerData,
-      cpuData: cpuData ?? this.cpuData,
-      threadData: threadData ?? this.threadData,
+      cpuFreq: cpuFreq ?? this.cpuFreq,
+      powerInfo: powerInfo ?? this.powerInfo,
+      threadHistories: threadHistories ?? this.threadHistories,
+      schedulerCycles: schedulerCycles ?? this.schedulerCycles,
       lastUpdate: lastUpdate ?? this.lastUpdate,
       error: error,
+      pollCount: pollCount ?? this.pollCount,
     );
   }
 }
@@ -201,6 +210,7 @@ class LiveMonitorState {
 class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
   final ShellService _shellService;
   Timer? _pollTimer;
+  static const _pollInterval = Duration(seconds: 5);
 
   LiveMonitorNotifier(this._shellService)
       : super(const LiveMonitorState());
@@ -216,7 +226,7 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
   void start() {
     state = state.copyWith(isEnabled: true, error: null);
     _poll();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _poll());
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
   }
 
   void stop() {
@@ -224,10 +234,19 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
     _pollTimer = null;
     state = LiveMonitorState(
       isEnabled: false,
-      powerData: state.powerData,
-      cpuData: state.cpuData,
-      threadData: state.threadData,
+      cpuFreq: state.cpuFreq,
+      powerInfo: state.powerInfo,
+      threadHistories: state.threadHistories,
+      schedulerCycles: state.schedulerCycles,
       lastUpdate: state.lastUpdate,
+      pollCount: state.pollCount,
+    );
+  }
+
+  void resetHistory() {
+    state = state.copyWith(
+      threadHistories: {},
+      pollCount: 0,
     );
   }
 
@@ -235,32 +254,69 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
     if (!state.isEnabled) return;
 
     try {
-      String? powerOutput;
+      // Power status
+      PowerInfo? powerInfo;
       try {
         final powerResult = await _shellService.execute('power status');
-        if (state.isEnabled) powerOutput = powerResult.output;
+        if (state.isEnabled) {
+          powerInfo = parsePowerStatus(powerResult.output);
+        }
       } catch (_) {}
       if (!state.isEnabled) return;
 
-      String? cpuOutput;
+      // CPU freq
+      String? cpuFreq;
       try {
         final cpuResult = await _shellService.execute('cpu freq');
-        if (state.isEnabled) cpuOutput = cpuResult.output;
+        if (state.isEnabled) {
+          cpuFreq = parseCpuFreq(cpuResult.output);
+        }
       } catch (_) {}
 
-      String? threadOutput;
+      // Thread list
+      ThreadListParseResult? parsed;
       try {
         final threadResult = await _shellService.execute('kernel thread list');
-        if (state.isEnabled) threadOutput = threadResult.output;
+        if (state.isEnabled) {
+          parsed = parseThreadList(threadResult.output);
+        }
       } catch (_) {}
 
       if (!state.isEnabled) return;
+
+      // Update thread histories
+      final histories = Map<String, ThreadHistory>.from(state.threadHistories);
+      final pollSec = _pollInterval.inMilliseconds / 1000.0;
+
+      if (parsed != null) {
+        for (final snapshot in parsed.threads) {
+          final key = snapshot.name;
+          final existing = histories[key];
+          if (existing != null) {
+            existing.update(snapshot, pollSec);
+          } else {
+            histories[key] = ThreadHistory(
+              name: snapshot.name,
+              maxStackUsed: snapshot.stackUsed,
+              stackSize: snapshot.stackSize,
+              currentStackUsed: snapshot.stackUsed,
+              currentUsagePercent: snapshot.usagePercent,
+              state: snapshot.state,
+              priority: snapshot.priority,
+              initialCycles: snapshot.totalCycles,
+            );
+          }
+        }
+      }
+
       state = state.copyWith(
-        powerData: powerOutput,
-        cpuData: cpuOutput,
-        threadData: threadOutput,
+        cpuFreq: cpuFreq,
+        powerInfo: powerInfo,
+        threadHistories: histories,
+        schedulerCycles: parsed?.scheduler?.cyclesSinceLastCall,
         lastUpdate: DateTime.now(),
         error: null,
+        pollCount: state.pollCount + 1,
       );
     } catch (e) {
       if (state.isEnabled) {
