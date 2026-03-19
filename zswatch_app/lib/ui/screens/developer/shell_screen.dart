@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/connection.dart';
+import '../../../data/models/thread_monitor_data.dart';
 import '../../../providers/shell_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 
@@ -574,24 +577,46 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
   List<String>? _appList;
   bool _isLoadingApps = false;
   String? _status;
+  bool _touchpadScrollLocked = false;
+
+  // Button key codes: KEY_1=2, KEY_2=3, KEY_3=4, KEY_4=5 (EV_KEY=1)
+  static const _buttonCodes = {'1': 2, '2': 3, '3': 4, '4': 5};
 
   Future<void> _sendButton(String buttonId, String label) async {
     setState(() => _status = 'Sending $label...');
     try {
       final shellService = ref.read(shellServiceProvider);
-      await shellService.execute('input button $buttonId');
+      final code = _buttonCodes[buttonId]!;
+      await shellService.execute('input report 1 $code 1 true');
+      await shellService.execute('input report 1 $code 0 true');
       if (mounted) setState(() => _status = '$label sent');
     } catch (e) {
       if (mounted) setState(() => _status = 'Error: $e');
     }
   }
 
-  Future<void> _sendSwipe(String direction, String label) async {
-    setState(() => _status = 'Sending $label...');
+  Future<void> _sendTouchDown(int x, int y) async {
+    setState(() => _status = 'Down ($x, $y)');
     try {
-      final shellService = ref.read(shellServiceProvider);
-      await shellService.execute('input swipe $direction');
-      if (mounted) setState(() => _status = '$label sent');
+      await ref.read(shellServiceProvider).execute('touchdown $x $y');
+    } catch (e) {
+      if (mounted) setState(() => _status = 'Error: $e');
+    }
+  }
+
+  Future<void> _sendTouchMove(int x, int y) async {
+    setState(() => _status = 'Move ($x, $y)');
+    try {
+      await ref.read(shellServiceProvider).execute('touchmove $x $y');
+    } catch (e) {
+      if (mounted) setState(() => _status = 'Error: $e');
+    }
+  }
+
+  Future<void> _sendTouchUp() async {
+    setState(() => _status = 'Touch up');
+    try {
+      await ref.read(shellServiceProvider).execute('touchup');
     } catch (e) {
       if (mounted) setState(() => _status = 'Error: $e');
     }
@@ -632,6 +657,7 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
     setState(() => _status = 'Launching $app...');
     try {
       final shellService = ref.read(shellServiceProvider);
+      await shellService.execute('app close');
       await shellService.execute('app launch $app');
       if (mounted) setState(() => _status = '$app launched');
     } catch (e) {
@@ -642,88 +668,71 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
   @override
   Widget build(BuildContext context) {
     return ListView(
+      physics: _touchpadScrollLocked ? const NeverScrollableScrollPhysics() : null,
       padding: const EdgeInsets.all(AppTheme.spacingMd),
       children: [
-        // Combined input: buttons on sides, swipes in center (like looking at the watch)
+        // Touchpad in center, hardware buttons at 45° corners (like the watch)
         _SectionHeader(title: 'Input'),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(AppTheme.spacingMd),
-            child: Row(
-              children: [
-                // Left-side buttons (Top-Left=Next, Bot-Left=Prev)
-                Column(
-                  mainAxisSize: MainAxisSize.min,
+            child: Center(
+              child: SizedBox(
+                width: 240 + 52 + 8, // touchpad + button + gap
+                height: 240 + 52 + 8,
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    _RemoteButton(
-                      label: 'Next',
-                      icon: Icons.skip_next,
-                      onPressed: () => _sendButton('4', 'Next (Top-Left)'),
+                    _WatchTouchpad(
+                      onDown: _sendTouchDown,
+                      onMove: _sendTouchMove,
+                      onUp: _sendTouchUp,
+                      onScrollLock: (locked) =>
+                          setState(() => _touchpadScrollLocked = locked),
                     ),
-                    const SizedBox(height: AppTheme.spacingMd),
-                    _RemoteButton(
-                      label: 'Prev',
-                      icon: Icons.skip_previous,
-                      onPressed: () => _sendButton('2', 'Prev (Bot-Left)'),
+                    // Top-Left: Next
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: _RemoteButton(
+                        label: 'Next',
+                        icon: Icons.skip_next,
+                        onPressed: () => _sendButton('4', 'Next (Top-Left)'),
+                      ),
+                    ),
+                    // Bottom-Left: Prev
+                    Positioned(
+                      left: 0,
+                      bottom: 0,
+                      child: _RemoteButton(
+                        label: 'Prev',
+                        icon: Icons.skip_previous,
+                        onPressed: () => _sendButton('2', 'Prev (Bot-Left)'),
+                      ),
+                    ),
+                    // Top-Right: Select
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: _RemoteButton(
+                        label: 'Select',
+                        icon: Icons.check_circle_outline,
+                        onPressed: () => _sendButton('1', 'Select (Top-Right)'),
+                      ),
+                    ),
+                    // Bottom-Right: Back
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: _RemoteButton(
+                        label: 'Back',
+                        icon: Icons.arrow_back_rounded,
+                        onPressed: () => _sendButton('3', 'Back (Bot-Right)'),
+                      ),
                     ),
                   ],
                 ),
-                // Center: swipe D-pad
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Swipe',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
-                      ),
-                      const SizedBox(height: AppTheme.spacingXs),
-                      _SwipeButton(
-                        icon: Icons.swipe_up,
-                        onPressed: () => _sendSwipe('up', 'Swipe Up'),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _SwipeButton(
-                            icon: Icons.swipe_left,
-                            onPressed: () => _sendSwipe('left', 'Swipe Left'),
-                          ),
-                          const SizedBox(width: AppTheme.spacingLg),
-                          _SwipeButton(
-                            icon: Icons.swipe_right,
-                            onPressed: () => _sendSwipe('right', 'Swipe Right'),
-                          ),
-                        ],
-                      ),
-                      _SwipeButton(
-                        icon: Icons.swipe_down,
-                        onPressed: () => _sendSwipe('down', 'Swipe Down'),
-                      ),
-                    ],
-                  ),
-                ),
-                // Right-side buttons (Top-Right=Select, Bot-Right=Back)
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _RemoteButton(
-                      label: 'Select',
-                      icon: Icons.check_circle_outline,
-                      onPressed: () => _sendButton('1', 'Select (Top-Right)'),
-                      isPrimary: true,
-                    ),
-                    const SizedBox(height: AppTheme.spacingMd),
-                    _RemoteButton(
-                      label: 'Back',
-                      icon: Icons.arrow_back_rounded,
-                      onPressed: () => _sendButton('3', 'Back (Bot-Right)'),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -790,25 +799,20 @@ class _RemoteButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onPressed;
-  final bool isPrimary;
 
   const _RemoteButton({
     required this.label,
     required this.icon,
     required this.onPressed,
-    this.isPrimary = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final size = isPrimary ? 64.0 : 52.0;
     return SizedBox(
-      width: size,
-      height: size,
+      width: 52,
+      height: 52,
       child: Material(
-        color: isPrimary
-            ? AppTheme.primaryColor.withValues(alpha: 0.2)
-            : AppTheme.elevatedSurfaceColor,
+        color: AppTheme.elevatedSurfaceColor,
         shape: const CircleBorder(),
         child: InkWell(
           onTap: onPressed,
@@ -816,16 +820,12 @@ class _RemoteButton extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: isPrimary ? 24 : 20,
-                color: isPrimary ? AppTheme.primaryColor : AppTheme.textSecondary,
-              ),
+              Icon(icon, size: 20, color: AppTheme.textSecondary),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 9,
-                  color: isPrimary ? AppTheme.primaryColor : AppTheme.textSecondary,
+                  color: AppTheme.textSecondary,
                 ),
               ),
             ],
@@ -836,35 +836,192 @@ class _RemoteButton extends StatelessWidget {
   }
 }
 
-class _SwipeButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onPressed;
+// =============================================================================
+// Watch Touchpad Widget
+// =============================================================================
 
-  const _SwipeButton({
-    required this.icon,
-    required this.onPressed,
+class _WatchTouchpad extends StatefulWidget {
+  final Future<void> Function(int x, int y) onDown;
+  final Future<void> Function(int x, int y) onMove;
+  final Future<void> Function() onUp;
+  final ValueChanged<bool>? onScrollLock;
+
+  const _WatchTouchpad({
+    required this.onDown,
+    required this.onMove,
+    required this.onUp,
+    this.onScrollLock,
   });
 
   @override
+  State<_WatchTouchpad> createState() => _WatchTouchpadState();
+}
+
+class _WatchTouchpadState extends State<_WatchTouchpad> {
+  static const double _displaySize = 240.0;
+  static const int _watchSize = 240;
+  static const int _moveIntervalMs = 50;
+
+  Offset? _pointerPos;
+  DateTime _lastMoveSent = DateTime.fromMillisecondsSinceEpoch(0);
+
+  (int, int) _localToWatch(Offset global) {
+    final box = context.findRenderObject()! as RenderBox;
+    final local = box.globalToLocal(global);
+    const center = Offset(_displaySize / 2, _displaySize / 2);
+    const radius = _displaySize / 2;
+    final fromCenter = local - center;
+    final clamped = fromCenter.distance > radius
+        ? center + fromCenter / fromCenter.distance * radius
+        : local;
+    setState(() => _pointerPos = clamped);
+    final x = (clamped.dx / _displaySize * _watchSize).round().clamp(0, _watchSize - 1);
+    final y = (clamped.dy / _displaySize * _watchSize).round().clamp(0, _watchSize - 1);
+    return (x, y);
+  }
+
+  bool _tracking = false;
+
+  void _handlePointerDown(PointerDownEvent event) {
+    _tracking = true;
+    widget.onScrollLock?.call(true);
+    final (x, y) = _localToWatch(event.position);
+    widget.onDown(x, y);
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (!_tracking) return;
+    final now = DateTime.now();
+    if (now.difference(_lastMoveSent).inMilliseconds >= _moveIntervalMs) {
+      _lastMoveSent = now;
+      final (x, y) = _localToWatch(event.position);
+      widget.onMove(x, y);
+    }
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    if (!_tracking) return;
+    _tracking = false;
+    widget.onScrollLock?.call(false);
+    widget.onUp();
+    if (mounted) setState(() => _pointerPos = null);
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    if (!_tracking) return;
+    _tracking = false;
+    widget.onScrollLock?.call(false);
+    widget.onUp();
+    if (mounted) setState(() => _pointerPos = null);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 40,
-      height: 40,
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          onTap: onPressed,
-          customBorder: const CircleBorder(),
-          child: Icon(
-            icon,
-            size: 28,
-            color: AppTheme.textSecondary,
+    // Listener gets raw pointer events immediately (no gesture arena delay).
+    // RawGestureDetector with _EagerGestureRecognizer immediately wins the
+    // gesture arena, preventing parent ListView/TabBarView from scrolling.
+    return Listener(
+      onPointerDown: _handlePointerDown,
+      onPointerMove: _handlePointerMove,
+      onPointerUp: _handlePointerUp,
+      onPointerCancel: _handlePointerCancel,
+      child: RawGestureDetector(
+        behavior: HitTestBehavior.opaque,
+        gestures: {
+          _EagerGestureRecognizer:
+              GestureRecognizerFactoryWithHandlers<_EagerGestureRecognizer>(
+            _EagerGestureRecognizer.new,
+            (_) {},
+          ),
+        },
+        child: SizedBox(
+          width: _displaySize,
+          height: _displaySize,
+          child: CustomPaint(
+            painter: _TouchpadPainter(pointerPos: _pointerPos),
           ),
         ),
       ),
     );
   }
+}
+
+/// Gesture recognizer that immediately claims victory in the arena on pointer
+/// down, preventing any parent scrollable (ListView, TabBarView) from
+/// intercepting the touch.
+class _EagerGestureRecognizer extends OneSequenceGestureRecognizer {
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    startTrackingPointer(event.pointer, event.transform);
+    resolve(GestureDisposition.accepted);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {}
+
+  @override
+  String get debugDescription => 'eager';
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {}
+}
+
+class _TouchpadPainter extends CustomPainter {
+  final Offset? pointerPos;
+
+  const _TouchpadPainter({this.pointerPos});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.shortestSide / 2;
+
+    // Background circle
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()..color = Colors.white10,
+    );
+
+    // Border
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = Colors.white24
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+
+    // Crosshair lines
+    final linePaint = Paint()
+      ..color = Colors.white12
+      ..strokeWidth = 1;
+    canvas.drawLine(Offset(center.dx, center.dy - radius * 0.8),
+        Offset(center.dx, center.dy + radius * 0.8), linePaint);
+    canvas.drawLine(Offset(center.dx - radius * 0.8, center.dy),
+        Offset(center.dx + radius * 0.8, center.dy), linePaint);
+
+    // Touch indicator dot
+    if (pointerPos != null) {
+      canvas.drawCircle(
+        pointerPos!,
+        8,
+        Paint()..color = Colors.blueAccent.withValues(alpha: 0.8),
+      );
+      canvas.drawCircle(
+        pointerPos!,
+        8,
+        Paint()
+          ..color = Colors.blue
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TouchpadPainter old) => old.pointerPos != pointerPos;
 }
 
 // =============================================================================
