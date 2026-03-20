@@ -5,20 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../navigation/app_router.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../data/models/connection.dart';
+import '../../../data/models/crash_summary.dart';
 import '../../../providers/developer_providers.dart';
-import '../../../providers/permission_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../widgets/developer/music_debug_section.dart';
 import '../../widgets/developer/notification_debug_section.dart';
 
-/// Developer tools hub screen
-///
-/// Provides access to:
-/// - BLE diagnostics (MTU, PHY, RSSI, reconnection count)
-/// - Log viewer (all incoming BLE NUS data)
-/// - Sensor debug (real-time sensor charts)
-/// - Communication log (TX/RX traffic)
-/// - Shell terminal (SMP shell over BLE)
 class DeveloperScreen extends ConsumerWidget {
   const DeveloperScreen({super.key});
 
@@ -32,164 +25,473 @@ class DeveloperScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Developer Tools'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppTheme.spacingMd),
-        children: [
-          // BLE Diagnostics Card
-          _DiagnosticsCard(diagnostics: diagnostics),
+      body: _DeveloperToolsBody(
+        diagnostics: diagnostics,
+        connection: connection,
+        crashSummary: crashSummary,
+      ),
+    );
+  }
+}
 
+class _DeveloperToolsBody extends ConsumerWidget {
+  final BleDiagnostics diagnostics;
+  final Connection connection;
+  final CrashSummary? crashSummary;
+
+  const _DeveloperToolsBody({
+    required this.diagnostics,
+    required this.connection,
+    this.crashSummary,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final toolTiles = [
+      _BlendToolTile(
+        icon: Icons.article_outlined,
+        title: 'Log Viewer',
+        subtitle: 'Firmware logs',
+        accent: AppTheme.primaryColor,
+        onTap: () => context.push(AppRoutes.logViewer),
+      ),
+      _BlendToolTile(
+        icon: Icons.swap_horiz,
+        title: 'Comm Log',
+        subtitle: 'BLE traffic',
+        accent: Colors.amberAccent.shade400,
+        onTap: () => context.push(AppRoutes.commLog),
+      ),
+      _BlendToolTile(
+        icon: Icons.terminal,
+        title: 'Shell',
+        subtitle: 'SMP commands',
+        accent: Colors.lightGreenAccent.shade400,
+        onTap: connection.isConnected ? () => context.push(AppRoutes.shell) : null,
+      ),
+      _BlendToolTile(
+        icon: Icons.bug_report_outlined,
+        title: 'Crash Reports',
+        subtitle: crashSummary != null ? 'Coredump available' : 'History & stats',
+        accent: Colors.redAccent.shade200,
+        badgeLabel: crashSummary != null ? 'Dump' : null,
+        onTap: () => context.push(AppRoutes.crashReport),
+      ),
+      _BlendToolTile(
+        icon: Icons.sensors,
+        title: 'Sensors',
+        subtitle: 'Real-time data',
+        accent: Colors.tealAccent.shade400,
+        onTap: connection.isConnected ? () => context.push(AppRoutes.sensors) : null,
+      ),
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.all(AppTheme.spacingMd),
+      children: [
+        _DiagnosticsCard(diagnostics: diagnostics),
+        const SizedBox(height: AppTheme.spacingMd),
+        if (!connection.isConnected) ...[
+          _DisconnectedBanner(),
           const SizedBox(height: AppTheme.spacingMd),
+        ],
+        const _BlendTerminalSectionTitle('TOOLS'),
+        const SizedBox(height: AppTheme.spacingSm),
+        GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 0.88,
+          children: toolTiles,
+        ),
+        const SizedBox(height: AppTheme.spacingLg),
+        const _BlendTerminalSectionTitle('ACTIONS'),
+        const SizedBox(height: AppTheme.spacingSm),
+        Row(
+          children: [
+            Expanded(
+              child: _BlendActionChip(
+                icon: Icons.vibration,
+                label: 'Find',
+                onTap: connection.isConnected
+                    ? () async {
+                        final watchService = ref.read(watchServiceProvider);
+                        await watchService.findDevice(true);
+                        await Future<void>.delayed(const Duration(seconds: 2));
+                        await watchService.findDevice(false);
+                      }
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _BlendActionChip(
+                icon: Icons.sync,
+                label: 'Sync Time',
+                onTap: connection.isConnected
+                    ? () async {
+                        final watchService = ref.read(watchServiceProvider);
+                        await watchService.syncTime();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Time synced'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      }
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _BlendActionChip(
+                icon: Icons.info_outline,
+                label: 'Device Info',
+                onTap: connection.isConnected
+                    ? () async {
+                        final watchService = ref.read(watchServiceProvider);
+                        await watchService.requestDeviceInfo();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Device info requested'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      }
+                    : null,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTheme.spacingLg),
+        const _BlendTerminalSectionTitle('DEBUG'),
+        const SizedBox(height: AppTheme.spacingSm),
+        const _CompactDebugToolsHub(),
+      ],
+    );
+  }
+}
 
-          // Connection status
-          if (!connection.isConnected)
-            Card(
-              color: AppTheme.warningColor.withValues(alpha: 0.1),
-              child: Padding(
-                padding: const EdgeInsets.all(AppTheme.spacingMd),
-                child: Row(
+class _BlendTerminalSectionTitle extends StatelessWidget {
+  final String label;
+
+  const _BlendTerminalSectionTitle(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '< $label',
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: AppTheme.primaryColor,
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.3,
+          ),
+    );
+  }
+}
+
+class _BlendToolTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accent;
+  final String? badgeLabel;
+  final VoidCallback? onTap;
+
+  const _BlendToolTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accent,
+    this.badgeLabel,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.45,
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+          child: Padding(
+            padding: const EdgeInsets.all(AppTheme.spacingMd),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: AppTheme.warningColor,
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, size: 22, color: accent),
                     ),
-                    const SizedBox(width: AppTheme.spacingSm),
+                    const Spacer(),
+                    if (badgeLabel != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: accent.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        child: Text(
+                          badgeLabel!,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: accent,
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BlendActionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  const _BlendActionChip({
+    required this.icon,
+    required this.label,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.45,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: enabled
+                  ? AppTheme.primaryColor.withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.1),
+            ),
+            color: Colors.white.withValues(alpha: 0.02),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16),
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactDebugToolsHub extends StatelessWidget {
+  const _CompactDebugToolsHub();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacingMd,
+          vertical: AppTheme.spacingSm,
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.tune, size: 18, color: AppTheme.primaryColor),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Debug Tools',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'monospace',
+                      color: AppTheme.primaryColor,
+                    ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () => _showDebugToolsSheet(context),
+              child: const Text('Open'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDebugToolsSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: FractionallySizedBox(
+            heightFactor: 0.82,
+            child: DefaultTabController(
+              length: 2,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Debug Tools',
+                      style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: TabBar(
+                        dividerColor: Colors.transparent,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        indicator: BoxDecoration(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        labelColor: AppTheme.primaryColor,
+                        unselectedLabelColor: AppTheme.textSecondary,
+                        tabs: const [
+                          Tab(text: 'Notifications'),
+                          Tab(text: 'Music'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Expanded(
-                      child: Text(
-                        'Watch not connected. Some features require an active connection.',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                      child: TabBarView(
+                        children: const [
+                          _DebugToolSheetPage(child: NotificationDebugSection()),
+                          _DebugToolSheetPage(child: MusicDebugSection()),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-
-          const SizedBox(height: AppTheme.spacingMd),
-
-          // Developer tools grid
-          Text(
-            'Tools',
-            style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: AppTheme.spacingSm),
+        );
+      },
+    );
+  }
+}
 
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: AppTheme.spacingSm,
-            crossAxisSpacing: AppTheme.spacingSm,
-            childAspectRatio: 1.3,
-            children: [
-              _ToolCard(
-                icon: Icons.article_outlined,
-                title: 'Log Viewer',
-                subtitle: 'All BLE data',
-                onTap: () => context.push(AppRoutes.logViewer),
+class _DebugToolSheetPage extends StatelessWidget {
+  final Widget child;
+
+  const _DebugToolSheetPage({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ScrollConfiguration(
+      behavior: const MaterialScrollBehavior().copyWith(overscroll: false),
+      child: SingleChildScrollView(
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DisconnectedBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: AppTheme.warningColor.withValues(alpha: 0.1),
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingMd),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: AppTheme.warningColor,
+            ),
+            const SizedBox(width: AppTheme.spacingSm),
+            Expanded(
+              child: Text(
+                'Watch not connected. Some features require an active connection.',
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-              _ToolCard(
-                icon: Icons.sensors,
-                title: 'Sensors',
-                subtitle: 'Real-time data',
-                onTap: () => context.push(AppRoutes.sensors),
-                enabled: connection.isConnected,
-              ),
-              _ToolCard(
-                icon: Icons.swap_horiz,
-                title: 'Comm Log',
-                subtitle: 'TX/RX traffic',
-                onTap: () => context.push(AppRoutes.commLog),
-              ),
-              _ToolCard(
-                icon: Icons.terminal,
-                title: 'Shell',
-                subtitle: 'SMP commands',
-                onTap: () => context.push(AppRoutes.shell),
-                enabled: connection.isConnected,
-              ),
-              _ToolCard(
-                icon: Icons.bug_report_outlined,
-                title: 'Crash Reports',
-                subtitle: crashSummary != null
-                    ? '${crashSummary.file}:${crashSummary.line}'
-                    : 'History & stats',
-                onTap: () => context.push(AppRoutes.crashReport),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: AppTheme.spacingLg),
-
-          // Quick actions
-          Text(
-            'Quick Actions',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppTheme.spacingSm),
-
-          _QuickActionTile(
-            icon: Icons.vibration,
-            title: 'Find Watch',
-            subtitle: 'Vibrate the watch',
-            onTap: connection.isConnected
-                ? () async {
-                    final watchService = ref.read(watchServiceProvider);
-                    await watchService.findDevice(true);
-                    await Future<void>.delayed(const Duration(seconds: 2));
-                    await watchService.findDevice(false);
-                  }
-                : null,
-          ),
-
-          const SizedBox(height: AppTheme.spacingXs),
-
-          _QuickActionTile(
-            icon: Icons.sync,
-            title: 'Sync Time',
-            subtitle: 'Update watch time',
-            onTap: connection.isConnected
-                ? () async {
-                    final watchService = ref.read(watchServiceProvider);
-                    await watchService.syncTime();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Time synced'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                    }
-                  }
-                : null,
-          ),
-
-          const SizedBox(height: AppTheme.spacingXs),
-
-          _QuickActionTile(
-            icon: Icons.info_outline,
-            title: 'Request Device Info',
-            subtitle: 'Query firmware version',
-            onTap: connection.isConnected
-                ? () async {
-                    final watchService = ref.read(watchServiceProvider);
-                    await watchService.requestDeviceInfo();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Device info requested'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                    }
-                  }
-                : null,
-          ),
-
-          const SizedBox(height: AppTheme.spacingLg),
-
-          // Debug Tools Section (collapsible)
-          const _DebugToolsSection(),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -225,10 +527,7 @@ class _DiagnosticsCard extends ConsumerWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: diagnostics.isConnected
                         ? AppTheme.successColor.withValues(alpha: 0.2)
@@ -313,184 +612,6 @@ class _DiagnosticRow extends StatelessWidget {
                   ),
               textAlign: TextAlign.end,
               overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ToolCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-  final bool enabled;
-
-  const _ToolCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-    this.enabled = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isEnabled = enabled && onTap != null;
-
-    return Card(
-      child: InkWell(
-        onTap: isEnabled ? onTap : null,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.spacingMd),
-          child: Opacity(
-            opacity: isEnabled ? 1.0 : 0.5,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 32,
-                  color: isEnabled ? AppTheme.primaryColor : AppTheme.textSecondary,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickActionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-
-  const _QuickActionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        dense: true,
-        visualDensity: VisualDensity.compact,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppTheme.spacingMd,
-          vertical: 0,
-        ),
-        leading: Icon(
-          icon,
-          size: 20,
-          color: onTap != null ? AppTheme.primaryColor : AppTheme.textSecondary,
-        ),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        subtitle: Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
-        ),
-        trailing: Icon(
-          Icons.chevron_right,
-          size: 20,
-          color: AppTheme.textSecondary,
-        ),
-        enabled: onTap != null,
-        onTap: onTap,
-      ),
-    );
-  }
-}
-
-/// Collapsible debug tools section
-class _DebugToolsSection extends ConsumerStatefulWidget {
-  const _DebugToolsSection();
-
-  @override
-  ConsumerState<_DebugToolsSection> createState() => _DebugToolsSectionState();
-}
-
-class _DebugToolsSectionState extends ConsumerState<_DebugToolsSection> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        initiallyExpanded: _isExpanded,
-        onExpansionChanged: (expanded) => setState(() => _isExpanded = expanded),
-        leading: Icon(
-          Icons.bug_report,
-          color: AppTheme.primaryColor,
-        ),
-        title: const Text('Debug Tools'),
-        subtitle: Text(
-          'Notification & Music testing',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
-        ),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.spacingMd,
-              0,
-              AppTheme.spacingMd,
-              AppTheme.spacingMd,
-            ),
-            child: Column(
-              children: [
-                const NotificationDebugSection(),
-                const SizedBox(height: AppTheme.spacingMd),
-                const MusicDebugSection(),
-                const SizedBox(height: AppTheme.spacingMd),
-                // Reset permission onboarding button
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      await ref.read(permissionNotifierProvider.notifier).resetOnboarding();
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Permission onboarding reset. Go to home to see it.'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.restart_alt),
-                    label: const Text('Reset Permission Onboarding'),
-                  ),
-                ),
-              ],
             ),
           ),
         ],

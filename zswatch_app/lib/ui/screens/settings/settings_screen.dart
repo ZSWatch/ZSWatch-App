@@ -274,7 +274,7 @@ class SettingsScreen extends ConsumerWidget {
         content: TextField(
           controller: controller,
           decoration: const InputDecoration(
-            hintText: 'http://192.168.1.77:8000',
+            hintText: CoredumpServerUrlNotifier.defaultUrl,
             labelText: 'Server URL',
           ),
           keyboardType: TextInputType.url,

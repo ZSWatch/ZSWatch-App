@@ -495,7 +495,7 @@ final coredumpServerUrlProvider =
 });
 
 class CoredumpServerUrlNotifier extends StateNotifier<String> {
-  static const String defaultUrl = 'http://192.168.1.77:8000';
+  static const String defaultUrl = 'https://zswatch-production.up.railway.app';
   final SharedPreferences? _prefs;
 
   CoredumpServerUrlNotifier(this._prefs)

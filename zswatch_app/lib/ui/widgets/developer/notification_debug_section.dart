@@ -154,6 +154,16 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
   Widget build(BuildContext context) {
     final connection = ref.watch(watchConnectionProvider);
     final isConnected = connection.isConnected;
+    final theme = Theme.of(context);
+
+    final compactButtonStyle = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(0, 34)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+      ),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
 
     return Card(
       child: Padding(
@@ -163,7 +173,7 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
           children: [
             Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.notifications_active,
                   color: AppTheme.primaryColor,
                   size: 20,
@@ -171,26 +181,46 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
                 const SizedBox(width: AppTheme.spacingSm),
                 Text(
                   'Notification Debug',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: theme.textTheme.titleMedium,
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '#${_notificationId}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontFamily: 'monospace',
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
                 ),
               ],
             ),
             const Divider(),
-            
-            // App selector dropdown
+            Text(
+              'Notification Details',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingSm),
             DropdownButtonFormField<String>(
               value: _selectedApp,
               decoration: const InputDecoration(
-                labelText: 'App Source',
+                labelText: 'Source',
                 border: OutlineInputBorder(),
                 isDense: true,
                 contentPadding: EdgeInsets.symmetric(
                   horizontal: AppTheme.spacingSm,
-                  vertical: AppTheme.spacingSm,
+                  vertical: 11,
                 ),
               ),
               items: _appOptions.map((app) {
-                return DropdownMenuItem(
+                return DropdownMenuItem<String>(
                   value: app,
                   child: Text(app),
                 );
@@ -201,96 +231,92 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
                 }
               },
             ),
-            
-            const SizedBox(height: AppTheme.spacingMd),
-
-            // Title input
+            const SizedBox(height: AppTheme.spacingSm),
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(
                 labelText: 'Title',
                 border: OutlineInputBorder(),
                 isDense: true,
-                hintText: 'Notification title',
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacingSm,
+                  vertical: 11,
+                ),
               ),
             ),
-
-            const SizedBox(height: AppTheme.spacingMd),
-
-            // Body input
+            const SizedBox(height: AppTheme.spacingSm),
             TextField(
               controller: _bodyController,
               decoration: const InputDecoration(
                 labelText: 'Body',
                 border: OutlineInputBorder(),
                 isDense: true,
-                hintText: 'Notification message',
+                alignLabelWithHint: true,
+                contentPadding: EdgeInsets.all(AppTheme.spacingSm),
               ),
-              maxLines: 3,
               minLines: 2,
+              maxLines: 2,
             ),
-
             const SizedBox(height: AppTheme.spacingMd),
-
-            // Action buttons
-            Row(
+            Wrap(
+              spacing: AppTheme.spacingSm,
+              runSpacing: AppTheme.spacingSm,
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: isConnected && !_isSending ? _sendNotification : null,
-                    icon: _isSending
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send),
-                    label: const Text('Send'),
-                  ),
+                FilledButton.icon(
+                  onPressed: isConnected && !_isSending ? _sendNotification : null,
+                  style: compactButtonStyle,
+                  icon: _isSending
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send, size: 16),
+                  label: const Text('Send'),
                 ),
-                const SizedBox(width: AppTheme.spacingSm),
-                IconButton(
+                OutlinedButton.icon(
                   onPressed: isConnected ? _clearNotifications : null,
-                  icon: const Icon(Icons.clear),
-                  tooltip: 'Clear last notification',
-                  style: IconButton.styleFrom(
-                    foregroundColor: AppTheme.errorColor,
-                  ),
+                  style: compactButtonStyle,
+                  icon: const Icon(Icons.clear, size: 16),
+                  label: const Text('Clear'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _isPostingNative ? null : _sendNativeAndroidNotification,
+                  style: compactButtonStyle,
+                  icon: _isPostingNative
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.phone_android, size: 16),
+                  label: const Text('Android'),
                 ),
               ],
             ),
-
             const SizedBox(height: AppTheme.spacingSm),
-
-            // Post native Android notification (uses system-assigned ID)
-            ElevatedButton.icon(
-              onPressed: _isPostingNative ? null : _sendNativeAndroidNotification,
-              icon: _isPostingNative
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.phone_android),
-              label: const Text('Send Android Notification'),
-            ),
-
-            if (_nativeNotificationId != null) ...[
-              const SizedBox(height: AppTheme.spacingXs),
-              Text(
-                'Last Android notification ID: $_nativeNotificationId'
-                '${_nativeNotificationTag != null ? ' (tag: $_nativeNotificationTag)' : ''}',
-                style: Theme.of(context).textTheme.bodySmall,
+            Text(
+              isConnected ? 'Send directly to the watch or post a local Android notification.' : 'Connect to watch to send notification data.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: isConnected ? AppTheme.textSecondary : AppTheme.warningColor,
               ),
-            ],
-
-            if (!isConnected) ...[
+            ),
+            if (_nativeNotificationId != null) ...[
               const SizedBox(height: AppTheme.spacingSm),
-              Text(
-                'Connect to watch to send notifications',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.warningColor,
+              Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 14, color: AppTheme.textSecondary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Android ID $_nativeNotificationId'
+                      '${_nativeNotificationTag != null ? ' · $_nativeNotificationTag' : ''}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
+                  ),
+                ],
               ),
             ],
           ],
