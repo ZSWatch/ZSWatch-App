@@ -877,18 +877,18 @@ class _ConnectionTimelineCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title row with clear button
+            // Title row with time range dropdown and clear button
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    _windowTitle(timelineAsync.valueOrNull?.windowStart,
-                        timelineAsync.valueOrNull?.windowEnd),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
+                Text(
+                  'Connection Timeline',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
+                const SizedBox(width: AppTheme.spacingMd),
+                _TimeRangeDropdown(watchId: watchId),
+                const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.delete_sweep_outlined),
                   iconSize: 20,
@@ -954,18 +954,6 @@ class _ConnectionTimelineCard extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  String _windowTitle(DateTime? start, DateTime? end) {
-    if (start == null || end == null) return 'Connection Timeline';
-    final duration = end.difference(start);
-    if (duration.inDays >= 1) {
-      return 'Connection Timeline (${duration.inDays}d ${duration.inHours % 24}h)';
-    } else if (duration.inHours >= 1) {
-      return 'Connection Timeline (${duration.inHours}h ${duration.inMinutes % 60}m)';
-    } else {
-      return 'Connection Timeline (${duration.inMinutes}m)';
-    }
   }
 
   Future<void> _confirmClear(BuildContext context, WidgetRef ref) async {
@@ -1211,6 +1199,45 @@ class _StatTile extends StatelessWidget {
                 ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TimeRangeDropdown extends ConsumerWidget {
+  final String watchId;
+
+  const _TimeRangeDropdown({required this.watchId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedRange = ref.watch(connectionTimelineRangeProvider(watchId));
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingSm),
+      decoration: BoxDecoration(
+        border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+      ),
+      child: DropdownButton<TimeRangeOption>(
+        value: selectedRange,
+        underline: const SizedBox.shrink(),
+        isDense: true,
+        onChanged: (TimeRangeOption? newValue) {
+          if (newValue != null) {
+            ref.read(connectionTimelineRangeProvider(watchId).notifier).state = newValue;
+          }
+        },
+        items: TimeRangeOption.values
+            .map((option) => DropdownMenuItem<TimeRangeOption>(
+                  value: option,
+                  child: Text(
+                    option.label,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ))
+            .toList(),
       ),
     );
   }
