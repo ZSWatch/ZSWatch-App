@@ -18,6 +18,8 @@ class FilesystemUploadService {
   Timer? _speedTimer;
   int _lastBytesTransferred = 0;
   DateTime? _lastSpeedUpdate;
+  final List<int> _speedSamples = [];
+  static const int _speedWindowSize = 5;
 
   final _stateController = BehaviorSubject<FilesystemUploadState>.seeded(
     const FilesystemUploadState(),
@@ -191,6 +193,7 @@ class FilesystemUploadService {
   void _startSpeedTimer() {
     _lastBytesTransferred = 0;
     _lastSpeedUpdate = DateTime.now();
+    _speedSamples.clear();
 
     _speedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       final now = DateTime.now();
@@ -200,7 +203,15 @@ class FilesystemUploadService {
         final speed = (bytesThisInterval / elapsed).round();
 
         if (bytesThisInterval > 0 || currentState.speedBytesPerSecond == 0) {
-          _updateState(currentState.copyWith(speedBytesPerSecond: speed));
+          _speedSamples.add(speed);
+          if (_speedSamples.length > _speedWindowSize) {
+            _speedSamples.removeAt(0);
+          }
+          final avg = _speedSamples.reduce((a, b) => a + b) ~/ _speedSamples.length;
+          _updateState(currentState.copyWith(
+            speedBytesPerSecond: avg,
+            speedHistory: [...currentState.speedHistory, avg],
+          ));
         }
 
         _lastBytesTransferred = currentState.bytesTransferred;

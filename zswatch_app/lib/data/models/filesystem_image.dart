@@ -135,6 +135,9 @@ abstract class FilesystemUploadState with _$FilesystemUploadState {
     /// Upload speed in bytes per second
     @Default(0) int speedBytesPerSecond,
 
+    /// Speed history for chart (bytes per second samples)
+    @Default([]) List<int> speedHistory,
+
     /// When the upload started
     DateTime? startedAt,
 

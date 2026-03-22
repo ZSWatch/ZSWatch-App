@@ -218,8 +218,9 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     final ready = await watchService.rediscoverServices();
     if (!ready) {
       throw Exception(
-        'SMP service did not become available after enabling it on the watch. '
-        'Try disconnecting and reconnecting.',
+        'SMP service did not become available. '
+        'If your watch firmware is older, you may need to manually enable it: '
+        'on the watch go to Apps → Update → Enable FW Update.',
       );
     }
     _ref.invalidate(hasSmpServiceProvider);
