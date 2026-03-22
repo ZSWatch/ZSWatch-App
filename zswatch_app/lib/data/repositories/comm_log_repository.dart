@@ -37,7 +37,8 @@ class CommLogRepository {
   bool get isEmpty => _entries.isEmpty;
 
   /// Whether the repository is at max capacity
-  bool get isFull => _entries.length >= maxEntries || _totalBytes >= maxSizeBytes;
+  bool get isFull =>
+      _entries.length >= maxEntries || _totalBytes >= maxSizeBytes;
 
   /// Total bytes stored
   int get totalBytes => _totalBytes;
@@ -75,23 +76,28 @@ class CommLogRepository {
   }
 
   /// Add a TX (outgoing) entry
-  void addTx(String data, {String? messageType, bool wasChunked = false, int? chunkCount}) {
-    _addEntry(CommLogEntry.tx(
-      id: _nextId++,
-      data: data,
-      messageType: messageType,
-      wasChunked: wasChunked,
-      chunkCount: chunkCount,
-    ));
+  void addTx(
+    String data, {
+    String? messageType,
+    bool wasChunked = false,
+    int? chunkCount,
+  }) {
+    _addEntry(
+      CommLogEntry.tx(
+        id: _nextId++,
+        data: data,
+        messageType: messageType,
+        wasChunked: wasChunked,
+        chunkCount: chunkCount,
+      ),
+    );
   }
 
   /// Add an RX (incoming) entry
   void addRx(String data, {String? messageType}) {
-    _addEntry(CommLogEntry.rx(
-      id: _nextId++,
-      data: data,
-      messageType: messageType,
-    ));
+    _addEntry(
+      CommLogEntry.rx(id: _nextId++, data: data, messageType: messageType),
+    );
   }
 
   void _addEntry(CommLogEntry entry) {
@@ -102,7 +108,6 @@ class CommLogRepository {
 
     _entries.add(entry);
     _totalBytes += entry.sizeBytes;
-
   }
 
   bool _shouldRotate(int newEntrySize) {
@@ -168,7 +173,9 @@ class CommLogRepository {
     buffer.writeln('---');
 
     for (final entry in _entries) {
-      buffer.writeln('[${entry.formattedTimestamp}] ${entry.directionArrow} ${entry.data}');
+      buffer.writeln(
+        '[${entry.formattedTimestamp}] ${entry.directionArrow} ${entry.data}',
+      );
     }
 
     return buffer.toString();

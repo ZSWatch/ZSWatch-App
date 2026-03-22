@@ -63,8 +63,8 @@ class ThreadHistory {
     required this.priority,
     required int initialCycles,
     required this.firstSeenPoll,
-  })  : _prevCycles = initialCycles,
-        cyclesPerSecHistory = [];
+  }) : _prevCycles = initialCycles,
+       cyclesPerSecHistory = [];
 
   void update(ThreadSnapshot snapshot, double pollIntervalSec) {
     // Thread reappeared — clear removed status.
@@ -82,7 +82,9 @@ class ThreadHistory {
     final deltaCycles = snapshot.totalCycles - _prevCycles;
     _prevCycles = snapshot.totalCycles;
 
-    final cps = (pollIntervalSec > 0 && deltaCycles >= 0) ? deltaCycles / pollIntervalSec : 0.0;
+    final cps = (pollIntervalSec > 0 && deltaCycles >= 0)
+        ? deltaCycles / pollIntervalSec
+        : 0.0;
     cyclesPerSecHistory.add(cps);
     if (cyclesPerSecHistory.length > maxHistory) {
       cyclesPerSecHistory.removeAt(0);
@@ -167,16 +169,17 @@ ThreadListParseResult parseThreadList(String output) {
         }
 
         // "Total execution cycles: 4810 (0 %)"
-        final cyclesMatch =
-            RegExp(r'Total execution cycles:\s*(\d+)').firstMatch(sub);
+        final cyclesMatch = RegExp(
+          r'Total execution cycles:\s*(\d+)',
+        ).firstMatch(sub);
         if (cyclesMatch != null) {
           totalCycles = int.parse(cyclesMatch.group(1)!);
         }
 
         // "stack size 1024, unused 576, usage 448 / 1024 (43 %)"
         final stackMatch = RegExp(
-                r'stack size\s+(\d+),\s*unused\s+(\d+),\s*usage\s+(\d+)\s*/\s*\d+\s*\((\d+)\s*%\)')
-            .firstMatch(sub);
+          r'stack size\s+(\d+),\s*unused\s+(\d+),\s*usage\s+(\d+)\s*/\s*\d+\s*\((\d+)\s*%\)',
+        ).firstMatch(sub);
         if (stackMatch != null) {
           stackSize = int.parse(stackMatch.group(1)!);
           stackUnused = int.parse(stackMatch.group(2)!);
@@ -187,17 +190,19 @@ ThreadListParseResult parseThreadList(String output) {
         i++;
       }
 
-      threads.add(ThreadSnapshot(
-        address: address,
-        name: name,
-        state: state,
-        priority: priority,
-        totalCycles: totalCycles,
-        stackSize: stackSize,
-        stackUsed: stackUsed,
-        stackUnused: stackUnused,
-        usagePercent: usagePercent,
-      ));
+      threads.add(
+        ThreadSnapshot(
+          address: address,
+          name: name,
+          state: state,
+          priority: priority,
+          totalCycles: totalCycles,
+          stackSize: stackSize,
+          stackUsed: stackUsed,
+          stackUnused: stackUnused,
+          usagePercent: usagePercent,
+        ),
+      );
       continue;
     }
 
@@ -229,8 +234,12 @@ class PowerInfo {
 /// Parse power status output.
 PowerInfo? parsePowerStatus(String output) {
   final stateMatch = RegExp(r'State:\s*(.+)').firstMatch(output);
-  final sleepMatch = RegExp(r'Time to sleep:\s*(\d+)\s*seconds').firstMatch(output);
-  final uptimeMatch = RegExp(r'Total uptime:\s*(\d+)\s*seconds').firstMatch(output);
+  final sleepMatch = RegExp(
+    r'Time to sleep:\s*(\d+)\s*seconds',
+  ).firstMatch(output);
+  final uptimeMatch = RegExp(
+    r'Total uptime:\s*(\d+)\s*seconds',
+  ).firstMatch(output);
 
   if (stateMatch == null) return null;
 

@@ -3,7 +3,7 @@ class FilesystemConstants {
   FilesystemConstants._();
 
   /// Target path on the watch for the LVGL resources filesystem image
-  /// 
+  ///
   /// This is where the lvgl_resources_raw.bin gets uploaded via MCUmgr filesystem commands.
   /// The path corresponds to the external flash partition used for LVGL resources.
   static const String targetPath = '/S/full_fs';
@@ -21,7 +21,8 @@ class FilesystemConstants {
   /// Check if a filename is a filesystem image
   static bool isFilesystemImage(String filename) {
     final lower = filename.toLowerCase();
-    return alternativeFilenames.any((name) => lower.endsWith(name.toLowerCase()));
+    return alternativeFilenames.any(
+      (name) => lower.endsWith(name.toLowerCase()),
+    );
   }
 }
-

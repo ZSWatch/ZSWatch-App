@@ -43,4 +43,3 @@ class Watches extends Table {
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
-

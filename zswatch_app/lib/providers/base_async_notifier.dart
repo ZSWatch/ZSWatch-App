@@ -11,7 +11,10 @@ abstract class BaseAsyncNotifier extends StateNotifier<AsyncValue<void>> {
 
   /// Run [action], setting state to loading while in-flight and to
   /// [AsyncValue.error] on failure. Returns `true` on success.
-  Future<bool> run(Future<void> Function() action, {bool rethrowError = false}) async {
+  Future<bool> run(
+    Future<void> Function() action, {
+    bool rethrowError = false,
+  }) async {
     state = const AsyncValue.loading();
     try {
       await action();

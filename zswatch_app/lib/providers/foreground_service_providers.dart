@@ -49,10 +49,14 @@ class ForegroundServiceNotifier extends StateNotifier<bool> {
   void _initialize() {
     // Listen to connection state changes
     final watchService = _ref.read(watchServiceProvider);
-    _connectionSubscription = watchService.connectionStream.listen(_handleConnectionChange);
+    _connectionSubscription = watchService.connectionStream.listen(
+      _handleConnectionChange,
+    );
 
     // Listen to disconnect requests from notification
-    _disconnectRequestedSubscription = _service.onDisconnectRequested.listen((_) {
+    _disconnectRequestedSubscription = _service.onDisconnectRequested.listen((
+      _,
+    ) {
       _handleNotificationDisconnect();
     });
 
@@ -67,7 +71,7 @@ class ForegroundServiceNotifier extends StateNotifier<bool> {
 
   void _handleConnectionChange(Connection connection) {
     final backgroundEnabled = _ref.read(backgroundConnectionEnabledProvider);
-    
+
     // Only manage foreground service on Android
     if (!Platform.isAndroid) return;
 
@@ -135,15 +139,17 @@ class ForegroundServiceNotifier extends StateNotifier<bool> {
   }
 
   void _handleNotificationDisconnect() {
-    debugPrint('[ForegroundServiceNotifier] Disconnect requested from notification');
-    
+    debugPrint(
+      '[ForegroundServiceNotifier] Disconnect requested from notification',
+    );
+
     // Mark as user-initiated disconnect
     _wasUserDisconnect = true;
-    
+
     // Disconnect from watch
     final watchService = _ref.read(watchServiceProvider);
     watchService.disconnect();
-    
+
     // Stop foreground service
     _stopService();
   }
@@ -151,8 +157,10 @@ class ForegroundServiceNotifier extends StateNotifier<bool> {
   Future<void> _startService(ForegroundConnectionState connectionState) async {
     if (state) return; // Already running
 
-    debugPrint('[ForegroundServiceNotifier] Starting foreground service for $_currentWatchName');
-    
+    debugPrint(
+      '[ForegroundServiceNotifier] Starting foreground service for $_currentWatchName',
+    );
+
     await _service.start(
       watchName: _currentWatchName ?? 'ZSWatch',
       state: connectionState,
@@ -164,12 +172,14 @@ class ForegroundServiceNotifier extends StateNotifier<bool> {
     if (!state) return; // Not running
 
     debugPrint('[ForegroundServiceNotifier] Stopping foreground service');
-    
+
     await _service.stop();
     state = false;
   }
 
-  Future<void> _updateNotification(ForegroundConnectionState connectionState) async {
+  Future<void> _updateNotification(
+    ForegroundConnectionState connectionState,
+  ) async {
     if (!state) return; // Not running
 
     await _service.updateNotification(
@@ -181,14 +191,14 @@ class ForegroundServiceNotifier extends StateNotifier<bool> {
   /// Manually start the foreground service
   Future<void> start() async {
     if (!Platform.isAndroid) return;
-    
+
     final connection = _ref.read(watchConnectionProvider);
     _currentWatchName = connection.watchName ?? 'ZSWatch';
-    
+
     final connectionState = connection.isConnected
         ? ForegroundConnectionState.connected
         : ForegroundConnectionState.reconnecting;
-    
+
     await _startService(connectionState);
   }
 
@@ -214,15 +224,16 @@ class ForegroundServiceNotifier extends StateNotifier<bool> {
 /// Provider for the foreground service notifier
 final foregroundServiceNotifierProvider =
     StateNotifierProvider<ForegroundServiceNotifier, bool>((ref) {
-  final service = ref.watch(foregroundServiceProvider);
-  return ForegroundServiceNotifier(ref, service);
-});
+      final service = ref.watch(foregroundServiceProvider);
+      return ForegroundServiceNotifier(ref, service);
+    });
 
 /// Provider to check and request battery optimization exemption
 class BatteryOptimizationNotifier extends StateNotifier<AsyncValue<bool>> {
   final ForegroundService _service;
 
-  BatteryOptimizationNotifier(this._service) : super(const AsyncValue.loading()) {
+  BatteryOptimizationNotifier(this._service)
+    : super(const AsyncValue.loading()) {
     _checkStatus();
   }
 
@@ -262,6 +273,6 @@ class BatteryOptimizationNotifier extends StateNotifier<AsyncValue<bool>> {
 /// Provider for battery optimization notifier
 final batteryOptimizationNotifierProvider =
     StateNotifierProvider<BatteryOptimizationNotifier, AsyncValue<bool>>((ref) {
-  final service = ref.watch(foregroundServiceProvider);
-  return BatteryOptimizationNotifier(service);
-});
+      final service = ref.watch(foregroundServiceProvider);
+      return BatteryOptimizationNotifier(service);
+    });

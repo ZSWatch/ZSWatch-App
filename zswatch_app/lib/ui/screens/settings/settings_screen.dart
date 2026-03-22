@@ -26,17 +26,17 @@ class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   // TODO: Update these URLs to point to the correct repositories
-  static const String _appGithubUrl = 'https://github.com/ZSWatch/ZSWatch-App';  // <-- Change to app repo
-  static const String _firmwareGithubUrl = 'https://github.com/ZSWatch/ZSWatch';  // <-- Change to firmware repo
+  static const String _appGithubUrl =
+      'https://github.com/ZSWatch/ZSWatch-App'; // <-- Change to app repo
+  static const String _firmwareGithubUrl =
+      'https://github.com/ZSWatch/ZSWatch'; // <-- Change to firmware repo
   static const String _appVersion = '1.0.0';
   static const String _buildNumber = '1';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
+      appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
           // Connection Settings
@@ -67,14 +67,18 @@ class SettingsScreen extends ConsumerWidget {
                       // Show warning that feature won't work properly
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Notification permission is required for the persistent connection indicator'),
+                          content: Text(
+                            'Notification permission is required for the persistent connection indicator',
+                          ),
                           duration: Duration(seconds: 3),
                         ),
                       );
                     }
                   }
                 }
-                ref.read(backgroundConnectionEnabledProvider.notifier).setEnabled(value);
+                ref
+                    .read(backgroundConnectionEnabledProvider.notifier)
+                    .setEnabled(value);
                 // If disabling while connected, the service will keep running
                 // until the watch is disconnected
                 if (!value) {
@@ -95,13 +99,18 @@ class SettingsScreen extends ConsumerWidget {
           // Firmware Update Settings
           _SectionHeader(title: 'Firmware Update'),
           _SettingsTile(
-            leading: const Icon(Icons.screen_lock_portrait, color: AppTheme.textSecondary),
+            leading: const Icon(
+              Icons.screen_lock_portrait,
+              color: AppTheme.textSecondary,
+            ),
             title: 'Keep Screen On During DFU',
             subtitle: 'Prevent screen timeout during firmware updates',
             trailing: Switch(
               value: ref.watch(keepScreenOnDuringDfuProvider),
               onChanged: (value) {
-                ref.read(keepScreenOnDuringDfuProvider.notifier).setEnabled(value);
+                ref
+                    .read(keepScreenOnDuringDfuProvider.notifier)
+                    .setEnabled(value);
               },
             ),
           ),
@@ -117,13 +126,19 @@ class SettingsScreen extends ConsumerWidget {
           // About Section
           _SectionHeader(title: 'About'),
           _SettingsTile(
-            leading: const Icon(Icons.info_outline, color: AppTheme.textSecondary),
+            leading: const Icon(
+              Icons.info_outline,
+              color: AppTheme.textSecondary,
+            ),
             title: 'App Version',
             subtitle: '$_appVersion ($_buildNumber)',
             onTap: () => _showVersionDialog(context),
           ),
           _SettingsTile(
-            leading: const Icon(Icons.phone_android, color: AppTheme.textSecondary),
+            leading: const Icon(
+              Icons.phone_android,
+              color: AppTheme.textSecondary,
+            ),
             title: 'Companion App Source',
             subtitle: 'View app source code on GitHub',
             trailing: const Icon(Icons.open_in_new, size: 20),
@@ -141,7 +156,10 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _launchUrl(_firmwareGithubUrl),
           ),
           _SettingsTile(
-            leading: const Icon(Icons.description_outlined, color: AppTheme.textSecondary),
+            leading: const Icon(
+              Icons.description_outlined,
+              color: AppTheme.textSecondary,
+            ),
             title: 'Licenses',
             subtitle: 'Open source licenses',
             trailing: const Icon(Icons.chevron_right),
@@ -172,7 +190,10 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           _SettingsTile(
-            leading: const Icon(Icons.dns_outlined, color: AppTheme.textSecondary),
+            leading: const Icon(
+              Icons.dns_outlined,
+              color: AppTheme.textSecondary,
+            ),
             title: 'Coredump Server',
             subtitle: ref.watch(coredumpServerUrlProvider),
             trailing: const Icon(Icons.edit, size: 20),
@@ -195,15 +216,15 @@ class SettingsScreen extends ConsumerWidget {
                 Text(
                   'ZSWatch Companion',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Companion app for the open-source ZSWatch smartwatch',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -346,9 +367,9 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: AppTheme.primaryColor,
-              fontWeight: FontWeight.bold,
-            ),
+          color: AppTheme.primaryColor,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -376,9 +397,9 @@ class _SettingsTile extends StatelessWidget {
       title: Text(title),
       subtitle: Text(
         subtitle,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
       ),
       trailing: trailing,
       onTap: onTap,
@@ -401,14 +422,11 @@ class _InfoRow extends StatelessWidget {
         children: [
           Text(
             label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
           ),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          Text(value, style: Theme.of(context).textTheme.bodyMedium),
         ],
       ),
     );
@@ -422,9 +440,9 @@ class _AiTranscriptionNavTile extends ConsumerWidget {
     final transcriptionType = ref.watch(transcriptionEngineTypeProvider);
     final transcriptionInfo = TranscriptionModelCatalog.info(transcriptionType);
     final localAiEnabled = ref.watch(localAiEnabledProvider);
-    final aiModelName = ref.watch(selectedLlmModelInfoProvider).whenOrNull(
-          data: (m) => m.displayName,
-        );
+    final aiModelName = ref
+        .watch(selectedLlmModelInfoProvider)
+        .whenOrNull(data: (m) => m.displayName);
 
     return _SettingsTile(
       leading: const Icon(Icons.mic, color: AppTheme.primaryColor),
@@ -439,7 +457,7 @@ class _AiTranscriptionNavTile extends ConsumerWidget {
 }
 
 /// Consolidated permissions summary tile
-/// 
+///
 /// Shows an overview of permission status and allows users to manage all permissions
 class _PermissionsSummaryTile extends ConsumerWidget {
   @override
@@ -447,15 +465,15 @@ class _PermissionsSummaryTile extends ConsumerWidget {
     final permState = ref.watch(permissionNotifierProvider);
     final status = permState.status;
     final missingCount = status.missingPermissions.length;
-    
+
     // Calculate overall status
     final allGranted = status.hasAllPermissions;
     final hasCritical = status.hasCriticalPermissions;
-    
+
     Color statusColor;
     IconData statusIcon;
     String statusText;
-    
+
     if (allGranted) {
       statusColor = AppTheme.successColor;
       statusIcon = Icons.check_circle;
@@ -463,7 +481,8 @@ class _PermissionsSummaryTile extends ConsumerWidget {
     } else if (hasCritical) {
       statusColor = AppTheme.warningColor;
       statusIcon = Icons.warning_amber;
-      statusText = '$missingCount optional permission${missingCount > 1 ? 's' : ''} missing';
+      statusText =
+          '$missingCount optional permission${missingCount > 1 ? 's' : ''} missing';
     } else {
       statusColor = AppTheme.errorColor;
       statusIcon = Icons.error;
@@ -479,7 +498,7 @@ class _PermissionsSummaryTile extends ConsumerWidget {
           trailing: const Icon(Icons.chevron_right),
           onTap: () => _openPermissionsScreen(context),
         ),
-        
+
         // Show quick status for each permission
         if (!allGranted) ...[
           Padding(
@@ -492,7 +511,7 @@ class _PermissionsSummaryTile extends ConsumerWidget {
                   label: 'Bluetooth',
                   isGranted: status.bluetoothGranted,
                 ),
-                
+
                 // Notifications (Android only)
                 if (Platform.isAndroid)
                   _QuickPermissionRow(
@@ -500,7 +519,7 @@ class _PermissionsSummaryTile extends ConsumerWidget {
                     label: 'Notifications',
                     isGranted: status.isNotificationGranted,
                   ),
-                
+
                 // Battery Optimization (Android only)
                 if (Platform.isAndroid)
                   _QuickPermissionRow(
@@ -508,14 +527,14 @@ class _PermissionsSummaryTile extends ConsumerWidget {
                     label: 'Battery Optimization',
                     isGranted: status.batteryOptimizationDisabled,
                   ),
-                
+
                 // Location
                 _QuickPermissionRow(
                   icon: Icons.location_on,
                   label: 'Location',
                   isGranted: status.isLocationGranted,
                 ),
-                
+
                 // Notification Listener (Android only)
                 if (Platform.isAndroid)
                   _QuickPermissionRow(
@@ -534,9 +553,8 @@ class _PermissionsSummaryTile extends ConsumerWidget {
   void _openPermissionsScreen(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => const PermissionOnboardingScreen(
-          isInitialOnboarding: false,
-        ),
+        builder: (context) =>
+            const PermissionOnboardingScreen(isInitialOnboarding: false),
       ),
     );
   }
@@ -557,7 +575,7 @@ class _QuickPermissionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isGranted ? AppTheme.successColor : AppTheme.warningColor;
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -567,9 +585,9 @@ class _QuickPermissionRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ),
           Icon(

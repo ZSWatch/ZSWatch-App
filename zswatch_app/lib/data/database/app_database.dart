@@ -25,7 +25,16 @@ part 'app_database.g.dart';
 /// - CommLogEntries: BLE communication logs for debugging
 /// - ConnectionEvents: Connection/disconnection events for analytics
 @DriftDatabase(
-  tables: [Watches, HealthSamples, BatteryReadings, CommLogEntries, ConnectionEvents, VoiceMemos, ExtractedActions, CrashReports],
+  tables: [
+    Watches,
+    HealthSamples,
+    BatteryReadings,
+    CommLogEntries,
+    ConnectionEvents,
+    VoiceMemos,
+    ExtractedActions,
+    CrashReports,
+  ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
@@ -68,8 +77,9 @@ class AppDatabase extends _$AppDatabase {
 
   /// Get the primary watch
   Future<WatchEntity?> getPrimaryWatch() {
-    return (select(watches)..where((w) => w.isPrimary.equals(true)))
-        .getSingleOrNull();
+    return (select(
+      watches,
+    )..where((w) => w.isPrimary.equals(true))).getSingleOrNull();
   }
 
   /// Insert or update a watch
@@ -81,24 +91,28 @@ class AppDatabase extends _$AppDatabase {
   Future<void> setWatchAsPrimary(String watchId) async {
     await transaction(() async {
       // Clear all primary flags
-      await (update(watches)..where((w) => w.isPrimary.equals(true)))
-          .write(const WatchesCompanion(isPrimary: Value(false)));
+      await (update(watches)..where((w) => w.isPrimary.equals(true))).write(
+        const WatchesCompanion(isPrimary: Value(false)),
+      );
       // Set the specified watch as primary
-      await (update(watches)..where((w) => w.id.equals(watchId)))
-          .write(const WatchesCompanion(isPrimary: Value(true)));
+      await (update(watches)..where((w) => w.id.equals(watchId))).write(
+        const WatchesCompanion(isPrimary: Value(true)),
+      );
     });
   }
 
   /// Delete a watch and all its associated data
   Future<void> deleteWatch(String watchId) async {
     await transaction(() async {
-      await (delete(healthSamples)..where((h) => h.watchId.equals(watchId)))
-          .go();
-      await (delete(batteryReadings)..where((b) => b.watchId.equals(watchId)))
-          .go();
-      await (delete(connectionEvents)
-            ..where((c) => c.watchId.equals(watchId)))
-          .go();
+      await (delete(
+        healthSamples,
+      )..where((h) => h.watchId.equals(watchId))).go();
+      await (delete(
+        batteryReadings,
+      )..where((b) => b.watchId.equals(watchId))).go();
+      await (delete(
+        connectionEvents,
+      )..where((c) => c.watchId.equals(watchId))).go();
       await (delete(watches)..where((w) => w.id.equals(watchId))).go();
     });
   }
@@ -137,18 +151,21 @@ class AppDatabase extends _$AppDatabase {
     required DateTime to,
   }) {
     return (select(healthSamples)
-          ..where((h) =>
-              h.watchId.equals(watchId) &
-              h.type.equals(type) &
-              h.timestamp.isBetweenValues(from, to))
+          ..where(
+            (h) =>
+                h.watchId.equals(watchId) &
+                h.type.equals(type) &
+                h.timestamp.isBetweenValues(from, to),
+          )
           ..orderBy([(h) => OrderingTerm.asc(h.timestamp)]))
         .get();
   }
 
   /// Delete health samples older than specified date
   Future<int> deleteOldHealthSamples(DateTime cutoff) {
-    return (delete(healthSamples)..where((h) => h.timestamp.isSmallerThanValue(cutoff)))
-        .go();
+    return (delete(
+      healthSamples,
+    )..where((h) => h.timestamp.isSmallerThanValue(cutoff))).go();
   }
 
   // ==================== Battery Reading Operations ====================
@@ -165,18 +182,20 @@ class AppDatabase extends _$AppDatabase {
     required DateTime to,
   }) {
     return (select(batteryReadings)
-          ..where((b) =>
-              b.watchId.equals(watchId) &
-              b.timestamp.isBetweenValues(from, to))
+          ..where(
+            (b) =>
+                b.watchId.equals(watchId) &
+                b.timestamp.isBetweenValues(from, to),
+          )
           ..orderBy([(b) => OrderingTerm.asc(b.timestamp)]))
         .get();
   }
 
   /// Delete battery readings older than specified date
   Future<int> deleteOldBatteryReadings(DateTime cutoff) {
-    return (delete(batteryReadings)
-          ..where((b) => b.timestamp.isSmallerThanValue(cutoff)))
-        .go();
+    return (delete(
+      batteryReadings,
+    )..where((b) => b.timestamp.isSmallerThanValue(cutoff))).go();
   }
 
   // ==================== Comm Log Operations ====================
@@ -240,9 +259,11 @@ class AppDatabase extends _$AppDatabase {
     required DateTime to,
   }) {
     return (select(connectionEvents)
-          ..where((e) =>
-              e.watchId.equals(watchId) &
-              e.timestamp.isBetweenValues(from, to))
+          ..where(
+            (e) =>
+                e.watchId.equals(watchId) &
+                e.timestamp.isBetweenValues(from, to),
+          )
           ..orderBy([(e) => OrderingTerm.asc(e.timestamp)]))
         .get();
   }
@@ -264,9 +285,10 @@ class AppDatabase extends _$AppDatabase {
     int limit = 20,
   }) {
     return (select(connectionEvents)
-          ..where((e) =>
-              e.watchId.equals(watchId) &
-              e.eventType.equals('disconnected'))
+          ..where(
+            (e) =>
+                e.watchId.equals(watchId) & e.eventType.equals('disconnected'),
+          )
           ..orderBy([(e) => OrderingTerm.desc(e.timestamp)])
           ..limit(limit))
         .get();
@@ -281,9 +303,11 @@ class AppDatabase extends _$AppDatabase {
   }) async {
     final query = selectOnly(connectionEvents)
       ..addColumns([connectionEvents.id.count()])
-      ..where(connectionEvents.watchId.equals(watchId) &
-          connectionEvents.eventType.equals(eventType) &
-          connectionEvents.timestamp.isBetweenValues(from, to));
+      ..where(
+        connectionEvents.watchId.equals(watchId) &
+            connectionEvents.eventType.equals(eventType) &
+            connectionEvents.timestamp.isBetweenValues(from, to),
+      );
     final result = await query.getSingle();
     return result.read(connectionEvents.id.count()) ?? 0;
   }
@@ -294,9 +318,11 @@ class AppDatabase extends _$AppDatabase {
     required DateTime before,
   }) {
     return (select(connectionEvents)
-          ..where((e) =>
-              e.watchId.equals(watchId) &
-              e.timestamp.isSmallerThanValue(before))
+          ..where(
+            (e) =>
+                e.watchId.equals(watchId) &
+                e.timestamp.isSmallerThanValue(before),
+          )
           ..orderBy([(e) => OrderingTerm.desc(e.timestamp)])
           ..limit(1))
         .getSingleOrNull();
@@ -304,16 +330,16 @@ class AppDatabase extends _$AppDatabase {
 
   /// Delete connection events older than specified date
   Future<int> deleteOldConnectionEvents(DateTime cutoff) {
-    return (delete(connectionEvents)
-          ..where((e) => e.timestamp.isSmallerThanValue(cutoff)))
-        .go();
+    return (delete(
+      connectionEvents,
+    )..where((e) => e.timestamp.isSmallerThanValue(cutoff))).go();
   }
 
   /// Delete all connection events for a specific watch
   Future<int> deleteAllConnectionEventsForWatch(String watchId) {
-    return (delete(connectionEvents)
-          ..where((e) => e.watchId.equals(watchId)))
-        .go();
+    return (delete(
+      connectionEvents,
+    )..where((e) => e.watchId.equals(watchId))).go();
   }
 
   /// Watch connection events (stream)
@@ -332,23 +358,23 @@ class AppDatabase extends _$AppDatabase {
 
   /// Get all voice memos, newest first
   Future<List<VoiceMemoEntity>> getAllVoiceMemos() {
-    return (select(voiceMemos)
-          ..orderBy([(v) => OrderingTerm.desc(v.timestampUtc)]))
-        .get();
+    return (select(
+      voiceMemos,
+    )..orderBy([(v) => OrderingTerm.desc(v.timestampUtc)])).get();
   }
 
   /// Watch all voice memos (reactive stream), newest first
   Stream<List<VoiceMemoEntity>> watchAllVoiceMemos() {
-    return (select(voiceMemos)
-          ..orderBy([(v) => OrderingTerm.desc(v.timestampUtc)]))
-        .watch();
+    return (select(
+      voiceMemos,
+    )..orderBy([(v) => OrderingTerm.desc(v.timestampUtc)])).watch();
   }
 
   /// Get voice memo by filename
   Future<VoiceMemoEntity?> getVoiceMemoByFilename(String filename) async {
-    final rows = await (select(voiceMemos)
-          ..where((v) => v.filename.equals(filename)))
-        .get();
+    final rows = await (select(
+      voiceMemos,
+    )..where((v) => v.filename.equals(filename))).get();
     if (rows.length > 1) {
       // Clean up stale duplicates (can occur from race conditions on double
       // BLE notification delivery). Keep the first row, delete the rest.
@@ -370,8 +396,9 @@ class AppDatabase extends _$AppDatabase {
   /// Get voice memos that are synced but not yet transcribed
   Future<List<VoiceMemoEntity>> getUntranscribedVoiceMemos() {
     return (select(voiceMemos)
-          ..where((v) =>
-              v.syncedFromWatch.equals(true) & v.transcription.isNull())
+          ..where(
+            (v) => v.syncedFromWatch.equals(true) & v.transcription.isNull(),
+          )
           ..orderBy([(v) => OrderingTerm.asc(v.timestampUtc)]))
         .get();
   }
@@ -379,11 +406,13 @@ class AppDatabase extends _$AppDatabase {
   /// Get voice memos that are transcribed but not yet AI-processed
   Future<List<VoiceMemoEntity>> getUnprocessedVoiceMemos() {
     return (select(voiceMemos)
-          ..where((v) =>
-              v.transcription.isNotNull() &
-              v.summary.isNull() &
-              (v.processingStatus.isNull() |
-                  v.processingStatus.equals('failed')))
+          ..where(
+            (v) =>
+                v.transcription.isNotNull() &
+                v.summary.isNull() &
+                (v.processingStatus.isNull() |
+                    v.processingStatus.equals('failed')),
+          )
           ..orderBy([(v) => OrderingTerm.asc(v.timestampUtc)]))
         .get();
   }
@@ -393,9 +422,9 @@ class AppDatabase extends _$AppDatabase {
     // getVoiceMemoByFilename also deduplicates if stale duplicates exist.
     final existing = await getVoiceMemoByFilename(memo.filename.value);
     if (existing != null) {
-      await (update(voiceMemos)
-            ..where((v) => v.filename.equals(memo.filename.value)))
-          .write(memo);
+      await (update(
+        voiceMemos,
+      )..where((v) => v.filename.equals(memo.filename.value))).write(memo);
     } else {
       await into(voiceMemos).insert(memo);
     }
@@ -406,20 +435,21 @@ class AppDatabase extends _$AppDatabase {
     required String filename,
     required String localFilePath,
   }) {
-    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
-        .write(VoiceMemosCompanion(
-      syncedFromWatch: const Value(true),
-      localFilePath: Value(localFilePath),
-      downloadedAt: Value(DateTime.now()),
-    ));
+    return (update(
+      voiceMemos,
+    )..where((v) => v.filename.equals(filename))).write(
+      VoiceMemosCompanion(
+        syncedFromWatch: const Value(true),
+        localFilePath: Value(localFilePath),
+        downloadedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Mark a voice memo as deleted on the watch
   Future<void> updateVoiceMemoDeletedOnWatch(String filename) {
     return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
-        .write(const VoiceMemosCompanion(
-      deletedOnWatch: Value(true),
-    ));
+        .write(const VoiceMemosCompanion(deletedOnWatch: Value(true)));
   }
 
   /// Update transcription for a voice memo
@@ -427,11 +457,14 @@ class AppDatabase extends _$AppDatabase {
     required String filename,
     required String transcription,
   }) {
-    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
-        .write(VoiceMemosCompanion(
-      transcription: Value(transcription),
-      transcribedAt: Value(DateTime.now()),
-    ));
+    return (update(
+      voiceMemos,
+    )..where((v) => v.filename.equals(filename))).write(
+      VoiceMemosCompanion(
+        transcription: Value(transcription),
+        transcribedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Update converted file path for a voice memo
@@ -439,10 +472,11 @@ class AppDatabase extends _$AppDatabase {
     required String filename,
     required String convertedFilePath,
   }) {
-    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
-        .write(VoiceMemosCompanion(
-      convertedFilePath: Value(convertedFilePath),
-    ));
+    return (update(
+      voiceMemos,
+    )..where((v) => v.filename.equals(filename))).write(
+      VoiceMemosCompanion(convertedFilePath: Value(convertedFilePath)),
+    );
   }
 
   /// Update AI processing results for a voice memo
@@ -452,14 +486,17 @@ class AppDatabase extends _$AppDatabase {
     required String category,
     required String aiModel,
   }) {
-    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
-        .write(VoiceMemosCompanion(
-      summary: Value(summary),
-      category: Value(category),
-      processingStatus: const Value('ready'),
-      aiModel: Value(aiModel),
-      aiProcessedAt: Value(DateTime.now()),
-    ));
+    return (update(
+      voiceMemos,
+    )..where((v) => v.filename.equals(filename))).write(
+      VoiceMemosCompanion(
+        summary: Value(summary),
+        category: Value(category),
+        processingStatus: const Value('ready'),
+        aiModel: Value(aiModel),
+        aiProcessedAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Update AI processing status
@@ -468,31 +505,24 @@ class AppDatabase extends _$AppDatabase {
     required String status,
   }) {
     return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
-        .write(VoiceMemosCompanion(
-      processingStatus: Value(status),
-    ));
+        .write(VoiceMemosCompanion(processingStatus: Value(status)));
   }
 
   /// Mark task created for a voice memo
   Future<void> updateVoiceMemoTaskCreated(String filename) {
     return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
-        .write(const VoiceMemosCompanion(
-      taskCreated: Value(true),
-    ));
+        .write(const VoiceMemosCompanion(taskCreated: Value(true)));
   }
 
   /// Mark calendar event created for a voice memo
   Future<void> updateVoiceMemoCalendarEventCreated(String filename) {
     return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
-        .write(const VoiceMemosCompanion(
-      calendarEventCreated: Value(true),
-    ));
+        .write(const VoiceMemosCompanion(calendarEventCreated: Value(true)));
   }
 
   /// Delete a voice memo by filename
   Future<int> deleteVoiceMemo(String filename) {
-    return (delete(voiceMemos)..where((v) => v.filename.equals(filename)))
-        .go();
+    return (delete(voiceMemos)..where((v) => v.filename.equals(filename))).go();
   }
 
   // ==================== Extracted Action Operations ====================
@@ -523,34 +553,35 @@ class AppDatabase extends _$AppDatabase {
     required int actionId,
     String? platformTargetId,
   }) {
-    return (update(extractedActions)..where((a) => a.id.equals(actionId)))
-        .write(ExtractedActionsCompanion(
-      created: const Value(true),
-      platformTargetId: Value(platformTargetId),
-      createdAt: Value(DateTime.now()),
-    ));
+    return (update(
+      extractedActions,
+    )..where((a) => a.id.equals(actionId))).write(
+      ExtractedActionsCompanion(
+        created: const Value(true),
+        platformTargetId: Value(platformTargetId),
+        createdAt: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Dismiss an extracted action
   Future<void> dismissExtractedAction(int actionId) {
     return (update(extractedActions)..where((a) => a.id.equals(actionId)))
-        .write(const ExtractedActionsCompanion(
-      dismissed: Value(true),
-    ));
+        .write(const ExtractedActionsCompanion(dismissed: Value(true)));
   }
 
   /// Delete all extracted actions for a memo
   Future<int> deleteActionsForMemo(int memoId) {
-    return (delete(extractedActions)..where((a) => a.memoId.equals(memoId)))
-        .go();
+    return (delete(
+      extractedActions,
+    )..where((a) => a.memoId.equals(memoId))).go();
   }
 
   /// Get all pending (not created, not dismissed) extracted actions
   Future<List<ExtractedActionEntity>> getPendingActions() {
-    return (select(extractedActions)
-          ..where(
-              (a) => a.created.equals(false) & a.dismissed.equals(false)))
-        .get();
+    return (select(
+      extractedActions,
+    )..where((a) => a.created.equals(false) & a.dismissed.equals(false))).get();
   }
 
   // ==================== Crash Report Operations ====================
@@ -622,11 +653,13 @@ class AppDatabase extends _$AppDatabase {
     required String crashTime,
   }) {
     return (select(crashReports)
-          ..where((c) =>
-              c.watchId.equals(watchId) &
-              c.file.equals(file) &
-              c.line.equals(line) &
-              c.crashTime.equals(crashTime))
+          ..where(
+            (c) =>
+                c.watchId.equals(watchId) &
+                c.file.equals(file) &
+                c.line.equals(line) &
+                c.crashTime.equals(crashTime),
+          )
           ..limit(1))
         .getSingleOrNull();
   }
@@ -642,11 +675,15 @@ class AppDatabase extends _$AppDatabase {
       readsFrom: {crashReports},
     );
     final rows = await query.get();
-    return rows.map((row) => CrashFileStats(
-      file: row.read<String>('file'),
-      count: row.read<int>('crash_count'),
-      lastCrash: row.read<DateTime>('last_crash'),
-    )).toList();
+    return rows
+        .map(
+          (row) => CrashFileStats(
+            file: row.read<String>('file'),
+            count: row.read<int>('crash_count'),
+            lastCrash: row.read<DateTime>('last_crash'),
+          ),
+        )
+        .toList();
   }
 
   /// Delete all crash reports.
@@ -695,4 +732,3 @@ LazyDatabase _openConnection() {
     return NativeDatabase.createInBackground(file);
   });
 }
-

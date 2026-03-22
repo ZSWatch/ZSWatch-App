@@ -61,14 +61,17 @@ class HttpRelayNotifier extends StateNotifier<HttpRelayState> {
   static const _maxRecentRequests = 50;
 
   HttpRelayNotifier(this._httpService, this._watchService)
-      : super(const HttpRelayState()) {
+    : super(const HttpRelayState()) {
     _init();
   }
 
   void _init() {
-    debugPrint('[HttpRelayNotifier] Initializing - listening to watch messages');
-    _messageSubscription =
-        _watchService.incomingMessages.listen(_handleWatchMessage);
+    debugPrint(
+      '[HttpRelayNotifier] Initializing - listening to watch messages',
+    );
+    _messageSubscription = _watchService.incomingMessages.listen(
+      _handleWatchMessage,
+    );
   }
 
   void _handleWatchMessage(Map<String, dynamic> message) {
@@ -100,7 +103,8 @@ class HttpRelayNotifier extends StateNotifier<HttpRelayState> {
     }
 
     // Track pending request
-    final requestId = request.id ?? DateTime.now().millisecondsSinceEpoch.toString();
+    final requestId =
+        request.id ?? DateTime.now().millisecondsSinceEpoch.toString();
     state = state.copyWith(
       pendingRequests: {...state.pendingRequests, requestId: request},
     );
@@ -118,7 +122,10 @@ class HttpRelayNotifier extends StateNotifier<HttpRelayState> {
 
       // Send response or error to watch
       if (result.isSuccess) {
-        await _watchService.sendHttpResponse(request.id ?? '', result.response!);
+        await _watchService.sendHttpResponse(
+          request.id ?? '',
+          result.response!,
+        );
       } else {
         await _watchService.sendHttpError(request.id ?? '', result.error!);
       }
@@ -151,10 +158,7 @@ class HttpRelayNotifier extends StateNotifier<HttpRelayState> {
       recent.removeLast();
     }
 
-    state = state.copyWith(
-      pendingRequests: pending,
-      recentRequests: recent,
-    );
+    state = state.copyWith(pendingRequests: pending, recentRequests: recent);
   }
 
   /// Enable or disable HTTP relay
@@ -178,10 +182,10 @@ class HttpRelayNotifier extends StateNotifier<HttpRelayState> {
 /// Provider for HTTP relay state and control
 final httpRelayNotifierProvider =
     StateNotifierProvider<HttpRelayNotifier, HttpRelayState>((ref) {
-  final httpService = ref.watch(httpRelayServiceProvider);
-  final watchService = ref.watch(watchServiceProvider);
-  return HttpRelayNotifier(httpService, watchService);
-});
+      final httpService = ref.watch(httpRelayServiceProvider);
+      final watchService = ref.watch(watchServiceProvider);
+      return HttpRelayNotifier(httpService, watchService);
+    });
 
 /// Whether HTTP relay is enabled
 final httpRelayEnabledProvider = Provider<bool>((ref) {

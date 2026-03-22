@@ -95,22 +95,23 @@ class ConnectionAnalyticsRepository
 
   /// Record a connection event
   Future<int> recordEvent(ConnectionEvent event) {
-    return _db.insertConnectionEvent(ConnectionEventsCompanion(
-      watchId: Value(event.watchId),
-      eventType: Value(event.eventType.toDbString()),
-      timestamp: Value(event.timestamp),
-      reason: Value(event.reason?.toDbString()),
-      details: Value(event.details),
-      sessionId: Value(event.sessionId),
-    ));
+    return _db.insertConnectionEvent(
+      ConnectionEventsCompanion(
+        watchId: Value(event.watchId),
+        eventType: Value(event.eventType.toDbString()),
+        timestamp: Value(event.timestamp),
+        reason: Value(event.reason?.toDbString()),
+        details: Value(event.details),
+        sessionId: Value(event.sessionId),
+      ),
+    );
   }
 
   /// Record a connected event
   Future<int> recordConnected(String watchId, {String? sessionId}) {
-    return recordEvent(ConnectionEvent.connected(
-      watchId: watchId,
-      sessionId: sessionId,
-    ));
+    return recordEvent(
+      ConnectionEvent.connected(watchId: watchId, sessionId: sessionId),
+    );
   }
 
   /// Record a disconnected event
@@ -120,20 +121,21 @@ class ConnectionAnalyticsRepository
     String? details,
     String? sessionId,
   }) {
-    return recordEvent(ConnectionEvent.disconnected(
-      watchId: watchId,
-      reason: reason,
-      details: details,
-      sessionId: sessionId,
-    ));
+    return recordEvent(
+      ConnectionEvent.disconnected(
+        watchId: watchId,
+        reason: reason,
+        details: details,
+        sessionId: sessionId,
+      ),
+    );
   }
 
   /// Record a reconnect attempt
   Future<int> recordReconnectAttempt(String watchId, {String? sessionId}) {
-    return recordEvent(ConnectionEvent.reconnectAttempt(
-      watchId: watchId,
-      sessionId: sessionId,
-    ));
+    return recordEvent(
+      ConnectionEvent.reconnectAttempt(watchId: watchId, sessionId: sessionId),
+    );
   }
 
   /// Record a failed reconnect
@@ -142,11 +144,13 @@ class ConnectionAnalyticsRepository
     String? details,
     String? sessionId,
   }) {
-    return recordEvent(ConnectionEvent.reconnectFailed(
-      watchId: watchId,
-      details: details,
-      sessionId: sessionId,
-    ));
+    return recordEvent(
+      ConnectionEvent.reconnectFailed(
+        watchId: watchId,
+        details: details,
+        sessionId: sessionId,
+      ),
+    );
   }
 
   /// Get connection events for a watch within date range
@@ -181,11 +185,7 @@ class ConnectionAnalyticsRepository
     required DateTime from,
     required DateTime to,
   }) async {
-    final events = await getEvents(
-      watchId: watchId,
-      from: from,
-      to: to,
-    );
+    final events = await getEvents(watchId: watchId, from: from, to: to);
 
     if (events.isEmpty) return 0;
 
@@ -221,11 +221,7 @@ class ConnectionAnalyticsRepository
     required DateTime from,
     required DateTime to,
   }) async {
-    final events = await getEvents(
-      watchId: watchId,
-      from: from,
-      to: to,
-    );
+    final events = await getEvents(watchId: watchId, from: from, to: to);
 
     if (events.isEmpty) return Duration.zero;
 
@@ -271,11 +267,7 @@ class ConnectionAnalyticsRepository
     required DateTime from,
     required DateTime to,
   }) async {
-    final events = await getEvents(
-      watchId: watchId,
-      from: from,
-      to: to,
-    );
+    final events = await getEvents(watchId: watchId, from: from, to: to);
 
     if (events.isEmpty) return Duration.zero;
 
@@ -314,11 +306,7 @@ class ConnectionAnalyticsRepository
     required DateTime from,
     required DateTime to,
   }) async {
-    final events = await getEvents(
-      watchId: watchId,
-      from: from,
-      to: to,
-    );
+    final events = await getEvents(watchId: watchId, from: from, to: to);
 
     if (events.isEmpty) return ConnectionStats.empty;
 
@@ -379,8 +367,8 @@ class ConnectionAnalyticsRepository
 
     // Successful reconnections = attempts - failures
     // (each success results in a connected event)
-    final successfulReconnections =
-        (reconnectAttempts - reconnectFailures).clamp(0, reconnectAttempts);
+    final successfulReconnections = (reconnectAttempts - reconnectFailures)
+        .clamp(0, reconnectAttempts);
 
     return ConnectionStats(
       uptimePercentage: uptimePercentage,
@@ -442,7 +430,13 @@ class ConnectionAnalyticsRepository
     for (final e in events) {
       debugPrint('  ${e.eventType} @ ${e.timestamp}');
     }
-    final result = _buildTimeline(events, from, to, appNotRunningThreshold, seed);
+    final result = _buildTimeline(
+      events,
+      from,
+      to,
+      appNotRunningThreshold,
+      seed,
+    );
     debugPrint('Segments (${result.length}):');
     for (final s in result) {
       debugPrint('  ${s.type} ${s.start} → ${s.end}');
@@ -469,16 +463,23 @@ class ConnectionAnalyticsRepository
 
     // Seed from the last event before the window so we know whether the watch
     // was already connected at windowStart (avoids a false appNotRunning gap).
-    DateTime? sessionStart = (seedEvent?.eventType == ConnectionEventType.connected) ? from : null;
+    DateTime? sessionStart =
+        (seedEvent?.eventType == ConnectionEventType.connected) ? from : null;
     ConnectionEvent? lastDisconnect;
 
-    void _emitGap(DateTime start, DateTime end, List<ConnectionEvent> eventsInGap) {
+    void _emitGap(
+      DateTime start,
+      DateTime end,
+      List<ConnectionEvent> eventsInGap,
+    ) {
       if (end.difference(start) < const Duration(seconds: 30)) return;
       final hasActivity = eventsInGap.any(
-        (e) => e.eventType == ConnectionEventType.reconnectAttempt ||
-               e.eventType == ConnectionEventType.reconnectFailed,
+        (e) =>
+            e.eventType == ConnectionEventType.reconnectAttempt ||
+            e.eventType == ConnectionEventType.reconnectFailed,
       );
-      final type = (!hasActivity && end.difference(start) >= appNotRunningThreshold)
+      final type =
+          (!hasActivity && end.difference(start) >= appNotRunningThreshold)
           ? ConnectionSegmentType.appNotRunning
           : ConnectionSegmentType.disconnected;
       segments.add(ConnectionSegment(start: start, end: end, type: type));
@@ -492,21 +493,31 @@ class ConnectionAnalyticsRepository
             // Close it as a connected segment up to the cursor position, then
             // emit an appNotRunning gap from cursor to this new connect event.
             if (sessionStart != cursor) {
-              segments.add(ConnectionSegment(
-                start: sessionStart!,
-                end: cursor,
-                type: ConnectionSegmentType.connected,
-              ));
+              segments.add(
+                ConnectionSegment(
+                  start: sessionStart!,
+                  end: cursor,
+                  type: ConnectionSegmentType.connected,
+                ),
+              );
             }
-            final gapEvents = events.where((e) =>
-              e.timestamp.isAfter(cursor) &&
-              e.timestamp.isBefore(event.timestamp)).toList();
+            final gapEvents = events
+                .where(
+                  (e) =>
+                      e.timestamp.isAfter(cursor) &&
+                      e.timestamp.isBefore(event.timestamp),
+                )
+                .toList();
             _emitGap(cursor, event.timestamp, gapEvents);
           } else if (cursor.isBefore(event.timestamp)) {
             // Gap with no prior session — disconnected or app-not-running.
-            final gapEvents = events.where((e) =>
-              e.timestamp.isAfter(cursor) &&
-              e.timestamp.isBefore(event.timestamp)).toList();
+            final gapEvents = events
+                .where(
+                  (e) =>
+                      e.timestamp.isAfter(cursor) &&
+                      e.timestamp.isBefore(event.timestamp),
+                )
+                .toList();
             _emitGap(cursor, event.timestamp, gapEvents);
           }
           sessionStart = event.timestamp;
@@ -517,11 +528,13 @@ class ConnectionAnalyticsRepository
         case ConnectionEventType.disconnected:
           if (sessionStart != null) {
             // Close the connected segment
-            segments.add(ConnectionSegment(
-              start: sessionStart!,
-              end: event.timestamp,
-              type: ConnectionSegmentType.connected,
-            ));
+            segments.add(
+              ConnectionSegment(
+                start: sessionStart!,
+                end: event.timestamp,
+                type: ConnectionSegmentType.connected,
+              ),
+            );
             cursor = event.timestamp;
             sessionStart = null;
           }
@@ -538,14 +551,22 @@ class ConnectionAnalyticsRepository
     // Handle the tail: from cursor to `to`
     if (sessionStart != null) {
       // Still connected
-      segments.add(ConnectionSegment(
-        start: sessionStart!,
-        end: to.isBefore(DateTime.now()) ? to : DateTime.now(),
-        type: ConnectionSegmentType.connected,
-      ));
+      segments.add(
+        ConnectionSegment(
+          start: sessionStart!,
+          end: to.isBefore(DateTime.now()) ? to : DateTime.now(),
+          type: ConnectionSegmentType.connected,
+        ),
+      );
     } else if (cursor.isBefore(to)) {
-      final tailEvents = events.where((e) => e.timestamp.isAfter(cursor)).toList();
-      _emitGap(cursor, to.isBefore(DateTime.now()) ? to : DateTime.now(), tailEvents);
+      final tailEvents = events
+          .where((e) => e.timestamp.isAfter(cursor))
+          .toList();
+      _emitGap(
+        cursor,
+        to.isBefore(DateTime.now()) ? to : DateTime.now(),
+        tailEvents,
+      );
     }
 
     segments.sort((a, b) => a.start.compareTo(b.start));
@@ -570,7 +591,9 @@ class ConnectionAnalyticsRepository
       to: DateTime.now().add(const Duration(seconds: 1)),
     );
     if (events.isEmpty) return null;
-    return events.map((e) => e.timestamp).reduce((a, b) => a.isBefore(b) ? a : b);
+    return events
+        .map((e) => e.timestamp)
+        .reduce((a, b) => a.isBefore(b) ? a : b);
   }
 
   /// Watch connection events stream
@@ -578,9 +601,9 @@ class ConnectionAnalyticsRepository
     required String watchId,
     int limit = 100,
   }) {
-    return _db.watchConnectionEvents(watchId: watchId, limit: limit).map(
-          (entities) => entities.map(_entityToModel).toList(),
-        );
+    return _db
+        .watchConnectionEvents(watchId: watchId, limit: limit)
+        .map((entities) => entities.map(_entityToModel).toList());
   }
 
   @override
@@ -605,6 +628,6 @@ class ConnectionAnalyticsRepository
 /// Provider for connection analytics repository
 final connectionAnalyticsRepositoryProvider =
     Provider<ConnectionAnalyticsRepository>((ref) {
-  final db = ref.watch(databaseProvider);
-  return ConnectionAnalyticsRepository(db);
-});
+      final db = ref.watch(databaseProvider);
+      return ConnectionAnalyticsRepository(db);
+    });

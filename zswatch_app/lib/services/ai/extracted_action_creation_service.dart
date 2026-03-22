@@ -37,7 +37,10 @@ class PlatformCalendar {
   String get label {
     final name = displayName?.trim();
     final account = accountName?.trim();
-    if (name != null && name.isNotEmpty && account != null && account.isNotEmpty) {
+    if (name != null &&
+        name.isNotEmpty &&
+        account != null &&
+        account.isNotEmpty) {
       return '$name — $account';
     }
     return name?.isNotEmpty == true
@@ -46,10 +49,12 @@ class PlatformCalendar {
   }
 
   bool get looksLocal {
-    final combined = [displayName, accountName, accountType, ownerAccount]
-        .whereType<String>()
-        .join(' ')
-        .toLowerCase();
+    final combined = [
+      displayName,
+      accountName,
+      accountType,
+      ownerAccount,
+    ].whereType<String>().join(' ').toLowerCase();
     return combined.contains('local');
   }
 }
@@ -77,7 +82,8 @@ class ActionCreationDraft {
 
   factory ActionCreationDraft.fromAction(ExtractedAction action) {
     final scheduledAt = action.startTime ?? action.dueDate;
-    final defaultEndAt = action.actionType == ExtractedActionType.calendarEvent &&
+    final defaultEndAt =
+        action.actionType == ExtractedActionType.calendarEvent &&
             scheduledAt != null
         ? (action.endTime ?? scheduledAt.add(const Duration(minutes: 30)))
         : action.endTime;
@@ -89,7 +95,8 @@ class ActionCreationDraft {
       scheduledAt: scheduledAt,
       endAt: defaultEndAt,
       location: action.location,
-      reminderMinutes: action.reminderMinutes ??
+      reminderMinutes:
+          action.reminderMinutes ??
           (action.actionType == ExtractedActionType.reminder ? 0 : null),
       platformCalendarId: null,
     );
@@ -136,6 +143,7 @@ class CreatedPlatformAction {
   final String targetType;
   final String? calendarDisplayName;
   final String? calendarAccountName;
+
   /// True when the calendar sync adapter is disabled (isSyncable=0).
   /// The event was inserted locally but won't appear in Google Calendar
   /// until the user enables Calendar sync in Android Settings.
@@ -150,7 +158,8 @@ class CreatedPlatformAction {
   });
 
   String get successMessage {
-    final calendarSuffix = calendarDisplayName != null && calendarDisplayName!.isNotEmpty
+    final calendarSuffix =
+        calendarDisplayName != null && calendarDisplayName!.isNotEmpty
         ? ' in ${calendarDisplayName!}'
         : '';
 
@@ -217,8 +226,9 @@ class CalendarSyncHealth {
 }
 
 class ExtractedActionCreationService {
-  static const MethodChannel _channel =
-      MethodChannel('dev.zswatch.app/productivity');
+  static const MethodChannel _channel = MethodChannel(
+    'dev.zswatch.app/productivity',
+  );
 
   const ExtractedActionCreationService();
 
@@ -235,13 +245,15 @@ class ExtractedActionCreationService {
       return const [];
     }
 
-    final result = await _channel.invokeListMethod<dynamic>('listWritableCalendars');
+    final result = await _channel.invokeListMethod<dynamic>(
+      'listWritableCalendars',
+    );
     if (result == null) {
       return const [];
     }
 
     return result
-      .whereType<Map<dynamic, dynamic>>()
+        .whereType<Map<dynamic, dynamic>>()
         .map(PlatformCalendar.fromMap)
         .toList(growable: false);
   }
@@ -289,8 +301,8 @@ class ExtractedActionCreationService {
 
     final targetType = switch (action.actionType) {
       ExtractedActionType.calendarEvent => 'calendar_event',
-      ExtractedActionType.task || ExtractedActionType.reminder =>
-        'calendar_reminder',
+      ExtractedActionType.task ||
+      ExtractedActionType.reminder => 'calendar_reminder',
     };
 
     await _openCreatedCalendarEntryIfSupported(
@@ -426,7 +438,9 @@ class ExtractedActionCreationService {
       }
       return CalendarSyncHealth.fromMap(result);
     } on PlatformException catch (e) {
-      debugPrint('[ExtractedActionCreation] checkCalendarSyncHealth failed: ${e.message}');
+      debugPrint(
+        '[ExtractedActionCreation] checkCalendarSyncHealth failed: ${e.message}',
+      );
       return const CalendarSyncHealth(hasCalendar: false, syncWorking: false);
     }
   }
@@ -442,15 +456,14 @@ class ExtractedActionCreationService {
     try {
       final result = await _channel.invokeMethod<Object>(
         'openCalendarSyncSettings',
-        {
-          'accountName': accountName,
-          'accountType': accountType,
-        },
+        {'accountName': accountName, 'accountType': accountType},
       );
       // Kotlin returns a String describing which settings page was opened
       return result != null;
     } on PlatformException catch (e) {
-      debugPrint('[ExtractedActionCreation] openCalendarSyncSettings failed: ${e.message}');
+      debugPrint(
+        '[ExtractedActionCreation] openCalendarSyncSettings failed: ${e.message}',
+      );
       return false;
     }
   }

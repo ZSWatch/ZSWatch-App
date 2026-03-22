@@ -112,10 +112,7 @@ class _MusicDebugSectionState extends ConsumerState<MusicDebugSection> {
     });
 
     try {
-      await watchService.sendMusicState(
-        state: 'stop',
-        positionSeconds: 0,
-      );
+      await watchService.sendMusicState(state: 'stop', positionSeconds: 0);
       _showSnackBar('Stopped');
     } catch (e) {
       _showSnackBar('Failed to send: $e', isError: true);
@@ -146,11 +143,7 @@ class _MusicDebugSectionState extends ConsumerState<MusicDebugSection> {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.music_note,
-                  color: AppTheme.primaryColor,
-                  size: 20,
-                ),
+                Icon(Icons.music_note, color: AppTheme.primaryColor, size: 20),
                 const SizedBox(width: AppTheme.spacingSm),
                 Text(
                   'Music Debug',
@@ -187,9 +180,9 @@ class _MusicDebugSectionState extends ConsumerState<MusicDebugSection> {
             // Sample tracks section
             Text(
               'Sample Tracks',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(color: AppTheme.textSecondary),
             ),
             const SizedBox(height: AppTheme.spacingSm),
 
@@ -210,9 +203,9 @@ class _MusicDebugSectionState extends ConsumerState<MusicDebugSection> {
               const SizedBox(height: AppTheme.spacingSm),
               Text(
                 'Connect to watch to send music info',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.warningColor,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.warningColor),
               ),
             ],
           ],
@@ -264,7 +257,9 @@ class _TrackTile extends StatelessWidget {
     return ListTile(
       dense: true,
       visualDensity: VisualDensity.compact,
-      contentPadding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingSm),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.spacingSm,
+      ),
       leading: CircleAvatar(
         radius: 16,
         backgroundColor: isSelected

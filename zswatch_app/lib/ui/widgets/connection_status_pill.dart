@@ -51,10 +51,7 @@ class ConnectionStatusPill extends ConsumerWidget {
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(AppTheme.radiusXLarge),
-          border: Border.all(
-            color: color.withValues(alpha: 0.3),
-            width: 1,
-          ),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -82,11 +79,7 @@ class ConnectionStatusPill extends ConsumerWidget {
   }
 
   Widget _buildStatusIcon(IconData icon, Color color) {
-    return Icon(
-      icon,
-      size: compact ? 14 : 16,
-      color: color,
-    );
+    return Icon(icon, size: compact ? 14 : 16, color: color);
   }
 
   (Color, String, IconData) _getStateInfo(Connection? connection) {
@@ -130,11 +123,7 @@ class ConnectionStatusPill extends ConsumerWidget {
           Icons.bluetooth_searching_rounded,
         );
       case WatchConnectionState.syncing:
-        return (
-          AppTheme.connecting,
-          'Syncing...',
-          Icons.sync_rounded,
-        );
+        return (AppTheme.connecting, 'Syncing...', Icons.sync_rounded);
       case WatchConnectionState.reconnecting:
         return (
           AppTheme.connecting,
@@ -142,11 +131,7 @@ class ConnectionStatusPill extends ConsumerWidget {
           Icons.bluetooth_searching_rounded,
         );
       case WatchConnectionState.scanning:
-        return (
-          AppTheme.infoColor,
-          'Scanning...',
-          Icons.search_rounded,
-        );
+        return (AppTheme.infoColor, 'Scanning...', Icons.search_rounded);
       case WatchConnectionState.disconnecting:
         return (
           AppTheme.disconnected,
@@ -154,11 +139,7 @@ class ConnectionStatusPill extends ConsumerWidget {
           Icons.bluetooth_disabled_rounded,
         );
       case WatchConnectionState.error:
-        return (
-          AppTheme.errorColor,
-          'Error',
-          Icons.error_outline_rounded,
-        );
+        return (AppTheme.errorColor, 'Error', Icons.error_outline_rounded);
       case WatchConnectionState.disconnected:
         return (
           AppTheme.disconnected,
@@ -173,10 +154,7 @@ class ConnectionStatusPill extends ConsumerWidget {
 class ConnectionStatusDot extends ConsumerWidget {
   final double size;
 
-  const ConnectionStatusDot({
-    super.key,
-    this.size = 8,
-  });
+  const ConnectionStatusDot({super.key, this.size = 8});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

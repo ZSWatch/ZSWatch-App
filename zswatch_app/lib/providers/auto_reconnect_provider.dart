@@ -39,8 +39,9 @@ final autoReconnectServiceProvider = Provider<AutoReconnectService>((ref) {
 });
 
 /// Provider for auto-reconnect state stream.
-final autoReconnectStateStreamProvider =
-    StreamProvider<AutoReconnectState>((ref) {
+final autoReconnectStateStreamProvider = StreamProvider<AutoReconnectState>((
+  ref,
+) {
   final service = ref.watch(autoReconnectServiceProvider);
   return service.stateStream;
 });
@@ -114,6 +115,6 @@ class AutoReconnectNotifier extends BaseAsyncNotifier {
 /// Provider for auto-reconnect notifier.
 final autoReconnectNotifierProvider =
     StateNotifierProvider<AutoReconnectNotifier, AsyncValue<void>>((ref) {
-  final service = ref.watch(autoReconnectServiceProvider);
-  return AutoReconnectNotifier(service);
-});
+      final service = ref.watch(autoReconnectServiceProvider);
+      return AutoReconnectNotifier(service);
+    });

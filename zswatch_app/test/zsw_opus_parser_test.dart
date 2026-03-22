@@ -115,7 +115,11 @@ void main() {
     test('handles truncated frame (dirty stop mid-write)', () {
       final fullData = buildZswOpusFile(frameCount: 5, frameLenBytes: 30);
       // Chop off last 10 bytes → last frame is truncated
-      final truncated = Uint8List.sublistView(fullData, 0, fullData.length - 10);
+      final truncated = Uint8List.sublistView(
+        fullData,
+        0,
+        fullData.length - 10,
+      );
       final result = ZswOpusParser.parse(truncated);
 
       expect(result, isNotNull);
@@ -169,16 +173,16 @@ void main() {
         true,
       );
       expect(
-        ZswOpusParser.validateDownload(data, expectedSizeBytes: data.length + 1),
+        ZswOpusParser.validateDownload(
+          data,
+          expectedSizeBytes: data.length + 1,
+        ),
         false,
       );
     });
 
     test('parseHeader returns header without parsing frames', () {
-      final data = buildZswOpusFile(
-        timestamp: 1234567890,
-        bitrate: 24000,
-      );
+      final data = buildZswOpusFile(timestamp: 1234567890, bitrate: 24000);
       final header = ZswOpusParser.parseHeader(data);
 
       expect(header, isNotNull);

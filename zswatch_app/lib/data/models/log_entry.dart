@@ -3,10 +3,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'log_entry.freezed.dart';
 
 /// Direction of the log entry (incoming from watch or outgoing to watch)
-enum LogDirection {
-  incoming,
-  outgoing,
-}
+enum LogDirection { incoming, outgoing }
 
 /// Log level parsed from log messages (<dbg>, <inf>, <wrn>, <err>)
 enum LogLevel {

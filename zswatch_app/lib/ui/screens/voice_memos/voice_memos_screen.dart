@@ -72,8 +72,9 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
   Widget build(BuildContext context) {
     final memosAsync = ref.watch(voiceMemoListProvider);
     final syncStateAsync = ref.watch(voiceMemoSyncStateProvider);
-    final transcriptionConfiguredAsync =
-        ref.watch(transcriptionConfiguredProvider);
+    final transcriptionConfiguredAsync = ref.watch(
+      transcriptionConfiguredProvider,
+    );
     final isConnected = ref.watch(isWatchConnectedProvider);
 
     return Scaffold(
@@ -84,15 +85,15 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
             IconButton(
               icon: const Icon(Icons.sync),
               tooltip: 'Sync from watch',
-              onPressed: () => ref.read(voiceMemoActionsProvider.notifier).sync(),
+              onPressed: () =>
+                  ref.read(voiceMemoActionsProvider.notifier).sync(),
             ),
         ],
       ),
       body: Column(
         children: [
           syncStateAsync.when(
-            data: (syncState) =>
-                VoiceMemoSyncProgressBar(state: syncState),
+            data: (syncState) => VoiceMemoSyncProgressBar(state: syncState),
             loading: () => const SizedBox.shrink(),
             error: (_, _) => const SizedBox.shrink(),
           ),
@@ -115,9 +116,9 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
                   Expanded(
                     child: Text(
                       'Connect to your watch to sync new notes',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.orange,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.orange),
                     ),
                   ),
                 ],
@@ -152,9 +153,7 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
                         children: [
                           Text(
                             'Transcription model not configured',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: AppTheme.warningColor,
                                   fontWeight: FontWeight.w600,
@@ -163,9 +162,7 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
                           const SizedBox(height: 2),
                           Text(
                             'Choose and download a model in Settings > Voice Memos.',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: AppTheme.warningColor),
                           ),
                         ],
@@ -274,9 +271,7 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
     final memoAsync = ref.watch(voiceMemoByIdProvider(widget.memoId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Voice Note'),
-      ),
+      appBar: AppBar(title: const Text('Voice Note')),
       body: memoAsync.when(
         data: (memo) {
           final effectiveMemo = memo ?? widget.initialMemo;
@@ -290,12 +285,7 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
           }
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              12,
-              12,
-              12,
-              16,
-            ),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final showSideBySide = constraints.maxWidth >= 430;
@@ -315,7 +305,9 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
                     _SectionCard(
                       title: 'Transcript',
                       trailing: IconButton(
-                        tooltip: _isEditing ? 'Cancel editing' : 'Edit transcript',
+                        tooltip: _isEditing
+                            ? 'Cancel editing'
+                            : 'Edit transcript',
                         visualDensity: VisualDensity.compact,
                         constraints: const BoxConstraints.tightFor(
                           width: 32,
@@ -330,7 +322,9 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
                           });
                         },
                         icon: Icon(
-                          _isEditing ? Icons.close_rounded : Icons.edit_outlined,
+                          _isEditing
+                              ? Icons.close_rounded
+                              : Icons.edit_outlined,
                         ),
                       ),
                       child: Column(
@@ -376,7 +370,8 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
                               currentTranscript.trim().isEmpty
                                   ? 'Transcription will appear here after sync and transcription finish.'
                                   : currentTranscript,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
                                     height: 1.45,
                                     color: currentTranscript.trim().isEmpty
                                         ? AppTheme.textSecondary
@@ -394,14 +389,20 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
                                       ? null
                                       : () async {
                                           await Clipboard.setData(
-                                            ClipboardData(text: currentTranscript),
+                                            ClipboardData(
+                                              text: currentTranscript,
+                                            ),
                                           );
                                           if (!context.mounted) {
                                             return;
                                           }
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
                                             const SnackBar(
-                                              content: Text('Transcript copied to clipboard'),
+                                              content: Text(
+                                                'Transcript copied to clipboard',
+                                              ),
                                             ),
                                           );
                                         },
@@ -436,8 +437,8 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
                               style: _compactFilledButtonStyle(),
                               onPressed: ref.watch(isWatchConnectedProvider)
                                   ? () => ref
-                                      .read(voiceMemoActionsProvider.notifier)
-                                      .sync()
+                                        .read(voiceMemoActionsProvider.notifier)
+                                        .sync()
                                   : null,
                               icon: const Icon(Icons.sync),
                               label: const Text('Sync now'),
@@ -466,7 +467,9 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
   Future<void> _saveTranscript(VoiceMemo memo) async {
     setState(() => _isSaving = true);
     try {
-      await ref.read(voiceMemoRepositoryProvider).updateTranscription(
+      await ref
+          .read(voiceMemoRepositoryProvider)
+          .updateTranscription(
             filename: memo.filename,
             transcription: _transcriptController.text.trim(),
           );
@@ -474,9 +477,9 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
         return;
       }
       setState(() => _isEditing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transcript updated')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Transcript updated')));
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -521,7 +524,8 @@ class _AISummarySection extends ConsumerWidget {
         final hasSummary = memo.summary != null && memo.summary!.isNotEmpty;
         final hasCategory = memo.aiCategory != null;
         final isProcessing = memo.isAiProcessing;
-        final hasFailed = memo.aiProcessingStatus == VoiceNoteProcessingStatus.failed;
+        final hasFailed =
+            memo.aiProcessingStatus == VoiceNoteProcessingStatus.failed;
 
         if (!hasSummary && !hasCategory && !isProcessing && !hasFailed) {
           return _SectionCard(
@@ -532,8 +536,8 @@ class _AISummarySection extends ConsumerWidget {
                 Text(
                   'Get AI-powered insights including summary, category, and extracted actions.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
@@ -541,8 +545,8 @@ class _AISummarySection extends ConsumerWidget {
                   onPressed: memo.transcription?.trim().isEmpty == true
                       ? null
                       : () => ref
-                          .read(aiActionsProvider.notifier)
-                          .processVoiceMemo(memo.filename),
+                            .read(aiActionsProvider.notifier)
+                            .processVoiceMemo(memo.filename),
                   icon: const Icon(Icons.auto_awesome),
                   label: const Text('Process with AI'),
                 ),
@@ -552,8 +556,8 @@ class _AISummarySection extends ConsumerWidget {
                     child: Text(
                       'Transcribe the audio first before AI processing.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ),
               ],
@@ -582,10 +586,8 @@ class _AISummarySection extends ConsumerWidget {
                         const SizedBox(width: AppTheme.spacingSm),
                         Text(
                           'Processing with AI...',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppTheme.textSecondary,
-                                  ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppTheme.textSecondary),
                         ),
                         const Spacer(),
                         const Icon(
@@ -600,9 +602,9 @@ class _AISummarySection extends ConsumerWidget {
               else if (hasFailed)
                 Text(
                   'AI processing failed. Please try again.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.errorColor,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppTheme.errorColor),
                 )
               else ...[
                 if (hasCategory)
@@ -613,9 +615,9 @@ class _AISummarySection extends ConsumerWidget {
                 if (hasSummary)
                   SelectableText(
                     memo.summary!,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          height: 1.45,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(height: 1.45),
                   ),
               ],
               if (!isProcessing && (hasSummary || hasCategory))
@@ -647,9 +649,9 @@ class _AISummarySection extends ConsumerWidget {
                   child: Text(
                     'Model: ${memo.aiModel}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                          fontSize: 11,
-                        ),
+                      color: AppTheme.textSecondary,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
             ],
@@ -674,10 +676,8 @@ class _AISummarySection extends ConsumerWidget {
         minChildSize: 0.4,
         maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollController) => _AiDebugSheet(
-          memo: memo,
-          scrollController: scrollController,
-        ),
+        builder: (context, scrollController) =>
+            _AiDebugSheet(memo: memo, scrollController: scrollController),
       ),
     );
   }
@@ -687,17 +687,14 @@ class _AiDebugSheet extends ConsumerWidget {
   final VoiceMemo memo;
   final ScrollController scrollController;
 
-  const _AiDebugSheet({
-    required this.memo,
-    required this.scrollController,
-  });
+  const _AiDebugSheet({required this.memo, required this.scrollController});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final streamValue = ref.watch(aiProcessingDebugInfoProvider).valueOrNull;
     // Show live stream data only when it's for THIS memo
-    final liveInfo = (streamValue != null &&
-            streamValue.filename == memo.filename)
+    final liveInfo =
+        (streamValue != null && streamValue.filename == memo.filename)
         ? streamValue
         : null;
     // For completed results, look up per-file cache
@@ -822,7 +819,8 @@ class _AiDebugSheet extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                 ],
-                if (debugInfo.parsedJson != null) ...[                  _debugBlock(
+                if (debugInfo.parsedJson != null) ...[
+                  _debugBlock(
                     context,
                     title: 'Parsed JSON',
                     content: aiFormatJson(debugInfo.parsedJson!),
@@ -834,8 +832,10 @@ class _AiDebugSheet extends ConsumerWidget {
                 if (aiHasChronoDetails(
                   extractedIntent: debugInfo.extractedIntent,
                   extractedTitle: debugInfo.extractedTitle,
-                  datetimeExpressionOriginal: debugInfo.datetimeExpressionOriginal,
-                  datetimeExpressionEnglish: debugInfo.datetimeExpressionEnglish,
+                  datetimeExpressionOriginal:
+                      debugInfo.datetimeExpressionOriginal,
+                  datetimeExpressionEnglish:
+                      debugInfo.datetimeExpressionEnglish,
                   resolvedDateTime: debugInfo.resolvedDateTime,
                   resolverMethod: debugInfo.resolverMethod,
                   extractedActions: debugInfo.extractedActions,
@@ -846,8 +846,10 @@ class _AiDebugSheet extends ConsumerWidget {
                     content: aiFormatChronoDetails(
                       extractedIntent: debugInfo.extractedIntent,
                       extractedTitle: debugInfo.extractedTitle,
-                      datetimeExpressionOriginal: debugInfo.datetimeExpressionOriginal,
-                      datetimeExpressionEnglish: debugInfo.datetimeExpressionEnglish,
+                      datetimeExpressionOriginal:
+                          debugInfo.datetimeExpressionOriginal,
+                      datetimeExpressionEnglish:
+                          debugInfo.datetimeExpressionEnglish,
                       resolvedDateTime: debugInfo.resolvedDateTime,
                       resolverMethod: debugInfo.resolverMethod,
                       extractedActions: debugInfo.extractedActions,
@@ -926,15 +928,11 @@ class _AiDebugSheet extends ConsumerWidget {
             spacing: 16,
             runSpacing: 8,
             children: [
-              _metricChip(
-                context,
-                'Tokens',
-                '${info.tokens}',
-                Icons.token,
-              ),
+              _metricChip(context, 'Tokens', '${info.tokens}', Icons.token),
             ],
           ),
-          if (aiMemoryInfoBlock(context, info) != null) ...[            const SizedBox(height: 8),
+          if (aiMemoryInfoBlock(context, info) != null) ...[
+            const SizedBox(height: 8),
             aiMemoryInfoBlock(context, info)!,
           ],
         ],
@@ -956,9 +954,9 @@ class _AiDebugSheet extends ConsumerWidget {
           Expanded(
             child: Text(
               text,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ),
         ],
@@ -971,20 +969,15 @@ class _AiDebugSheet extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (memo.aiModel != null)
-          _kvRow(context, 'Model', memo.aiModel!),
-        if (memo.summary != null)
-          _kvRow(context, 'Summary', memo.summary!),
+        if (memo.aiModel != null) _kvRow(context, 'Model', memo.aiModel!),
+        if (memo.summary != null) _kvRow(context, 'Summary', memo.summary!),
         if (memo.aiCategory != null)
           _kvRow(context, 'Category', memo.aiCategory!.name),
         if (memo.transcription != null) ...[
           const SizedBox(height: 12),
           Text('Transcription', style: theme.textTheme.labelMedium),
           const SizedBox(height: 4),
-          SelectableText(
-            memo.transcription!,
-            style: theme.textTheme.bodySmall,
-          ),
+          SelectableText(memo.transcription!, style: theme.textTheme.bodySmall),
         ],
       ],
     );
@@ -1080,16 +1073,16 @@ class _AiDebugSheet extends ConsumerWidget {
         Text(
           '$label: ',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-                fontSize: 11,
-              ),
+            color: AppTheme.textSecondary,
+            fontSize: 11,
+          ),
         ),
         Text(
           value,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                fontSize: 11,
-              ),
+            fontWeight: FontWeight.w600,
+            fontSize: 11,
+          ),
         ),
       ],
     );
@@ -1111,9 +1104,9 @@ class _AiDebugSheet extends ConsumerWidget {
             const SizedBox(width: 6),
             Text(
               title,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppTheme.textSecondary),
             ),
             const Spacer(),
             IconButton(
@@ -1146,10 +1139,10 @@ class _AiDebugSheet extends ConsumerWidget {
           child: SelectableText(
             content,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontFamily: mono ? 'monospace' : null,
-                  fontSize: mono ? 11 : null,
-                  height: 1.5,
-                ),
+              fontFamily: mono ? 'monospace' : null,
+              fontSize: mono ? 11 : null,
+              height: 1.5,
+            ),
           ),
         ),
       ],
@@ -1173,13 +1166,17 @@ class _AiDebugSheet extends ConsumerWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.compare_arrows, size: 16, color: AppTheme.textSecondary),
+            const Icon(
+              Icons.compare_arrows,
+              size: 16,
+              color: AppTheme.textSecondary,
+            ),
             const SizedBox(width: 6),
             Text(
               'Transcription Diff',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppTheme.textSecondary),
             ),
             const Spacer(),
             _diffLegendChip(context, 'removed', const Color(0x40EF5350)),
@@ -1237,9 +1234,7 @@ class _AiDebugSheet extends ConsumerWidget {
         if (origWords[i - 1].toLowerCase() == corrWords[j - 1].toLowerCase()) {
           dp[i][j] = dp[i - 1][j - 1] + 1;
         } else {
-          dp[i][j] = dp[i - 1][j] > dp[i][j - 1]
-              ? dp[i - 1][j]
-              : dp[i][j - 1];
+          dp[i][j] = dp[i - 1][j] > dp[i][j - 1] ? dp[i - 1][j] : dp[i][j - 1];
         }
       }
     }
@@ -1277,23 +1272,27 @@ class _AiDebugSheet extends ConsumerWidget {
           spans.add(TextSpan(text: op.word));
           break;
         case _DiffType.delete:
-          spans.add(TextSpan(
-            text: op.word,
-            style: const TextStyle(
-              backgroundColor: Color(0x40EF5350),
-              decoration: TextDecoration.lineThrough,
-              decorationColor: Color(0xFFEF5350),
+          spans.add(
+            TextSpan(
+              text: op.word,
+              style: const TextStyle(
+                backgroundColor: Color(0x40EF5350),
+                decoration: TextDecoration.lineThrough,
+                decorationColor: Color(0xFFEF5350),
+              ),
             ),
-          ));
+          );
           break;
         case _DiffType.insert:
-          spans.add(TextSpan(
-            text: op.word,
-            style: const TextStyle(
-              backgroundColor: Color(0x4066BB6A),
-              fontWeight: FontWeight.w600,
+          spans.add(
+            TextSpan(
+              text: op.word,
+              style: const TextStyle(
+                backgroundColor: Color(0x4066BB6A),
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ));
+          );
           break;
       }
     }
@@ -1306,13 +1305,17 @@ class _AiDebugSheet extends ConsumerWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.check_circle_outline, size: 16, color: AppTheme.textSecondary),
+            Icon(
+              Icons.check_circle_outline,
+              size: 16,
+              color: AppTheme.textSecondary,
+            ),
             const SizedBox(width: 6),
             Text(
               'Parsed Result',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppTheme.textSecondary),
             ),
           ],
         ),
@@ -1340,9 +1343,9 @@ class _AiDebugSheet extends ConsumerWidget {
             width: 100,
             child: Text(
               key,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ),
           Expanded(
@@ -1396,14 +1399,9 @@ class _ExtractedActionsSectionState
           trailing: IconButton(
             tooltip: _isExpanded ? 'Collapse' : 'Expand',
             visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints.tightFor(
-              width: 32,
-              height: 32,
-            ),
+            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
             onPressed: () => setState(() => _isExpanded = !_isExpanded),
-            icon: Icon(
-              _isExpanded ? Icons.expand_less : Icons.expand_more,
-            ),
+            icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
           ),
           child: _isExpanded
               ? Column(
@@ -1418,8 +1416,8 @@ class _ExtractedActionsSectionState
               : Text(
                   '${actions.length} action${actions.length == 1 ? '' : 's'}',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
         );
       },
@@ -1484,8 +1482,8 @@ class _ActionItemState extends ConsumerState<_ActionItem> {
                 Text(
                   timingLabel,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
               if (action.notes != null && action.notes!.trim().isNotEmpty) ...[
@@ -1493,8 +1491,8 @@ class _ActionItemState extends ConsumerState<_ActionItem> {
                 Text(
                   action.notes!.trim(),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
               if (action.location != null) ...[
@@ -1502,8 +1500,8 @@ class _ActionItemState extends ConsumerState<_ActionItem> {
                 Text(
                   action.location!,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
               const SizedBox(height: 10),
@@ -1562,21 +1560,22 @@ class _ActionItemState extends ConsumerState<_ActionItem> {
   Future<void> _createAction() async {
     setState(() => _isCreating = true);
     try {
-      final selectedCalendarId = ref.read(selectedProductivityCalendarIdProvider);
+      final selectedCalendarId = ref.read(
+        selectedProductivityCalendarIdProvider,
+      );
       final draft = ActionCreationDraft.fromAction(action).copyWith(
         platformCalendarId: Platform.isAndroid ? selectedCalendarId : null,
       );
 
-      final message = await ref.read(extractedActionOperationsProvider).createAction(
-            action: action,
-            draft: draft,
-          );
+      final message = await ref
+          .read(extractedActionOperationsProvider)
+          .createAction(action: action, draft: draft);
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } catch (error) {
       if (!mounted) return;
 
@@ -1593,7 +1592,9 @@ class _ActionItemState extends ConsumerState<_ActionItem> {
   Future<void> _dismissAction() async {
     setState(() => _isDismissing = true);
     try {
-      await ref.read(extractedActionOperationsProvider).dismissAction(action.id);
+      await ref
+          .read(extractedActionOperationsProvider)
+          .dismissAction(action.id);
     } catch (error) {
       if (!mounted) return;
 
@@ -1685,9 +1686,9 @@ class _ActionStatusBadge extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -1701,10 +1702,7 @@ class _CategoryBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 6,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: voiceNoteCategoryColor(category).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
@@ -1721,16 +1719,15 @@ class _CategoryBadge extends StatelessWidget {
           Text(
             voiceNoteCategoryLabel(category),
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: voiceNoteCategoryColor(category),
-                  fontWeight: FontWeight.w600,
-                ),
+              color: voiceNoteCategoryColor(category),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
     );
   }
 }
-
 
 class _EmptyState extends StatelessWidget {
   final bool hasQuery;
@@ -1749,9 +1746,7 @@ class _EmptyState extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  hasQuery
-                      ? Icons.search_off_rounded
-                      : Icons.mic_none_rounded,
+                  hasQuery ? Icons.search_off_rounded : Icons.mic_none_rounded,
                   size: 64,
                   color: Colors.grey.shade600,
                 ),
@@ -1759,17 +1754,17 @@ class _EmptyState extends StatelessWidget {
                 Text(
                   hasQuery ? 'No matching notes' : 'No voice notes yet',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.grey.shade500,
-                      ),
+                    color: Colors.grey.shade500,
+                  ),
                 ),
                 const SizedBox(height: AppTheme.spacingSm),
                 Text(
                   hasQuery
                       ? 'Try a different search term or clear the filter.'
                       : 'Press record on the watch to create your first note.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey.shade600,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -1785,10 +1780,7 @@ class _VoiceMemoTimeline extends ConsumerWidget {
   final List<VoiceMemo> memos;
   final ValueChanged<VoiceMemo> onOpenMemo;
 
-  const _VoiceMemoTimeline({
-    required this.memos,
-    required this.onOpenMemo,
-  });
+  const _VoiceMemoTimeline({required this.memos, required this.onOpenMemo});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1810,21 +1802,19 @@ class _VoiceMemoTimeline extends ConsumerWidget {
             ),
             child: Text(
               section.label,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ),
           for (final memo in section.memos)
-            VoiceNoteCard(
-              memo: memo,
-              onOpen: () => onOpenMemo(memo),
-            ),
+            VoiceNoteCard(memo: memo, onOpen: () => onOpenMemo(memo)),
         ],
       ],
     );
   }
 }
+
 class _MissingNoteState extends StatelessWidget {
   const _MissingNoteState();
 
@@ -1850,10 +1840,7 @@ class _TopSummarySection extends StatelessWidget {
   final VoiceMemo memo;
   final bool sideBySide;
 
-  const _TopSummarySection({
-    required this.memo,
-    required this.sideBySide,
-  });
+  const _TopSummarySection({required this.memo, required this.sideBySide});
 
   @override
   Widget build(BuildContext context) {
@@ -1865,16 +1852,8 @@ class _TopSummarySection extends StatelessWidget {
             final compactWidth = constraints.maxWidth < 380;
             final rightColumnWidth = compactWidth ? 128.0 : 164.0;
             final audioWidget = hasLocalAudio(memo)
-                ? _AudioPlayerCard(
-                    memo: memo,
-                    compact: true,
-                    alignRight: true,
-                  )
-                : _SyncPromptCard(
-                    memo: memo,
-                    compact: true,
-                    alignRight: true,
-                  );
+                ? _AudioPlayerCard(memo: memo, compact: true, alignRight: true)
+                : _SyncPromptCard(memo: memo, compact: true, alignRight: true);
 
             if (!sideBySide && constraints.maxWidth < 320) {
               return Column(
@@ -1892,10 +1871,7 @@ class _TopSummarySection extends StatelessWidget {
               children: [
                 Expanded(child: _VoiceNoteHeaderContent(memo: memo)),
                 const SizedBox(width: 10),
-                SizedBox(
-                  width: rightColumnWidth,
-                  child: audioWidget,
-                ),
+                SizedBox(width: rightColumnWidth, child: audioWidget),
               ],
             );
           },
@@ -1924,9 +1900,9 @@ class _VoiceNoteHeaderContent extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           '${memo.formattedDuration} · ${memo.formattedSize}',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
         ),
         const SizedBox(height: 10),
         Wrap(
@@ -1962,11 +1938,7 @@ class _SectionCard extends StatelessWidget {
   final Widget child;
   final Widget? trailing;
 
-  const _SectionCard({
-    required this.title,
-    required this.child,
-    this.trailing,
-  });
+  const _SectionCard({required this.title, required this.child, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -2070,19 +2042,18 @@ class _AudioPlayerCardState extends ConsumerState<_AudioPlayerCard> {
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
-      return Text(
-        _error!,
-        style: const TextStyle(color: AppTheme.errorColor),
-      );
+      return Text(_error!, style: const TextStyle(color: AppTheme.errorColor));
     }
 
     return Column(
-      crossAxisAlignment:
-          widget.alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: widget.alignRight
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisAlignment:
-              widget.alignRight ? MainAxisAlignment.end : MainAxisAlignment.center,
+          mainAxisAlignment: widget.alignRight
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
@@ -2101,7 +2072,10 @@ class _AudioPlayerCardState extends ConsumerState<_AudioPlayerCard> {
             IconButton.filled(
               style: IconButton.styleFrom(
                 visualDensity: VisualDensity.compact,
-                minimumSize: Size(widget.compact ? 34 : 40, widget.compact ? 34 : 40),
+                minimumSize: Size(
+                  widget.compact ? 34 : 40,
+                  widget.compact ? 34 : 40,
+                ),
                 padding: EdgeInsets.zero,
               ),
               iconSize: widget.compact ? 24 : 28,
@@ -2154,8 +2128,8 @@ class _AudioPlayerCardState extends ConsumerState<_AudioPlayerCard> {
                   value: _duration.inMilliseconds == 0
                       ? 0
                       : _position.inMilliseconds
-                          .clamp(0, _duration.inMilliseconds)
-                          .toDouble(),
+                            .clamp(0, _duration.inMilliseconds)
+                            .toDouble(),
                   max: _duration.inMilliseconds == 0
                       ? 1
                       : _duration.inMilliseconds.toDouble(),
@@ -2179,10 +2153,7 @@ class _TranscribeButton extends ConsumerWidget {
   final VoiceMemo memo;
   final bool expand;
 
-  const _TranscribeButton({
-    required this.memo,
-    this.expand = true,
-  });
+  const _TranscribeButton({required this.memo, this.expand = true});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2207,8 +2178,9 @@ class _TranscribeButton extends ConsumerWidget {
           data: (engineState) {
             final isTranscribing =
                 engineState.status == TranscriptionEngineStatus.transcribing;
-            final buttonLabel =
-                memo.transcription == null ? 'Transcribe' : 'Re-transcribe';
+            final buttonLabel = memo.transcription == null
+                ? 'Transcribe'
+                : 'Re-transcribe';
 
             return _ButtonBox(
               expand: expand,
@@ -2225,8 +2197,8 @@ class _TranscribeButton extends ConsumerWidget {
                 onPressed: isTranscribing
                     ? null
                     : () => ref
-                        .read(voiceMemoActionsProvider.notifier)
-                        .retranscribe(memo),
+                          .read(voiceMemoActionsProvider.notifier)
+                          .retranscribe(memo),
               ),
             );
           },
@@ -2236,10 +2208,12 @@ class _TranscribeButton extends ConsumerWidget {
             child: OutlinedButton.icon(
               style: _compactOutlinedButtonStyle(),
               icon: const Icon(Icons.transcribe, size: 18),
-              label:
-                  Text(memo.transcription == null ? 'Transcribe' : 'Re-transcribe'),
-              onPressed: () =>
-                  ref.read(voiceMemoActionsProvider.notifier).retranscribe(memo),
+              label: Text(
+                memo.transcription == null ? 'Transcribe' : 'Re-transcribe',
+              ),
+              onPressed: () => ref
+                  .read(voiceMemoActionsProvider.notifier)
+                  .retranscribe(memo),
             ),
           ),
         );
@@ -2265,14 +2239,14 @@ class _TranscribeButton extends ConsumerWidget {
                 isTranscribing
                     ? 'Transcribing...'
                     : (memo.transcription == null
-                        ? 'Transcribe'
-                        : 'Re-transcribe'),
+                          ? 'Transcribe'
+                          : 'Re-transcribe'),
               ),
               onPressed: isTranscribing
                   ? null
                   : () => ref
-                      .read(voiceMemoActionsProvider.notifier)
-                      .retranscribe(memo),
+                        .read(voiceMemoActionsProvider.notifier)
+                        .retranscribe(memo),
             ),
           );
         },
@@ -2282,8 +2256,9 @@ class _TranscribeButton extends ConsumerWidget {
           child: OutlinedButton.icon(
             style: _compactOutlinedButtonStyle(),
             icon: const Icon(Icons.transcribe, size: 18),
-            label:
-                Text(memo.transcription == null ? 'Transcribe' : 'Re-transcribe'),
+            label: Text(
+              memo.transcription == null ? 'Transcribe' : 'Re-transcribe',
+            ),
             onPressed: () =>
                 ref.read(voiceMemoActionsProvider.notifier).retranscribe(memo),
           ),
@@ -2310,8 +2285,9 @@ class _SyncPromptCard extends ConsumerWidget {
     final syncStateAsync = ref.watch(voiceMemoSyncStateProvider);
 
     return Column(
-      crossAxisAlignment:
-          alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: alignRight
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         Container(
           width: double.infinity,
@@ -2328,8 +2304,8 @@ class _SyncPromptCard extends ConsumerWidget {
                 child: Text(
                   'This note is still on the watch. Sync it to enable playback and transcription.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontSize: compact ? 11 : null,
-                      ),
+                    fontSize: compact ? 11 : null,
+                  ),
                 ),
               ),
             ],
@@ -2343,7 +2319,9 @@ class _SyncPromptCard extends ConsumerWidget {
             }
 
             return Padding(
-              padding: EdgeInsets.only(bottom: compact ? 8 : AppTheme.spacingMd),
+              padding: EdgeInsets.only(
+                bottom: compact ? 8 : AppTheme.spacingMd,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2376,9 +2354,9 @@ class _SyncPromptCard extends ConsumerWidget {
           Text(
             'Connect to your watch to sync this note.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                  fontSize: compact ? 11 : null,
-                ),
+              color: AppTheme.textSecondary,
+              fontSize: compact ? 11 : null,
+            ),
           ),
         ],
       ],
@@ -2406,10 +2384,7 @@ class _VoiceMemoTimelineSection {
   final String label;
   final List<VoiceMemo> memos;
 
-  const _VoiceMemoTimelineSection({
-    required this.label,
-    required this.memos,
-  });
+  const _VoiceMemoTimelineSection({required this.label, required this.memos});
 }
 
 List<VoiceMemo> _filterMemos(List<VoiceMemo> memos, String query) {
@@ -2425,9 +2400,11 @@ List<_VoiceMemoTimelineSection> _groupMemosByDay(List<VoiceMemo> memos) {
 
   for (final memo in memos) {
     final local = memo.timestampUtc.toLocal();
-    final key = DateTime(local.year, local.month, local.day)
-        .millisecondsSinceEpoch
-        .toString();
+    final key = DateTime(
+      local.year,
+      local.month,
+      local.day,
+    ).millisecondsSinceEpoch.toString();
     grouped.putIfAbsent(key, () => []).add(memo);
   }
 

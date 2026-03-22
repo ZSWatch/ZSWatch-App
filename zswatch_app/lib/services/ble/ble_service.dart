@@ -15,10 +15,7 @@ enum BleConnectionState {
 }
 
 /// PHY mode for BLE connection
-enum BlePhyMode {
-  phy1M,
-  phy2M,
-}
+enum BlePhyMode { phy1M, phy2M }
 
 /// Connection metadata
 class BleConnectionInfo {
@@ -142,10 +139,7 @@ abstract class BleService {
   ///
   /// [device] - The device to connect to
   /// [autoReconnect] - Whether to auto-reconnect on disconnect
-  Future<void> connect(
-    BluetoothDevice device, {
-    bool autoReconnect = true,
-  });
+  Future<void> connect(BluetoothDevice device, {bool autoReconnect = true});
 
   /// Disconnect from current device
   Future<void> disconnect();
@@ -202,4 +196,3 @@ abstract class BleService {
     Guid characteristicUuid,
   );
 }
-

@@ -74,16 +74,15 @@ class RealTimeChart extends StatelessWidget {
           gridData: FlGridData(
             show: showGrid,
             drawVerticalLine: true,
-            horizontalInterval: _calculateYInterval(calculatedMinY, calculatedMaxY),
+            horizontalInterval: _calculateYInterval(
+              calculatedMinY,
+              calculatedMaxY,
+            ),
             verticalInterval: timeWindowSeconds / 6,
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: AppTheme.elevatedSurfaceColor,
-              strokeWidth: 1,
-            ),
-            getDrawingVerticalLine: (value) => FlLine(
-              color: AppTheme.elevatedSurfaceColor,
-              strokeWidth: 1,
-            ),
+            getDrawingHorizontalLine: (value) =>
+                FlLine(color: AppTheme.elevatedSurfaceColor, strokeWidth: 1),
+            getDrawingVerticalLine: (value) =>
+                FlLine(color: AppTheme.elevatedSurfaceColor, strokeWidth: 1),
           ),
           titlesData: FlTitlesData(
             show: true,
@@ -296,10 +295,8 @@ class StepsBarChart extends StatelessWidget {
             show: showGrid,
             drawVerticalLine: false,
             horizontalInterval: calculatedMaxY / 5,
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: AppTheme.elevatedSurfaceColor,
-              strokeWidth: 1,
-            ),
+            getDrawingHorizontalLine: (value) =>
+                FlLine(color: AppTheme.elevatedSurfaceColor, strokeWidth: 1),
           ),
           titlesData: FlTitlesData(
             show: true,
@@ -387,7 +384,8 @@ class StepsBarChart extends StatelessWidget {
                       dashArray: [8, 4],
                       label: HorizontalLineLabel(
                         show: true,
-                        labelResolver: (line) => 'Goal: ${_formatStepCount(stepGoal!)}',
+                        labelResolver: (line) =>
+                            'Goal: ${_formatStepCount(stepGoal!)}',
                         style: const TextStyle(
                           fontSize: 10,
                           color: AppTheme.warningColor,
@@ -467,8 +465,5 @@ class StepsBarData {
   final String label;
   final int steps;
 
-  const StepsBarData({
-    required this.label,
-    required this.steps,
-  });
+  const StepsBarData({required this.label, required this.steps});
 }

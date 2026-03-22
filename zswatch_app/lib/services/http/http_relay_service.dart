@@ -25,7 +25,8 @@ class HttpRelayResult {
   factory HttpRelayResult.success(String response) =>
       HttpRelayResult(response: response);
 
-  factory HttpRelayResult.failure(String error) => HttpRelayResult(error: error);
+  factory HttpRelayResult.failure(String error) =>
+      HttpRelayResult(error: error);
 }
 
 /// Service for performing HTTP relay requests on behalf of the watch.
@@ -66,8 +67,10 @@ class HttpRelayService {
   /// [request] contains the URL, optional XPath, and insecure flag.
   /// Returns [HttpRelayResult] with either response or error.
   Future<HttpRelayResult> performRequest(HttpRequest request) async {
-    debugPrint('[HttpRelayService] Performing request: ${request.url}, '
-        'xpath: ${request.xpath}, insecure: ${request.insecure}');
+    debugPrint(
+      '[HttpRelayService] Performing request: ${request.url}, '
+      'xpath: ${request.xpath}, insecure: ${request.insecure}',
+    );
 
     // Validate URL
     final uri = Uri.tryParse(request.url);
@@ -86,10 +89,10 @@ class HttpRelayService {
 
       // Perform GET request
       final response = await client
-          .get(uri, headers: {
-            'User-Agent': 'ZSWatch-Companion/1.0',
-            'Accept': '*/*',
-          })
+          .get(
+            uri,
+            headers: {'User-Agent': 'ZSWatch-Companion/1.0', 'Accept': '*/*'},
+          )
           .timeout(_defaultTimeout);
 
       debugPrint('[HttpRelayService] Response status: ${response.statusCode}');
@@ -97,7 +100,8 @@ class HttpRelayService {
       // Check for HTTP errors
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return HttpRelayResult.failure(
-            'HTTP ${response.statusCode}: ${response.reasonPhrase}');
+          'HTTP ${response.statusCode}: ${response.reasonPhrase}',
+        );
       }
 
       String body = response.body;

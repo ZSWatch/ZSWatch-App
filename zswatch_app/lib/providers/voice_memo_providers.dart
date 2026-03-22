@@ -38,9 +38,9 @@ final transcriptionEngineProvider = Provider<TranscriptionEngine>((ref) {
 /// Stream of transcription engine state
 final transcriptionEngineStateProvider =
     StreamProvider<TranscriptionEngineState>((ref) {
-  final engine = ref.watch(transcriptionEngineProvider);
-  return engine.stateStream;
-});
+      final engine = ref.watch(transcriptionEngineProvider);
+      return engine.stateStream;
+    });
 
 class TranscriptionModelLocalStatus {
   final bool downloaded;
@@ -55,27 +55,31 @@ class TranscriptionModelLocalStatus {
 }
 
 final transcriptionModelStatusProvider =
-    FutureProvider.family<TranscriptionModelLocalStatus, TranscriptionEngineType>(
-        (ref, type) async {
-  final engine = createTranscriptionEngine(type);
-  try {
-    final localPath = await engine.modelFilePath();
-    final file = File(localPath);
-    final downloaded = file.existsSync();
+    FutureProvider.family<
+      TranscriptionModelLocalStatus,
+      TranscriptionEngineType
+    >((ref, type) async {
+      final engine = createTranscriptionEngine(type);
+      try {
+        final localPath = await engine.modelFilePath();
+        final file = File(localPath);
+        final downloaded = file.existsSync();
 
-    return TranscriptionModelLocalStatus(
-      downloaded: downloaded,
-      localSizeBytes: downloaded ? file.lengthSync() : null,
-      localPath: localPath,
-    );
-  } finally {
-    engine.dispose();
-  }
-});
+        return TranscriptionModelLocalStatus(
+          downloaded: downloaded,
+          localSizeBytes: downloaded ? file.lengthSync() : null,
+          localPath: localPath,
+        );
+      } finally {
+        engine.dispose();
+      }
+    });
 
 final transcriptionConfiguredProvider = FutureProvider<bool>((ref) async {
   final selected = ref.watch(transcriptionEngineTypeProvider);
-  final status = await ref.watch(transcriptionModelStatusProvider(selected).future);
+  final status = await ref.watch(
+    transcriptionModelStatusProvider(selected).future,
+  );
   return status.downloaded;
 });
 
@@ -96,8 +100,9 @@ final voiceMemoSyncServiceProvider = Provider<VoiceMemoSyncService>((ref) {
   // provider creation are always picked up.
   service.onSyncCompleted = (downloadedCount) async {
     debugPrint(
-        '[VoiceMemoProviders] Sync completed ($downloadedCount new). '
-        'Starting auto-transcription.');
+      '[VoiceMemoProviders] Sync completed ($downloadedCount new). '
+      'Starting auto-transcription.',
+    );
     final engine = ref.read(transcriptionEngineProvider);
     final aiEnabled = ref.read(localAiEnabledProvider);
     final autoProcess = ref.read(autoProcessVoiceNotesProvider);
@@ -114,9 +119,9 @@ final voiceMemoSyncServiceProvider = Provider<VoiceMemoSyncService>((ref) {
           datetime: datetime,
           onConfirmed: autoCreate
               ? (confirmedFilename) => _autoCreateActionsForMemo(
-                    ref: ref,
-                    filename: confirmedFilename,
-                  )
+                  ref: ref,
+                  filename: confirmedFilename,
+                )
               : null,
         );
       };
@@ -127,8 +132,9 @@ final voiceMemoSyncServiceProvider = Provider<VoiceMemoSyncService>((ref) {
       pipeline: pipeline,
       // Report per-memo progress so the UI shows "Transcribing..." state
       onTranscribingMemo: (filename) {
-        ref.read(autoTranscribeStateProvider.notifier).state =
-            VoiceMemoActionState.loading(
+        ref
+            .read(autoTranscribeStateProvider.notifier)
+            .state = VoiceMemoActionState.loading(
           actionType: VoiceMemoActionType.transcribe,
           activeFilename: filename,
         );
@@ -147,8 +153,9 @@ final voiceMemoSyncServiceProvider = Provider<VoiceMemoSyncService>((ref) {
 /// State for background auto-transcription triggered after sync.
 /// The UI watches this alongside [voiceMemoActionsProvider] so buttons
 /// reflect in-progress state even when transcription was auto-started.
-final autoTranscribeStateProvider =
-    StateProvider<VoiceMemoActionState>((ref) => const VoiceMemoActionState.idle());
+final autoTranscribeStateProvider = StateProvider<VoiceMemoActionState>(
+  (ref) => const VoiceMemoActionState.idle(),
+);
 
 /// Auto-transcribe all untranscribed memos after sync, then optionally
 /// run the AI pipeline on newly transcribed memos.
@@ -171,7 +178,8 @@ Future<void> _autoTranscribeAndProcess({
     }
 
     debugPrint(
-        '[VoiceMemoProviders] Auto-transcribing ${untranscribed.length} memos');
+      '[VoiceMemoProviders] Auto-transcribing ${untranscribed.length} memos',
+    );
 
     for (final memo in untranscribed) {
       try {
@@ -184,11 +192,11 @@ Future<void> _autoTranscribeAndProcess({
           filename: memo.filename,
           transcription: text.isEmpty ? '[No speech detected]' : text,
         );
-        debugPrint(
-            '[VoiceMemoProviders] Auto-transcribed: ${memo.filename}');
+        debugPrint('[VoiceMemoProviders] Auto-transcribed: ${memo.filename}');
       } catch (e) {
         debugPrint(
-            '[VoiceMemoProviders] Failed to transcribe ${memo.filename}: $e');
+          '[VoiceMemoProviders] Failed to transcribe ${memo.filename}: $e',
+        );
       }
     }
 
@@ -218,7 +226,9 @@ Future<void> _autoCreateActionsForMemo({
     final repository = ref.read(voiceMemoRepositoryProvider);
     final memo = await repository.getMemoByFilename(filename);
     if (memo == null) {
-      debugPrint('[VoiceMemoProviders] Auto-create: memo not found for $filename');
+      debugPrint(
+        '[VoiceMemoProviders] Auto-create: memo not found for $filename',
+      );
       return;
     }
 
@@ -227,7 +237,9 @@ Future<void> _autoCreateActionsForMemo({
     final pending = actions.where((a) => !a.created && !a.dismissed).toList();
 
     if (pending.isEmpty) {
-      debugPrint('[VoiceMemoProviders] Auto-create: no pending actions for $filename');
+      debugPrint(
+        '[VoiceMemoProviders] Auto-create: no pending actions for $filename',
+      );
       return;
     }
 
@@ -237,12 +249,14 @@ Future<void> _autoCreateActionsForMemo({
     for (final action in pending) {
       // Tasks and reminders require a scheduled time on Android — skip
       // auto-creation if there's no date, the user can create manually.
-      final requiresDate = action.actionType == ExtractedActionType.task ||
+      final requiresDate =
+          action.actionType == ExtractedActionType.task ||
           action.actionType == ExtractedActionType.reminder;
       if (requiresDate && action.startTime == null && action.dueDate == null) {
         debugPrint(
-            '[VoiceMemoProviders] Skipping auto-create for action ${action.id} '
-            '(${action.actionType}) — no scheduled time');
+          '[VoiceMemoProviders] Skipping auto-create for action ${action.id} '
+          '(${action.actionType}) — no scheduled time',
+        );
         continue;
       }
       try {
@@ -253,7 +267,8 @@ Future<void> _autoCreateActionsForMemo({
         debugPrint('[VoiceMemoProviders] Auto-created action: $message');
       } catch (e) {
         debugPrint(
-            '[VoiceMemoProviders] Failed to auto-create action ${action.id}: $e');
+          '[VoiceMemoProviders] Failed to auto-create action ${action.id}: $e',
+        );
       }
     }
   } catch (e) {
@@ -292,11 +307,7 @@ final voiceMemoSyncStateProvider = StreamProvider<VoiceMemoSyncState>((ref) {
 
 // ==================== Voice Memo Actions ====================
 
-enum VoiceMemoActionType {
-  sync,
-  delete,
-  transcribe,
-}
+enum VoiceMemoActionType { sync, delete, transcribe }
 
 class VoiceMemoActionState {
   final bool isLoading;
@@ -312,27 +323,27 @@ class VoiceMemoActionState {
   });
 
   const VoiceMemoActionState.idle()
-      : isLoading = false,
-        actionType = null,
-        activeFilename = null,
-        error = null;
+    : isLoading = false,
+      actionType = null,
+      activeFilename = null,
+      error = null;
 
   const VoiceMemoActionState.loading({
     required VoiceMemoActionType actionType,
     String? activeFilename,
-  })  : isLoading = true,
-        actionType = actionType,
-        activeFilename = activeFilename,
-        error = null;
+  }) : isLoading = true,
+       actionType = actionType,
+       activeFilename = activeFilename,
+       error = null;
 
   const VoiceMemoActionState.error({
     required VoiceMemoActionType actionType,
     String? activeFilename,
     required Object error,
-  })  : isLoading = false,
-        actionType = actionType,
-        activeFilename = activeFilename,
-        error = error;
+  }) : isLoading = false,
+       actionType = actionType,
+       activeFilename = activeFilename,
+       error = error;
 
   bool isTranscribingMemo(String filename) {
     return isLoading &&
@@ -351,10 +362,10 @@ class VoiceMemoActionsNotifier extends StateNotifier<VoiceMemoActionState> {
     required VoiceMemoSyncService syncService,
     required VoiceMemoRepository repository,
     required TranscriptionEngine transcriptionEngine,
-  })  : _syncService = syncService,
-        _repository = repository,
-        _transcriptionEngine = transcriptionEngine,
-        super(const VoiceMemoActionState.idle());
+  }) : _syncService = syncService,
+       _repository = repository,
+       _transcriptionEngine = transcriptionEngine,
+       super(const VoiceMemoActionState.idle());
 
   /// Trigger a sync of voice memos from the watch
   Future<void> sync() async {
@@ -433,14 +444,16 @@ class VoiceMemoActionsNotifier extends StateNotifier<VoiceMemoActionState> {
     try {
       final untranscribed = await _repository.getUntranscribedMemos();
       debugPrint(
-          '[VoiceMemoActions] Transcribing ${untranscribed.length} memos');
+        '[VoiceMemoActions] Transcribing ${untranscribed.length} memos',
+      );
 
       for (final memo in untranscribed) {
         try {
           await transcribe(memo);
         } catch (e) {
           debugPrint(
-              '[VoiceMemoActions] Failed to transcribe ${memo.filename}: $e');
+            '[VoiceMemoActions] Failed to transcribe ${memo.filename}: $e',
+          );
           // Continue with next memo
         }
       }
@@ -464,15 +477,15 @@ class VoiceMemoActionsNotifier extends StateNotifier<VoiceMemoActionState> {
     );
     try {
       final memos = await _repository.getTranscribableMemos();
-      debugPrint(
-          '[VoiceMemoActions] Re-transcribing ${memos.length} memos');
+      debugPrint('[VoiceMemoActions] Re-transcribing ${memos.length} memos');
 
       for (final memo in memos) {
         try {
           await _transcribeMemo(memo);
         } catch (e) {
           debugPrint(
-              '[VoiceMemoActions] Failed to re-transcribe ${memo.filename}: $e');
+            '[VoiceMemoActions] Failed to re-transcribe ${memo.filename}: $e',
+          );
         }
       }
 
@@ -507,13 +520,15 @@ class VoiceMemoActionsNotifier extends StateNotifier<VoiceMemoActionState> {
 
 /// Provider for voice memo actions
 final voiceMemoActionsProvider =
-  StateNotifierProvider<VoiceMemoActionsNotifier, VoiceMemoActionState>((ref) {
-  final syncService = ref.watch(voiceMemoSyncServiceProvider);
-  final repository = ref.watch(voiceMemoRepositoryProvider);
-  final transcriptionEngine = ref.watch(transcriptionEngineProvider);
-  return VoiceMemoActionsNotifier(
-    syncService: syncService,
-    repository: repository,
-    transcriptionEngine: transcriptionEngine,
-  );
-});
+    StateNotifierProvider<VoiceMemoActionsNotifier, VoiceMemoActionState>((
+      ref,
+    ) {
+      final syncService = ref.watch(voiceMemoSyncServiceProvider);
+      final repository = ref.watch(voiceMemoRepositoryProvider);
+      final transcriptionEngine = ref.watch(transcriptionEngineProvider);
+      return VoiceMemoActionsNotifier(
+        syncService: syncService,
+        repository: repository,
+        transcriptionEngine: transcriptionEngine,
+      );
+    });

@@ -22,12 +22,14 @@ class BatteryRepository {
     bool isCharging = false,
     DateTime? timestamp,
   }) {
-    return _db.insertBatteryReading(BatteryReadingsCompanion(
-      watchId: Value(watchId),
-      level: Value(level),
-      isCharging: Value(isCharging),
-      timestamp: Value(timestamp ?? DateTime.now()),
-    ));
+    return _db.insertBatteryReading(
+      BatteryReadingsCompanion(
+        watchId: Value(watchId),
+        level: Value(level),
+        isCharging: Value(isCharging),
+        timestamp: Value(timestamp ?? DateTime.now()),
+      ),
+    );
   }
 
   /// Get battery readings for a watch within date range
@@ -36,11 +38,7 @@ class BatteryRepository {
     required DateTime from,
     required DateTime to,
   }) {
-    return _db.getBatteryReadings(
-      watchId: watchId,
-      from: from,
-      to: to,
-    );
+    return _db.getBatteryReadings(watchId: watchId, from: from, to: to);
   }
 
   /// Get battery readings for the last 24 hours
@@ -89,8 +87,9 @@ class BatteryRepository {
     if (readings.length < 2) return null;
 
     // Focus on discharging readings only
-    final dischargingReadings =
-        readings.where((r) => !r.isCharging).toList(growable: false);
+    final dischargingReadings = readings
+        .where((r) => !r.isCharging)
+        .toList(growable: false);
     if (dischargingReadings.length < 2) return null;
 
     // Find the start of the current discharge cycle (last upward jump → new slope)
@@ -108,8 +107,9 @@ class BatteryRepository {
 
     // Use the full window up to "to" so long idle periods don't inflate the rate
     final effectiveEndTime = to.isAfter(end.timestamp) ? to : end.timestamp;
-    final elapsedMinutes =
-        effectiveEndTime.difference(start.timestamp).inMinutes;
+    final elapsedMinutes = effectiveEndTime
+        .difference(start.timestamp)
+        .inMinutes;
 
     // Require a reasonable span to avoid noisy spikes
     if (elapsedMinutes < 30) return null;

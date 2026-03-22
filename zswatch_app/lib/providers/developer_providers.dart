@@ -25,15 +25,17 @@ final logFilterProvider = StateProvider<LogFilter>((ref) => LogFilter.all);
 final logStreamingEnabledProvider = StateProvider<bool>((ref) => false);
 
 /// Provider for log streaming state (with pending/error tracking)
-final logStreamingStateProvider = StateNotifierProvider<LogStreamingStateNotifier, LogStreamingState>((ref) {
-  final watchService = ref.watch(watchServiceProvider);
-  return LogStreamingStateNotifier(watchService);
-});
+final logStreamingStateProvider =
+    StateNotifierProvider<LogStreamingStateNotifier, LogStreamingState>((ref) {
+      final watchService = ref.watch(watchServiceProvider);
+      return LogStreamingStateNotifier(watchService);
+    });
 
 class LogStreamingStateNotifier extends StateNotifier<LogStreamingState> {
   final WatchService _watchService;
 
-  LogStreamingStateNotifier(this._watchService) : super(const LogStreamingState());
+  LogStreamingStateNotifier(this._watchService)
+    : super(const LogStreamingState());
 
   Future<void> enable() async {
     state = state.copyWith(pending: true, error: null);
@@ -45,10 +47,7 @@ class LogStreamingStateNotifier extends StateNotifier<LogStreamingState> {
         pending: false,
       );
     } catch (e) {
-      state = state.copyWith(
-        pending: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(pending: false, error: e.toString());
     }
   }
 
@@ -62,10 +61,7 @@ class LogStreamingStateNotifier extends StateNotifier<LogStreamingState> {
         pending: false,
       );
     } catch (e) {
-      state = state.copyWith(
-        pending: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(pending: false, error: e.toString());
     }
   }
 
@@ -79,22 +75,23 @@ class LogStreamingStateNotifier extends StateNotifier<LogStreamingState> {
 }
 
 /// Provider for all log entries (maintains a buffer)
-final logEntriesProvider = StateNotifierProvider<LogEntriesNotifier, List<LogEntry>>((ref) {
-  final watchService = ref.watch(watchServiceProvider);
-  return LogEntriesNotifier(watchService);
-});
+final logEntriesProvider =
+    StateNotifierProvider<LogEntriesNotifier, List<LogEntry>>((ref) {
+      final watchService = ref.watch(watchServiceProvider);
+      return LogEntriesNotifier(watchService);
+    });
 
 class LogEntriesNotifier extends StateNotifier<List<LogEntry>> {
   static const int maxEntries = 1000;
-  
+
   /// BLE log message delimiters (from watch firmware)
   static const String _bleLogPrefix = '<BLELOG>';
   static const String _bleLogSuffix = '</BLELOG>';
-  
+
   final WatchService _watchService;
   int _nextId = 1;
   StreamSubscription<String>? _incomingSubscription;
-  
+
   /// Buffer for incomplete log messages (logs can span multiple BLE packets)
   final StringBuffer _logBuffer = StringBuffer();
   bool _isBufferingLog = false;
@@ -115,7 +112,7 @@ class LogEntriesNotifier extends StateNotifier<List<LogEntry>> {
   /// Process incoming data, extracting only BLELOG-wrapped log messages
   void _processIncomingData(String data) {
     String remaining = data;
-    
+
     while (remaining.isNotEmpty) {
       if (_isBufferingLog) {
         // We're in the middle of receiving a log message
@@ -137,15 +134,19 @@ class LogEntriesNotifier extends StateNotifier<List<LogEntry>> {
         final prefixIndex = remaining.indexOf(_bleLogPrefix);
         if (prefixIndex >= 0) {
           // Found a log prefix - ignore any data before it (protocol traffic)
-          
+
           // Start buffering the log message
-          final afterPrefix = remaining.substring(prefixIndex + _bleLogPrefix.length);
+          final afterPrefix = remaining.substring(
+            prefixIndex + _bleLogPrefix.length,
+          );
           final suffixIndex = afterPrefix.indexOf(_bleLogSuffix);
-          
+
           if (suffixIndex >= 0) {
             // Complete log message in this packet
             _emitLogEntry(afterPrefix.substring(0, suffixIndex));
-            remaining = afterPrefix.substring(suffixIndex + _bleLogSuffix.length);
+            remaining = afterPrefix.substring(
+              suffixIndex + _bleLogSuffix.length,
+            );
           } else {
             // Log continues in next packet(s)
             _isBufferingLog = true;
@@ -159,11 +160,11 @@ class LogEntriesNotifier extends StateNotifier<List<LogEntry>> {
       }
     }
   }
-  
+
   /// Emit a log entry (from BLELOG wrapper)
   void _emitLogEntry(String logContent) {
     if (logContent.isEmpty) return;
-    
+
     final entry = LogEntry.incoming(
       id: _nextId++,
       message: logContent,
@@ -232,10 +233,11 @@ final filteredLogEntriesProvider = Provider<List<LogEntry>>((ref) {
 
 /// Provider for the communication log repository
 /// Wired to watch service streams to automatically capture TX/RX traffic
-final commLogRepositoryProvider = StateNotifierProvider<CommLogNotifier, List<CommLogEntry>>((ref) {
-  final watchService = ref.watch(watchServiceProvider);
-  return CommLogNotifier(watchService);
-});
+final commLogRepositoryProvider =
+    StateNotifierProvider<CommLogNotifier, List<CommLogEntry>>((ref) {
+      final watchService = ref.watch(watchServiceProvider);
+      return CommLogNotifier(watchService);
+    });
 
 /// State notifier that maintains the comm log repository and subscribes to watch streams
 class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
@@ -339,7 +341,7 @@ final commLogEntriesProvider = Provider<List<CommLogEntry>>((ref) {
 final commLogStatsProvider = Provider<CommLogStats>((ref) {
   // Watch the state to trigger rebuild when entries change
   final entries = ref.watch(commLogRepositoryProvider);
-  
+
   if (entries.isEmpty) {
     return const CommLogStats();
   }
@@ -411,30 +413,33 @@ abstract class SensorStreamingState with _$SensorStreamingState {
 }
 
 /// Provider for accelerometer readings buffer
-final accelerometerBufferProvider = StateNotifierProvider<SensorBufferNotifier, List<SensorReading>>((ref) {
-  return SensorBufferNotifier(SensorType.accelerometer);
-});
+final accelerometerBufferProvider =
+    StateNotifierProvider<SensorBufferNotifier, List<SensorReading>>((ref) {
+      return SensorBufferNotifier(SensorType.accelerometer);
+    });
 
 /// Provider for gyroscope readings buffer
-final gyroscopeBufferProvider = StateNotifierProvider<SensorBufferNotifier, List<SensorReading>>((ref) {
-  return SensorBufferNotifier(SensorType.gyroscope);
-});
+final gyroscopeBufferProvider =
+    StateNotifierProvider<SensorBufferNotifier, List<SensorReading>>((ref) {
+      return SensorBufferNotifier(SensorType.gyroscope);
+    });
 
 /// Provider for temperature readings buffer
-final temperatureBufferProvider = StateNotifierProvider<SensorBufferNotifier, List<SensorReading>>((ref) {
-  return SensorBufferNotifier(SensorType.temperature);
-});
+final temperatureBufferProvider =
+    StateNotifierProvider<SensorBufferNotifier, List<SensorReading>>((ref) {
+      return SensorBufferNotifier(SensorType.temperature);
+    });
 
 class SensorBufferNotifier extends StateNotifier<List<SensorReading>> {
   static const int maxReadings = 200;
-  
+
   final SensorType type;
 
   SensorBufferNotifier(this.type) : super([]);
 
   void add(SensorReading reading) {
     if (reading.type != type) return;
-    
+
     final newList = [...state, reading];
     if (newList.length > maxReadings) {
       state = newList.sublist(newList.length - maxReadings);
@@ -480,7 +485,7 @@ class BleDiagnostics {
 
   String get mtuDisplay => mtu != null ? '$mtu bytes' : 'N/A';
   String get rssiDisplay => rssi != null ? '$rssi dBm' : 'N/A';
-  
+
   /// Connection duration since connected
   Duration? get connectionDuration {
     if (connectedAt == null || !isConnected) return null;
@@ -491,11 +496,11 @@ class BleDiagnostics {
   String get connectionDurationDisplay {
     final duration = connectionDuration;
     if (duration == null) return 'N/A';
-    
+
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
     final seconds = duration.inSeconds % 60;
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m';
     } else if (minutes > 0) {
@@ -504,7 +509,7 @@ class BleDiagnostics {
       return '${seconds}s';
     }
   }
-  
+
   String get signalStrength {
     if (rssi == null) return 'Unknown';
     if (rssi! > -50) return 'Excellent';

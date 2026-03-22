@@ -11,10 +11,12 @@ abstract final class SettingsKeys {
   static const String autoTimeSync = 'auto_time_sync';
   static const String preferredMtu = 'preferred_mtu';
   static const String lastConnectedWatchId = 'last_connected_watch_id';
-  static const String notificationFilterPackages = 'notification_filter_packages';
+  static const String notificationFilterPackages =
+      'notification_filter_packages';
   static const String onboardingCompleted = 'onboarding_completed';
   static const String keepScreenOnDuringDfu = 'keep_screen_on_during_dfu';
-  static const String backgroundConnectionEnabled = 'background_connection_enabled';
+  static const String backgroundConnectionEnabled =
+      'background_connection_enabled';
   static const String transcriptionEngineType = 'transcription_engine_type';
   static const String localAiEnabled = 'local_ai_enabled';
   static const String autoProcessVoiceNotes = 'auto_process_voice_notes';
@@ -28,22 +30,24 @@ abstract final class SettingsKeys {
 }
 
 /// Provider for SharedPreferences instance
-final sharedPreferencesProvider = FutureProvider<SharedPreferences>((ref) async {
+final sharedPreferencesProvider = FutureProvider<SharedPreferences>((
+  ref,
+) async {
   return SharedPreferences.getInstance();
 });
 
 /// Provider for developer mode setting
 final developerModeProvider =
     StateNotifierProvider<DeveloperModeNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return DeveloperModeNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return DeveloperModeNotifier(prefs.valueOrNull);
+    });
 
 class DeveloperModeNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   DeveloperModeNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.developerModeEnabled) ?? false);
+    : super(_prefs?.getBool(SettingsKeys.developerModeEnabled) ?? false);
 
   void toggle() {
     state = !state;
@@ -59,15 +63,15 @@ class DeveloperModeNotifier extends StateNotifier<bool> {
 /// Provider for notifications enabled setting
 final notificationsEnabledProvider =
     StateNotifierProvider<NotificationsEnabledNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return NotificationsEnabledNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return NotificationsEnabledNotifier(prefs.valueOrNull);
+    });
 
 class NotificationsEnabledNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   NotificationsEnabledNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.notificationsEnabled) ?? true);
+    : super(_prefs?.getBool(SettingsKeys.notificationsEnabled) ?? true);
 
   void toggle() {
     state = !state;
@@ -83,15 +87,15 @@ class NotificationsEnabledNotifier extends StateNotifier<bool> {
 /// Provider for auto-reconnect setting
 final autoReconnectProvider =
     StateNotifierProvider<AutoReconnectNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return AutoReconnectNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return AutoReconnectNotifier(prefs.valueOrNull);
+    });
 
 class AutoReconnectNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   AutoReconnectNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.autoReconnect) ?? true);
+    : super(_prefs?.getBool(SettingsKeys.autoReconnect) ?? true);
 
   void toggle() {
     state = !state;
@@ -105,8 +109,9 @@ class AutoReconnectNotifier extends StateNotifier<bool> {
 }
 
 /// Provider for auto time sync setting
-final autoTimeSyncProvider =
-    StateNotifierProvider<AutoTimeSyncNotifier, bool>((ref) {
+final autoTimeSyncProvider = StateNotifierProvider<AutoTimeSyncNotifier, bool>((
+  ref,
+) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return AutoTimeSyncNotifier(prefs.valueOrNull);
 });
@@ -115,7 +120,7 @@ class AutoTimeSyncNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   AutoTimeSyncNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.autoTimeSync) ?? true);
+    : super(_prefs?.getBool(SettingsKeys.autoTimeSync) ?? true);
 
   void toggle() {
     state = !state;
@@ -129,8 +134,9 @@ class AutoTimeSyncNotifier extends StateNotifier<bool> {
 }
 
 /// Provider for preferred MTU setting
-final preferredMtuProvider =
-    StateNotifierProvider<PreferredMtuNotifier, int>((ref) {
+final preferredMtuProvider = StateNotifierProvider<PreferredMtuNotifier, int>((
+  ref,
+) {
   final prefs = ref.watch(sharedPreferencesProvider);
   return PreferredMtuNotifier(prefs.valueOrNull);
 });
@@ -139,7 +145,7 @@ class PreferredMtuNotifier extends StateNotifier<int> {
   final SharedPreferences? _prefs;
 
   PreferredMtuNotifier(this._prefs)
-      : super(_prefs?.getInt(SettingsKeys.preferredMtu) ?? 512);
+    : super(_prefs?.getInt(SettingsKeys.preferredMtu) ?? 512);
 
   void setMtu(int mtu) {
     state = mtu;
@@ -156,17 +162,17 @@ final lastConnectedWatchIdProvider = Provider<String?>((ref) {
 /// Provider for notification filter packages
 final notificationFilterPackagesProvider =
     StateNotifierProvider<NotificationFilterNotifier, List<String>>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return NotificationFilterNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return NotificationFilterNotifier(prefs.valueOrNull);
+    });
 
 class NotificationFilterNotifier extends StateNotifier<List<String>> {
   final SharedPreferences? _prefs;
 
   NotificationFilterNotifier(this._prefs)
-      : super(
-          _prefs?.getStringList(SettingsKeys.notificationFilterPackages) ?? [],
-        );
+    : super(
+        _prefs?.getStringList(SettingsKeys.notificationFilterPackages) ?? [],
+      );
 
   void addPackage(String packageName) {
     if (!state.contains(packageName)) {
@@ -191,15 +197,15 @@ class NotificationFilterNotifier extends StateNotifier<List<String>> {
 /// Provider for onboarding completed flag
 final onboardingCompletedProvider =
     StateNotifierProvider<OnboardingCompletedNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return OnboardingCompletedNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return OnboardingCompletedNotifier(prefs.valueOrNull);
+    });
 
 class OnboardingCompletedNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   OnboardingCompletedNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.onboardingCompleted) ?? false);
+    : super(_prefs?.getBool(SettingsKeys.onboardingCompleted) ?? false);
 
   void setCompleted() {
     state = true;
@@ -215,15 +221,15 @@ class OnboardingCompletedNotifier extends StateNotifier<bool> {
 /// Provider for keep screen on during DFU setting
 final keepScreenOnDuringDfuProvider =
     StateNotifierProvider<KeepScreenOnDuringDfuNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return KeepScreenOnDuringDfuNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return KeepScreenOnDuringDfuNotifier(prefs.valueOrNull);
+    });
 
 class KeepScreenOnDuringDfuNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   KeepScreenOnDuringDfuNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.keepScreenOnDuringDfu) ?? true);
+    : super(_prefs?.getBool(SettingsKeys.keepScreenOnDuringDfu) ?? true);
 
   void toggle() {
     state = !state;
@@ -240,15 +246,15 @@ class KeepScreenOnDuringDfuNotifier extends StateNotifier<bool> {
 /// When enabled, the app maintains a persistent BLE connection when backgrounded
 final backgroundConnectionEnabledProvider =
     StateNotifierProvider<BackgroundConnectionEnabledNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return BackgroundConnectionEnabledNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return BackgroundConnectionEnabledNotifier(prefs.valueOrNull);
+    });
 
 class BackgroundConnectionEnabledNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   BackgroundConnectionEnabledNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.backgroundConnectionEnabled) ?? true);
+    : super(_prefs?.getBool(SettingsKeys.backgroundConnectionEnabled) ?? true);
 
   void toggle() {
     state = !state;
@@ -298,19 +304,22 @@ final settingsManagerProvider = Provider<SettingsManager?>((ref) {
 /// Which offline Whisper engine variant to use for voice memo transcription.
 /// Persisted in SharedPreferences.
 final transcriptionEngineTypeProvider =
-    StateNotifierProvider<TranscriptionEngineTypeNotifier, TranscriptionEngineType>(
-  (ref) {
-    final prefs = ref.watch(sharedPreferencesProvider);
-    return TranscriptionEngineTypeNotifier(prefs.valueOrNull);
-  },
-);
+    StateNotifierProvider<
+      TranscriptionEngineTypeNotifier,
+      TranscriptionEngineType
+    >((ref) {
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return TranscriptionEngineTypeNotifier(prefs.valueOrNull);
+    });
 
 class TranscriptionEngineTypeNotifier
     extends StateNotifier<TranscriptionEngineType> {
   final SharedPreferences? _prefs;
 
   TranscriptionEngineTypeNotifier(this._prefs)
-      : super(_parseType(_prefs?.getString(SettingsKeys.transcriptionEngineType)));
+    : super(
+        _parseType(_prefs?.getString(SettingsKeys.transcriptionEngineType)),
+      );
 
   static TranscriptionEngineType _parseType(String? value) {
     for (final type in TranscriptionEngineType.values) {
@@ -332,15 +341,15 @@ class TranscriptionEngineTypeNotifier
 /// Whether local AI processing of voice notes is enabled
 final localAiEnabledProvider =
     StateNotifierProvider<LocalAiEnabledNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return LocalAiEnabledNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return LocalAiEnabledNotifier(prefs.valueOrNull);
+    });
 
 class LocalAiEnabledNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   LocalAiEnabledNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.localAiEnabled) ?? false);
+    : super(_prefs?.getBool(SettingsKeys.localAiEnabled) ?? false);
 
   void toggle() {
     state = !state;
@@ -356,15 +365,15 @@ class LocalAiEnabledNotifier extends StateNotifier<bool> {
 /// Whether voice notes should be automatically AI-processed after transcription
 final autoProcessVoiceNotesProvider =
     StateNotifierProvider<AutoProcessVoiceNotesNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return AutoProcessVoiceNotesNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return AutoProcessVoiceNotesNotifier(prefs.valueOrNull);
+    });
 
 class AutoProcessVoiceNotesNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   AutoProcessVoiceNotesNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.autoProcessVoiceNotes) ?? true);
+    : super(_prefs?.getBool(SettingsKeys.autoProcessVoiceNotes) ?? true);
 
   void toggle() {
     state = !state;
@@ -381,15 +390,15 @@ class AutoProcessVoiceNotesNotifier extends StateNotifier<bool> {
 /// created after AI processing, with a watch-side undo window.
 final autoCreateActionsProvider =
     StateNotifierProvider<AutoCreateActionsNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return AutoCreateActionsNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return AutoCreateActionsNotifier(prefs.valueOrNull);
+    });
 
 class AutoCreateActionsNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   AutoCreateActionsNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.autoCreateActions) ?? false);
+    : super(_prefs?.getBool(SettingsKeys.autoCreateActions) ?? false);
 
   void setEnabled(bool enabled) {
     state = enabled;
@@ -400,15 +409,15 @@ class AutoCreateActionsNotifier extends StateNotifier<bool> {
 /// Whether AI transcript correction is enabled before classification.
 final aiCorrectionEnabledProvider =
     StateNotifierProvider<AiCorrectionEnabledNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return AiCorrectionEnabledNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return AiCorrectionEnabledNotifier(prefs.valueOrNull);
+    });
 
 class AiCorrectionEnabledNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   AiCorrectionEnabledNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.aiCorrectionEnabled) ?? false);
+    : super(_prefs?.getBool(SettingsKeys.aiCorrectionEnabled) ?? false);
 
   void setEnabled(bool enabled) {
     state = enabled;
@@ -419,18 +428,18 @@ class AiCorrectionEnabledNotifier extends StateNotifier<bool> {
 /// Currently selected local AI model id.
 final selectedAiModelIdProvider =
     StateNotifierProvider<SelectedAiModelIdNotifier, String>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return SelectedAiModelIdNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return SelectedAiModelIdNotifier(prefs.valueOrNull);
+    });
 
 class SelectedAiModelIdNotifier extends StateNotifier<String> {
   final SharedPreferences? _prefs;
 
   SelectedAiModelIdNotifier(this._prefs)
-      : super(
-          _prefs?.getString(SettingsKeys.selectedAiModelId) ??
-              'qwen25_1_5b_q4_k_m',
-        );
+    : super(
+        _prefs?.getString(SettingsKeys.selectedAiModelId) ??
+            'qwen25_1_5b_q4_k_m',
+      );
 
   void setModelId(String modelId) {
     state = modelId;
@@ -440,18 +449,16 @@ class SelectedAiModelIdNotifier extends StateNotifier<String> {
 
 /// Currently selected Android calendar id for created reminders/events.
 final selectedProductivityCalendarIdProvider =
-    StateNotifierProvider<SelectedProductivityCalendarIdNotifier, int?>(
-  (ref) {
-    final prefs = ref.watch(sharedPreferencesProvider);
-    return SelectedProductivityCalendarIdNotifier(prefs.valueOrNull);
-  },
-);
+    StateNotifierProvider<SelectedProductivityCalendarIdNotifier, int?>((ref) {
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return SelectedProductivityCalendarIdNotifier(prefs.valueOrNull);
+    });
 
 class SelectedProductivityCalendarIdNotifier extends StateNotifier<int?> {
   final SharedPreferences? _prefs;
 
   SelectedProductivityCalendarIdNotifier(this._prefs)
-      : super(_prefs?.getInt(SettingsKeys.selectedProductivityCalendarId));
+    : super(_prefs?.getInt(SettingsKeys.selectedProductivityCalendarId));
 
   void setCalendarId(int? calendarId) {
     state = calendarId;
@@ -466,15 +473,15 @@ class SelectedProductivityCalendarIdNotifier extends StateNotifier<int?> {
 /// Dev mode: use the latest ELF on the server regardless of hash/commit matching.
 final coredumpUseLatestElfProvider =
     StateNotifierProvider<CoredumpUseLatestElfNotifier, bool>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return CoredumpUseLatestElfNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return CoredumpUseLatestElfNotifier(prefs.valueOrNull);
+    });
 
 class CoredumpUseLatestElfNotifier extends StateNotifier<bool> {
   final SharedPreferences? _prefs;
 
   CoredumpUseLatestElfNotifier(this._prefs)
-      : super(_prefs?.getBool(SettingsKeys.coredumpUseLatestElf) ?? false);
+    : super(_prefs?.getBool(SettingsKeys.coredumpUseLatestElf) ?? false);
 
   void toggle() {
     state = !state;
@@ -490,16 +497,16 @@ class CoredumpUseLatestElfNotifier extends StateNotifier<bool> {
 /// Coredump analysis server URL.
 final coredumpServerUrlProvider =
     StateNotifierProvider<CoredumpServerUrlNotifier, String>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return CoredumpServerUrlNotifier(prefs.valueOrNull);
-});
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return CoredumpServerUrlNotifier(prefs.valueOrNull);
+    });
 
 class CoredumpServerUrlNotifier extends StateNotifier<String> {
   static const String defaultUrl = 'https://zswatch-production.up.railway.app';
   final SharedPreferences? _prefs;
 
   CoredumpServerUrlNotifier(this._prefs)
-      : super(_prefs?.getString(SettingsKeys.coredumpServerUrl) ?? defaultUrl);
+    : super(_prefs?.getString(SettingsKeys.coredumpServerUrl) ?? defaultUrl);
 
   void setUrl(String url) {
     state = url;
@@ -511,4 +518,3 @@ class CoredumpServerUrlNotifier extends StateNotifier<String> {
     _prefs?.remove(SettingsKeys.coredumpServerUrl);
   }
 }
-

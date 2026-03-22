@@ -217,4 +217,3 @@ extension IntTimestampExtensions on int {
   /// Convert Unix timestamp (milliseconds) to DateTime
   DateTime get toDateTimeMs => DateTime.fromMillisecondsSinceEpoch(this);
 }
-

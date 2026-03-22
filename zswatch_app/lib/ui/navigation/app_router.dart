@@ -254,13 +254,11 @@ class _HomeScreen extends ConsumerWidget {
 
     // If connecting, show progress
     if (isConnecting) {
-      final isReconnecting = connection.state == WatchConnectionState.reconnecting;
+      final isReconnecting =
+          connection.state == WatchConnectionState.reconnecting;
       return Scaffold(
         appBar: AppBar(
-          title: SvgPicture.asset(
-            'assets/images/ZSWatch_Text.svg',
-            height: 24,
-          ),
+          title: SvgPicture.asset('assets/images/ZSWatch_Text.svg', height: 24),
         ),
         body: Center(
           child: Padding(
@@ -279,19 +277,19 @@ class _HomeScreen extends ConsumerWidget {
                   Text(
                     'Attempt ${connection.reconnectionCount} of 3',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.color
-                              ?.withValues(alpha: 0.6),
-                        ),
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                    ),
                   ),
                 ],
                 const SizedBox(height: 32),
                 OutlinedButton(
                   onPressed: () {
                     // Mark as user-initiated disconnect so foreground service stops
-                    ref.read(foregroundServiceNotifierProvider.notifier).markUserDisconnect();
+                    ref
+                        .read(foregroundServiceNotifierProvider.notifier)
+                        .markUserDisconnect();
                     // Cancel auto-reconnect and suppress for session
                     ref.read(autoReconnectNotifierProvider.notifier).cancel();
                     // Cancel any pending connection (goes through BleConnectionService)
@@ -320,9 +318,7 @@ class _PlaceholderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-      ),
+      appBar: AppBar(title: Text(title)),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -330,23 +326,20 @@ class _PlaceholderScreen extends StatelessWidget {
             Icon(
               Icons.construction_rounded,
               size: 64,
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
+            Text(title, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 8),
             Text(
               'Coming soon...',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.color
-                        ?.withValues(alpha: 0.5),
-                  ),
+                color: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.color?.withValues(alpha: 0.5),
+              ),
             ),
           ],
         ),
@@ -364,9 +357,7 @@ class _ErrorScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Error'),
-      ),
+      appBar: AppBar(title: const Text('Error')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -450,4 +441,3 @@ extension NavigationExtensions on BuildContext {
   /// Navigate to saved watches
   void goToSavedWatches() => go(AppRoutes.savedWatches);
 }
-

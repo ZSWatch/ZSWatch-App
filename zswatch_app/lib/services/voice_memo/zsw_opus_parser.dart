@@ -121,7 +121,10 @@ class ZswOpusParser {
 
   /// Validate that a downloaded file matches expected metadata.
   /// Used for post-download verification before deleting from watch.
-  static bool validateDownload(Uint8List data, {required int expectedSizeBytes}) {
+  static bool validateDownload(
+    Uint8List data, {
+    required int expectedSizeBytes,
+  }) {
     if (data.length != expectedSizeBytes) return false;
     return validate(data);
   }
@@ -153,9 +156,14 @@ class ZswOpusParser {
       final frameLen = bd.getUint16(0, Endian.little);
 
       if (frameLen == 0) break; // Zero-length frame = end marker or corruption
-      if (offset + 2 + frameLen > data.length) break; // Truncated frame (dirty stop)
+      if (offset + 2 + frameLen > data.length)
+        break; // Truncated frame (dirty stop)
 
-      final frameData = Uint8List.sublistView(data, offset + 2, offset + 2 + frameLen);
+      final frameData = Uint8List.sublistView(
+        data,
+        offset + 2,
+        offset + 2 + frameLen,
+      );
       frames.add(OpusFrame(fileOffset: offset, data: frameData));
       offset += 2 + frameLen;
     }

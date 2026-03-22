@@ -13,7 +13,8 @@ import '../../data/models/crash_summary.dart';
 /// Endpoints:
 /// - POST /api/coredump/analyze  — analyze a coredump.txt with the matching ELF
 class CoredumpApiService {
-  static const String _defaultBaseUrl = 'https://zswatch-production.up.railway.app';
+  static const String _defaultBaseUrl =
+      'https://zswatch-production.up.railway.app';
   static const Duration _analyzeTimeout = Duration(seconds: 60);
 
   final String baseUrl;
@@ -46,25 +47,26 @@ class CoredumpApiService {
     });
 
     debugPrint('[CoredumpApiService] POST $uri');
-    debugPrint('[CoredumpApiService] commit=${summary.fwCommitSha}, '
-        'version=${summary.fwVersion}, elfHash=$elfHash, '
-        'useLatest=$useLatestElf, coredump=${coredumpTxt.length} chars');
+    debugPrint(
+      '[CoredumpApiService] commit=${summary.fwCommitSha}, '
+      'version=${summary.fwVersion}, elfHash=$elfHash, '
+      'useLatest=$useLatestElf, coredump=${coredumpTxt.length} chars',
+    );
 
     final stopwatch = Stopwatch()..start();
     final http.Response response;
     try {
       response = await http
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json'},
-            body: body,
-          )
+          .post(uri, headers: {'Content-Type': 'application/json'}, body: body)
           .timeout(_analyzeTimeout);
     } on TimeoutException {
-      debugPrint('[CoredumpApiService] TIMEOUT after ${stopwatch.elapsedMilliseconds}ms');
+      debugPrint(
+        '[CoredumpApiService] TIMEOUT after ${stopwatch.elapsedMilliseconds}ms',
+      );
       return const CoredumpAnalysis(
         success: false,
-        error: 'Server did not respond within 60s. '
+        error:
+            'Server did not respond within 60s. '
             'It may be trying to fetch the ELF from GitHub releases.',
       );
     } on SocketException catch (e) {
@@ -81,23 +83,27 @@ class CoredumpApiService {
       );
     }
 
-    debugPrint('[CoredumpApiService] Response ${response.statusCode} '
-        'in ${stopwatch.elapsedMilliseconds}ms');
+    debugPrint(
+      '[CoredumpApiService] Response ${response.statusCode} '
+      'in ${stopwatch.elapsedMilliseconds}ms',
+    );
 
     if (response.statusCode == 200) {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final result = CoredumpAnalysis.fromJson(json);
-      debugPrint('[CoredumpApiService] success=${result.success}, '
-          'elfAvailable=${result.elfAvailable}, elfHash=${result.elfHash}');
+      debugPrint(
+        '[CoredumpApiService] success=${result.success}, '
+        'elfAvailable=${result.elfAvailable}, elfHash=${result.elfHash}',
+      );
       return result;
     } else {
       debugPrint(
-          '[CoredumpApiService] Error ${response.statusCode}: ${response.body}');
+        '[CoredumpApiService] Error ${response.statusCode}: ${response.body}',
+      );
       return CoredumpAnalysis(
         success: false,
         error: 'Server error ${response.statusCode}: ${response.reasonPhrase}',
       );
     }
   }
-
 }

@@ -46,7 +46,7 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
   void initState() {
     super.initState();
     _rotatedMode = ref.read(firmwareManagerProvider).useRotatedFirmware;
-    
+
     // Reset state when entering the screen to clear any stale state
     // Use addPostFrameCallback to ensure ref is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -54,7 +54,7 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
         ref.read(dfuNotifierProvider.notifier).reset();
       }
     });
-    
+
     // Listen to DFU logs
     ref.read(dfuServiceProvider).logStream.listen((log) {
       if (mounted) {
@@ -78,7 +78,7 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
   /// Enable wakelock if setting is enabled and DFU is in progress
   void _updateWakelock(bool dfuInProgress) {
     final keepScreenOn = ref.read(keepScreenOnDuringDfuProvider);
-    
+
     if (dfuInProgress && keepScreenOn && !_wakelockEnabled) {
       WakelockPlus.enable();
       _wakelockEnabled = true;
@@ -105,9 +105,10 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
     final hasSmp = ref.watch(hasSmpServiceProvider);
 
     // Manage wakelock based on DFU/upload state
-    final isDfuInProgress = dfuState.status.isInProgress || 
-                            fsUploadState.status.isInProgress ||
-                            operationState.isDownloading;
+    final isDfuInProgress =
+        dfuState.status.isInProgress ||
+        fsUploadState.status.isInProgress ||
+        operationState.isDownloading;
     _updateWakelock(isDfuInProgress);
 
     // Prevent back navigation during critical DFU phase
@@ -157,9 +158,10 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                         !operationState.isDownloading) ...[
                       // GitHub releases
                       _ReleasesSection(
-                        boardPrefix: FirmwareManager.boardPrefixFromHardwareVersion(
-                          watch?.hardwareVersion,
-                        ),
+                        boardPrefix:
+                            FirmwareManager.boardPrefixFromHardwareVersion(
+                              watch?.hardwareVersion,
+                            ),
                         onAssetSelected: (release, asset) {
                           ref
                               .read(dfuNotifierProvider.notifier)
@@ -171,9 +173,10 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
 
                       // CI Builds (GitHub Actions)
                       _CIBuildsSection(
-                        boardPrefix: FirmwareManager.boardPrefixFromHardwareVersion(
-                          watch?.hardwareVersion,
-                        ),
+                        boardPrefix:
+                            FirmwareManager.boardPrefixFromHardwareVersion(
+                              watch?.hardwareVersion,
+                            ),
                         onOpenInBrowser: (run, artifact) async {
                           final url = ref
                               .read(dfuNotifierProvider.notifier)
@@ -198,7 +201,9 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Could not open browser. URL: $url'),
+                                    content: Text(
+                                      'Could not open browser. URL: $url',
+                                    ),
                                     backgroundColor: AppTheme.errorColor,
                                   ),
                                 );
@@ -256,15 +261,17 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                                 onChanged: (value) {
                                   final enabled = value ?? false;
                                   setState(() => _rotatedMode = enabled);
-                                  ref.read(firmwareManagerProvider).useRotatedFirmware = enabled;
+                                  ref
+                                          .read(firmwareManagerProvider)
+                                          .useRotatedFirmware =
+                                      enabled;
                                 },
                               ),
                               Expanded(
                                 child: Text(
                                   'Use rotated display firmware',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: AppTheme.textSecondary,
-                                      ),
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: AppTheme.textSecondary),
                                 ),
                               ),
                             ],
@@ -297,10 +304,12 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                       hasSmpService: hasSmp,
                       onStartFirmware: () =>
                           ref.read(dfuNotifierProvider.notifier).startUpdate(),
-                      onStartFilesystem: () =>
-                          ref.read(dfuNotifierProvider.notifier).startFilesystemUpload(),
-                      onStartBoth: () =>
-                          ref.read(dfuNotifierProvider.notifier).startBothUpdates(),
+                      onStartFilesystem: () => ref
+                          .read(dfuNotifierProvider.notifier)
+                          .startFilesystemUpload(),
+                      onStartBoth: () => ref
+                          .read(dfuNotifierProvider.notifier)
+                          .startBothUpdates(),
                       onCancel: () =>
                           ref.read(dfuNotifierProvider.notifier).cancel(),
                       onReset: () =>
@@ -389,8 +398,8 @@ class _BatteryWarningCard extends StatelessWidget {
                   Text(
                     'Low Battery ($level%)',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppTheme.warningColor,
-                        ),
+                      color: AppTheme.warningColor,
+                    ),
                   ),
                   Text(
                     'Consider charging your watch before updating.',
@@ -428,8 +437,8 @@ class _ConnectionWarningCard extends StatelessWidget {
                   Text(
                     'Watch Not Connected',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppTheme.errorColor,
-                        ),
+                      color: AppTheme.errorColor,
+                    ),
                   ),
                   Text(
                     'Connect to your watch to update firmware.',
@@ -438,10 +447,7 @@ class _ConnectionWarningCard extends StatelessWidget {
                 ],
               ),
             ),
-            TextButton(
-              onPressed: onReconnect,
-              child: const Text('Connect'),
-            ),
+            TextButton(onPressed: onReconnect, child: const Text('Connect')),
           ],
         ),
       ),
@@ -449,15 +455,11 @@ class _ConnectionWarningCard extends StatelessWidget {
   }
 }
 
-
 class _StatusCard extends ConsumerWidget {
   final DfuState dfuState;
   final DownloadProgress downloadProgress;
 
-  const _StatusCard({
-    required this.dfuState,
-    required this.downloadProgress,
-  });
+  const _StatusCard({required this.dfuState, required this.downloadProgress});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -484,12 +486,14 @@ class _StatusCard extends ConsumerWidget {
     if (isDownloading) {
       statusTitle = 'Downloading...';
       progress = downloadProgress.progress;
-      bytesText = '${downloadProgress.formattedBytesReceived} / ${downloadProgress.formattedTotalBytes}';
+      bytesText =
+          '${downloadProgress.formattedBytesReceived} / ${downloadProgress.formattedTotalBytes}';
       percentText = '${downloadProgress.progressPercent}%';
     } else if (isFsUploading) {
       statusTitle = 'Uploading Filesystem...';
       progress = fsUploadState.progress;
-      bytesText = '${fsUploadState.formattedBytesTransferred} / ${fsUploadState.formattedTotalBytes}';
+      bytesText =
+          '${fsUploadState.formattedBytesTransferred} / ${fsUploadState.formattedTotalBytes}';
       percentText = '${fsUploadState.progressPercent}%';
       speedText = 'Speed: ${fsUploadState.formattedSpeed}';
       timeRemainingText = 'Remaining: ${fsUploadState.formattedTimeRemaining}';
@@ -498,7 +502,8 @@ class _StatusCard extends ConsumerWidget {
     } else {
       statusTitle = dfuState.status.statusText;
       progress = dfuState.progress;
-      bytesText = '${dfuState.formattedBytesTransferred} / ${dfuState.formattedTotalBytes}';
+      bytesText =
+          '${dfuState.formattedBytesTransferred} / ${dfuState.formattedTotalBytes}';
       percentText = '${dfuState.progressPercent}%';
       if (dfuState.status == DfuStatus.uploading) {
         speedText = 'Speed: ${dfuState.formattedSpeed}';
@@ -526,8 +531,10 @@ class _StatusCard extends ConsumerWidget {
                   status: isDfuInProgress
                       ? dfuState.status
                       : (isFsUploading
-                          ? DfuStatus.uploading
-                          : (isDownloading ? DfuStatus.preparing : DfuStatus.idle)),
+                            ? DfuStatus.uploading
+                            : (isDownloading
+                                  ? DfuStatus.preparing
+                                  : DfuStatus.idle)),
                 ),
                 const SizedBox(width: AppTheme.spacingSm),
                 Expanded(
@@ -575,8 +582,14 @@ class _StatusCard extends ConsumerWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(speedText, style: Theme.of(context).textTheme.bodySmall),
-                    Text(timeRemainingText, style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      speedText,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    Text(
+                      timeRemainingText,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                 ),
               ),
@@ -635,7 +648,9 @@ class _SpeedChart extends StatelessWidget {
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.1),
               ),
             ),
           ],
@@ -744,9 +759,8 @@ class _SelectedFirmwareCard extends StatelessWidget {
                       if (image.version != null)
                         Text(
                           'Version: ${image.version}',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textSecondary,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppTheme.textSecondary),
                         ),
                     ],
                   ),
@@ -785,8 +799,8 @@ class _SelectedFirmwareCard extends StatelessWidget {
                     Text(
                       'Filesystem image included (${filesystemImage!.formattedSize})',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.successColor,
-                          ),
+                        color: AppTheme.successColor,
+                      ),
                     ),
                   ],
                 ),
@@ -814,8 +828,8 @@ class _SelectedFirmwareCard extends StatelessWidget {
                     Text(
                       'Firmware only (no filesystem image)',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -877,9 +891,8 @@ class _ReleasesSection extends ConsumerWidget {
                         const Text('No releases loaded'),
                         Text(
                           'Tap refresh to fetch from GitHub',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textSecondary,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppTheme.textSecondary),
                         ),
                       ],
                     ),
@@ -890,11 +903,14 @@ class _ReleasesSection extends ConsumerWidget {
             return Column(
               children: releases
                   .take(5)
-                  .map((release) => _ReleaseCard(
-                        release: release,
-                        boardPrefix: boardPrefix,
-                        onAssetSelected: (asset) => onAssetSelected(release, asset),
-                      ))
+                  .map(
+                    (release) => _ReleaseCard(
+                      release: release,
+                      boardPrefix: boardPrefix,
+                      onAssetSelected: (asset) =>
+                          onAssetSelected(release, asset),
+                    ),
+                  )
                   .toList(),
             );
           },
@@ -913,7 +929,8 @@ class _ReleasesSection extends ConsumerWidget {
                   const SizedBox(height: 8),
                   Text('Failed to load releases: $error'),
                   TextButton(
-                    onPressed: () => ref.read(releasesProvider.notifier).fetch(),
+                    onPressed: () =>
+                        ref.read(releasesProvider.notifier).fetch(),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -949,8 +966,9 @@ class _ReleaseCard extends StatelessWidget {
       child: ListTile(
         leading: Icon(
           release.isPrerelease ? Icons.science : Icons.new_releases,
-          color:
-              release.isPrerelease ? AppTheme.warningColor : AppTheme.successColor,
+          color: release.isPrerelease
+              ? AppTheme.warningColor
+              : AppTheme.successColor,
         ),
         title: Text(release.name),
         subtitle: Text(
@@ -969,7 +987,10 @@ class _ReleaseCard extends StatelessWidget {
     );
   }
 
-  void _showAssetSelectionDialog(BuildContext context, List<ReleaseAsset> assetsToShow) {
+  void _showAssetSelectionDialog(
+    BuildContext context,
+    List<ReleaseAsset> assetsToShow,
+  ) {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -982,9 +1003,9 @@ class _ReleaseCard extends StatelessWidget {
             children: [
               Text(
                 '${release.name} (${release.version})',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
               ),
               const SizedBox(height: AppTheme.spacingMd),
               Text(
@@ -994,23 +1015,26 @@ class _ReleaseCard extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: AppTheme.spacingSm),
-              ...assetsToShow.map((asset) => _AssetTile(
-                    asset: asset,
-                    isCompatible: FirmwareManager.isAssetCompatible(
-                      asset.name,
-                      boardPrefix,
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      onAssetSelected(asset);
-                    },
-                  )),
+              ...assetsToShow.map(
+                (asset) => _AssetTile(
+                  asset: asset,
+                  isCompatible: FirmwareManager.isAssetCompatible(
+                    asset.name,
+                    boardPrefix,
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    onAssetSelected(asset);
+                  },
+                ),
+              ),
             ],
           ),
         ),
         actions: [
           // Allow showing all assets if filtering is active
-          if (boardPrefix != null && assetsToShow.length != release.assets.length)
+          if (boardPrefix != null &&
+              assetsToShow.length != release.assets.length)
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
@@ -1072,10 +1096,7 @@ class _CIBuildsSection extends ConsumerStatefulWidget {
   final void Function(WorkflowRun, WorkflowArtifact) onOpenInBrowser;
   final String? boardPrefix;
 
-  const _CIBuildsSection({
-    required this.onOpenInBrowser,
-    this.boardPrefix,
-  });
+  const _CIBuildsSection({required this.onOpenInBrowser, this.boardPrefix});
 
   @override
   ConsumerState<_CIBuildsSection> createState() => _CIBuildsSectionState();
@@ -1104,7 +1125,10 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -1112,15 +1136,16 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
                     child: Text(
                       'GitHub Actions',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.primaryColor,
-                          ),
+                        color: AppTheme.primaryColor,
+                      ),
                     ),
                   ),
                 ],
               ),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 20),
-                onPressed: () => ref.read(workflowRunsProvider.notifier).fetch(),
+                onPressed: () =>
+                    ref.read(workflowRunsProvider.notifier).fetch(),
                 tooltip: 'Load CI builds',
               ),
             ],
@@ -1145,9 +1170,8 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
                         const Text('No CI builds loaded'),
                         Text(
                           'Tap refresh to fetch from GitHub Actions',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textSecondary,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppTheme.textSecondary),
                         ),
                       ],
                     ),
@@ -1196,9 +1220,7 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
                             const SizedBox(width: 8),
                             Text(
                               branch,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
+                              style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(width: 8),
@@ -1209,15 +1231,17 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
                               ),
                               decoration: BoxDecoration(
                                 color: isMainBranch
-                                    ? AppTheme.successColor.withValues(alpha: 0.1)
-                                    : AppTheme.primaryColor.withValues(alpha: 0.1),
+                                    ? AppTheme.successColor.withValues(
+                                        alpha: 0.1,
+                                      )
+                                    : AppTheme.primaryColor.withValues(
+                                        alpha: 0.1,
+                                      ),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
                                 isMainBranch ? 'Release' : 'Debug',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
+                                style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(
                                       color: isMainBranch
                                           ? AppTheme.successColor
@@ -1229,28 +1253,31 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
                             const Spacer(),
                             Text(
                               '${branchRuns.length} build${branchRuns.length != 1 ? 's' : ''}',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.textSecondary,
-                                  ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppTheme.textSecondary),
                             ),
                           ],
                         ),
                       ),
                       // Runs for this branch
-                      ...branchRuns.map((run) => _WorkflowRunTile(
-                            run: run,
-                            boardPrefix: widget.boardPrefix,
-                            isExpanded: _expandedBranches['${branch}_${run.id}'] ?? false,
-                            onToggle: () {
-                              setState(() {
-                                final key = '${branch}_${run.id}';
-                                _expandedBranches[key] = !(_expandedBranches[key] ?? false);
-                              });
-                            },
-                            onOpenInBrowser: (artifact) {
-                              widget.onOpenInBrowser(run, artifact);
-                            },
-                          )),
+                      ...branchRuns.map(
+                        (run) => _WorkflowRunTile(
+                          run: run,
+                          boardPrefix: widget.boardPrefix,
+                          isExpanded:
+                              _expandedBranches['${branch}_${run.id}'] ?? false,
+                          onToggle: () {
+                            setState(() {
+                              final key = '${branch}_${run.id}';
+                              _expandedBranches[key] =
+                                  !(_expandedBranches[key] ?? false);
+                            });
+                          },
+                          onOpenInBrowser: (artifact) {
+                            widget.onOpenInBrowser(run, artifact);
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -1277,12 +1304,13 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
                   Text(
                     error.toString(),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
+                      color: AppTheme.textSecondary,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   TextButton(
-                    onPressed: () => ref.read(workflowRunsProvider.notifier).fetch(),
+                    onPressed: () =>
+                        ref.read(workflowRunsProvider.notifier).fetch(),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -1342,9 +1370,8 @@ class _WorkflowRunTile extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             '${filteredArtifacts.length} artifact${filteredArtifacts.length != 1 ? 's' : ''}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppTheme.textSecondary,
-                                ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppTheme.textSecondary),
                           ),
                         ],
                       ),
@@ -1353,7 +1380,8 @@ class _WorkflowRunTile extends StatelessWidget {
                         children: [
                           Text(
                             run.shortSha,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
                                   fontFamily: 'monospace',
                                   color: AppTheme.textSecondary,
                                 ),
@@ -1362,9 +1390,8 @@ class _WorkflowRunTile extends StatelessWidget {
                           Expanded(
                             child: Text(
                               run.shortCommitMessage,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.textSecondary,
-                                  ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: AppTheme.textSecondary),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -1415,13 +1442,13 @@ class _WorkflowRunTile extends StatelessWidget {
                           children: [
                             Text(
                               artifact.name,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontFamily: 'monospace',
-                                  ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(fontFamily: 'monospace'),
                             ),
                             Text(
                               artifact.formattedSize,
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
                                     color: AppTheme.textSecondary,
                                     fontSize: 10,
                                   ),
@@ -1455,10 +1482,7 @@ class _ErrorCard extends StatelessWidget {
   final String error;
   final VoidCallback onDismiss;
 
-  const _ErrorCard({
-    required this.error,
-    required this.onDismiss,
-  });
+  const _ErrorCard({required this.error, required this.onDismiss});
 
   @override
   Widget build(BuildContext context) {
@@ -1473,15 +1497,12 @@ class _ErrorCard extends StatelessWidget {
             Expanded(
               child: Text(
                 error,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.errorColor,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppTheme.errorColor),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: onDismiss,
-            ),
+            IconButton(icon: const Icon(Icons.close), onPressed: onDismiss),
           ],
         ),
       ),
@@ -1516,12 +1537,14 @@ class _ActionButtons extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fsUploadState = ref.watch(filesystemUploadStateProvider);
     final isFsUploading = fsUploadState.status.isInProgress;
-    final isFsCompleted = fsUploadState.status == FilesystemUploadStatus.completed;
+    final isFsCompleted =
+        fsUploadState.status == FilesystemUploadStatus.completed;
     final isFsFailed = fsUploadState.status == FilesystemUploadStatus.failed;
-    
+
     // During "both" update, only show completion when firmware DFU finishes (not just FS)
     final isBothUpdating = operationState.isBothUpdating;
-    final showFsOnlyComplete = isFsCompleted && !isBothUpdating && dfuState.status == DfuStatus.idle;
+    final showFsOnlyComplete =
+        isFsCompleted && !isBothUpdating && dfuState.status == DfuStatus.idle;
 
     // Completed state - show reset button
     if (dfuState.status == DfuStatus.completed || showFsOnlyComplete) {
@@ -1536,9 +1559,9 @@ class _ActionButtons extends ConsumerWidget {
           const SizedBox(height: AppTheme.spacingMd),
           Text(
             isFullComplete ? 'Update Complete!' : 'Filesystem Upload Complete!',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppTheme.successColor,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: AppTheme.successColor),
           ),
           const SizedBox(height: AppTheme.spacingLg),
           FilledButton.icon(
@@ -1560,17 +1583,13 @@ class _ActionButtons extends ConsumerWidget {
           : fsUploadState.errorMessage;
       return Column(
         children: [
-          const Icon(
-            Icons.error,
-            color: AppTheme.errorColor,
-            size: 64,
-          ),
+          const Icon(Icons.error, color: AppTheme.errorColor, size: 64),
           const SizedBox(height: AppTheme.spacingMd),
           Text(
             'Update Failed',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppTheme.errorColor,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: AppTheme.errorColor),
           ),
           if (errorMessage != null) ...[
             const SizedBox(height: AppTheme.spacingSm),
@@ -1584,13 +1603,12 @@ class _ActionButtons extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              OutlinedButton(
-                onPressed: onReset,
-                child: const Text('Reset'),
-              ),
+              OutlinedButton(onPressed: onReset, child: const Text('Reset')),
               const SizedBox(width: AppTheme.spacingMd),
               FilledButton(
-                onPressed: operationState.canStartFirmwareUpdate ? onStartFirmware : null,
+                onPressed: operationState.canStartFirmwareUpdate
+                    ? onStartFirmware
+                    : null,
                 child: const Text('Retry'),
               ),
             ],
@@ -1605,17 +1623,17 @@ class _ActionButtons extends ConsumerWidget {
         onPressed: onCancel,
         icon: const Icon(Icons.cancel),
         label: const Text('Cancel Download'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppTheme.errorColor,
-        ),
+        style: OutlinedButton.styleFrom(foregroundColor: AppTheme.errorColor),
       );
     }
 
     // In progress - show cancel button
-    if (dfuState.status.isInProgress || isFsUploading || operationState.isBothUpdating) {
+    if (dfuState.status.isInProgress ||
+        isFsUploading ||
+        operationState.isBothUpdating) {
       final isCritical = dfuState.status.isCritical;
       final canCancel = dfuState.status.canCancel || isFsUploading;
-      
+
       return Column(
         children: [
           if (isCritical)
@@ -1662,7 +1680,9 @@ class _ActionButtons extends ConsumerWidget {
         // Start Both button (shown when both are available)
         if (operationState.hasBoth) ...[
           FilledButton.icon(
-            onPressed: operationState.canStartBoth && isConnected ? onStartBoth : null,
+            onPressed: operationState.canStartBoth && isConnected
+                ? onStartBoth
+                : null,
             icon: const Icon(Icons.playlist_play),
             label: const Text('Start Both (FS + FW)'),
             style: FilledButton.styleFrom(
@@ -1673,22 +1693,22 @@ class _ActionButtons extends ConsumerWidget {
           const SizedBox(height: AppTheme.spacingSm),
           Text(
             'Uploads filesystem first, then firmware',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: AppTheme.spacingMd),
           const Divider(),
           const SizedBox(height: AppTheme.spacingSm),
           Text(
             'Or update individually:',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: AppTheme.spacingSm),
         ],
-        
+
         // Individual buttons row
         Row(
           children: [
@@ -1700,37 +1720,34 @@ class _ActionButtons extends ConsumerWidget {
                     : null,
                 icon: const Icon(Icons.system_update, size: 18),
                 label: const Text('FW Update'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 44),
-                ),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
               ),
             ),
             const SizedBox(width: AppTheme.spacingSm),
             // Filesystem Upload button
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: operationState.canStartFilesystemUpload && isConnected
+                onPressed:
+                    operationState.canStartFilesystemUpload && isConnected
                     ? onStartFilesystem
                     : null,
                 icon: const Icon(Icons.storage, size: 18),
                 label: const Text('FS Upload'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 44),
-                ),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
               ),
             ),
           ],
         ),
-        
+
         // Status messages
         if (!isConnected)
           Padding(
             padding: const EdgeInsets.only(top: AppTheme.spacingMd),
             child: Text(
               'Connect to your watch to start',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ),
         if (!operationState.hasFirmware && !operationState.hasFilesystem)
@@ -1738,13 +1755,12 @@ class _ActionButtons extends ConsumerWidget {
             padding: const EdgeInsets.only(top: AppTheme.spacingMd),
             child: Text(
               'Select a firmware package to continue',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ),
       ],
     );
   }
 }
-

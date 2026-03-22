@@ -98,11 +98,7 @@ class BatteryRing extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (isCharging)
-          Icon(
-            Icons.bolt_rounded,
-            size: size * 0.2,
-            color: color,
-          ),
+          Icon(Icons.bolt_rounded, size: size * 0.2, color: color),
         Text(
           '$level%',
           style: TextStyle(
@@ -226,4 +222,3 @@ class BatteryIndicator extends StatelessWidget {
     return Icons.battery_alert_rounded;
   }
 }
-

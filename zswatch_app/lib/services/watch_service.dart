@@ -125,9 +125,10 @@ class WatchService {
   // --- Public API: connection (delegates to BleConnectionService) ---
 
   /// Connect to a scanned device.
-  Future<void> connect(ScannedWatch scannedDevice,
-      {bool autoConnect = false}) =>
-      _ble.connect(scannedDevice, autoConnect: autoConnect);
+  Future<void> connect(
+    ScannedWatch scannedDevice, {
+    bool autoConnect = false,
+  }) => _ble.connect(scannedDevice, autoConnect: autoConnect);
 
   /// Connect by device ID (for saved watches).
   Future<void> connectById(String deviceId, {bool autoConnect = false}) =>
@@ -171,11 +172,7 @@ class WatchService {
     String? phoneNumber,
     bool canReply = false,
   }) async {
-    final data = <String, dynamic>{
-      't': 'notify',
-      'id': id,
-      'src': source,
-    };
+    final data = <String, dynamic>{'t': 'notify', 'id': id, 'src': source};
     if (title != null) data['title'] = title;
     if (body != null) data['body'] = body;
     if (sender != null) data['sender'] = sender;
@@ -202,10 +199,7 @@ class WatchService {
     bool shuffle = false,
     bool repeat = false,
   }) async {
-    final data = <String, dynamic>{
-      't': 'musicstate',
-      'state': state,
-    };
+    final data = <String, dynamic>{'t': 'musicstate', 'state': state};
     if (positionSeconds != null) data['position'] = positionSeconds;
     if (shuffle) data['shuffle'] = 1;
     if (repeat) data['repeat'] = 1;
@@ -286,8 +280,10 @@ class WatchService {
   Future<void> disableLogStreaming() => setLogStreaming(false);
 
   /// Send a voice memo command to the watch.
-  Future<void> sendVoiceMemoCommand(String action,
-      {Map<String, dynamic>? extraData}) async {
+  Future<void> sendVoiceMemoCommand(
+    String action, {
+    Map<String, dynamic>? extraData,
+  }) async {
     final data = <String, dynamic>{'t': 'voice_memo', 'action': action};
     if (extraData != null) data.addAll(extraData);
     await _sendGb(data);
@@ -310,8 +306,12 @@ class WatchService {
 
   // --- Setup callback (called by BleConnectionService) ---
 
-  Future<void> _onSetupRequired(BluetoothDevice device,
-      List<BluetoothService> services, String watchId, String name) async {
+  Future<void> _onSetupRequired(
+    BluetoothDevice device,
+    List<BluetoothService> services,
+    String watchId,
+    String name,
+  ) async {
     // Create or update watch object
     final existingWatch = currentWatch;
     final watch = existingWatch != null && existingWatch.id == watchId
@@ -367,7 +367,9 @@ class WatchService {
   Future<void> _setupNus(List<BluetoothService> services) async {
     await _nusSubscription?.cancel();
     _nusSubscription = null;
-    try { await _nusRxChar?.setNotifyValue(false); } catch (_) {}
+    try {
+      await _nusRxChar?.setNotifyValue(false);
+    } catch (_) {}
     _nusRxChar = null;
 
     // Reset protocol state — critical for auto-reconnect where
@@ -380,8 +382,10 @@ class WatchService {
     final nusService = _findServiceIn(services, _guid(NusUuids.service));
     if (nusService == null) return;
 
-    final rxChar =
-        _findCharacteristic(nusService, _guid(NusUuids.rxCharacteristic));
+    final rxChar = _findCharacteristic(
+      nusService,
+      _guid(NusUuids.rxCharacteristic),
+    );
     if (rxChar == null) return;
 
     _nusRxChar = rxChar;
@@ -488,7 +492,8 @@ class WatchService {
 
       if (jsonEnd == -1) {
         debugPrint(
-            '[BLE RX] Buffering incomplete JSON (${_messageBuffer.length} bytes)');
+          '[BLE RX] Buffering incomplete JSON (${_messageBuffer.length} bytes)',
+        );
         break;
       }
 
@@ -522,8 +527,7 @@ class WatchService {
     var fixed = message;
     var wasModified = false;
 
-    final unquotedKeyRegex =
-        RegExp(r'([{,])\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:');
+    final unquotedKeyRegex = RegExp(r'([{,])\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:');
     final fixedKeys = fixed.replaceAllMapped(unquotedKeyRegex, (match) {
       final prefix = match.group(1)!;
       final key = match.group(2)!;
@@ -534,8 +538,7 @@ class WatchService {
       wasModified = true;
     }
 
-    final unquotedValueRegex =
-        RegExp(r':\s*([a-zA-Z_][a-zA-Z0-9_]*)(\s*[,}])');
+    final unquotedValueRegex = RegExp(r':\s*([a-zA-Z_][a-zA-Z0-9_]*)(\s*[,}])');
     final fixedValues = fixed.replaceAllMapped(unquotedValueRegex, (match) {
       final value = match.group(1)!;
       final suffix = match.group(2)!;
@@ -560,17 +563,18 @@ class WatchService {
 
     switch (type) {
       case 'ver':
-        debugPrint('[WatchService] Ver response: sha=${message['sha']}, dbg=${message['dbg']}');
+        debugPrint(
+          '[WatchService] Ver response: sha=${message['sha']}, dbg=${message['dbg']}',
+        );
         final fw = message['fw'] as String?;
         final hw = message['hw'] as String?;
         _fwCommitSha = message['sha'] as String?;
         _fwIsDebug = message['dbg'] == 1;
         final watch = currentWatch;
         if (watch != null) {
-          _watchInfoController.add(watch.copyWith(
-            firmwareVersion: fw,
-            hardwareVersion: hw,
-          ));
+          _watchInfoController.add(
+            watch.copyWith(firmwareVersion: fw, hardwareVersion: hw),
+          );
         }
         break;
 
@@ -578,15 +582,17 @@ class WatchService {
         debugPrint('[WatchService] Coredump message: $message');
         final available = message['available'] == true;
         if (available) {
-          _crashSummaryController.add(CrashSummary(
-            file: message['file'] as String? ?? '',
-            line: message['line'] as int? ?? 0,
-            time: message['time'] as String? ?? '',
-            fwVersion: currentWatch?.firmwareVersion ?? '',
-            fwCommitSha: _fwCommitSha ?? '',
-            board: currentWatch?.hardwareVersion ?? 'watchdk',
-            buildType: _fwIsDebug ? 'debug' : 'release',
-          ));
+          _crashSummaryController.add(
+            CrashSummary(
+              file: message['file'] as String? ?? '',
+              line: message['line'] as int? ?? 0,
+              time: message['time'] as String? ?? '',
+              fwVersion: currentWatch?.firmwareVersion ?? '',
+              fwCommitSha: _fwCommitSha ?? '',
+              board: currentWatch?.hardwareVersion ?? 'watchdk',
+              buildType: _fwIsDebug ? 'debug' : 'release',
+            ),
+          );
         } else {
           _crashSummaryController.add(null);
         }
@@ -601,14 +607,12 @@ class WatchService {
           if (watch != null) {
             _watchInfoController.add(watch.copyWith(batteryLevel: battery));
           }
-          _ble.updateConnectionField(
-              (c) => c.copyWith(isCharging: isCharging));
+          _ble.updateConnectionField((c) => c.copyWith(isCharging: isCharging));
         }
         break;
 
       case 'voice_memo':
-        debugPrint(
-            '[WatchService] Voice memo message: ${message['action']}');
+        debugPrint('[WatchService] Voice memo message: ${message['action']}');
         break;
     }
   }
@@ -616,18 +620,25 @@ class WatchService {
   // --- Internal: battery ---
 
   Future<void> _setupBatteryNotifications(
-      List<BluetoothService> services) async {
+    List<BluetoothService> services,
+  ) async {
     await _batterySubscription?.cancel();
     _batterySubscription = null;
-    try { await _batteryLevelChar?.setNotifyValue(false); } catch (_) {}
+    try {
+      await _batteryLevelChar?.setNotifyValue(false);
+    } catch (_) {}
     _batteryLevelChar = null;
 
-    final batteryService =
-        _findServiceIn(services, _guid(BatteryUuids.service));
+    final batteryService = _findServiceIn(
+      services,
+      _guid(BatteryUuids.service),
+    );
     if (batteryService == null) return;
 
-    final levelChar =
-        _findCharacteristic(batteryService, _guid(BatteryUuids.level));
+    final levelChar = _findCharacteristic(
+      batteryService,
+      _guid(BatteryUuids.level),
+    );
     if (levelChar == null) return;
 
     // Read initial value
@@ -642,8 +653,7 @@ class WatchService {
         }
       }
     } catch (e) {
-      debugPrint(
-          '[WatchService] Battery initial read failed (ignored): $e');
+      debugPrint('[WatchService] Battery initial read failed (ignored): $e');
     }
 
     // Subscribe to notifications
@@ -661,8 +671,7 @@ class WatchService {
         }
       });
     } catch (e) {
-      debugPrint(
-          '[WatchService] Battery notify setup failed (ignored): $e');
+      debugPrint('[WatchService] Battery notify setup failed (ignored): $e');
     }
   }
 
@@ -681,8 +690,10 @@ class WatchService {
     final nusService = _findServiceIn(services, _guid(NusUuids.service));
     if (nusService == null) return;
 
-    final txChar =
-        _findCharacteristic(nusService, _guid(NusUuids.txCharacteristic));
+    final txChar = _findCharacteristic(
+      nusService,
+      _guid(NusUuids.txCharacteristic),
+    );
     if (txChar == null) return;
 
     debugPrint('[BLE TX] $data');
@@ -690,19 +701,21 @@ class WatchService {
 
     final bytes = utf8.encode(data);
 
-    final currentMtu =
-        _ble.currentConnection.mtu ?? BleConfig.minimumMtu;
+    final currentMtu = _ble.currentConnection.mtu ?? BleConfig.minimumMtu;
     final maxChunkSize = currentMtu - 3;
 
     if (bytes.length <= maxChunkSize) {
-      await txChar.write(bytes,
-          withoutResponse: txChar.properties.writeWithoutResponse);
+      await txChar.write(
+        bytes,
+        withoutResponse: txChar.properties.writeWithoutResponse,
+      );
       return;
     }
 
     if (bytes.length > 2000) {
       debugPrint(
-          '[BLE TX] WARNING: Data exceeds watch max buffer (${bytes.length} > 2000)');
+        '[BLE TX] WARNING: Data exceeds watch max buffer (${bytes.length} > 2000)',
+      );
     }
 
     int offset = 0;
@@ -713,10 +726,13 @@ class WatchService {
 
       chunkNum++;
       debugPrint(
-          '[BLE TX] Chunk $chunkNum: ${chunk.length} bytes (offset $offset)');
+        '[BLE TX] Chunk $chunkNum: ${chunk.length} bytes (offset $offset)',
+      );
 
-      await txChar.write(chunk,
-          withoutResponse: txChar.properties.writeWithoutResponse);
+      await txChar.write(
+        chunk,
+        withoutResponse: txChar.properties.writeWithoutResponse,
+      );
 
       if (end < bytes.length) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -758,21 +774,20 @@ class WatchService {
 
   // --- Helpers ---
 
-  BluetoothService? _findServiceIn(
-      List<BluetoothService> services, Guid uuid) {
+  BluetoothService? _findServiceIn(List<BluetoothService> services, Guid uuid) {
     return services.cast<BluetoothService?>().firstWhere(
-          (s) => s?.uuid == uuid,
-          orElse: () => null,
-        );
+      (s) => s?.uuid == uuid,
+      orElse: () => null,
+    );
   }
 
   BluetoothCharacteristic? _findCharacteristic(
-      BluetoothService service, Guid uuid) {
-    return service.characteristics
-        .cast<BluetoothCharacteristic?>()
-        .firstWhere(
-          (c) => c?.uuid == uuid,
-          orElse: () => null,
-        );
+    BluetoothService service,
+    Guid uuid,
+  ) {
+    return service.characteristics.cast<BluetoothCharacteristic?>().firstWhere(
+      (c) => c?.uuid == uuid,
+      orElse: () => null,
+    );
   }
 }

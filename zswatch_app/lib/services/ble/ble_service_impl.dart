@@ -75,10 +75,12 @@ class BleServiceImpl implements BleService {
     _isScanning = true;
 
     _updateConnectionState(
-      (_currentConnection ?? const BleConnectionInfo(
-        deviceId: '',
-        state: BleConnectionState.disconnected,
-      )).copyWith(state: BleConnectionState.scanning),
+      (_currentConnection ??
+              const BleConnectionInfo(
+                deviceId: '',
+                state: BleConnectionState.disconnected,
+              ))
+          .copyWith(state: BleConnectionState.scanning),
     );
 
     _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
@@ -107,18 +109,20 @@ class BleServiceImpl implements BleService {
     );
 
     // Auto-stop tracking when scan completes
-    unawaited(Future<void>.delayed(timeout, () {
-      if (_isScanning) {
-        _isScanning = false;
-        if (_currentConnection?.state == BleConnectionState.scanning) {
-          _updateConnectionState(
-            _currentConnection!.copyWith(
-              state: BleConnectionState.disconnected,
-            ),
-          );
+    unawaited(
+      Future<void>.delayed(timeout, () {
+        if (_isScanning) {
+          _isScanning = false;
+          if (_currentConnection?.state == BleConnectionState.scanning) {
+            _updateConnectionState(
+              _currentConnection!.copyWith(
+                state: BleConnectionState.disconnected,
+              ),
+            );
+          }
         }
-      }
-    }));
+      }),
+    );
   }
 
   @override
@@ -137,16 +141,19 @@ class BleServiceImpl implements BleService {
     _autoReconnect = autoReconnect;
     _reconnectionCount = 0;
 
-    _updateConnectionState(BleConnectionInfo(
-      deviceId: device.remoteId.str,
-      state: BleConnectionState.connecting,
-    ));
+    _updateConnectionState(
+      BleConnectionInfo(
+        deviceId: device.remoteId.str,
+        state: BleConnectionState.connecting,
+      ),
+    );
 
     try {
       // Listen to connection state changes
       _connectionSubscription?.cancel();
-      _connectionSubscription =
-          device.connectionState.listen(_handleConnectionStateChange);
+      _connectionSubscription = device.connectionState.listen(
+        _handleConnectionStateChange,
+      );
 
       await device.connect(
         license: License.free,
@@ -157,19 +164,23 @@ class BleServiceImpl implements BleService {
 
       _connectedDevice = device;
 
-      _updateConnectionState(BleConnectionInfo(
-        deviceId: device.remoteId.str,
-        state: BleConnectionState.connected,
-        connectedAt: DateTime.now(),
-        lastActivityAt: DateTime.now(),
-        reconnectionCount: _reconnectionCount,
-      ));
+      _updateConnectionState(
+        BleConnectionInfo(
+          deviceId: device.remoteId.str,
+          state: BleConnectionState.connected,
+          connectedAt: DateTime.now(),
+          lastActivityAt: DateTime.now(),
+          reconnectionCount: _reconnectionCount,
+        ),
+      );
     } catch (e) {
-      _updateConnectionState(BleConnectionInfo(
-        deviceId: device.remoteId.str,
-        state: BleConnectionState.error,
-        reconnectionCount: _reconnectionCount,
-      ));
+      _updateConnectionState(
+        BleConnectionInfo(
+          deviceId: device.remoteId.str,
+          state: BleConnectionState.error,
+          reconnectionCount: _reconnectionCount,
+        ),
+      );
       rethrow;
     }
   }
@@ -180,14 +191,16 @@ class BleServiceImpl implements BleService {
     switch (state) {
       case BluetoothConnectionState.connected:
         _updateConnectionState(
-          (_currentConnection ?? BleConnectionInfo(
-            deviceId: _connectedDevice!.remoteId.str,
-            state: BleConnectionState.connected,
-          )).copyWith(
-            state: BleConnectionState.connected,
-            connectedAt: _currentConnection?.connectedAt ?? DateTime.now(),
-            lastActivityAt: DateTime.now(),
-          ),
+          (_currentConnection ??
+                  BleConnectionInfo(
+                    deviceId: _connectedDevice!.remoteId.str,
+                    state: BleConnectionState.connected,
+                  ))
+              .copyWith(
+                state: BleConnectionState.connected,
+                connectedAt: _currentConnection?.connectedAt ?? DateTime.now(),
+                lastActivityAt: DateTime.now(),
+              ),
         );
       case BluetoothConnectionState.disconnected:
         if (_autoReconnect &&
@@ -195,24 +208,24 @@ class BleServiceImpl implements BleService {
           _handleReconnection();
         } else {
           _updateConnectionState(
-            (_currentConnection ?? BleConnectionInfo(
-              deviceId: _connectedDevice!.remoteId.str,
-              state: BleConnectionState.disconnected,
-            )).copyWith(
-              state: BleConnectionState.disconnected,
-            ),
+            (_currentConnection ??
+                    BleConnectionInfo(
+                      deviceId: _connectedDevice!.remoteId.str,
+                      state: BleConnectionState.disconnected,
+                    ))
+                .copyWith(state: BleConnectionState.disconnected),
           );
           _cleanupConnection();
         }
       // ignore: deprecated_member_use
       case BluetoothConnectionState.connecting:
         _updateConnectionState(
-          (_currentConnection ?? BleConnectionInfo(
-            deviceId: _connectedDevice!.remoteId.str,
-            state: BleConnectionState.connecting,
-          )).copyWith(
-            state: BleConnectionState.connecting,
-          ),
+          (_currentConnection ??
+                  BleConnectionInfo(
+                    deviceId: _connectedDevice!.remoteId.str,
+                    state: BleConnectionState.connecting,
+                  ))
+              .copyWith(state: BleConnectionState.connecting),
         );
       // ignore: deprecated_member_use
       case BluetoothConnectionState.disconnecting:
@@ -224,13 +237,15 @@ class BleServiceImpl implements BleService {
   Future<void> _handleReconnection() async {
     _reconnectionCount++;
     _updateConnectionState(
-      (_currentConnection ?? BleConnectionInfo(
-        deviceId: _connectedDevice!.remoteId.str,
-        state: BleConnectionState.reconnecting,
-      )).copyWith(
-        state: BleConnectionState.reconnecting,
-        reconnectionCount: _reconnectionCount,
-      ),
+      (_currentConnection ??
+              BleConnectionInfo(
+                deviceId: _connectedDevice!.remoteId.str,
+                state: BleConnectionState.reconnecting,
+              ))
+          .copyWith(
+            state: BleConnectionState.reconnecting,
+            reconnectionCount: _reconnectionCount,
+          ),
     );
 
     await Future<void>.delayed(BleConfig.reconnectionDelay);
@@ -285,9 +300,7 @@ class BleServiceImpl implements BleService {
       mtu = 185;
     }
 
-    _updateConnectionState(
-      _currentConnection?.copyWith(mtu: mtu),
-    );
+    _updateConnectionState(_currentConnection?.copyWith(mtu: mtu));
 
     return mtu;
   }
@@ -308,9 +321,7 @@ class BleServiceImpl implements BleService {
   Future<void> enableDle() async {
     // DLE is typically enabled automatically with MTU negotiation
     // on modern BLE stacks. This is a placeholder for explicit DLE handling.
-    _updateConnectionState(
-      _currentConnection?.copyWith(dleEnabled: true),
-    );
+    _updateConnectionState(_currentConnection?.copyWith(dleEnabled: true));
   }
 
   @override
@@ -344,10 +355,7 @@ class BleServiceImpl implements BleService {
     Uint8List data, {
     bool withResponse = true,
   }) async {
-    await characteristic.write(
-      data,
-      withoutResponse: !withResponse,
-    );
+    await characteristic.write(data, withoutResponse: !withResponse);
 
     _updateConnectionState(
       _currentConnection?.copyWith(lastActivityAt: DateTime.now()),
@@ -372,8 +380,9 @@ class BleServiceImpl implements BleService {
     BluetoothCharacteristic characteristic,
   ) async {
     await characteristic.setNotifyValue(true);
-    return characteristic.onValueReceived
-        .map((data) => Uint8List.fromList(data));
+    return characteristic.onValueReceived.map(
+      (data) => Uint8List.fromList(data),
+    );
   }
 
   @override
@@ -397,9 +406,9 @@ class BleServiceImpl implements BleService {
   @override
   BluetoothService? findService(Guid serviceUuid) {
     return _discoveredServices?.cast<BluetoothService?>().firstWhere(
-          (s) => s?.uuid == serviceUuid,
-          orElse: () => null,
-        );
+      (s) => s?.uuid == serviceUuid,
+      orElse: () => null,
+    );
   }
 
   @override
@@ -408,9 +417,9 @@ class BleServiceImpl implements BleService {
     Guid characteristicUuid,
   ) {
     return service.characteristics.cast<BluetoothCharacteristic?>().firstWhere(
-          (c) => c?.uuid == characteristicUuid,
-          orElse: () => null,
-        );
+      (c) => c?.uuid == characteristicUuid,
+      orElse: () => null,
+    );
   }
 
   void _updateConnectionState(BleConnectionInfo? state) {
@@ -418,4 +427,3 @@ class BleServiceImpl implements BleService {
     _connectionStateController.add(state);
   }
 }
-

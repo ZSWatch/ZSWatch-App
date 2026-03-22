@@ -35,20 +35,21 @@ class GattOperations {
 
     // Find NUS service
     final nusService = services.cast<BluetoothService?>().firstWhere(
-          (s) => s?.uuid == NusUuids.service,
-          orElse: () => null,
-        );
+      (s) => s?.uuid == NusUuids.service,
+      orElse: () => null,
+    );
 
     if (nusService == null) {
       throw StateError('NUS service not found on device');
     }
 
     // Find RX characteristic (notify)
-    final rxChar =
-        nusService.characteristics.cast<BluetoothCharacteristic?>().firstWhere(
-              (c) => c?.uuid == NusUuids.rxCharacteristic,
-              orElse: () => null,
-            );
+    final rxChar = nusService.characteristics
+        .cast<BluetoothCharacteristic?>()
+        .firstWhere(
+          (c) => c?.uuid == NusUuids.rxCharacteristic,
+          orElse: () => null,
+        );
 
     if (rxChar == null) {
       throw StateError('NUS RX characteristic not found');
@@ -121,8 +122,10 @@ class GattOperations {
     final service = _bleService.findService(HeartRateUuids.service);
     if (service == null) return null;
 
-    final char =
-        _bleService.findCharacteristic(service, HeartRateUuids.measurement);
+    final char = _bleService.findCharacteristic(
+      service,
+      HeartRateUuids.measurement,
+    );
     if (char == null) return null;
 
     final stream = await _bleService.subscribeToCharacteristic(char);
@@ -221,4 +224,3 @@ class GattOperations {
   /// Check if Sensor service is available
   bool get hasSensorService => hasService(SensorServiceUuids.service);
 }
-

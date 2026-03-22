@@ -38,8 +38,8 @@ class InitialSyncService {
   InitialSyncService({
     required WatchService watchService,
     required MediaService mediaService,
-  })  : _watchService = watchService,
-        _mediaService = mediaService;
+  }) : _watchService = watchService,
+       _mediaService = mediaService;
 
   /// Perform all initial sync operations
   ///
@@ -47,7 +47,7 @@ class InitialSyncService {
   /// Non-critical sync failures (like music state) don't cause overall failure.
   Future<bool> performInitialSync() async {
     debugPrint('[InitialSync] Starting initial sync operations');
-    
+
     var allSucceeded = true;
 
     // 1. Time sync (FR-085) - Critical
@@ -101,7 +101,9 @@ class InitialSyncService {
 
       // Check if media service is initialized
       if (!_mediaService.isInitialized) {
-        debugPrint('[InitialSync] Media service not initialized, attempting init');
+        debugPrint(
+          '[InitialSync] Media service not initialized, attempting init',
+        );
         await _mediaService.initialize();
       }
 
@@ -110,9 +112,8 @@ class InitialSyncService {
       final metadata = _mediaService.currentMetadata;
 
       // Only send if there's something playing or paused (FR-083)
-      if (playbackState != null && 
+      if (playbackState != null &&
           (playbackState.isPlaying || playbackState.isPaused)) {
-        
         // Send playback state
         await _watchService.sendMusicState(
           state: playbackState.state,
@@ -130,12 +131,16 @@ class InitialSyncService {
             trackNumber: metadata.trackNumber,
             trackCount: metadata.trackCount,
           );
-          debugPrint('[InitialSync] Sent music info: ${metadata.artist} - ${metadata.track}');
+          debugPrint(
+            '[InitialSync] Sent music info: ${metadata.artist} - ${metadata.track}',
+          );
         }
-        
+
         return SyncResult.success;
       } else {
-        debugPrint('[InitialSync] No active media playback, skipping music sync');
+        debugPrint(
+          '[InitialSync] No active media playback, skipping music sync',
+        );
         return SyncResult.skipped;
       }
     } catch (e) {

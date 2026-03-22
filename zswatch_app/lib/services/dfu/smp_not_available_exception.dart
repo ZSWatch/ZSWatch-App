@@ -7,9 +7,10 @@ class SmpNotAvailableException implements Exception {
   final Object? cause;
 
   SmpNotAvailableException([this.cause])
-      : message = 'SMP service not available on the watch. '
-            'The app tried to enable it automatically but failed. '
-            'Try disconnecting and reconnecting, then retry the update.';
+    : message =
+          'SMP service not available on the watch. '
+          'The app tried to enable it automatically but failed. '
+          'Try disconnecting and reconnecting, then retry the update.';
 
   @override
   String toString() => message;

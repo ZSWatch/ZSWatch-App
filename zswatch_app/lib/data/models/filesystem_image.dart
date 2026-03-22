@@ -10,12 +10,16 @@ part 'filesystem_image.freezed.dart';
 enum FilesystemUploadStatus {
   /// Not started
   idle,
+
   /// Upload is in progress
   uploading,
+
   /// Upload completed successfully
   completed,
+
   /// Upload failed
   failed,
+
   /// Upload was cancelled
   cancelled,
 }

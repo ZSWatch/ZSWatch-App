@@ -8,11 +8,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/core/theme/app_theme.dart';
 
 void main() {
-  testWidgets('Theme smoke test - dark theme loads correctly',
-      (WidgetTester tester) async {
+  testWidgets('Theme smoke test - dark theme loads correctly', (
+    WidgetTester tester,
+  ) async {
     // Test that the theme configuration works
     final theme = AppTheme.darkTheme;
-    
+
     expect(theme.brightness, Brightness.dark);
     expect(theme.colorScheme.primary, AppTheme.primaryColor);
     expect(theme.scaffoldBackgroundColor, AppTheme.backgroundColor);

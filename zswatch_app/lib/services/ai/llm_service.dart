@@ -324,6 +324,7 @@ class LlmService {
 
   // ---- Tunables ----
   int nCtx = defaultTargetContextSize;
+
   /// Compute a portable thread count for on-device inference.
   /// Uses half the reported cores (targets performance/big cores on
   /// big.LITTLE), clamped to [2, 6].  iOS with Metal doesn't benefit
@@ -714,15 +715,13 @@ class LlmService {
   ///   available ≥  400 MB → nCtx 2048, maxTokens unchanged (shorter prompt)
   ///   available ≥  100 MB → nCtx 1024, maxTokens unchanged (compact prompt)
   ///   available <  100 MB → nCtx 1024, maxTokens capped at 256 (compact prompt)
-  Future<({int contextSize, int? maxTokensCap})>
-  _computeInferenceParams(LlmModelInfo modelInfo) async {
+  Future<({int contextSize, int? maxTokensCap})> _computeInferenceParams(
+    LlmModelInfo modelInfo,
+  ) async {
     // Explicit per-model context override wins.
     final explicitCtx = modelInfo.contextSize;
     if (explicitCtx != null) {
-      return (
-        contextSize: explicitCtx,
-        maxTokensCap: null,
-      );
+      return (contextSize: explicitCtx, maxTokensCap: null);
     }
 
     final deviceMB = await _queryDeviceMemoryMB();
@@ -784,10 +783,7 @@ class LlmService {
       maxTokensCap: tokensCap,
     );
 
-    return (
-      contextSize: ctx,
-      maxTokensCap: tokensCap,
-    );
+    return (contextSize: ctx, maxTokensCap: tokensCap);
   }
 
   static void _logFilter(String log) {
@@ -994,7 +990,9 @@ class LlmService {
       final raw = structuredResult.raw;
       final classifyMetrics = structuredResult.metrics;
 
-      debugPrint('[LlmService] Classify done at ${totalStopwatch.elapsedMilliseconds}ms');
+      debugPrint(
+        '[LlmService] Classify done at ${totalStopwatch.elapsedMilliseconds}ms',
+      );
       debugPrint('[LlmService] Raw AI response: $raw');
 
       // --- Parse JSON from output ---

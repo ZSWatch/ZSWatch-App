@@ -29,10 +29,12 @@ final watchServiceProvider = Provider<WatchService>((ref) {
   final ble = ref.watch(bleConnectionServiceProvider);
   final service = WatchService(ble);
   debugPrint(
-      '[watchServiceProvider] Created WatchService instance: ${service.hashCode}');
+    '[watchServiceProvider] Created WatchService instance: ${service.hashCode}',
+  );
   ref.onDispose(() {
     debugPrint(
-        '[watchServiceProvider] Disposing WatchService instance: ${service.hashCode}');
+      '[watchServiceProvider] Disposing WatchService instance: ${service.hashCode}',
+    );
     service.dispose();
   });
   return service;
@@ -66,10 +68,7 @@ final watchConnectionProvider = Provider<Connection>((ref) {
 
   final asyncValue = ref.watch(watchConnectionStreamProvider);
   return asyncValue.valueOrNull ??
-      const Connection(
-        watchId: '',
-        state: WatchConnectionState.disconnected,
-      );
+      const Connection(watchId: '', state: WatchConnectionState.disconnected);
 });
 
 /// Provider for whether watch is connected.
@@ -171,13 +170,17 @@ final watchInfoPersistenceProvider = Provider<void>((ref) {
     if (watch == null || watch.id.isEmpty) return;
 
     final fwChanged =
-        watch.firmwareVersion != null && watch.firmwareVersion != lastPersistedFw;
+        watch.firmwareVersion != null &&
+        watch.firmwareVersion != lastPersistedFw;
     final hwChanged =
-        watch.hardwareVersion != null && watch.hardwareVersion != lastPersistedHw;
+        watch.hardwareVersion != null &&
+        watch.hardwareVersion != lastPersistedHw;
 
     if (fwChanged || hwChanged) {
-      debugPrint('[WatchInfoPersistence] Persisting firmware/hw version: '
-          'fw=${watch.firmwareVersion}, hw=${watch.hardwareVersion}');
+      debugPrint(
+        '[WatchInfoPersistence] Persisting firmware/hw version: '
+        'fw=${watch.firmwareVersion}, hw=${watch.hardwareVersion}',
+      );
 
       if (watch.firmwareVersion != null) {
         lastPersistedFw = watch.firmwareVersion;
@@ -186,11 +189,13 @@ final watchInfoPersistenceProvider = Provider<void>((ref) {
         lastPersistedHw = watch.hardwareVersion;
       }
 
-      unawaited(repository.updateFirmwareVersion(
-        watch.id,
-        watch.firmwareVersion ?? '',
-        hardwareVersion: watch.hardwareVersion,
-      ));
+      unawaited(
+        repository.updateFirmwareVersion(
+          watch.id,
+          watch.firmwareVersion ?? '',
+          hardwareVersion: watch.hardwareVersion,
+        ),
+      );
     }
   });
 
@@ -212,7 +217,8 @@ final watchInfoPersistenceProvider = Provider<void>((ref) {
         !hasUpdatedLastConnected) {
       hasUpdatedLastConnected = true;
       debugPrint(
-          '[WatchInfoPersistence] Updating lastConnectedAt for ${connection.watchId}');
+        '[WatchInfoPersistence] Updating lastConnectedAt for ${connection.watchId}',
+      );
       unawaited(repository.updateLastConnected(connection.watchId));
     }
   });
@@ -257,6 +263,6 @@ class WatchNotifier extends BaseAsyncNotifier {
 /// Provider for watch notifier.
 final watchNotifierProvider =
     StateNotifierProvider<WatchNotifier, AsyncValue<void>>((ref) {
-  final watchService = ref.watch(watchServiceProvider);
-  return WatchNotifier(watchService);
-});
+      final watchService = ref.watch(watchServiceProvider);
+      return WatchNotifier(watchService);
+    });

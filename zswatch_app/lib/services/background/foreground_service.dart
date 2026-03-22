@@ -38,7 +38,8 @@ class ForegroundService {
   final _disconnectRequestedController = StreamController<void>.broadcast();
 
   /// Stream that emits when user taps "Disconnect" on the notification
-  Stream<void> get onDisconnectRequested => _disconnectRequestedController.stream;
+  Stream<void> get onDisconnectRequested =>
+      _disconnectRequestedController.stream;
 
   bool _isRunning = false;
 
@@ -49,7 +50,9 @@ class ForegroundService {
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'onDisconnectRequested':
-        debugPrint('[ForegroundService] Disconnect requested from notification');
+        debugPrint(
+          '[ForegroundService] Disconnect requested from notification',
+        );
         _disconnectRequestedController.add(null);
         break;
     }
@@ -111,7 +114,9 @@ class ForegroundService {
         'connectionState': _stateToString(state),
       });
     } on PlatformException catch (e) {
-      debugPrint('[ForegroundService] Failed to update notification: ${e.message}');
+      debugPrint(
+        '[ForegroundService] Failed to update notification: ${e.message}',
+      );
     }
   }
 
@@ -141,9 +146,14 @@ class ForegroundService {
     }
 
     try {
-      return await _channel.invokeMethod<bool>('isBatteryOptimizationDisabled') ?? false;
+      return await _channel.invokeMethod<bool>(
+            'isBatteryOptimizationDisabled',
+          ) ??
+          false;
     } on PlatformException catch (e) {
-      debugPrint('[ForegroundService] Failed to check battery optimization: ${e.message}');
+      debugPrint(
+        '[ForegroundService] Failed to check battery optimization: ${e.message}',
+      );
       return false;
     }
   }
@@ -161,9 +171,14 @@ class ForegroundService {
     }
 
     try {
-      return await _channel.invokeMethod<bool>('requestDisableBatteryOptimization') ?? false;
+      return await _channel.invokeMethod<bool>(
+            'requestDisableBatteryOptimization',
+          ) ??
+          false;
     } on PlatformException catch (e) {
-      debugPrint('[ForegroundService] Failed to request battery optimization: ${e.message}');
+      debugPrint(
+        '[ForegroundService] Failed to request battery optimization: ${e.message}',
+      );
       return false;
     }
   }
@@ -178,9 +193,14 @@ class ForegroundService {
     }
 
     try {
-      return await _channel.invokeMethod<bool>('openBatteryOptimizationSettings') ?? false;
+      return await _channel.invokeMethod<bool>(
+            'openBatteryOptimizationSettings',
+          ) ??
+          false;
     } on PlatformException catch (e) {
-      debugPrint('[ForegroundService] Failed to open battery settings: ${e.message}');
+      debugPrint(
+        '[ForegroundService] Failed to open battery settings: ${e.message}',
+      );
       return false;
     }
   }

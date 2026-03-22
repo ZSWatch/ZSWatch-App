@@ -154,15 +154,17 @@ class SensorGattService {
         SensorServiceUuids.sensorFusionChar,
       );
 
-      debugPrint('[SensorGatt] Found sensors: '
-          'temp=${_tempChar != null}, '
-          'accel=${_accelChar != null}, '
-          'light=${_lightChar != null}, '
-          'gyro=${_gyroChar != null}, '
-          'mag=${_magChar != null}, '
-          'humidity=${_humidityChar != null}, '
-          'pressure=${_pressureChar != null}, '
-          'fusion=${_fusionChar != null}');
+      debugPrint(
+        '[SensorGatt] Found sensors: '
+        'temp=${_tempChar != null}, '
+        'accel=${_accelChar != null}, '
+        'light=${_lightChar != null}, '
+        'gyro=${_gyroChar != null}, '
+        'mag=${_magChar != null}, '
+        'humidity=${_humidityChar != null}, '
+        'pressure=${_pressureChar != null}, '
+        'fusion=${_fusionChar != null}',
+      );
 
       _isConnected = true;
       return true;
@@ -177,15 +179,15 @@ class SensorGattService {
     String charUuid,
   ) {
     final service = _services?.cast<BluetoothService?>().firstWhere(
-          (s) => s?.uuid == _guid(serviceUuid),
-          orElse: () => null,
-        );
+      (s) => s?.uuid == _guid(serviceUuid),
+      orElse: () => null,
+    );
     if (service == null) return null;
 
     return service.characteristics.cast<BluetoothCharacteristic?>().firstWhere(
-          (c) => c?.uuid == _guid(charUuid),
-          orElse: () => null,
-        );
+      (c) => c?.uuid == _guid(charUuid),
+      orElse: () => null,
+    );
   }
 
   // =========================================================================
@@ -216,7 +218,9 @@ class SensorGattService {
       await _tempChar?.setNotifyValue(false);
     } catch (e) {
       // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+      debugPrint(
+        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
+      );
     }
   }
 
@@ -258,7 +262,9 @@ class SensorGattService {
       await _accelChar?.setNotifyValue(false);
     } catch (e) {
       // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+      debugPrint(
+        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
+      );
     }
   }
 
@@ -302,7 +308,9 @@ class SensorGattService {
       await _lightChar?.setNotifyValue(false);
     } catch (e) {
       // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+      debugPrint(
+        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
+      );
     }
   }
 
@@ -344,7 +352,9 @@ class SensorGattService {
       await _gyroChar?.setNotifyValue(false);
     } catch (e) {
       // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+      debugPrint(
+        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
+      );
     }
   }
 
@@ -388,7 +398,9 @@ class SensorGattService {
       await _magChar?.setNotifyValue(false);
     } catch (e) {
       // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+      debugPrint(
+        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
+      );
     }
   }
 
@@ -417,8 +429,9 @@ class SensorGattService {
 
     try {
       await _humidityChar!.setNotifyValue(true);
-      _humiditySubscription =
-          _humidityChar!.onValueReceived.listen(_handleHumidityData);
+      _humiditySubscription = _humidityChar!.onValueReceived.listen(
+        _handleHumidityData,
+      );
       debugPrint('[SensorGatt] Humidity streaming started');
     } catch (e) {
       debugPrint('[SensorGatt] Failed to start humidity: $e');
@@ -433,7 +446,9 @@ class SensorGattService {
       await _humidityChar?.setNotifyValue(false);
     } catch (e) {
       // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+      debugPrint(
+        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
+      );
     }
   }
 
@@ -460,8 +475,9 @@ class SensorGattService {
 
     try {
       await _pressureChar!.setNotifyValue(true);
-      _pressureSubscription =
-          _pressureChar!.onValueReceived.listen(_handlePressureData);
+      _pressureSubscription = _pressureChar!.onValueReceived.listen(
+        _handlePressureData,
+      );
       debugPrint('[SensorGatt] Pressure streaming started');
     } catch (e) {
       debugPrint('[SensorGatt] Failed to start pressure: $e');
@@ -476,7 +492,9 @@ class SensorGattService {
       await _pressureChar?.setNotifyValue(false);
     } catch (e) {
       // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+      debugPrint(
+        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
+      );
     }
   }
 
@@ -503,8 +521,9 @@ class SensorGattService {
 
     try {
       await _fusionChar!.setNotifyValue(true);
-      _fusionSubscription =
-          _fusionChar!.onValueReceived.listen(_handleFusionData);
+      _fusionSubscription = _fusionChar!.onValueReceived.listen(
+        _handleFusionData,
+      );
       debugPrint('[SensorGatt] Sensor fusion streaming started');
     } catch (e) {
       debugPrint('[SensorGatt] Failed to start sensor fusion: $e');
@@ -519,7 +538,9 @@ class SensorGattService {
       await _fusionChar?.setNotifyValue(false);
     } catch (e) {
       // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint('[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e');
+      debugPrint(
+        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
+      );
     }
   }
 
@@ -585,10 +606,7 @@ class StreamGroup {
     final subscriptions = <StreamSubscription<T>>[];
 
     for (final stream in streams) {
-      final sub = stream.listen(
-        controller.add,
-        onError: controller.addError,
-      );
+      final sub = stream.listen(controller.add, onError: controller.addError);
       subscriptions.add(sub);
     }
 

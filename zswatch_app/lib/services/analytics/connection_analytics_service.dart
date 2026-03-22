@@ -22,7 +22,7 @@ class ConnectionAnalyticsService {
   final ConnectionAnalyticsRepository _repository;
 
   StreamSubscription? _connectionSubscription;
-  
+
   // Track current session for duration calculation
   String? _currentSessionId;
   DateTime? _sessionStartTime;
@@ -33,7 +33,9 @@ class ConnectionAnalyticsService {
 
   /// Start tracking connection events
   void start() {
-    _connectionSubscription = _watchService.connectionStream.listen(_onConnectionChange);
+    _connectionSubscription = _watchService.connectionStream.listen(
+      _onConnectionChange,
+    );
 
     // If already connected, start a session
     if (_watchService.isConnected) {
@@ -46,7 +48,7 @@ class ConnectionAnalyticsService {
   void stop() {
     _connectionSubscription?.cancel();
     _connectionSubscription = null;
-    
+
     // End any active session
     if (_currentSessionId != null && _lastWatchId != null) {
       _endSession(_lastWatchId!, DisconnectReason.appTerminated);
@@ -56,14 +58,16 @@ class ConnectionAnalyticsService {
   void _onConnectionChange(Connection connection) async {
     final state = connection.state;
     final watchId = connection.watchId;
-    
+
     // Skip if no watch ID
     if (watchId.isEmpty) return;
-    
+
     // Skip if state hasn't actually changed
     if (state == _lastState) return;
-    
-    debugPrint('[ConnectionAnalytics] State change: ${_lastState?.name ?? 'null'} -> ${state.name}');
+
+    debugPrint(
+      '[ConnectionAnalytics] State change: ${_lastState?.name ?? 'null'} -> ${state.name}',
+    );
 
     // Handle state transitions
     switch (state) {
@@ -77,7 +81,7 @@ class ConnectionAnalyticsService {
 
       case WatchConnectionState.reconnecting:
         // Record reconnect attempt
-        if (_lastState == WatchConnectionState.connected || 
+        if (_lastState == WatchConnectionState.connected ||
             _lastState == WatchConnectionState.error) {
           await _recordReconnectAttempt(watchId);
         }
@@ -125,12 +129,12 @@ class ConnectionAnalyticsService {
           return DisconnectReason.unknown;
       }
     }
-    
+
     // If we're in error state without a specific error type
     if (connection.state == WatchConnectionState.error) {
       return DisconnectReason.unknown;
     }
-    
+
     // Clean disconnect
     return DisconnectReason.userRequested;
   }
@@ -145,7 +149,9 @@ class ConnectionAnalyticsService {
   void _endSession(String watchId, DisconnectReason reason) {
     if (_sessionStartTime != null) {
       final duration = DateTime.now().difference(_sessionStartTime!);
-      debugPrint('[ConnectionAnalytics] Ended session $_currentSessionId - duration: ${duration.inMinutes} minutes, reason: ${reason.name}');
+      debugPrint(
+        '[ConnectionAnalytics] Ended session $_currentSessionId - duration: ${duration.inMinutes} minutes, reason: ${reason.name}',
+      );
     }
     _currentSessionId = null;
     _sessionStartTime = null;
@@ -177,7 +183,9 @@ class ConnectionAnalyticsService {
         sessionId: _currentSessionId,
       );
       await _repository.recordEvent(event);
-      debugPrint('[ConnectionAnalytics] Recorded: disconnected (${reason.name})');
+      debugPrint(
+        '[ConnectionAnalytics] Recorded: disconnected (${reason.name})',
+      );
     } catch (e) {
       debugPrint('[ConnectionAnalytics] Failed to record disconnected: $e');
     }
@@ -192,7 +200,9 @@ class ConnectionAnalyticsService {
       await _repository.recordEvent(event);
       debugPrint('[ConnectionAnalytics] Recorded: reconnect attempt');
     } catch (e) {
-      debugPrint('[ConnectionAnalytics] Failed to record reconnect attempt: $e');
+      debugPrint(
+        '[ConnectionAnalytics] Failed to record reconnect attempt: $e',
+      );
     }
   }
 
@@ -203,16 +213,18 @@ class ConnectionAnalyticsService {
 }
 
 /// Provider for connection analytics service
-final connectionAnalyticsServiceProvider = Provider<ConnectionAnalyticsService>((ref) {
-  final watchService = ref.watch(watchServiceProvider);
-  final repository = ref.watch(connectionAnalyticsRepositoryProvider);
-  
-  final service = ConnectionAnalyticsService(watchService, repository);
-  service.start();
-  
-  ref.onDispose(() {
-    service.dispose();
-  });
-  
-  return service;
-});
+final connectionAnalyticsServiceProvider = Provider<ConnectionAnalyticsService>(
+  (ref) {
+    final watchService = ref.watch(watchServiceProvider);
+    final repository = ref.watch(connectionAnalyticsRepositoryProvider);
+
+    final service = ConnectionAnalyticsService(watchService, repository);
+    service.start();
+
+    ref.onDispose(() {
+      service.dispose();
+    });
+
+    return service;
+  },
+);

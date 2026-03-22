@@ -375,9 +375,9 @@ class WhisperEngine implements TranscriptionEngine {
   String get modelSourceUrl => _defaultModel.modelUri.toString();
 
   @override
-  int get expectedModelSizeBytes =>
-      TranscriptionModelCatalog.info(TranscriptionEngineType.whisperTinyEn)
-          .expectedSizeBytes;
+  int get expectedModelSizeBytes => TranscriptionModelCatalog.info(
+    TranscriptionEngineType.whisperTinyEn,
+  ).expectedSizeBytes;
 
   @override
   Stream<TranscriptionEngineState> get stateStream => _state.stream;
@@ -402,26 +402,32 @@ class WhisperEngine implements TranscriptionEngine {
     try {
       final available = await isAvailable();
       if (available) {
-        _state.add(const TranscriptionEngineState(
-          status: TranscriptionEngineStatus.ready,
-        ));
+        _state.add(
+          const TranscriptionEngineState(
+            status: TranscriptionEngineStatus.ready,
+          ),
+        );
         return;
       }
 
-      _state.add(const TranscriptionEngineState(
-        status: TranscriptionEngineStatus.downloading,
-      ));
+      _state.add(
+        const TranscriptionEngineState(
+          status: TranscriptionEngineStatus.downloading,
+        ),
+      );
 
       await _downloadModel();
 
-      _state.add(const TranscriptionEngineState(
-        status: TranscriptionEngineStatus.ready,
-      ));
+      _state.add(
+        const TranscriptionEngineState(status: TranscriptionEngineStatus.ready),
+      );
     } catch (e) {
-      _state.add(TranscriptionEngineState(
-        status: TranscriptionEngineStatus.error,
-        errorMessage: e.toString(),
-      ));
+      _state.add(
+        TranscriptionEngineState(
+          status: TranscriptionEngineStatus.error,
+          errorMessage: e.toString(),
+        ),
+      );
       rethrow;
     }
   }
@@ -433,12 +439,16 @@ class WhisperEngine implements TranscriptionEngine {
     }
 
     if (!await isAvailable()) {
-      throw Exception('Transcription model not downloaded. Configure in Settings > Voice Memos.');
+      throw Exception(
+        'Transcription model not downloaded. Configure in Settings > Voice Memos.',
+      );
     }
 
-    _state.add(const TranscriptionEngineState(
-      status: TranscriptionEngineStatus.transcribing,
-    ));
+    _state.add(
+      const TranscriptionEngineState(
+        status: TranscriptionEngineStatus.transcribing,
+      ),
+    );
 
     try {
       debugPrint('[WhisperEngine] Transcribing: $audioFilePath');
@@ -449,9 +459,9 @@ class WhisperEngine implements TranscriptionEngine {
         lang: 'en',
       );
 
-      _state.add(const TranscriptionEngineState(
-        status: TranscriptionEngineStatus.ready,
-      ));
+      _state.add(
+        const TranscriptionEngineState(status: TranscriptionEngineStatus.ready),
+      );
 
       if (result == null) {
         debugPrint('[WhisperEngine] Transcription returned null');
@@ -463,10 +473,12 @@ class WhisperEngine implements TranscriptionEngine {
       return text;
     } catch (e) {
       debugPrint('[WhisperEngine] Error: $e');
-      _state.add(TranscriptionEngineState(
-        status: TranscriptionEngineStatus.error,
-        errorMessage: e.toString(),
-      ));
+      _state.add(
+        TranscriptionEngineState(
+          status: TranscriptionEngineStatus.error,
+          errorMessage: e.toString(),
+        ),
+      );
       rethrow;
     }
   }
@@ -489,7 +501,9 @@ class WhisperEngine implements TranscriptionEngine {
     final client = http.Client();
     IOSink? sink;
     try {
-      debugPrint('[WhisperEngine] Downloading ${_defaultModel.modelName} from ${_defaultModel.modelUri}');
+      debugPrint(
+        '[WhisperEngine] Downloading ${_defaultModel.modelName} from ${_defaultModel.modelUri}',
+      );
       final request = http.Request('GET', _defaultModel.modelUri);
       final response = await client.send(request);
 
@@ -505,10 +519,12 @@ class WhisperEngine implements TranscriptionEngine {
         sink.add(chunk);
         received += chunk.length;
         if (totalBytes > 0) {
-          _state.add(TranscriptionEngineState(
-            status: TranscriptionEngineStatus.downloading,
-            downloadProgress: received / totalBytes,
-          ));
+          _state.add(
+            TranscriptionEngineState(
+              status: TranscriptionEngineStatus.downloading,
+              downloadProgress: received / totalBytes,
+            ),
+          );
         }
       }
       await sink.close();
@@ -544,9 +560,11 @@ class WhisperEngine implements TranscriptionEngine {
     if (modelFile.existsSync()) {
       await modelFile.delete();
     }
-    _state.add(const TranscriptionEngineState(
-      status: TranscriptionEngineStatus.uninitialized,
-    ));
+    _state.add(
+      const TranscriptionEngineState(
+        status: TranscriptionEngineStatus.uninitialized,
+      ),
+    );
   }
 
   @override
@@ -581,10 +599,10 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
     required String modelFileName,
     required String languageCode,
     required String displayName,
-  })  : _modelUrl = modelUrl,
-        _modelFileName = modelFileName,
-        _languageCode = languageCode,
-        _displayName = displayName;
+  }) : _modelUrl = modelUrl,
+       _modelFileName = modelFileName,
+       _languageCode = languageCode,
+       _displayName = displayName;
 
   @override
   String get engineName => _displayName;
@@ -625,27 +643,33 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
 
     try {
       if (await isAvailable()) {
-        _state.add(const TranscriptionEngineState(
-          status: TranscriptionEngineStatus.ready,
-        ));
+        _state.add(
+          const TranscriptionEngineState(
+            status: TranscriptionEngineStatus.ready,
+          ),
+        );
         return;
       }
 
-      _state.add(const TranscriptionEngineState(
-        status: TranscriptionEngineStatus.downloading,
-      ));
+      _state.add(
+        const TranscriptionEngineState(
+          status: TranscriptionEngineStatus.downloading,
+        ),
+      );
 
       await _downloadModel();
 
-      _state.add(const TranscriptionEngineState(
-        status: TranscriptionEngineStatus.ready,
-      ));
+      _state.add(
+        const TranscriptionEngineState(status: TranscriptionEngineStatus.ready),
+      );
     } catch (e) {
       debugPrint('[CustomGgmlWhisperEngine] Download error: $e');
-      _state.add(TranscriptionEngineState(
-        status: TranscriptionEngineStatus.error,
-        errorMessage: e.toString(),
-      ));
+      _state.add(
+        TranscriptionEngineState(
+          status: TranscriptionEngineStatus.error,
+          errorMessage: e.toString(),
+        ),
+      );
       rethrow;
     }
   }
@@ -662,7 +686,9 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
 
     final client = http.Client();
     try {
-      debugPrint('[CustomGgmlWhisperEngine] Downloading $_modelFileName from $_modelUrl');
+      debugPrint(
+        '[CustomGgmlWhisperEngine] Downloading $_modelFileName from $_modelUrl',
+      );
       final request = http.Request('GET', Uri.parse(_modelUrl));
       final response = await client.send(request);
 
@@ -678,10 +704,12 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
         sink.add(chunk);
         received += chunk.length;
         if (totalBytes > 0) {
-          _state.add(TranscriptionEngineState(
-            status: TranscriptionEngineStatus.downloading,
-            downloadProgress: received / totalBytes,
-          ));
+          _state.add(
+            TranscriptionEngineState(
+              status: TranscriptionEngineStatus.downloading,
+              downloadProgress: received / totalBytes,
+            ),
+          );
         }
       }
       await sink.close();
@@ -715,22 +743,29 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
 
     final modelPath = await _modelFilePath();
     if (!File(modelPath).existsSync()) {
-      throw Exception('Transcription model not downloaded. Configure in Settings > Voice Memos.');
+      throw Exception(
+        'Transcription model not downloaded. Configure in Settings > Voice Memos.',
+      );
     }
 
-    _state.add(const TranscriptionEngineState(
-      status: TranscriptionEngineStatus.transcribing,
-    ));
+    _state.add(
+      const TranscriptionEngineState(
+        status: TranscriptionEngineStatus.transcribing,
+      ),
+    );
 
     String? convertedAudioPath;
     try {
-      final transcriptionAudioPath = await _prepareAudioForWhisper(audioFilePath);
+      final transcriptionAudioPath = await _prepareAudioForWhisper(
+        audioFilePath,
+      );
       if (transcriptionAudioPath != audioFilePath) {
         convertedAudioPath = transcriptionAudioPath;
       }
 
       debugPrint(
-          '[CustomGgmlWhisperEngine] Transcribing: $transcriptionAudioPath');
+        '[CustomGgmlWhisperEngine] Transcribing: $transcriptionAudioPath',
+      );
 
       // Use Whisper directly so we can pass an arbitrary modelPath string.
       // WhisperController.transcribe() only accepts a WhisperModel enum, but
@@ -745,19 +780,21 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
         modelPath: modelPath,
       );
 
-      _state.add(const TranscriptionEngineState(
-        status: TranscriptionEngineStatus.ready,
-      ));
+      _state.add(
+        const TranscriptionEngineState(status: TranscriptionEngineStatus.ready),
+      );
 
       final text = response.text.trim();
       debugPrint('[CustomGgmlWhisperEngine] Result: $text');
       return text;
     } catch (e) {
       debugPrint('[CustomGgmlWhisperEngine] Error: $e');
-      _state.add(TranscriptionEngineState(
-        status: TranscriptionEngineStatus.error,
-        errorMessage: e.toString(),
-      ));
+      _state.add(
+        TranscriptionEngineState(
+          status: TranscriptionEngineStatus.error,
+          errorMessage: e.toString(),
+        ),
+      );
       rethrow;
     } finally {
       if (convertedAudioPath != null) {
@@ -767,8 +804,7 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
             convertedFile.deleteSync();
           }
         } catch (e) {
-          debugPrint(
-              '[CustomGgmlWhisperEngine] Failed to delete temp WAV: $e');
+          debugPrint('[CustomGgmlWhisperEngine] Failed to delete temp WAV: $e');
         }
       }
     }
@@ -801,10 +837,10 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
     ];
 
     debugPrint(
-        '[CustomGgmlWhisperEngine] Converting audio for Whisper: ${input.path} -> $outputPath');
+      '[CustomGgmlWhisperEngine] Converting audio for Whisper: ${input.path} -> $outputPath',
+    );
 
-    final FFmpegSession session =
-        await FFmpegKit.execute(arguments.join(' '));
+    final FFmpegSession session = await FFmpegKit.execute(arguments.join(' '));
     final ReturnCode? returnCode = await session.getReturnCode();
 
     if (ReturnCode.isSuccess(returnCode) && output.existsSync()) {
@@ -835,9 +871,11 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
     if (modelFile.existsSync()) {
       await modelFile.delete();
     }
-    _state.add(const TranscriptionEngineState(
-      status: TranscriptionEngineStatus.uninitialized,
-    ));
+    _state.add(
+      const TranscriptionEngineState(
+        status: TranscriptionEngineStatus.uninitialized,
+      ),
+    );
   }
 
   @override
@@ -856,43 +894,46 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
 /// outperforms stock OpenAI Whisper on Swedish (WER: 9.1 vs 39.6 for base).
 /// Apache-2.0 licensed. Models are hosted on HuggingFace.
 abstract final class KbWhisperEngines {
-  static const String _hfBase = 'https://huggingface.co/KBLab/kb-whisper-base/resolve/main';
-  static const String _hfSmall = 'https://huggingface.co/KBLab/kb-whisper-small/resolve/main';
-  static const String _hfWhisperCpp = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main';
+  static const String _hfBase =
+      'https://huggingface.co/KBLab/kb-whisper-base/resolve/main';
+  static const String _hfSmall =
+      'https://huggingface.co/KBLab/kb-whisper-small/resolve/main';
+  static const String _hfWhisperCpp =
+      'https://huggingface.co/ggerganov/whisper.cpp/resolve/main';
 
   /// Base model, q5_0 quantised (~147 MB).
   /// Recommended: good accuracy, reasonable size for mobile.
   static CustomGgmlWhisperEngine base() => CustomGgmlWhisperEngine(
-        modelUrl: '$_hfBase/ggml-model-q5_0.bin',
-        modelFileName: 'ggml-kb-whisper-base-q5_0.bin',
-        languageCode: 'sv',
-        displayName: 'KB-Whisper Base (Swedish)',
-      );
+    modelUrl: '$_hfBase/ggml-model-q5_0.bin',
+    modelFileName: 'ggml-kb-whisper-base-q5_0.bin',
+    languageCode: 'sv',
+    displayName: 'KB-Whisper Base (Swedish)',
+  );
 
   /// Small model, q5_0 quantised (~175 MB).
   /// Big accuracy leap over Base at nearly the same size. ~500 MB RAM.
   static CustomGgmlWhisperEngine smallQ5() => CustomGgmlWhisperEngine(
-        modelUrl: '$_hfSmall/ggml-model-q5_0.bin',
-        modelFileName: 'ggml-kb-whisper-small-q5_0.bin',
-        languageCode: 'sv',
-        displayName: 'KB-Whisper Small · Q5_0 (Swedish)',
-      );
+    modelUrl: '$_hfSmall/ggml-model-q5_0.bin',
+    modelFileName: 'ggml-kb-whisper-small-q5_0.bin',
+    languageCode: 'sv',
+    displayName: 'KB-Whisper Small · Q5_0 (Swedish)',
+  );
 
   /// Small model, full GGML checkpoint (~488 MB).
   /// Highest fidelity Small variant currently published for whisper.cpp.
   static CustomGgmlWhisperEngine smallQ8() => CustomGgmlWhisperEngine(
-        modelUrl: '$_hfSmall/ggml-model.bin',
-        modelFileName: 'ggml-kb-whisper-small.bin',
-        languageCode: 'sv',
-        displayName: 'KB-Whisper Small · Full GGML (Swedish)',
-      );
+    modelUrl: '$_hfSmall/ggml-model.bin',
+    modelFileName: 'ggml-kb-whisper-small.bin',
+    languageCode: 'sv',
+    displayName: 'KB-Whisper Small · Full GGML (Swedish)',
+  );
 
   /// Whisper Large-v3-Turbo, q5_0 quantised (~547 MB).
   /// Near-cloud accuracy, heavily optimised. ~1 GB RAM — flagship devices.
   static CustomGgmlWhisperEngine largeV3TurboQ5() => CustomGgmlWhisperEngine(
-        modelUrl: '$_hfWhisperCpp/ggml-large-v3-turbo-q5_0.bin',
-        modelFileName: 'ggml-large-v3-turbo-q5_0.bin',
-        languageCode: 'auto',
-        displayName: 'Whisper Large-v3-Turbo · Q5_0',
-      );
+    modelUrl: '$_hfWhisperCpp/ggml-large-v3-turbo-q5_0.bin',
+    modelFileName: 'ggml-large-v3-turbo-q5_0.bin',
+    languageCode: 'auto',
+    displayName: 'Whisper Large-v3-Turbo · Q5_0',
+  );
 }

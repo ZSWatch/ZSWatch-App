@@ -35,11 +35,9 @@ class AsyncValueWidget<T> extends StatelessWidget {
     return value.when(
       data: data,
       loading: () =>
-          loading ??
-          const Center(child: CircularProgressIndicator()),
+          loading ?? const Center(child: CircularProgressIndicator()),
       error: (e, st) =>
-          errorBuilder?.call(e, st) ??
-          _DefaultErrorWidget(error: e),
+          errorBuilder?.call(e, st) ?? _DefaultErrorWidget(error: e),
     );
   }
 }
@@ -61,10 +59,9 @@ class _DefaultErrorWidget extends StatelessWidget {
           const SizedBox(height: AppTheme.spacingSm),
           Text(
             error.toString(),
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: AppTheme.errorColor),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.errorColor),
             textAlign: TextAlign.center,
           ),
         ],

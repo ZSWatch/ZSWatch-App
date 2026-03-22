@@ -25,8 +25,8 @@ class WatchRepository extends BaseRepository<Watch, WatchEntity> {
   /// Watch all saved watches (stream)
   Stream<List<Watch>> watchAllWatches() {
     return _db.watchAllWatches().map(
-          (entities) => entities.map(_entityToModel).toList(),
-        );
+      (entities) => entities.map(_entityToModel).toList(),
+    );
   }
 
   /// Get watch by ID
@@ -45,7 +45,7 @@ class WatchRepository extends BaseRepository<Watch, WatchEntity> {
   Future<Watch?> getLastConnectedWatch() async {
     final watches = await getAllWatches();
     if (watches.isEmpty) return null;
-    
+
     // Sort by lastConnectedAt descending, null values last
     watches.sort((a, b) {
       if (a.lastConnectedAt == null && b.lastConnectedAt == null) return 0;
@@ -53,7 +53,7 @@ class WatchRepository extends BaseRepository<Watch, WatchEntity> {
       if (b.lastConnectedAt == null) return -1;
       return b.lastConnectedAt!.compareTo(a.lastConnectedAt!);
     });
-    
+
     return watches.firstOrNull;
   }
 
@@ -93,10 +93,12 @@ class WatchRepository extends BaseRepository<Watch, WatchEntity> {
   }) async {
     final watch = await getWatchById(watchId);
     if (watch != null) {
-      await updateWatch(watch.copyWith(
-        firmwareVersion: firmwareVersion,
-        hardwareVersion: hardwareVersion ?? watch.hardwareVersion,
-      ));
+      await updateWatch(
+        watch.copyWith(
+          firmwareVersion: firmwareVersion,
+          hardwareVersion: hardwareVersion ?? watch.hardwareVersion,
+        ),
+      );
     }
   }
 
@@ -114,7 +116,7 @@ class WatchRepository extends BaseRepository<Watch, WatchEntity> {
   }
 
   /// Rename a watch by setting its custom name (T114)
-  /// 
+  ///
   /// If [customName] is null or empty, clears the custom name and
   /// falls back to the default advertised name.
   Future<void> renameWatch(String watchId, String? customName) async {
@@ -139,11 +141,11 @@ class WatchRepository extends BaseRepository<Watch, WatchEntity> {
   }
 
   /// Forget a watch completely (T115)
-  /// 
+  ///
   /// This removes the watch from the database AND removes the BLE bond.
   /// After calling this, the user will need to re-pair if they want to
   /// use the watch again.
-  /// 
+  ///
   /// Note: removeBond() only works on Android. On iOS, users must
   /// manually forget the device in Bluetooth settings.
   Future<void> forgetWatch(String watchId) async {
@@ -155,7 +157,7 @@ class WatchRepository extends BaseRepository<Watch, WatchEntity> {
       // Bond removal may fail if device is not bonded or on iOS
       // Continue with database deletion anyway
     }
-    
+
     // Then delete from database
     await deleteWatch(watchId);
   }
@@ -222,4 +224,3 @@ class WatchRepository extends BaseRepository<Watch, WatchEntity> {
     );
   }
 }
-

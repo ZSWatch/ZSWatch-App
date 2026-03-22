@@ -155,16 +155,11 @@ abstract final class AppTheme {
             horizontal: spacingMd,
             vertical: spacingSm,
           ),
-          textStyle: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
-        style: IconButton.styleFrom(
-          foregroundColor: textPrimary,
-        ),
+        style: IconButton.styleFrom(foregroundColor: textPrimary),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: primaryColor,
@@ -225,10 +220,7 @@ abstract final class AppTheme {
           fontWeight: FontWeight.w500,
           color: textPrimary,
         ),
-        subtitleTextStyle: TextStyle(
-          fontSize: 14,
-          color: textSecondary,
-        ),
+        subtitleTextStyle: TextStyle(fontSize: 14, color: textSecondary),
         iconColor: textSecondary,
       ),
       switchTheme: SwitchThemeData(
@@ -308,10 +300,7 @@ abstract final class AppTheme {
           fontWeight: FontWeight.w600,
           color: textPrimary,
         ),
-        contentTextStyle: const TextStyle(
-          fontSize: 16,
-          color: textSecondary,
-        ),
+        contentTextStyle: const TextStyle(fontSize: 16, color: textSecondary),
       ),
       textTheme: const TextTheme(
         displayLarge: TextStyle(
@@ -407,10 +396,6 @@ abstract final class AppTheme {
   /// Get gradient for battery ring
   static List<Color> getBatteryGradient(int level) {
     final color = getBatteryColor(level);
-    return [
-      color.withValues(alpha: 0.8),
-      color,
-    ];
+    return [color.withValues(alpha: 0.8), color];
   }
 }
-

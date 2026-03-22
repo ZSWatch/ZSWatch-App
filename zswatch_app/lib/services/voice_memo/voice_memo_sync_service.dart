@@ -127,10 +127,14 @@ class VoiceMemoSyncService {
   VoiceMemoSyncService({
     required WatchService watchService,
     required VoiceMemoRepository repository,
-  })  : _watchService = watchService,
-        _repository = repository {
-    _messageSubscription = _watchService.incomingMessages.listen(_handleMessage);
-    _connectionSubscription = _watchService.connectionStream.listen(_handleConnectionChange);
+  }) : _watchService = watchService,
+       _repository = repository {
+    _messageSubscription = _watchService.incomingMessages.listen(
+      _handleMessage,
+    );
+    _connectionSubscription = _watchService.connectionStream.listen(
+      _handleConnectionChange,
+    );
   }
 
   void _handleConnectionChange(Connection connection) {
@@ -180,7 +184,8 @@ class VoiceMemoSyncService {
     final completer = _listCompleter!;
     _listCompleter = null;
 
-    final recordings = (message['recordings'] as List<dynamic>?)
+    final recordings =
+        (message['recordings'] as List<dynamic>?)
             ?.map((r) => WatchRecordingInfo.fromJson(r as Map<String, dynamic>))
             .toList() ??
         [];
@@ -217,38 +222,42 @@ class VoiceMemoSyncService {
     }
 
     try {
-      _updateState(const VoiceMemoSyncState(
-        phase: VoiceMemoSyncPhase.fetchingList,
-      ));
+      _updateState(
+        const VoiceMemoSyncState(phase: VoiceMemoSyncPhase.fetchingList),
+      );
 
       // Request recording list from watch
       await _watchService.sendVoiceMemoCommand('list');
 
       // Wait for list response (with timeout)
       _listCompleter = Completer<List<WatchRecordingInfo>>();
-      final recordings = await _listCompleter!.future
-          .timeout(const Duration(seconds: 10), onTimeout: () {
-        _log('List request timed out');
-        return <WatchRecordingInfo>[];
-      });
+      final recordings = await _listCompleter!.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          _log('List request timed out');
+          return <WatchRecordingInfo>[];
+        },
+      );
       _log('Fetched ${recordings.length} recordings from list');
 
       // Find recordings not yet downloaded
       final undownloaded = await _repository.getUndownloadedMemos();
       if (undownloaded.isEmpty) {
         _log('All recordings already synced');
-        _updateState(const VoiceMemoSyncState(
-          phase: VoiceMemoSyncPhase.completed,
-        ));
+        _updateState(
+          const VoiceMemoSyncState(phase: VoiceMemoSyncPhase.completed),
+        );
         _resetStateAfterDelay();
         return;
       }
 
-      _updateState(VoiceMemoSyncState(
-        phase: VoiceMemoSyncPhase.downloading,
-        totalToSync: undownloaded.length,
-        completedCount: 0,
-      ));
+      _updateState(
+        VoiceMemoSyncState(
+          phase: VoiceMemoSyncPhase.downloading,
+          totalToSync: undownloaded.length,
+          completedCount: 0,
+        ),
+      );
 
       // Enable SMP server on the watch (required for MCUmgr file transfers)
       _log('Enabling SMP server for file download');
@@ -266,17 +275,17 @@ class VoiceMemoSyncService {
       int completed = 0;
       try {
         for (final memo in undownloaded) {
-          _updateState(currentState.copyWith(
-            currentFilename: memo.filename,
-            downloadProgress: 0.0,
-          ));
+          _updateState(
+            currentState.copyWith(
+              currentFilename: memo.filename,
+              downloadProgress: 0.0,
+            ),
+          );
 
           final success = await _downloadRecording(memo);
           if (success) {
             completed++;
-            _updateState(currentState.copyWith(
-              completedCount: completed,
-            ));
+            _updateState(currentState.copyWith(completedCount: completed));
           }
         }
       } finally {
@@ -290,11 +299,13 @@ class VoiceMemoSyncService {
         await _resetFsManager();
       }
 
-      _updateState(VoiceMemoSyncState(
-        phase: VoiceMemoSyncPhase.completed,
-        totalToSync: undownloaded.length,
-        completedCount: completed,
-      ));
+      _updateState(
+        VoiceMemoSyncState(
+          phase: VoiceMemoSyncPhase.completed,
+          totalToSync: undownloaded.length,
+          completedCount: completed,
+        ),
+      );
 
       // Notify listeners that new memos were downloaded (triggers auto-transcribe)
       if (completed > 0) {
@@ -302,10 +313,12 @@ class VoiceMemoSyncService {
       }
     } catch (e) {
       _log('Sync failed: $e');
-      _updateState(VoiceMemoSyncState(
-        phase: VoiceMemoSyncPhase.failed,
-        errorMessage: e.toString(),
-      ));
+      _updateState(
+        VoiceMemoSyncState(
+          phase: VoiceMemoSyncPhase.failed,
+          errorMessage: e.toString(),
+        ),
+      );
     }
 
     _resetStateAfterDelay();
@@ -340,40 +353,45 @@ class VoiceMemoSyncService {
       // Set up download completion listener
       _downloadCompleter = Completer<Uint8List?>();
       await _downloadSubscription?.cancel();
-      _downloadSubscription = _fsManager!.downloadCallbacks.listen((callback) {
-        switch (callback) {
-          case OnDownloadProgressChanged():
-            final progress = callback.total > 0
-                ? callback.current / callback.total
-                : 0.0;
-            _updateState(currentState.copyWith(downloadProgress: progress));
-          case OnDownloadCompleted():
-            _downloadCompleter?.complete(callback.data);
-            _downloadCompleter = null;
-          case OnDownloadFailed():
-            _log('Download failed: ${callback.cause}');
-            _downloadCompleter?.complete(null);
-            _downloadCompleter = null;
-          case OnDownloadCancelled():
-            _log('Download cancelled');
-            _downloadCompleter?.complete(null);
-            _downloadCompleter = null;
-        }
-      }, onError: (Object error) {
-        _log('Download callback stream error: $error');
-        _downloadCompleter?.complete(null);
-        _downloadCompleter = null;
-      });
+      _downloadSubscription = _fsManager!.downloadCallbacks.listen(
+        (callback) {
+          switch (callback) {
+            case OnDownloadProgressChanged():
+              final progress = callback.total > 0
+                  ? callback.current / callback.total
+                  : 0.0;
+              _updateState(currentState.copyWith(downloadProgress: progress));
+            case OnDownloadCompleted():
+              _downloadCompleter?.complete(callback.data);
+              _downloadCompleter = null;
+            case OnDownloadFailed():
+              _log('Download failed: ${callback.cause}');
+              _downloadCompleter?.complete(null);
+              _downloadCompleter = null;
+            case OnDownloadCancelled():
+              _log('Download cancelled');
+              _downloadCompleter?.complete(null);
+              _downloadCompleter = null;
+          }
+        },
+        onError: (Object error) {
+          _log('Download callback stream error: $error');
+          _downloadCompleter?.complete(null);
+          _downloadCompleter = null;
+        },
+      );
 
       // Start download
       await _fsManager!.download(remotePath);
 
       // Wait for completion
-      final data = await _downloadCompleter!.future
-          .timeout(const Duration(minutes: 5), onTimeout: () {
-        _log('Download timed out');
-        return null;
-      });
+      final data = await _downloadCompleter!.future.timeout(
+        const Duration(minutes: 5),
+        onTimeout: () {
+          _log('Download timed out');
+          return null;
+        },
+      );
 
       if (data == null) {
         _log('Download returned no data');
@@ -381,12 +399,12 @@ class VoiceMemoSyncService {
       }
 
       // Verify download
-      _updateState(currentState.copyWith(
-        phase: VoiceMemoSyncPhase.verifying,
-      ));
+      _updateState(currentState.copyWith(phase: VoiceMemoSyncPhase.verifying));
 
-      if (!ZswOpusParser.validateDownload(data,
-          expectedSizeBytes: memo.sizeBytes)) {
+      if (!ZswOpusParser.validateDownload(
+        data,
+        expectedSizeBytes: memo.sizeBytes,
+      )) {
         _log('Download verification failed for ${memo.filename}');
         return false;
       }
@@ -417,9 +435,7 @@ class VoiceMemoSyncService {
       }
 
       // Delete from watch after successful verification
-      _updateState(currentState.copyWith(
-        phase: VoiceMemoSyncPhase.deleting,
-      ));
+      _updateState(currentState.copyWith(phase: VoiceMemoSyncPhase.deleting));
 
       await _watchService.sendVoiceMemoCommand(
         'delete',
@@ -455,8 +471,7 @@ class VoiceMemoSyncService {
   }
 
   /// Save downloaded recording to app's local storage
-  Future<String> _saveToLocalStorage(
-      String filename, Uint8List data) async {
+  Future<String> _saveToLocalStorage(String filename, Uint8List data) async {
     final appDir = await getApplicationDocumentsDirectory();
     final voiceDir = Directory(p.join(appDir.path, 'voice_memos'));
     if (!voiceDir.existsSync()) {

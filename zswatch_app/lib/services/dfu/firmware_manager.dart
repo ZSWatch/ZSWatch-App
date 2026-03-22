@@ -24,7 +24,7 @@ class FirmwareManager {
   static const String _owner = 'ZSWatch';
   static const String _repo = 'ZSWatch';
   static const String _apiBase = 'https://api.github.com';
-  
+
   /// Artifact name filters to match ZSWatch firmware artifacts
   static const List<String> _artifactFilters = ['watchdk@1', '@5'];
 
@@ -62,7 +62,9 @@ class FirmwareManager {
     String? boardPrefix,
   ) {
     if (boardPrefix == null) return assets;
-    final compatible = assets.where((a) => isAssetCompatible(a.name, boardPrefix)).toList();
+    final compatible = assets
+        .where((a) => isAssetCompatible(a.name, boardPrefix))
+        .toList();
     return compatible.isNotEmpty ? compatible : assets;
   }
 
@@ -74,7 +76,9 @@ class FirmwareManager {
     String? boardPrefix,
   ) {
     if (boardPrefix == null) return artifacts;
-    final compatible = artifacts.where((a) => a.name.contains(boardPrefix)).toList();
+    final compatible = artifacts
+        .where((a) => a.name.contains(boardPrefix))
+        .toList();
     return compatible.isNotEmpty ? compatible : artifacts;
   }
 
@@ -103,9 +107,7 @@ class FirmwareManager {
     try {
       final response = await http.get(
         Uri.parse('$_apiBase/repos/$_owner/$_repo/releases?per_page=$limit'),
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-        },
+        headers: {'Accept': 'application/vnd.github.v3+json'},
       );
 
       if (response.statusCode != 200) {
@@ -120,30 +122,37 @@ class FirmwareManager {
       for (final release in data) {
         final Map<String, dynamic> releaseMap = release as Map<String, dynamic>;
         final assets = releaseMap['assets'] as List<dynamic>? ?? [];
-        
+
         // Collect all firmware assets for this release
         final releaseAssets = <ReleaseAsset>[];
         for (final asset in assets) {
           final Map<String, dynamic> assetMap = asset as Map<String, dynamic>;
           final assetName = assetMap['name'] as String? ?? '';
           if (_isFirmwareAsset(assetName)) {
-            releaseAssets.add(ReleaseAsset(
-              name: assetName,
-              downloadUrl: assetMap['browser_download_url'] as String,
-              size: assetMap['size'] as int? ?? 0,
-            ));
+            releaseAssets.add(
+              ReleaseAsset(
+                name: assetName,
+                downloadUrl: assetMap['browser_download_url'] as String,
+                size: assetMap['size'] as int? ?? 0,
+              ),
+            );
           }
         }
 
         if (releaseAssets.isNotEmpty) {
-          releases.add(GitHubRelease(
-            tagName: releaseMap['tag_name'] as String? ?? '',
-            name: releaseMap['name'] as String? ?? releaseMap['tag_name'] as String? ?? '',
-            body: releaseMap['body'] as String?,
-            isPrerelease: releaseMap['prerelease'] as bool? ?? false,
-            publishedAt: DateTime.parse(releaseMap['published_at'] as String),
-            assets: releaseAssets,
-          ));
+          releases.add(
+            GitHubRelease(
+              tagName: releaseMap['tag_name'] as String? ?? '',
+              name:
+                  releaseMap['name'] as String? ??
+                  releaseMap['tag_name'] as String? ??
+                  '',
+              body: releaseMap['body'] as String?,
+              isPrerelease: releaseMap['prerelease'] as bool? ?? false,
+              publishedAt: DateTime.parse(releaseMap['published_at'] as String),
+              assets: releaseAssets,
+            ),
+          );
         }
       }
 
@@ -156,7 +165,7 @@ class FirmwareManager {
   }
 
   /// Fetch workflow runs with artifacts from GitHub Actions
-  /// 
+  ///
   /// Similar to the website implementation, this fetches recent successful builds
   /// and prioritizes the main branch.
   Future<List<WorkflowRun>> fetchWorkflowRuns({int numRuns = 5}) async {
@@ -166,11 +175,15 @@ class FirmwareManager {
       // Fetch recent runs plus explicitly grab the latest successful run on main
       final responses = await Future.wait([
         http.get(
-          Uri.parse('$_apiBase/repos/$_owner/$_repo/actions/runs?per_page=${numRuns * 2}'),
+          Uri.parse(
+            '$_apiBase/repos/$_owner/$_repo/actions/runs?per_page=${numRuns * 2}',
+          ),
           headers: {'Accept': 'application/vnd.github.v3+json'},
         ),
         http.get(
-          Uri.parse('$_apiBase/repos/$_owner/$_repo/actions/runs?branch=main&status=success&per_page=1'),
+          Uri.parse(
+            '$_apiBase/repos/$_owner/$_repo/actions/runs?branch=main&status=success&per_page=1',
+          ),
           headers: {'Accept': 'application/vnd.github.v3+json'},
         ),
       ]);
@@ -185,10 +198,12 @@ class FirmwareManager {
       }
 
       final runsData = jsonDecode(runsResponse.body) as Map<String, dynamic>;
-      final mainRunData = jsonDecode(mainRunResponse.body) as Map<String, dynamic>;
+      final mainRunData =
+          jsonDecode(mainRunResponse.body) as Map<String, dynamic>;
 
       final workflowRuns = (runsData['workflow_runs'] as List<dynamic>?) ?? [];
-      final mainBranchRuns = (mainRunData['workflow_runs'] as List<dynamic>?) ?? [];
+      final mainBranchRuns =
+          (mainRunData['workflow_runs'] as List<dynamic>?) ?? [];
 
       if (workflowRuns.isEmpty && mainBranchRuns.isEmpty) {
         _log('No workflow runs found');
@@ -200,9 +215,11 @@ class FirmwareManager {
       // Filter for successful runs, excluding gh-pages
       final successfulRuns = workflowRuns
           .map((r) => r as Map<String, dynamic>)
-          .where((run) => 
-              run['conclusion'] == 'success' && 
-              run['head_branch'] != 'gh-pages')
+          .where(
+            (run) =>
+                run['conclusion'] == 'success' &&
+                run['head_branch'] != 'gh-pages',
+          )
           .toList();
 
       // Find latest main run
@@ -219,12 +236,15 @@ class FirmwareManager {
 
       // Remove duplicates
       final seen = <int>{};
-      final uniqueRuns = runsWithMain.where((run) {
-        final id = run['id'] as int;
-        if (seen.contains(id)) return false;
-        seen.add(id);
-        return true;
-      }).take(numRuns).toList();
+      final uniqueRuns = runsWithMain
+          .where((run) {
+            final id = run['id'] as int;
+            if (seen.contains(id)) return false;
+            seen.add(id);
+            return true;
+          })
+          .take(numRuns)
+          .toList();
 
       _log('Fetching artifacts from ${uniqueRuns.length} workflow runs...');
 
@@ -233,10 +253,12 @@ class FirmwareManager {
       for (final run in uniqueRuns) {
         final runId = run['id'] as int;
         final artifacts = await _fetchArtifactsForRun(runId);
-        
+
         // Filter artifacts to match ZSWatch firmware
         final filteredArtifacts = artifacts.where((artifact) {
-          return _artifactFilters.any((filter) => artifact.name.contains(filter));
+          return _artifactFilters.any(
+            (filter) => artifact.name.contains(filter),
+          );
         }).toList();
 
         if (filteredArtifacts.isEmpty) {
@@ -245,15 +267,25 @@ class FirmwareManager {
         }
 
         final headCommit = run['head_commit'] as Map<String, dynamic>?;
-        runs.add(WorkflowRun(
-          id: runId,
-          branch: run['head_branch'] as String? ?? 'unknown',
-          user: (run['actor'] as Map<String, dynamic>?)?['login'] as String? ?? 'unknown',
-          commitSha: run['head_sha'] as String? ?? headCommit?['id'] as String? ?? '',
-          commitMessage: headCommit?['message'] as String? ?? run['display_title'] as String? ?? '',
-          createdAt: DateTime.parse(run['created_at'] as String),
-          artifacts: filteredArtifacts,
-        ));
+        runs.add(
+          WorkflowRun(
+            id: runId,
+            branch: run['head_branch'] as String? ?? 'unknown',
+            user:
+                (run['actor'] as Map<String, dynamic>?)?['login'] as String? ??
+                'unknown',
+            commitSha:
+                run['head_sha'] as String? ??
+                headCommit?['id'] as String? ??
+                '',
+            commitMessage:
+                headCommit?['message'] as String? ??
+                run['display_title'] as String? ??
+                '',
+            createdAt: DateTime.parse(run['created_at'] as String),
+            artifacts: filteredArtifacts,
+          ),
+        );
       }
 
       _log('Found ${runs.length} runs with firmware artifacts');
@@ -268,37 +300,48 @@ class FirmwareManager {
   Future<List<WorkflowArtifact>> _fetchArtifactsForRun(int runId) async {
     try {
       final response = await http.get(
-        Uri.parse('$_apiBase/repos/$_owner/$_repo/actions/runs/$runId/artifacts'),
+        Uri.parse(
+          '$_apiBase/repos/$_owner/$_repo/actions/runs/$runId/artifacts',
+        ),
         headers: {'Accept': 'application/vnd.github.v3+json'},
       );
 
       if (response.statusCode != 200) {
-        _log('Failed to fetch artifacts for run $runId: ${response.statusCode}');
+        _log(
+          'Failed to fetch artifacts for run $runId: ${response.statusCode}',
+        );
         return [];
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final artifacts = (data['artifacts'] as List<dynamic>?) ?? [];
-      
-      print('[FirmwareManager] Found ${artifacts.length} artifacts for run $runId');
 
-      return artifacts.map((a) {
-        final artifact = a as Map<String, dynamic>;
-        print('[FirmwareManager] Artifact: ${artifact['name']}');
-        print('[FirmwareManager]   ID: ${artifact['id']}');
-        print('[FirmwareManager]   Size: ${artifact['size_in_bytes']}');
-        print('[FirmwareManager]   Expired: ${artifact['expired']}');
-        print('[FirmwareManager]   archive_download_url: ${artifact['archive_download_url']}');
-        
-        return WorkflowArtifact(
-          id: artifact['id'] as int,
-          name: artifact['name'] as String? ?? 'unknown',
-          sizeInBytes: artifact['size_in_bytes'] as int? ?? 0,
-          createdAt: DateTime.parse(artifact['created_at'] as String),
-          expired: artifact['expired'] as bool? ?? false,
-          archiveDownloadUrl: artifact['archive_download_url'] as String?,
-        );
-      }).where((a) => !a.expired).toList();
+      print(
+        '[FirmwareManager] Found ${artifacts.length} artifacts for run $runId',
+      );
+
+      return artifacts
+          .map((a) {
+            final artifact = a as Map<String, dynamic>;
+            print('[FirmwareManager] Artifact: ${artifact['name']}');
+            print('[FirmwareManager]   ID: ${artifact['id']}');
+            print('[FirmwareManager]   Size: ${artifact['size_in_bytes']}');
+            print('[FirmwareManager]   Expired: ${artifact['expired']}');
+            print(
+              '[FirmwareManager]   archive_download_url: ${artifact['archive_download_url']}',
+            );
+
+            return WorkflowArtifact(
+              id: artifact['id'] as int,
+              name: artifact['name'] as String? ?? 'unknown',
+              sizeInBytes: artifact['size_in_bytes'] as int? ?? 0,
+              createdAt: DateTime.parse(artifact['created_at'] as String),
+              expired: artifact['expired'] as bool? ?? false,
+              archiveDownloadUrl: artifact['archive_download_url'] as String?,
+            );
+          })
+          .where((a) => !a.expired)
+          .toList();
     } catch (e) {
       _log('Error fetching artifacts for run $runId: $e');
       return [];
@@ -306,73 +349,89 @@ class FirmwareManager {
   }
 
   /// Download firmware from a GitHub Actions artifact
-  /// 
+  ///
   /// Uses the same URL format as the website:
   /// https://github.com/{owner}/{repo}/actions/runs/{runId}/artifacts/{artifactId}
   /// This triggers GitHub's download mechanism which works for public repos.
-  Future<ReleaseExtractionResult> downloadArtifact(WorkflowRun run, WorkflowArtifact artifact) async {
+  Future<ReleaseExtractionResult> downloadArtifact(
+    WorkflowRun run,
+    WorkflowArtifact artifact,
+  ) async {
     print('[FirmwareManager] downloadArtifact called');
     print('[FirmwareManager] Artifact: ${artifact.name}, ID: ${artifact.id}');
     print('[FirmwareManager] Run ID: ${run.id}, Branch: ${run.branch}');
-    print('[FirmwareManager] Archive Download URL from API: ${artifact.archiveDownloadUrl}');
-    
+    print(
+      '[FirmwareManager] Archive Download URL from API: ${artifact.archiveDownloadUrl}',
+    );
+
     _log('Downloading artifact: ${artifact.name} from run ${run.id}');
     _cancelDownload = false;
 
     // Try the GitHub web UI URL format first (same as website)
     // This URL format: https://github.com/{owner}/{repo}/actions/runs/{runId}/artifacts/{artifactId}
-    final webUiUrl = 'https://github.com/$_owner/$_repo/actions/runs/${run.id}/artifacts/${artifact.id}';
-    
+    final webUiUrl =
+        'https://github.com/$_owner/$_repo/actions/runs/${run.id}/artifacts/${artifact.id}';
+
     // Also have the API URL as fallback
-    final apiUrl = artifact.archiveDownloadUrl ?? 
+    final apiUrl =
+        artifact.archiveDownloadUrl ??
         '$_apiBase/repos/$_owner/$_repo/actions/artifacts/${artifact.id}/zip';
-    
+
     print('[FirmwareManager] Web UI URL: $webUiUrl');
     print('[FirmwareManager] API URL: $apiUrl');
     _log('Web UI URL: $webUiUrl');
     _log('API URL: $apiUrl');
-    
+
     // Start with web UI URL (same as website does)
     var downloadUrl = webUiUrl;
-    
-    _updateProgress(DownloadProgress(0, artifact.sizeInBytes, DownloadStatus.downloading));
+
+    _updateProgress(
+      DownloadProgress(0, artifact.sizeInBytes, DownloadStatus.downloading),
+    );
 
     try {
       _httpClient = http.Client();
-      
+
       // Follow redirects manually to handle GitHub's redirect chain
       var currentUrl = downloadUrl;
       http.StreamedResponse? response;
       Map<String, String> cookies = {};
-      
+
       for (int redirectCount = 0; redirectCount < 15; redirectCount++) {
         print('[FirmwareManager] Request #$redirectCount: GET $currentUrl');
         _log('Request #$redirectCount: GET $currentUrl');
-        
+
         final request = http.Request('GET', Uri.parse(currentUrl));
         // Don't follow redirects automatically so we can handle them
         request.followRedirects = false;
-        
+
         // Add cookies from previous responses
         if (cookies.isNotEmpty) {
-          request.headers['Cookie'] = cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
-          print('[FirmwareManager] Sending cookies: ${request.headers['Cookie']}');
+          request.headers['Cookie'] = cookies.entries
+              .map((e) => '${e.key}=${e.value}')
+              .join('; ');
+          print(
+            '[FirmwareManager] Sending cookies: ${request.headers['Cookie']}',
+          );
           _log('Sending cookies: ${request.headers['Cookie']}');
         }
-        
+
         // Add common browser headers
-        request.headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36';
+        request.headers['User-Agent'] =
+            'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36';
         request.headers['Accept'] = '*/*';
-        
+
         response = await _httpClient!.send(request);
-        
-        print('[FirmwareManager] Response: ${response.statusCode} ${response.reasonPhrase}');
+
+        print(
+          '[FirmwareManager] Response: ${response.statusCode} ${response.reasonPhrase}',
+        );
         _log('Response: ${response.statusCode} ${response.reasonPhrase}');
         _log('Response headers:');
         response.headers.forEach((key, value) {
           _log('  $key: $value');
         });
-        
+
         // Collect any cookies
         final setCookie = response.headers['set-cookie'];
         if (setCookie != null) {
@@ -383,7 +442,7 @@ class FirmwareManager {
             cookies[cookieParts[0]] = cookieParts.sublist(1).join('=');
           }
         }
-        
+
         if (response.statusCode == 200) {
           // Success - download the file
           print('[FirmwareManager] Success! Starting file download...');
@@ -392,7 +451,10 @@ class FirmwareManager {
           print('[FirmwareManager] Content-Length: $contentLength');
           _log('Content-Length: $contentLength');
           break;
-        } else if (response.statusCode == 302 || response.statusCode == 301 || response.statusCode == 307 || response.statusCode == 308) {
+        } else if (response.statusCode == 302 ||
+            response.statusCode == 301 ||
+            response.statusCode == 307 ||
+            response.statusCode == 308) {
           // Follow redirect (301, 302, 307, 308 are all redirect codes)
           final location = response.headers['location'];
           if (location == null) {
@@ -400,7 +462,7 @@ class FirmwareManager {
             _log('ERROR: Redirect without location header!');
             throw FirmwareDownloadException('Redirect without location header');
           }
-          
+
           // Handle relative URLs
           if (location.startsWith('/')) {
             final uri = Uri.parse(currentUrl);
@@ -408,8 +470,10 @@ class FirmwareManager {
           } else {
             currentUrl = location;
           }
-          
-          print('[FirmwareManager] Following ${response.statusCode} redirect to: $currentUrl');
+
+          print(
+            '[FirmwareManager] Following ${response.statusCode} redirect to: $currentUrl',
+          );
           _log('Following ${response.statusCode} redirect to: $currentUrl');
           // Drain the response body before following redirect
           await response.stream.drain<void>();
@@ -421,13 +485,17 @@ class FirmwareManager {
             'Artifact not found. It may have expired.',
           );
         } else if (response.statusCode == 401 || response.statusCode == 403) {
-          print('[FirmwareManager] ERROR: Authentication required (${response.statusCode})');
+          print(
+            '[FirmwareManager] ERROR: Authentication required (${response.statusCode})',
+          );
           _log('ERROR: Authentication required (${response.statusCode})');
           throw FirmwareDownloadException(
             'Authentication required. GitHub Actions artifacts may require login.',
           );
         } else {
-          print('[FirmwareManager] ERROR: Unexpected status code ${response.statusCode}');
+          print(
+            '[FirmwareManager] ERROR: Unexpected status code ${response.statusCode}',
+          );
           _log('ERROR: Unexpected status code ${response.statusCode}');
           throw FirmwareDownloadException(
             'Download failed with status ${response.statusCode}',
@@ -436,7 +504,9 @@ class FirmwareManager {
       }
 
       if (response == null || response.statusCode != 200) {
-        throw FirmwareDownloadException('Failed to download after following redirects');
+        throw FirmwareDownloadException(
+          'Failed to download after following redirects',
+        );
       }
 
       final image = await _downloadFromStream(
@@ -476,7 +546,9 @@ class FirmwareManager {
 
       return ReleaseExtractionResult(firmwareImage: image);
     } catch (e) {
-      _updateProgress(DownloadProgress(0, 0, DownloadStatus.failed, error: e.toString()));
+      _updateProgress(
+        DownloadProgress(0, 0, DownloadStatus.failed, error: e.toString()),
+      );
       _log('Download error: $e');
       rethrow;
     } finally {
@@ -509,14 +581,22 @@ class FirmwareManager {
 
       sink.add(chunk);
       bytesReceived += chunk.length;
-      _updateProgress(DownloadProgress(bytesReceived, expectedSize, DownloadStatus.downloading));
+      _updateProgress(
+        DownloadProgress(
+          bytesReceived,
+          expectedSize,
+          DownloadStatus.downloading,
+        ),
+      );
     }
 
     await sink.close();
     _log('Download complete: ${file.path}');
 
     final actualSize = await file.length();
-    _updateProgress(DownloadProgress(actualSize, actualSize, DownloadStatus.completed));
+    _updateProgress(
+      DownloadProgress(actualSize, actualSize, DownloadStatus.completed),
+    );
 
     return FirmwareImage.fromGitHub(
       name: artifactName,
@@ -529,14 +609,14 @@ class FirmwareManager {
   }
 
   /// Get the browser download URL for an artifact
-  /// 
+  ///
   /// This can be used to open in browser for manual download
   String getArtifactBrowserUrl(WorkflowRun run, WorkflowArtifact artifact) {
     return 'https://github.com/$_owner/$_repo/actions/runs/${run.id}/artifacts/${artifact.id}';
   }
 
   /// Download firmware from a GitHub release asset
-  /// 
+  ///
   /// Downloads the selected asset (e.g., watchdk@1_nrf5340_cpuapp_debug.zip),
   /// extracts it to find dfu_application.zip (and optionally lvgl_resources_raw.bin),
   /// and returns the extraction result.
@@ -547,7 +627,9 @@ class FirmwareManager {
     _log('Downloading release asset: ${asset.name}');
     _cancelDownload = false;
 
-    _updateProgress(DownloadProgress(0, asset.size, DownloadStatus.downloading));
+    _updateProgress(
+      DownloadProgress(0, asset.size, DownloadStatus.downloading),
+    );
 
     try {
       _httpClient = http.Client();
@@ -578,7 +660,13 @@ class FirmwareManager {
 
         sink.add(chunk);
         bytesReceived += chunk.length;
-        _updateProgress(DownloadProgress(bytesReceived, totalBytes, DownloadStatus.downloading));
+        _updateProgress(
+          DownloadProgress(
+            bytesReceived,
+            totalBytes,
+            DownloadStatus.downloading,
+          ),
+        );
       }
 
       await sink.close();
@@ -599,11 +687,15 @@ class FirmwareManager {
         _log('Outer zip cleanup failed (ignored): $e');
       }
 
-      _updateProgress(DownloadProgress(totalBytes, totalBytes, DownloadStatus.completed));
+      _updateProgress(
+        DownloadProgress(totalBytes, totalBytes, DownloadStatus.completed),
+      );
 
       return result;
     } catch (e) {
-      _updateProgress(DownloadProgress(0, 0, DownloadStatus.failed, error: e.toString()));
+      _updateProgress(
+        DownloadProgress(0, 0, DownloadStatus.failed, error: e.toString()),
+      );
       _log('Download error: $e');
       rethrow;
     } finally {
@@ -633,7 +725,9 @@ class FirmwareManager {
     FirmwareImage? rotatedFirmwareImage;
     FilesystemImage? filesystemImage;
 
-    _log('Extracting firmware variants (rotated preferred: $useRotatedFirmware)');
+    _log(
+      'Extracting firmware variants (rotated preferred: $useRotatedFirmware)',
+    );
 
     // Extract both DFU variants (if present) and filesystem image
     for (final file in archive) {
@@ -668,7 +762,10 @@ class FirmwareManager {
 
       // Rotated DFU firmware
       if (baseName == 'dfu_application_rotated.zip') {
-        final rotatedZipPath = path.join(downloadDir.path, 'dfu_application_rotated.zip');
+        final rotatedZipPath = path.join(
+          downloadDir.path,
+          'dfu_application_rotated.zip',
+        );
         final rotatedZipFile = File(rotatedZipPath);
         await rotatedZipFile.writeAsBytes(file.content as List<int>);
 
@@ -744,7 +841,7 @@ class FirmwareManager {
   }
 
   /// Extract firmware images from a zip file
-  /// 
+  ///
   /// Parses the manifest.json inside the zip to get image_index for each file.
   Future<List<FirmwareImage>> extractZip(FirmwareImage zipImage) async {
     if (!zipImage.filePath.toLowerCase().endsWith('.zip')) {
@@ -788,10 +885,10 @@ class FirmwareManager {
         }
 
         final fileName = path.basename(file.name);
-        
+
         // Look up in manifest first
         final manifestEntry = manifestEntries?[fileName.toLowerCase()];
-        
+
         if (manifestEntry != null) {
           // Extract this file - manifest tells us everything
           final outputPath = path.join(extractPath, fileName);
@@ -799,16 +896,20 @@ class FirmwareManager {
           await outputFile.create(recursive: true);
           await outputFile.writeAsBytes(file.content as List<int>);
 
-          _log('Extracted: $fileName (image_index: ${manifestEntry.imageIndex})');
+          _log(
+            'Extracted: $fileName (image_index: ${manifestEntry.imageIndex})',
+          );
 
-          images.add(FirmwareImage.fromLocalFile(
-            name: fileName,
-            filePath: outputPath,
-            size: file.size,
-            version: manifestEntry.version ?? zipImage.version,
-            slot: manifestEntry.imageIndex,
-            board: manifestEntry.board,
-          ));
+          images.add(
+            FirmwareImage.fromLocalFile(
+              name: fileName,
+              filePath: outputPath,
+              size: file.size,
+              version: manifestEntry.version ?? zipImage.version,
+              slot: manifestEntry.imageIndex,
+              board: manifestEntry.board,
+            ),
+          );
         } else if (manifestEntries == null) {
           // No manifest - fall back to filename-based detection (legacy support)
           if (_isFirmwareFile(file.name)) {
@@ -819,12 +920,14 @@ class FirmwareManager {
 
             _log('Extracted (no manifest): $fileName');
 
-            images.add(FirmwareImage.fromLocalFile(
-              name: fileName,
-              filePath: outputPath,
-              size: file.size,
-              version: zipImage.version,
-            ));
+            images.add(
+              FirmwareImage.fromLocalFile(
+                name: fileName,
+                filePath: outputPath,
+                size: file.size,
+                version: zipImage.version,
+              ),
+            );
           }
         } else {
           _log('Skipping $fileName - not in manifest');
@@ -842,7 +945,9 @@ class FirmwareManager {
         return slotA.compareTo(slotB);
       });
 
-      _log('Extracted ${images.length} firmware image(s): ${images.map((i) => '${i.name}(slot:${i.slot})').join(', ')}');
+      _log(
+        'Extracted ${images.length} firmware image(s): ${images.map((i) => '${i.name}(slot:${i.slot})').join(', ')}',
+      );
       return images;
     } catch (e) {
       _log('Extraction error: $e');
@@ -854,7 +959,7 @@ class FirmwareManager {
   Map<String, ManifestEntry> _parseManifest(String jsonContent) {
     final json = jsonDecode(jsonContent) as Map<String, dynamic>;
     final files = json['files'] as List<dynamic>?;
-    
+
     if (files == null) {
       return {};
     }
@@ -867,15 +972,16 @@ class FirmwareManager {
 
       // image_index can be int or string
       final imageIndexRaw = entry['image_index'];
-      final imageIndex = imageIndexRaw is int 
-          ? imageIndexRaw 
+      final imageIndex = imageIndexRaw is int
+          ? imageIndexRaw
           : int.tryParse(imageIndexRaw?.toString() ?? '');
 
       entries[fileName.toLowerCase()] = ManifestEntry(
         file: fileName,
         imageIndex: imageIndex ?? 0,
         size: entry['size'] as int?,
-        version: entry['version_MCUBOOT'] as String? ?? entry['version'] as String?,
+        version:
+            entry['version_MCUBOOT'] as String? ?? entry['version'] as String?,
         type: entry['type'] as String?,
         board: entry['board'] as String?,
       );
@@ -962,7 +1068,9 @@ class FirmwareManager {
     // Validate single file
     final file = File(selectedImage.filePath);
     if (!await file.exists()) {
-      throw FirmwareDownloadException('File not found: ${selectedImage.filePath}');
+      throw FirmwareDownloadException(
+        'File not found: ${selectedImage.filePath}',
+      );
     }
 
     return [selectedImage];
@@ -1036,10 +1144,9 @@ class FirmwareManager {
     try {
       final downloadDir = await _getDownloadDirectory();
       final entities = await downloadDir.list().toList();
-      
+
       for (final entity in entities) {
-        if (entity is Directory && 
-            entity.path.contains('extracted_')) {
+        if (entity is Directory && entity.path.contains('extracted_')) {
           final stat = await entity.stat();
           final age = DateTime.now().difference(stat.modified);
           if (age.inHours > 24) {
@@ -1133,10 +1240,12 @@ class FirmwareManager {
     }
     // Prefix match for truncated SHAs
     final entries = dir.listSync().whereType<File>().where(
-        (f) => f.path.endsWith('.elf.gz'));
+      (f) => f.path.endsWith('.elf.gz'),
+    );
     for (final entry in entries) {
       final name = path.basenameWithoutExtension(
-          path.basenameWithoutExtension(entry.path)); // strip .elf.gz
+        path.basenameWithoutExtension(entry.path),
+      ); // strip .elf.gz
       if (name.startsWith(commitSha) || commitSha.startsWith(name)) {
         _log('ELF cache prefix hit: $commitSha matched $name');
         return entry;
@@ -1156,7 +1265,8 @@ class FirmwareManager {
     }
     // Prefix match for truncated SHAs
     final entries = dir.listSync().whereType<File>().where(
-        (f) => f.path.endsWith('.meta'));
+      (f) => f.path.endsWith('.meta'),
+    );
     for (final entry in entries) {
       final name = path.basenameWithoutExtension(entry.path); // strip .meta
       if (name.startsWith(commitSha) || commitSha.startsWith(name)) {
@@ -1300,13 +1410,13 @@ class FirmwareDownloadException implements Exception {
 }
 
 /// Result of extracting a release archive
-/// 
+///
 /// Contains the firmware image (dfu_application.zip) and optionally
 /// a filesystem image (lvgl_resources_raw.bin) if found in the archive.
 class ReleaseExtractionResult {
   /// The extracted firmware image (dfu_application.zip)
   final FirmwareImage firmwareImage;
-  
+
   /// The extracted filesystem image (lvgl_resources_raw.bin), if found
   final FilesystemImage? filesystemImage;
 
@@ -1353,12 +1463,15 @@ class WorkflowRun {
   });
 
   /// Short commit SHA (first 7 characters)
-  String get shortSha => commitSha.length > 7 ? commitSha.substring(0, 7) : commitSha;
+  String get shortSha =>
+      commitSha.length > 7 ? commitSha.substring(0, 7) : commitSha;
 
   /// First line of commit message
   String get shortCommitMessage {
     final firstLine = commitMessage.split('\n').first;
-    return firstLine.length > 60 ? '${firstLine.substring(0, 57)}...' : firstLine;
+    return firstLine.length > 60
+        ? '${firstLine.substring(0, 57)}...'
+        : firstLine;
   }
 
   /// Whether this is from the main branch
@@ -1386,7 +1499,7 @@ class WorkflowArtifact {
 
   /// Whether the artifact has expired
   final bool expired;
-  
+
   /// GitHub API download URL (requires auth)
   final String? archiveDownloadUrl;
 
@@ -1415,19 +1528,19 @@ class WorkflowArtifact {
 class ManifestEntry {
   /// Filename (e.g., "app.internal.bin")
   final String file;
-  
+
   /// MCUmgr image index (0, 1, 2, etc.)
   final int imageIndex;
-  
+
   /// File size in bytes
   final int? size;
-  
+
   /// Version string (from version_MCUBOOT or version field)
   final String? version;
-  
+
   /// Type (e.g., "application")
   final String? type;
-  
+
   /// Board identifier
   final String? board;
 
@@ -1440,4 +1553,3 @@ class ManifestEntry {
     this.board,
   });
 }
-

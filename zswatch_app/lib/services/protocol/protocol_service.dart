@@ -134,11 +134,7 @@ class WatchCall {
   final String? name;
   final String? number;
 
-  const WatchCall({
-    required this.state,
-    this.name,
-    this.number,
-  });
+  const WatchCall({required this.state, this.name, this.number});
 }
 
 /// Navigation instruction to send to watch
@@ -259,4 +255,3 @@ abstract class ProtocolService {
   /// Send HTTP error (for watch HTTP requests)
   Future<void> sendHttpError(String requestId, String error);
 }
-

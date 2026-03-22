@@ -53,7 +53,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       // First check if we have permissions
       final notifier = ref.read(bleNotifierProvider.notifier);
       final hasPerms = await notifier.checkPermissions();
-      
+
       if (!hasPerms) {
         // Don't have permissions
         if (mounted) {
@@ -72,7 +72,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
       // Start scanning
       await _startScan();
-      
+
       if (mounted) {
         setState(() {
           _hasPermissions = true;
@@ -112,7 +112,9 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Bluetooth permission is required to scan for devices'),
+            content: Text(
+              'Bluetooth permission is required to scan for devices',
+            ),
             backgroundColor: AppTheme.errorColor,
           ),
         );

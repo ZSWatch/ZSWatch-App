@@ -9,7 +9,7 @@ import '../../data/models/filesystem_image.dart';
 import 'smp_not_available_exception.dart';
 
 /// Service for uploading filesystem images to the watch via MCUmgr
-/// 
+///
 /// Uses the FsManager from mcumgr_flutter to upload files to the watch's
 /// filesystem via the MCUmgr filesystem commands.
 class FilesystemUploadService {
@@ -39,7 +39,7 @@ class FilesystemUploadService {
   bool get isInProgress => currentState.status.isInProgress;
 
   /// Start uploading a filesystem image
-  /// 
+  ///
   /// [deviceId] - The BLE device remote ID (MAC address or UUID)
   /// [image] - The filesystem image to upload
   Future<void> startUpload({
@@ -57,20 +57,20 @@ class FilesystemUploadService {
       // Verify file exists
       final file = File(image.filePath);
       if (!await file.exists()) {
-        throw FilesystemUploadException(
-          'File not found: ${image.filePath}',
-        );
+        throw FilesystemUploadException('File not found: ${image.filePath}');
       }
 
       // Read file data
       final Uint8List data = await file.readAsBytes();
       _log('Read ${data.length} bytes from ${image.name}');
 
-      _updateState(FilesystemUploadState.uploading(
-        totalBytes: data.length,
-        imageName: image.name,
-        startedAt: startTime,
-      ));
+      _updateState(
+        FilesystemUploadState.uploading(
+          totalBytes: data.length,
+          imageName: image.name,
+          startedAt: startTime,
+        ),
+      );
 
       // Get FsManager instance
       try {
@@ -85,10 +85,12 @@ class FilesystemUploadService {
         (callback) => _handleUploadCallback(callback, startTime),
         onError: (Object error) {
           _log('Upload error: $error');
-          _updateState(FilesystemUploadState.failed(
-            error.toString(),
-            startedAt: startTime,
-          ));
+          _updateState(
+            FilesystemUploadState.failed(
+              error.toString(),
+              startedAt: startTime,
+            ),
+          );
         },
       );
 
@@ -100,15 +102,13 @@ class FilesystemUploadService {
       await _fsManager!.upload(image.targetPath, data);
 
       _log('Upload initiated');
-
     } on FilesystemUploadException {
       rethrow;
     } catch (e) {
       _log('Upload failed: $e');
-      _updateState(FilesystemUploadState.failed(
-        e.toString(),
-        startedAt: startTime,
-      ));
+      _updateState(
+        FilesystemUploadState.failed(e.toString(), startedAt: startTime),
+      );
       rethrow;
     }
   }
@@ -116,14 +116,16 @@ class FilesystemUploadService {
   void _handleUploadCallback(UploadCallback callback, DateTime startTime) {
     switch (callback) {
       case OnUploadProgressChanged():
-        final progress = callback.total > 0 
-            ? callback.current / callback.total 
+        final progress = callback.total > 0
+            ? callback.current / callback.total
             : 0.0;
-        _updateState(currentState.copyWith(
-          progress: progress.clamp(0.0, 1.0),
-          bytesTransferred: callback.current,
-          totalBytes: callback.total,
-        ));
+        _updateState(
+          currentState.copyWith(
+            progress: progress.clamp(0.0, 1.0),
+            bytesTransferred: callback.current,
+            totalBytes: callback.total,
+          ),
+        );
         break;
       case OnUploadCompleted():
         _stopSpeedTimer();
@@ -135,10 +137,12 @@ class FilesystemUploadService {
       case OnUploadFailed():
         _stopSpeedTimer();
         _log('Upload failed: ${callback.cause}');
-        _updateState(FilesystemUploadState.failed(
-          callback.cause ?? 'Unknown error',
-          startedAt: startTime,
-        ));
+        _updateState(
+          FilesystemUploadState.failed(
+            callback.cause ?? 'Unknown error',
+            startedAt: startTime,
+          ),
+        );
         _cleanup();
         break;
       case OnUploadCancelled():
@@ -171,7 +175,7 @@ class FilesystemUploadService {
   /// Pause the current upload
   Future<void> pause() async {
     if (!isInProgress) return;
-    
+
     _log('Pausing upload...');
     try {
       await _fsManager?.pauseTransfer();
@@ -199,7 +203,8 @@ class FilesystemUploadService {
       final now = DateTime.now();
       final elapsed = now.difference(_lastSpeedUpdate!).inMilliseconds / 1000;
       if (elapsed > 0 && currentState.status.isInProgress) {
-        final bytesThisInterval = currentState.bytesTransferred - _lastBytesTransferred;
+        final bytesThisInterval =
+            currentState.bytesTransferred - _lastBytesTransferred;
         final speed = (bytesThisInterval / elapsed).round();
 
         if (bytesThisInterval > 0 || currentState.speedBytesPerSecond == 0) {
@@ -207,11 +212,14 @@ class FilesystemUploadService {
           if (_speedSamples.length > _speedWindowSize) {
             _speedSamples.removeAt(0);
           }
-          final avg = _speedSamples.reduce((a, b) => a + b) ~/ _speedSamples.length;
-          _updateState(currentState.copyWith(
-            speedBytesPerSecond: avg,
-            speedHistory: [...currentState.speedHistory, avg],
-          ));
+          final avg =
+              _speedSamples.reduce((a, b) => a + b) ~/ _speedSamples.length;
+          _updateState(
+            currentState.copyWith(
+              speedBytesPerSecond: avg,
+              speedHistory: [...currentState.speedHistory, avg],
+            ),
+          );
         }
 
         _lastBytesTransferred = currentState.bytesTransferred;
@@ -267,4 +275,3 @@ class FilesystemUploadException implements Exception {
   @override
   String toString() => 'FilesystemUploadException: $message';
 }
-

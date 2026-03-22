@@ -27,4 +27,3 @@ class CommLogEntries extends Table {
   /// When the message was sent/received
   DateTimeColumn get timestamp => dateTime()();
 }
-

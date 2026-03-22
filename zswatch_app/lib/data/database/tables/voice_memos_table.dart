@@ -23,8 +23,7 @@ class VoiceMemos extends Table {
   IntColumn get sizeBytes => integer().named('size_bytes')();
 
   /// Local file path after download (null = not yet downloaded)
-  TextColumn get localFilePath =>
-      text().nullable().named('local_file_path')();
+  TextColumn get localFilePath => text().nullable().named('local_file_path')();
 
   /// Transcription text (null = not yet transcribed)
   TextColumn get transcription => text().nullable()();
@@ -74,8 +73,9 @@ class VoiceMemos extends Table {
       boolean().withDefault(const Constant(false)).named('task_created')();
 
   /// Whether a calendar event has been created from this memo's suggestions
-  BoolColumn get calendarEventCreated =>
-      boolean().withDefault(const Constant(false)).named('calendar_event_created')();
+  BoolColumn get calendarEventCreated => boolean()
+      .withDefault(const Constant(false))
+      .named('calendar_event_created')();
 
   /// Review state for extracted actions: 'pending', 'reviewed', 'dismissed'
   TextColumn get actionReviewState =>

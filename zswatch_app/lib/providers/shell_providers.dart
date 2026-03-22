@@ -74,8 +74,7 @@ class ShellTerminalState {
 class ShellTerminalNotifier extends StateNotifier<ShellTerminalState> {
   final ShellService _shellService;
 
-  ShellTerminalNotifier(this._shellService)
-      : super(const ShellTerminalState());
+  ShellTerminalNotifier(this._shellService) : super(const ShellTerminalState());
 
   Future<void> execute(String command) async {
     if (command.trim().isEmpty) return;
@@ -107,10 +106,7 @@ class ShellTerminalNotifier extends StateNotifier<ShellTerminalState> {
         lines: [
           ...state.lines,
           if (result.output.isNotEmpty)
-            TerminalLine(
-              text: result.output,
-              timestamp: DateTime.now(),
-            ),
+            TerminalLine(text: result.output, timestamp: DateTime.now()),
           if (result.returnCode != 0)
             TerminalLine(
               text: '[exit code: ${result.returnCode}]',
@@ -162,9 +158,9 @@ class ShellTerminalNotifier extends StateNotifier<ShellTerminalState> {
 
 final shellTerminalProvider =
     StateNotifierProvider<ShellTerminalNotifier, ShellTerminalState>((ref) {
-  final shellService = ref.watch(shellServiceProvider);
-  return ShellTerminalNotifier(shellService);
-});
+      final shellService = ref.watch(shellServiceProvider);
+      return ShellTerminalNotifier(shellService);
+    });
 
 /// State for the live monitor.
 class LiveMonitorState {
@@ -220,8 +216,7 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
   static const _pollInterval = Duration(seconds: 1);
   static const _maxConsecutiveErrors = 5;
 
-  LiveMonitorNotifier(this._shellService)
-      : super(const LiveMonitorState());
+  LiveMonitorNotifier(this._shellService) : super(const LiveMonitorState());
 
   void toggle() {
     if (state.isEnabled) {
@@ -260,10 +255,7 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
   }
 
   void resetHistory() {
-    state = state.copyWith(
-      threadHistories: {},
-      pollCount: 0,
-    );
+    state = state.copyWith(threadHistories: {}, pollCount: 0);
   }
 
   Future<void> _poll() async {
@@ -297,10 +289,12 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
         if (state.isEnabled) {
           parsed = parseThreadList(threadResult.output);
           debugPrint(
-              '[LiveMonitor] Parsed ${parsed.threads.length} threads from ${threadResult.output.length} chars');
+            '[LiveMonitor] Parsed ${parsed.threads.length} threads from ${threadResult.output.length} chars',
+          );
           if (parsed.threads.isEmpty) {
             debugPrint(
-                '[LiveMonitor] Raw output (first 300): ${threadResult.output.substring(0, threadResult.output.length.clamp(0, 300))}');
+              '[LiveMonitor] Raw output (first 300): ${threadResult.output.substring(0, threadResult.output.length.clamp(0, 300))}',
+            );
           }
         }
       } catch (e) {
@@ -360,9 +354,13 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
       _consecutiveErrors++;
       if (state.isEnabled) {
         if (_consecutiveErrors >= _maxConsecutiveErrors) {
-          debugPrint('[LiveMonitor] Too many consecutive errors ($_consecutiveErrors), stopping');
+          debugPrint(
+            '[LiveMonitor] Too many consecutive errors ($_consecutiveErrors), stopping',
+          );
           stop();
-          state = state.copyWith(error: 'Stopped: SMP connection failed repeatedly');
+          state = state.copyWith(
+            error: 'Stopped: SMP connection failed repeatedly',
+          );
         } else {
           state = state.copyWith(error: e.toString());
         }
@@ -381,6 +379,6 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
 
 final liveMonitorProvider =
     StateNotifierProvider<LiveMonitorNotifier, LiveMonitorState>((ref) {
-  final shellService = ref.watch(shellServiceProvider);
-  return LiveMonitorNotifier(shellService);
-});
+      final shellService = ref.watch(shellServiceProvider);
+      return LiveMonitorNotifier(shellService);
+    });

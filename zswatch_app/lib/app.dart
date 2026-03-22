@@ -40,7 +40,7 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       // Initialize permission notifier first to check/track permission state
       // This also sets up the lifecycle observer to re-check on app resume
       ref.read(permissionNotifierProvider);
-      
+
       await ref.read(bleNotifierProvider.notifier).initialize();
       // Initialize notification forwarding so it works even when the
       // notification settings screen hasn't been opened yet
@@ -93,9 +93,9 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       builder: (context, child) {
         return MediaQuery(
           // Prevent system text scaling from breaking layouts
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.noScaling,
-          ),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.noScaling),
           child: child ?? const SizedBox.shrink(),
         );
       },
@@ -107,10 +107,7 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
 class AppErrorWidget extends StatelessWidget {
   final FlutterErrorDetails details;
 
-  const AppErrorWidget({
-    super.key,
-    required this.details,
-  });
+  const AppErrorWidget({super.key, required this.details});
 
   @override
   Widget build(BuildContext context) {

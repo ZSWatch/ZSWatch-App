@@ -39,23 +39,27 @@ class OggOpusWriter {
       preSkip: _preSkip,
       inputSampleRate: parsed.header.sampleRate,
     );
-    builder.add(_buildOggPage(
-      granulePosition: 0,
-      serialNumber: _serialNumber,
-      pageSequence: pageSeq++,
-      headerType: 0x02, // BOS
-      packets: [opusHead],
-    ));
+    builder.add(
+      _buildOggPage(
+        granulePosition: 0,
+        serialNumber: _serialNumber,
+        pageSequence: pageSeq++,
+        headerType: 0x02, // BOS
+        packets: [opusHead],
+      ),
+    );
 
     // ── Page 2: OpusTags ────────────────────────────────────
     final opusTags = _buildOpusTags();
-    builder.add(_buildOggPage(
-      granulePosition: 0,
-      serialNumber: _serialNumber,
-      pageSequence: pageSeq++,
-      headerType: 0x00,
-      packets: [opusTags],
-    ));
+    builder.add(
+      _buildOggPage(
+        granulePosition: 0,
+        serialNumber: _serialNumber,
+        pageSequence: pageSeq++,
+        headerType: 0x00,
+        packets: [opusTags],
+      ),
+    );
 
     // ── Pages 3+: Audio data ────────────────────────────────
     int totalSamples = 0;
@@ -66,13 +70,15 @@ class OggOpusWriter {
       totalSamples += pageFrames.length * _samplesPerFrame48k;
 
       final isLast = end >= parsed.frames.length;
-      builder.add(_buildOggPage(
-        granulePosition: totalSamples,
-        serialNumber: _serialNumber,
-        pageSequence: pageSeq++,
-        headerType: isLast ? 0x04 : 0x00, // EOS on last page
-        packets: pageFrames.map((f) => f.data).toList(),
-      ));
+      builder.add(
+        _buildOggPage(
+          granulePosition: totalSamples,
+          serialNumber: _serialNumber,
+          pageSequence: pageSeq++,
+          headerType: isLast ? 0x04 : 0x00, // EOS on last page
+          packets: pageFrames.map((f) => f.data).toList(),
+        ),
+      );
     }
 
     return builder.toBytes();
@@ -216,8 +222,7 @@ class OggOpusWriter {
   static int _oggCrc32(Uint8List data) {
     int crc = 0;
     for (final byte in data) {
-      crc = (_crcTable[((crc >> 24) ^ byte) & 0xFF] ^ (crc << 8)) &
-          0xFFFFFFFF;
+      crc = (_crcTable[((crc >> 24) ^ byte) & 0xFF] ^ (crc << 8)) & 0xFFFFFFFF;
     }
     return crc;
   }

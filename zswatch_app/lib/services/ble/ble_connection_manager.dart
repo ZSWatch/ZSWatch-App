@@ -39,9 +39,8 @@ class BleConnectionManager {
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
 
-  BleConnectionManager({
-    FlutterSecureStorage? secureStorage,
-  }) : _secureStorage = secureStorage ?? const FlutterSecureStorage();
+  BleConnectionManager({FlutterSecureStorage? secureStorage})
+    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
 
   /// Stream of connection state changes
   Stream<Connection> get connectionStream => _connectionController.stream;
@@ -74,7 +73,10 @@ class BleConnectionManager {
   }
 
   /// Connect to a device by ID (for reconnecting to saved devices)
-  Future<void> connectById(String deviceId, {bool autoReconnect = false}) async {
+  Future<void> connectById(
+    String deviceId, {
+    bool autoReconnect = false,
+  }) async {
     _autoReconnect = autoReconnect;
     _reconnectAttempts = 0;
     _isCancelled = false; // Reset for new connection
@@ -87,16 +89,17 @@ class BleConnectionManager {
   Future<void> _connectToDevice(BluetoothDevice device, String watchId) async {
     // Don't connect if user has cancelled
     if (_isCancelled) {
-      debugPrint('[BleConnectionManager] _connectToDevice skipped - cancelled by user');
+      debugPrint(
+        '[BleConnectionManager] _connectToDevice skipped - cancelled by user',
+      );
       return;
     }
 
     try {
       // Update state to connecting
-      _updateConnection(Connection(
-        watchId: watchId,
-        state: WatchConnectionState.connecting,
-      ));
+      _updateConnection(
+        Connection(watchId: watchId, state: WatchConnectionState.connecting),
+      );
 
       // Cancel any existing subscriptions
       await _connectionStateSubscription?.cancel();
@@ -117,14 +120,15 @@ class BleConnectionManager {
 
       // Perform post-connection setup
       await _performPostConnectionSetup(watchId);
-
     } catch (e) {
       debugPrint('Connection error: $e');
-      _updateConnection(Connection.error(
-        watchId,
-        ConnectionErrorType.timeout,
-        details: e.toString(),
-      ));
+      _updateConnection(
+        Connection.error(
+          watchId,
+          ConnectionErrorType.timeout,
+          details: e.toString(),
+        ),
+      );
       rethrow;
     }
   }
@@ -132,9 +136,9 @@ class BleConnectionManager {
   Future<void> _performPostConnectionSetup(String watchId) async {
     try {
       // Update state to bonding
-      _updateConnection(_currentConnection.copyWith(
-        state: WatchConnectionState.bonding,
-      ));
+      _updateConnection(
+        _currentConnection.copyWith(state: WatchConnectionState.bonding),
+      );
 
       // Ensure bonding (may prompt user)
       if (_connectedDevice != null) {
@@ -142,9 +146,11 @@ class BleConnectionManager {
       }
 
       // Update state to discovering services
-      _updateConnection(_currentConnection.copyWith(
-        state: WatchConnectionState.discoveringServices,
-      ));
+      _updateConnection(
+        _currentConnection.copyWith(
+          state: WatchConnectionState.discoveringServices,
+        ),
+      );
 
       // Discover services
       _services = await _connectedDevice?.discoverServices();
@@ -155,27 +161,30 @@ class BleConnectionManager {
       }
 
       // Update state to negotiating
-      _updateConnection(_currentConnection.copyWith(
-        state: WatchConnectionState.negotiating,
-      ));
+      _updateConnection(
+        _currentConnection.copyWith(state: WatchConnectionState.negotiating),
+      );
 
       // Optimize connection parameters
       await _optimizeConnection(watchId);
 
       // All done - update to connected state
-      _updateConnection(_currentConnection.copyWith(
-        state: WatchConnectionState.connected,
-        connectedAt: DateTime.now(),
-        lastActivityAt: DateTime.now(),
-      ));
-
+      _updateConnection(
+        _currentConnection.copyWith(
+          state: WatchConnectionState.connected,
+          connectedAt: DateTime.now(),
+          lastActivityAt: DateTime.now(),
+        ),
+      );
     } catch (e) {
       debugPrint('Post-connection setup error: $e');
-      _updateConnection(Connection.error(
-        watchId,
-        ConnectionErrorType.serviceDiscoveryFailed,
-        details: e.toString(),
-      ));
+      _updateConnection(
+        Connection.error(
+          watchId,
+          ConnectionErrorType.serviceDiscoveryFailed,
+          details: e.toString(),
+        ),
+      );
       await disconnect();
       rethrow;
     }
@@ -204,9 +213,7 @@ class BleConnectionManager {
   void enableDle() {
     // DLE is typically enabled automatically with MTU negotiation
     // on modern BLE stacks. This just updates our tracking.
-    _updateConnection(_currentConnection.copyWith(
-      dleEnabled: true,
-    ));
+    _updateConnection(_currentConnection.copyWith(dleEnabled: true));
   }
 
   Future<void> _optimizeConnection(String watchId) async {
@@ -223,7 +230,6 @@ class BleConnectionManager {
 
       // Mark DLE as enabled (automatic with MTU negotiation)
       enableDle();
-
     } catch (e) {
       debugPrint('Connection optimization warning: $e');
       // Non-fatal - continue with default parameters
@@ -252,7 +258,6 @@ class BleConnectionManager {
         key: 'bond_$watchId',
         value: DateTime.now().toIso8601String(),
       );
-
     } catch (e) {
       debugPrint('Bonding error: $e');
       // Continue anyway - some devices work without explicit bonding
@@ -297,27 +302,32 @@ class BleConnectionManager {
   void _handleDisconnect(String watchId) {
     // If user has cancelled, don't attempt reconnection
     if (_isCancelled) {
-      debugPrint('[BleConnectionManager] Disconnect ignored - cancelled by user');
-      _updateConnection(Connection(
-        watchId: watchId,
-        state: WatchConnectionState.disconnected,
-      ));
+      debugPrint(
+        '[BleConnectionManager] Disconnect ignored - cancelled by user',
+      );
+      _updateConnection(
+        Connection(watchId: watchId, state: WatchConnectionState.disconnected),
+      );
       _cleanup();
       return;
     }
 
     final wasConnected = _currentConnection.isConnected;
 
-    if (wasConnected && _autoReconnect && _reconnectAttempts < _maxReconnectAttempts) {
+    if (wasConnected &&
+        _autoReconnect &&
+        _reconnectAttempts < _maxReconnectAttempts) {
       // Attempt reconnection
       _attemptReconnect(watchId);
     } else {
       // Final disconnect
-      _updateConnection(Connection(
-        watchId: watchId,
-        state: WatchConnectionState.disconnected,
-        reconnectionCount: _reconnectAttempts,
-      ));
+      _updateConnection(
+        Connection(
+          watchId: watchId,
+          state: WatchConnectionState.disconnected,
+          reconnectionCount: _reconnectAttempts,
+        ),
+      );
       _cleanup();
     }
   }
@@ -325,34 +335,44 @@ class BleConnectionManager {
   void _attemptReconnect(String watchId) {
     // If user has cancelled, don't attempt reconnection
     if (_isCancelled) {
-      debugPrint('[BleConnectionManager] Reconnect skipped - cancelled by user');
+      debugPrint(
+        '[BleConnectionManager] Reconnect skipped - cancelled by user',
+      );
       return;
     }
 
     _reconnectAttempts++;
 
-    _updateConnection(_currentConnection.copyWith(
-      state: WatchConnectionState.reconnecting,
-      reconnectionCount: _reconnectAttempts,
-    ));
+    _updateConnection(
+      _currentConnection.copyWith(
+        state: WatchConnectionState.reconnecting,
+        reconnectionCount: _reconnectAttempts,
+      ),
+    );
 
     // Delay before reconnect attempt
     _reconnectTimer = Timer(BleConfig.reconnectionDelay, () async {
       // Double-check cancellation inside timer callback
       if (_isCancelled) {
-        debugPrint('[BleConnectionManager] Reconnect timer skipped - cancelled by user');
+        debugPrint(
+          '[BleConnectionManager] Reconnect timer skipped - cancelled by user',
+        );
         return;
       }
       if (_connectedDevice != null && _autoReconnect) {
         try {
           await _connectToDevice(_connectedDevice!, watchId);
         } catch (e) {
-          debugPrint('[BleConnectionManager] Reconnect attempt $_reconnectAttempts failed: $e');
+          debugPrint(
+            '[BleConnectionManager] Reconnect attempt $_reconnectAttempts failed: $e',
+          );
           if (_reconnectAttempts >= _maxReconnectAttempts) {
-            _updateConnection(Connection.error(
-              watchId,
-              ConnectionErrorType.maxReconnectionsReached,
-            ));
+            _updateConnection(
+              Connection.error(
+                watchId,
+                ConnectionErrorType.maxReconnectionsReached,
+              ),
+            );
             _cleanup();
           }
         }
@@ -367,10 +387,9 @@ class BleConnectionManager {
     }
 
     final rssi = await _connectedDevice!.readRssi();
-    _updateConnection(_currentConnection.copyWith(
-      rssi: rssi,
-      lastActivityAt: DateTime.now(),
-    ));
+    _updateConnection(
+      _currentConnection.copyWith(rssi: rssi, lastActivityAt: DateTime.now()),
+    );
     return rssi;
   }
 
@@ -380,15 +399,17 @@ class BleConnectionManager {
     _autoReconnect = false;
     _isCancelled = true;
     _reconnectTimer?.cancel();
-    
+
     final device = _connectedDevice;
     _cleanup();
     device?.disconnect();
-    
-    _updateConnection(Connection(
-      watchId: _currentConnection.watchId,
-      state: WatchConnectionState.disconnected,
-    ));
+
+    _updateConnection(
+      Connection(
+        watchId: _currentConnection.watchId,
+        state: WatchConnectionState.disconnected,
+      ),
+    );
   }
 
   /// Disconnect from current device
@@ -410,10 +431,9 @@ class BleConnectionManager {
       }
     }
 
-    _updateConnection(Connection(
-      watchId: watchId,
-      state: WatchConnectionState.disconnected,
-    ));
+    _updateConnection(
+      Connection(watchId: watchId, state: WatchConnectionState.disconnected),
+    );
   }
 
   void _cleanup() {
@@ -433,18 +453,18 @@ class BleConnectionManager {
   /// Update last activity timestamp
   void updateActivity() {
     if (_currentConnection.isConnected) {
-      _updateConnection(_currentConnection.copyWith(
-        lastActivityAt: DateTime.now(),
-      ));
+      _updateConnection(
+        _currentConnection.copyWith(lastActivityAt: DateTime.now()),
+      );
     }
   }
 
   /// Find a service by UUID
   BluetoothService? findService(Guid uuid) {
     return _services?.cast<BluetoothService?>().firstWhere(
-          (s) => s?.uuid == uuid,
-          orElse: () => null,
-        );
+      (s) => s?.uuid == uuid,
+      orElse: () => null,
+    );
   }
 
   /// Find a characteristic by UUID within a service
@@ -453,9 +473,9 @@ class BleConnectionManager {
     Guid uuid,
   ) {
     return service.characteristics.cast<BluetoothCharacteristic?>().firstWhere(
-          (c) => c?.uuid == uuid,
-          orElse: () => null,
-        );
+      (c) => c?.uuid == uuid,
+      orElse: () => null,
+    );
   }
 
   /// Dispose resources
@@ -464,4 +484,3 @@ class BleConnectionManager {
     await _connectionController.close();
   }
 }
-

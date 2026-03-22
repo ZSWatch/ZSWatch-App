@@ -13,11 +13,7 @@ class VoiceNoteCard extends ConsumerWidget {
   final VoiceMemo memo;
   final VoidCallback onOpen;
 
-  const VoiceNoteCard({
-    super.key,
-    required this.memo,
-    required this.onOpen,
-  });
+  const VoiceNoteCard({super.key, required this.memo, required this.onOpen});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -56,8 +52,9 @@ class VoiceNoteCard extends ConsumerWidget {
                   children: [
                     if (memo.aiCategory != null)
                       Padding(
-                        padding:
-                            const EdgeInsets.only(right: AppTheme.spacingSm),
+                        padding: const EdgeInsets.only(
+                          right: AppTheme.spacingSm,
+                        ),
                         child: Icon(
                           voiceNoteCategoryIcon(memo.aiCategory!),
                           size: 20,
@@ -68,8 +65,8 @@ class VoiceNoteCard extends ConsumerWidget {
                       child: Text(
                         timelineTimestampLabel(memo.timestampUtc.toLocal()),
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
                     ),
                     const Icon(
@@ -84,12 +81,13 @@ class VoiceNoteCard extends ConsumerWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        height: 1.35,
-                        color: memo.summary != null ||
-                                memo.transcription?.trim().isNotEmpty == true
-                            ? AppTheme.textPrimary
-                            : AppTheme.textSecondary,
-                      ),
+                    height: 1.35,
+                    color:
+                        memo.summary != null ||
+                            memo.transcription?.trim().isNotEmpty == true
+                        ? AppTheme.textPrimary
+                        : AppTheme.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: AppTheme.spacingSm),
                 Wrap(
@@ -110,8 +108,9 @@ class VoiceNoteCard extends ConsumerWidget {
                         ),
                         decoration: BoxDecoration(
                           color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                          borderRadius:
-                              BorderRadius.circular(AppTheme.radiusXLarge),
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusXLarge,
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -119,15 +118,14 @@ class VoiceNoteCard extends ConsumerWidget {
                             const SizedBox(
                               width: 10,
                               height: 10,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 1.5),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                              ),
                             ),
                             const SizedBox(width: 4),
                             Text(
                               'Processing',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
+                              style: Theme.of(context).textTheme.labelSmall
                                   ?.copyWith(
                                     color: AppTheme.primaryColor,
                                     fontWeight: FontWeight.w600,
@@ -167,8 +165,8 @@ class VoiceNoteCard extends ConsumerWidget {
                     Text(
                       memo.formattedSize,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                     const Spacer(),
                     Icon(
@@ -206,10 +204,7 @@ class VoiceMemoMetaChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 7,
-        vertical: 3,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppTheme.radiusXLarge),
@@ -222,10 +217,10 @@ class VoiceMemoMetaChip extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 10.5,
-                ),
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 10.5,
+            ),
           ),
         ],
       ),
@@ -273,22 +268,23 @@ String syncStatusLabel(VoiceMemo memo) {
 }
 
 IconData syncStatusIcon(VoiceMemoSyncStatus status) => switch (status) {
-      VoiceMemoSyncStatus.onWatchOnly => Icons.watch_outlined,
-      VoiceMemoSyncStatus.downloading => Icons.downloading_rounded,
-      VoiceMemoSyncStatus.synced => Icons.check_circle_outline,
-      VoiceMemoSyncStatus.downloadFailed => Icons.error_outline,
-      VoiceMemoSyncStatus.transcribed => Icons.text_snippet_outlined,
-    };
+  VoiceMemoSyncStatus.onWatchOnly => Icons.watch_outlined,
+  VoiceMemoSyncStatus.downloading => Icons.downloading_rounded,
+  VoiceMemoSyncStatus.synced => Icons.check_circle_outline,
+  VoiceMemoSyncStatus.downloadFailed => Icons.error_outline,
+  VoiceMemoSyncStatus.transcribed => Icons.text_snippet_outlined,
+};
 
 Color syncStatusColor(VoiceMemoSyncStatus status) => switch (status) {
-      VoiceMemoSyncStatus.onWatchOnly => AppTheme.warningColor,
-      VoiceMemoSyncStatus.downloading => AppTheme.primaryColor,
-      VoiceMemoSyncStatus.synced => AppTheme.successColor,
-      VoiceMemoSyncStatus.downloadFailed => AppTheme.errorColor,
-      VoiceMemoSyncStatus.transcribed => AppTheme.primaryColor,
-    };
+  VoiceMemoSyncStatus.onWatchOnly => AppTheme.warningColor,
+  VoiceMemoSyncStatus.downloading => AppTheme.primaryColor,
+  VoiceMemoSyncStatus.synced => AppTheme.successColor,
+  VoiceMemoSyncStatus.downloadFailed => AppTheme.errorColor,
+  VoiceMemoSyncStatus.transcribed => AppTheme.primaryColor,
+};
 
-IconData voiceNoteCategoryIcon(VoiceNoteCategory category) => switch (category) {
+IconData voiceNoteCategoryIcon(VoiceNoteCategory category) =>
+    switch (category) {
       VoiceNoteCategory.idea => Icons.lightbulb_outline,
       VoiceNoteCategory.task => Icons.check_box_outlined,
       VoiceNoteCategory.reminder => Icons.alarm,
@@ -297,20 +293,20 @@ IconData voiceNoteCategoryIcon(VoiceNoteCategory category) => switch (category) 
     };
 
 Color voiceNoteCategoryColor(VoiceNoteCategory category) => switch (category) {
-      VoiceNoteCategory.idea => const Color(0xFFFFA726),
-      VoiceNoteCategory.task => AppTheme.primaryColor,
-      VoiceNoteCategory.reminder => AppTheme.warningColor,
-      VoiceNoteCategory.meeting => const Color(0xFF26A69A),
-      VoiceNoteCategory.note => AppTheme.textSecondary,
-    };
+  VoiceNoteCategory.idea => const Color(0xFFFFA726),
+  VoiceNoteCategory.task => AppTheme.primaryColor,
+  VoiceNoteCategory.reminder => AppTheme.warningColor,
+  VoiceNoteCategory.meeting => const Color(0xFF26A69A),
+  VoiceNoteCategory.note => AppTheme.textSecondary,
+};
 
 String voiceNoteCategoryLabel(VoiceNoteCategory category) => switch (category) {
-      VoiceNoteCategory.idea => 'Idea',
-      VoiceNoteCategory.task => 'Task',
-      VoiceNoteCategory.reminder => 'Reminder',
-      VoiceNoteCategory.meeting => 'Meeting',
-      VoiceNoteCategory.note => 'Note',
-    };
+  VoiceNoteCategory.idea => 'Idea',
+  VoiceNoteCategory.task => 'Task',
+  VoiceNoteCategory.reminder => 'Reminder',
+  VoiceNoteCategory.meeting => 'Meeting',
+  VoiceNoteCategory.note => 'Note',
+};
 
 Future<bool?> confirmDeleteMemo(BuildContext context, VoiceMemo memo) {
   return showDialog<bool>(

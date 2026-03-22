@@ -9,7 +9,8 @@ import '../services/health/health_sync_service.dart';
 import 'watch_providers.dart';
 import 'watch_service_provider.dart';
 
-export '../services/health/health_sync_service.dart' show ActivityState, ActivityBreakdown;
+export '../services/health/health_sync_service.dart'
+    show ActivityState, ActivityBreakdown;
 
 part 'health_providers.freezed.dart';
 
@@ -27,12 +28,12 @@ final healthRepositoryProvider = Provider<HealthRepository>((ref) {
 final healthSyncServiceProvider = Provider<HealthSyncService>((ref) {
   final watchService = ref.watch(watchServiceProvider);
   final healthRepository = ref.watch(healthRepositoryProvider);
-  
+
   final service = HealthSyncService(
     watchService: watchService,
     healthRepository: healthRepository,
   );
-  
+
   ref.onDispose(() => service.dispose());
   return service;
 });
@@ -76,32 +77,32 @@ class HeartRateReading {
   final int bpm;
   final DateTime timestamp;
 
-  const HeartRateReading({
-    required this.bpm,
-    required this.timestamp,
-  });
+  const HeartRateReading({required this.bpm, required this.timestamp});
 }
 
 /// Notifier for heart rate streaming state
-class HeartRateStreamingNotifier extends StateNotifier<HeartRateStreamingState> {
+class HeartRateStreamingNotifier
+    extends StateNotifier<HeartRateStreamingState> {
   final HealthSyncService _healthSyncService;
   final Ref _ref;
-  
+
   StreamSubscription<int?>? _hrSubscription;
   StreamSubscription<bool>? _streamingSubscription;
   bool _disposed = false;
-  
+
   /// Maximum number of readings to keep for chart
   static const int maxReadings = 120; // 2 minutes at 1 reading/second
 
-  HeartRateStreamingNotifier(this._healthSyncService, this._ref) 
-      : super(const HeartRateStreamingState()) {
+  HeartRateStreamingNotifier(this._healthSyncService, this._ref)
+    : super(const HeartRateStreamingState()) {
     _initialize();
   }
 
   void _initialize() {
     // Listen to streaming state
-    _streamingSubscription = _healthSyncService.isStreamingStream.listen((isStreaming) {
+    _streamingSubscription = _healthSyncService.isStreamingStream.listen((
+      isStreaming,
+    ) {
       if (_disposed) return;
       state = state.copyWith(isStreaming: isStreaming);
     });
@@ -117,16 +118,16 @@ class HeartRateStreamingNotifier extends StateNotifier<HeartRateStreamingState> 
 
   void _addReading(int bpm) {
     if (_disposed) return;
-    
+
     final now = DateTime.now();
     final newReading = HeartRateReading(bpm: bpm, timestamp: now);
-    
+
     // Keep only recent readings
     final readings = [...state.recentReadings, newReading];
     if (readings.length > maxReadings) {
       readings.removeRange(0, readings.length - maxReadings);
     }
-    
+
     state = state.copyWith(
       currentBpm: bpm,
       recentReadings: readings,
@@ -138,17 +139,14 @@ class HeartRateStreamingNotifier extends StateNotifier<HeartRateStreamingState> 
   Future<void> startStreaming() async {
     final connection = _ref.read(watchConnectionProvider);
     if (!connection.isConnected) return;
-    
+
     await _healthSyncService.startHeartRateStreaming(connection.watchId);
   }
 
   /// Stop heart rate streaming
   Future<void> stopStreaming() async {
     await _healthSyncService.stopHeartRateStreaming();
-    state = state.copyWith(
-      isStreaming: false,
-      currentBpm: null,
-    );
+    state = state.copyWith(isStreaming: false, currentBpm: null);
   }
 
   /// Clear reading history
@@ -167,11 +165,13 @@ class HeartRateStreamingNotifier extends StateNotifier<HeartRateStreamingState> 
 }
 
 /// Provider for heart rate streaming notifier
-final heartRateStreamingProvider = 
-    StateNotifierProvider<HeartRateStreamingNotifier, HeartRateStreamingState>((ref) {
-  final healthSyncService = ref.watch(healthSyncServiceProvider);
-  return HeartRateStreamingNotifier(healthSyncService, ref);
-});
+final heartRateStreamingProvider =
+    StateNotifierProvider<HeartRateStreamingNotifier, HeartRateStreamingState>((
+      ref,
+    ) {
+      final healthSyncService = ref.watch(healthSyncServiceProvider);
+      return HeartRateStreamingNotifier(healthSyncService, ref);
+    });
 
 // ==================== Activity Breakdown Provider ====================
 
@@ -191,20 +191,25 @@ class ActivityBreakdownNotifier extends StateNotifier<ActivityBreakdownState> {
   final HealthRepository _healthRepository;
   final HealthSyncService _healthSyncService;
   final Ref _ref;
-  
+
   StreamSubscription<ActivityBreakdown>? _activitySubscription;
   bool _disposed = false;
 
-  ActivityBreakdownNotifier(this._healthRepository, this._healthSyncService, this._ref) 
-      : super(const ActivityBreakdownState()) {
+  ActivityBreakdownNotifier(
+    this._healthRepository,
+    this._healthSyncService,
+    this._ref,
+  ) : super(const ActivityBreakdownState()) {
     _initialize();
   }
-  
+
   void _initialize() {
     loadData(StepsHistoryRange.day);
-    
+
     // Listen to real-time activity updates - only update when viewing today
-    _activitySubscription = _healthSyncService.activityBreakdownStream.listen((breakdown) {
+    _activitySubscription = _healthSyncService.activityBreakdownStream.listen((
+      breakdown,
+    ) {
       if (_disposed) return;
       // Only update with real-time data for day view
       if (state.range == StepsHistoryRange.day) {
@@ -280,10 +285,7 @@ class ActivityBreakdownNotifier extends StateNotifier<ActivityBreakdownState> {
         error: null,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -291,7 +293,7 @@ class ActivityBreakdownNotifier extends StateNotifier<ActivityBreakdownState> {
   Future<void> refresh() async {
     await loadData(state.range);
   }
-  
+
   @override
   void dispose() {
     _disposed = true;
@@ -301,12 +303,18 @@ class ActivityBreakdownNotifier extends StateNotifier<ActivityBreakdownState> {
 }
 
 /// Provider for activity breakdown notifier
-final activityBreakdownProvider = 
-    StateNotifierProvider<ActivityBreakdownNotifier, ActivityBreakdownState>((ref) {
-  final healthRepository = ref.watch(healthRepositoryProvider);
-  final healthSyncService = ref.watch(healthSyncServiceProvider);
-  return ActivityBreakdownNotifier(healthRepository, healthSyncService, ref);
-});
+final activityBreakdownProvider =
+    StateNotifierProvider<ActivityBreakdownNotifier, ActivityBreakdownState>((
+      ref,
+    ) {
+      final healthRepository = ref.watch(healthRepositoryProvider);
+      final healthSyncService = ref.watch(healthSyncServiceProvider);
+      return ActivityBreakdownNotifier(
+        healthRepository,
+        healthSyncService,
+        ref,
+      );
+    });
 
 // ==================== Health Summary State ====================
 
@@ -327,25 +335,28 @@ class HealthSummaryNotifier extends StateNotifier<HealthSummaryState> {
   final HealthRepository _healthRepository;
   final HealthSyncService _healthSyncService;
   final Ref _ref;
-  
+
   StreamSubscription<int>? _stepsSubscription;
   StreamSubscription<int?>? _hrSubscription;
   bool _disposed = false;
 
-  HealthSummaryNotifier(this._healthRepository, this._healthSyncService, this._ref) 
-      : super(const HealthSummaryState()) {
+  HealthSummaryNotifier(
+    this._healthRepository,
+    this._healthSyncService,
+    this._ref,
+  ) : super(const HealthSummaryState()) {
     _initialize();
   }
-  
+
   void _initialize() {
     _loadSummary();
-    
+
     // Listen to real-time step updates
     _stepsSubscription = _healthSyncService.stepsStream.listen((steps) {
       if (_disposed) return;
       state = state.copyWith(todaySteps: steps);
     });
-    
+
     // Listen to real-time HR updates
     _hrSubscription = _healthSyncService.heartRateStream.listen((hr) {
       if (_disposed) return;
@@ -386,10 +397,7 @@ class HealthSummaryNotifier extends StateNotifier<HealthSummaryState> {
         error: null,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -397,7 +405,7 @@ class HealthSummaryNotifier extends StateNotifier<HealthSummaryState> {
   Future<void> refresh() async {
     await _loadSummary();
   }
-  
+
   @override
   void dispose() {
     _disposed = true;
@@ -408,21 +416,17 @@ class HealthSummaryNotifier extends StateNotifier<HealthSummaryState> {
 }
 
 /// Provider for health summary notifier
-final healthSummaryProvider = 
+final healthSummaryProvider =
     StateNotifierProvider<HealthSummaryNotifier, HealthSummaryState>((ref) {
-  final healthRepository = ref.watch(healthRepositoryProvider);
-  final healthSyncService = ref.watch(healthSyncServiceProvider);
-  return HealthSummaryNotifier(healthRepository, healthSyncService, ref);
-});
+      final healthRepository = ref.watch(healthRepositoryProvider);
+      final healthSyncService = ref.watch(healthSyncServiceProvider);
+      return HealthSummaryNotifier(healthRepository, healthSyncService, ref);
+    });
 
 // ==================== Steps History State ====================
 
 /// Time range for steps history
-enum StepsHistoryRange {
-  day,
-  week,
-  month,
-}
+enum StepsHistoryRange { day, week, month }
 
 /// State class for steps history
 @freezed
@@ -441,18 +445,21 @@ class StepsHistoryNotifier extends StateNotifier<StepsHistoryState> {
   final HealthRepository _healthRepository;
   final HealthSyncService _healthSyncService;
   final Ref _ref;
-  
+
   StreamSubscription<int>? _stepsSubscription;
   bool _disposed = false;
 
-  StepsHistoryNotifier(this._healthRepository, this._healthSyncService, this._ref) 
-      : super(const StepsHistoryState()) {
+  StepsHistoryNotifier(
+    this._healthRepository,
+    this._healthSyncService,
+    this._ref,
+  ) : super(const StepsHistoryState()) {
     _initialize();
   }
-  
+
   void _initialize() {
     loadData(StepsHistoryRange.day);
-    
+
     // Listen to real-time step updates - only update total when viewing today
     _stepsSubscription = _healthSyncService.stepsStream.listen((steps) {
       if (_disposed) return;
@@ -505,7 +512,9 @@ class StepsHistoryNotifier extends StateNotifier<StepsHistoryState> {
         total = 0;
       } else if (range == StepsHistoryRange.day) {
         // For today, use the max value since it's cumulative
-        total = data.map((a) => a.total.round()).reduce((a, b) => a > b ? a : b);
+        total = data
+            .map((a) => a.total.round())
+            .reduce((a, b) => a > b ? a : b);
       } else {
         // For week/month, sum up each period's max
         total = data.map((a) => a.total.round()).reduce((a, b) => a + b);
@@ -518,10 +527,7 @@ class StepsHistoryNotifier extends StateNotifier<StepsHistoryState> {
         error: null,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -529,7 +535,7 @@ class StepsHistoryNotifier extends StateNotifier<StepsHistoryState> {
   Future<void> refresh() async {
     await loadData(state.range);
   }
-  
+
   @override
   void dispose() {
     _disposed = true;
@@ -539,12 +545,12 @@ class StepsHistoryNotifier extends StateNotifier<StepsHistoryState> {
 }
 
 /// Provider for steps history notifier
-final stepsHistoryProvider = 
+final stepsHistoryProvider =
     StateNotifierProvider<StepsHistoryNotifier, StepsHistoryState>((ref) {
-  final healthRepository = ref.watch(healthRepositoryProvider);
-  final healthSyncService = ref.watch(healthSyncServiceProvider);
-  return StepsHistoryNotifier(healthRepository, healthSyncService, ref);
-});
+      final healthRepository = ref.watch(healthRepositoryProvider);
+      final healthSyncService = ref.watch(healthSyncServiceProvider);
+      return StepsHistoryNotifier(healthRepository, healthSyncService, ref);
+    });
 
 // ==================== Heart Rate History State ====================
 
@@ -582,18 +588,21 @@ class HeartRateHistoryNotifier extends StateNotifier<HeartRateHistoryState> {
   final HealthRepository _healthRepository;
   final HealthSyncService _healthSyncService;
   final Ref _ref;
-  
+
   StreamSubscription<int?>? _hrSubscription;
   bool _disposed = false;
 
-  HeartRateHistoryNotifier(this._healthRepository, this._healthSyncService, this._ref) 
-      : super(const HeartRateHistoryState()) {
+  HeartRateHistoryNotifier(
+    this._healthRepository,
+    this._healthSyncService,
+    this._ref,
+  ) : super(const HeartRateHistoryState()) {
     _initialize();
   }
-  
+
   void _initialize() {
     loadData();
-    
+
     // Listen to real-time HR updates (from activity messages or live streaming)
     // and refresh data when new HR values arrive
     _hrSubscription = _healthSyncService.heartRateStream.listen((hr) {
@@ -634,10 +643,7 @@ class HeartRateHistoryNotifier extends StateNotifier<HeartRateHistoryState> {
         error: null,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -645,7 +651,7 @@ class HeartRateHistoryNotifier extends StateNotifier<HeartRateHistoryState> {
   Future<void> refresh() async {
     await loadData();
   }
-  
+
   @override
   void dispose() {
     _disposed = true;
@@ -655,12 +661,14 @@ class HeartRateHistoryNotifier extends StateNotifier<HeartRateHistoryState> {
 }
 
 /// Provider for heart rate history notifier
-final heartRateHistoryProvider = 
-    StateNotifierProvider<HeartRateHistoryNotifier, HeartRateHistoryState>((ref) {
-  final healthRepository = ref.watch(healthRepositoryProvider);
-  final healthSyncService = ref.watch(healthSyncServiceProvider);
-  return HeartRateHistoryNotifier(healthRepository, healthSyncService, ref);
-});
+final heartRateHistoryProvider =
+    StateNotifierProvider<HeartRateHistoryNotifier, HeartRateHistoryState>((
+      ref,
+    ) {
+      final healthRepository = ref.watch(healthRepositoryProvider);
+      final healthSyncService = ref.watch(healthSyncServiceProvider);
+      return HeartRateHistoryNotifier(healthRepository, healthSyncService, ref);
+    });
 
 // ==================== Data Cleanup Provider ====================
 

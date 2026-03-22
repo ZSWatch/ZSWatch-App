@@ -78,9 +78,12 @@ class _HeartRateScreenState extends ConsumerState<HeartRateScreen> {
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const Spacer(),
-                          if (hrState.recentReadings.isNotEmpty && 
+                          if (hrState.recentReadings.isNotEmpty &&
                               hrState.lastUpdate != null &&
-                              DateTime.now().difference(hrState.lastUpdate!).inSeconds < 10) ...[
+                              DateTime.now()
+                                      .difference(hrState.lastUpdate!)
+                                      .inSeconds <
+                                  10) ...[
                             Container(
                               width: 8,
                               height: 8,
@@ -92,17 +95,14 @@ class _HeartRateScreenState extends ConsumerState<HeartRateScreen> {
                             const SizedBox(width: 6),
                             Text(
                               'Live',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: AppTheme.errorColor,
-                                  ),
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(color: AppTheme.errorColor),
                             ),
                           ],
                         ],
                       ),
                       const SizedBox(height: AppTheme.spacingMd),
-                      Expanded(
-                        child: _buildChart(hrState),
-                      ),
+                      Expanded(child: _buildChart(hrState)),
                     ],
                   ),
                 ),
@@ -123,8 +123,7 @@ class _HeartRateScreenState extends ConsumerState<HeartRateScreen> {
             const SizedBox(height: AppTheme.spacingMd),
 
             // Info message when not connected
-            if (!isConnected)
-              _ConnectionWarning(),
+            if (!isConnected) _ConnectionWarning(),
           ],
         ),
       ),
@@ -145,17 +144,17 @@ class _HeartRateScreenState extends ConsumerState<HeartRateScreen> {
             const SizedBox(height: AppTheme.spacingMd),
             Text(
               'No heart rate data',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: AppTheme.textSecondary),
             ),
             const SizedBox(height: AppTheme.spacingSm),
             Text(
               'Heart rate data will appear when\nthe watch sends activity updates',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ],
         ),
@@ -164,11 +163,17 @@ class _HeartRateScreenState extends ConsumerState<HeartRateScreen> {
 
     // Convert readings to chart data
     final now = DateTime.now();
-    final spots = hrState.recentReadings.map((reading) {
-      final secondsAgo = now.difference(reading.timestamp).inSeconds;
-      final x = (_timeWindowSeconds - secondsAgo).toDouble().clamp(0.0, _timeWindowSeconds.toDouble());
-      return FlSpot(x.toDouble(), reading.bpm.toDouble());
-    }).where((spot) => spot.x >= 0).toList();
+    final spots = hrState.recentReadings
+        .map((reading) {
+          final secondsAgo = now.difference(reading.timestamp).inSeconds;
+          final x = (_timeWindowSeconds - secondsAgo).toDouble().clamp(
+            0.0,
+            _timeWindowSeconds.toDouble(),
+          );
+          return FlSpot(x.toDouble(), reading.bpm.toDouble());
+        })
+        .where((spot) => spot.x >= 0)
+        .toList();
 
     // Sort by x value
     spots.sort((a, b) => a.x.compareTo(b.x));
@@ -189,10 +194,7 @@ class _CurrentBpmCard extends StatelessWidget {
   final int? currentBpm;
   final bool hasData;
 
-  const _CurrentBpmCard({
-    this.currentBpm,
-    required this.hasData,
-  });
+  const _CurrentBpmCard({this.currentBpm, required this.hasData});
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +209,10 @@ class _CurrentBpmCard extends StatelessWidget {
           children: [
             // Animated heart icon
             TweenAnimationBuilder<double>(
-              tween: Tween(begin: 1.0, end: hasData && currentBpm != null ? 1.15 : 1.0),
+              tween: Tween(
+                begin: 1.0,
+                end: hasData && currentBpm != null ? 1.15 : 1.0,
+              ),
               duration: const Duration(milliseconds: 300),
               builder: (context, scale, child) {
                 return Transform.scale(
@@ -229,12 +234,12 @@ class _CurrentBpmCard extends StatelessWidget {
                 Text(
                   currentBpm?.toString() ?? '--',
                   style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                        color: hasData && currentBpm != null
-                            ? AppTheme.errorColor
-                            : AppTheme.textSecondary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 56,
-                      ),
+                    color: hasData && currentBpm != null
+                        ? AppTheme.errorColor
+                        : AppTheme.textSecondary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 56,
+                  ),
                 ),
               ],
             ),
@@ -243,9 +248,9 @@ class _CurrentBpmCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: 16),
               child: Text(
                 'BPM',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(color: AppTheme.textSecondary),
               ),
             ),
           ],
@@ -283,15 +288,15 @@ class _StatisticsCard extends StatelessWidget {
                 Text(
                   'Session Statistics',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
                 const Spacer(),
                 Text(
                   '$sampleCount readings',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -333,11 +338,7 @@ class _StatItem extends StatelessWidget {
   final int? value;
   final Color color;
 
-  const _StatItem({
-    required this.label,
-    this.value,
-    required this.color,
-  });
+  const _StatItem({required this.label, this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -345,23 +346,23 @@ class _StatItem extends StatelessWidget {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: AppTheme.textSecondary),
         ),
         const SizedBox(height: 4),
         Text(
           value?.toString() ?? '--',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
+            color: color,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         Text(
           'BPM',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: AppTheme.textSecondary),
         ),
       ],
     );
@@ -380,16 +381,13 @@ class _ConnectionWarning extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.bluetooth_disabled,
-            color: AppTheme.warningColor,
-          ),
+          const Icon(Icons.bluetooth_disabled, color: AppTheme.warningColor),
           const SizedBox(width: AppTheme.spacingSm),
           Text(
             'Connect your watch to see heart rate',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.warningColor,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.warningColor),
           ),
         ],
       ),

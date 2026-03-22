@@ -3,11 +3,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'extracted_action.freezed.dart';
 
 /// Type of extracted action from AI processing
-enum ExtractedActionType {
-  task,
-  calendarEvent,
-  reminder,
-}
+enum ExtractedActionType { task, calendarEvent, reminder }
 
 /// Domain model for an AI-extracted action from a voice memo
 @freezed
