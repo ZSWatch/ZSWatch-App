@@ -143,7 +143,11 @@ class _MusicDebugSectionState extends ConsumerState<MusicDebugSection> {
           children: [
             Row(
               children: [
-                Icon(Icons.music_note, color: AppTheme.primaryColor, size: 20),
+                const Icon(
+                  Icons.music_note,
+                  color: AppTheme.primaryColor,
+                  size: 20,
+                ),
                 const SizedBox(width: AppTheme.spacingSm),
                 Text(
                   'Music Debug',

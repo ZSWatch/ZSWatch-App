@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_slow_async_io
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -6,6 +7,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 import 'package:mcumgr_flutter/models/firmware_upgrade_mode.dart';
 import 'package:mcumgr_flutter/models/image_upload_alignment.dart';
+// ignore: implementation_imports
 import 'package:mcumgr_flutter/src/mcumgr_update_manager.dart';
 import 'package:rxdart/rxdart.dart';
 

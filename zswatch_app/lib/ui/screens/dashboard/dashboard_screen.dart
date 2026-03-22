@@ -233,34 +233,6 @@ class _ConnectionStatusCard extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  final String title;
-  final Widget child;
-
-  const _InfoCard({required this.title, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.spacingMd),
-        child: Column(
-          children: [
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: AppTheme.spacingSm),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Compact stats row with 4 mini cards
 class _StatsRow extends StatelessWidget {
   final int? batteryLevel;

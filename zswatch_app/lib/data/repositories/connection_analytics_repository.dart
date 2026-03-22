@@ -271,7 +271,7 @@ class ConnectionAnalyticsRepository
 
     if (events.isEmpty) return Duration.zero;
 
-    List<Duration> sessions = [];
+    final List<Duration> sessions = [];
     DateTime? lastConnectTime;
 
     for (final event in events) {
@@ -312,7 +312,7 @@ class ConnectionAnalyticsRepository
 
     // Calculate all stats in one pass
     Duration totalConnected = Duration.zero;
-    List<Duration> sessions = [];
+    final List<Duration> sessions = [];
     DateTime? lastConnectTime;
     int disconnectionCount = 0;
     int reconnectAttempts = 0;
@@ -465,9 +465,7 @@ class ConnectionAnalyticsRepository
     // was already connected at windowStart (avoids a false appNotRunning gap).
     DateTime? sessionStart =
         (seedEvent?.eventType == ConnectionEventType.connected) ? from : null;
-    ConnectionEvent? lastDisconnect;
-
-    void _emitGap(
+    void emitGap(
       DateTime start,
       DateTime end,
       List<ConnectionEvent> eventsInGap,
@@ -495,7 +493,7 @@ class ConnectionAnalyticsRepository
             if (sessionStart != cursor) {
               segments.add(
                 ConnectionSegment(
-                  start: sessionStart!,
+                  start: sessionStart,
                   end: cursor,
                   type: ConnectionSegmentType.connected,
                 ),
@@ -508,7 +506,7 @@ class ConnectionAnalyticsRepository
                       e.timestamp.isBefore(event.timestamp),
                 )
                 .toList();
-            _emitGap(cursor, event.timestamp, gapEvents);
+            emitGap(cursor, event.timestamp, gapEvents);
           } else if (cursor.isBefore(event.timestamp)) {
             // Gap with no prior session — disconnected or app-not-running.
             final gapEvents = events
@@ -518,11 +516,10 @@ class ConnectionAnalyticsRepository
                       e.timestamp.isBefore(event.timestamp),
                 )
                 .toList();
-            _emitGap(cursor, event.timestamp, gapEvents);
+            emitGap(cursor, event.timestamp, gapEvents);
           }
           sessionStart = event.timestamp;
           cursor = event.timestamp;
-          lastDisconnect = null;
           break;
 
         case ConnectionEventType.disconnected:
@@ -530,7 +527,7 @@ class ConnectionAnalyticsRepository
             // Close the connected segment
             segments.add(
               ConnectionSegment(
-                start: sessionStart!,
+                start: sessionStart,
                 end: event.timestamp,
                 type: ConnectionSegmentType.connected,
               ),
@@ -538,7 +535,6 @@ class ConnectionAnalyticsRepository
             cursor = event.timestamp;
             sessionStart = null;
           }
-          lastDisconnect = event;
           break;
 
         case ConnectionEventType.reconnectAttempt:
@@ -553,7 +549,7 @@ class ConnectionAnalyticsRepository
       // Still connected
       segments.add(
         ConnectionSegment(
-          start: sessionStart!,
+          start: sessionStart,
           end: to.isBefore(DateTime.now()) ? to : DateTime.now(),
           type: ConnectionSegmentType.connected,
         ),
@@ -562,7 +558,7 @@ class ConnectionAnalyticsRepository
       final tailEvents = events
           .where((e) => e.timestamp.isAfter(cursor))
           .toList();
-      _emitGap(
+      emitGap(
         cursor,
         to.isBefore(DateTime.now()) ? to : DateTime.now(),
         tailEvents,

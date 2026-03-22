@@ -99,7 +99,7 @@ class _NotificationSettingsScreenState
             Icon(
               Icons.notifications_active,
               size: 64,
-              color: AppTheme.primaryColor.withOpacity(0.7),
+              color: AppTheme.primaryColor.withValues(alpha: 0.7),
             ),
             const SizedBox(height: AppTheme.spacingLg),
             const Text(
@@ -111,7 +111,7 @@ class _NotificationSettingsScreenState
               ),
             ),
             const SizedBox(height: AppTheme.spacingMd),
-            Text(
+            const Text(
               'On iOS, notifications are forwarded directly from your iPhone to ZSWatch using Apple Notification Center Service (ANCS).\n\n'
               'No app configuration is needed - just make sure your watch is connected and paired.',
               textAlign: TextAlign.center,
@@ -160,17 +160,17 @@ class _NotificationSettingsScreenState
 
   Widget _buildPermissionCard() {
     return Card(
-      color: AppTheme.warningColor.withOpacity(0.15),
+      color: AppTheme.warningColor.withValues(alpha: 0.15),
       child: Padding(
         padding: const EdgeInsets.all(AppTheme.spacingMd),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
                 Icon(Icons.warning_amber_rounded, color: AppTheme.warningColor),
-                const SizedBox(width: AppTheme.spacingSm),
-                const Expanded(
+                SizedBox(width: AppTheme.spacingSm),
+                Expanded(
                   child: Text(
                     'Notification Access Required',
                     style: TextStyle(
@@ -218,10 +218,10 @@ class _NotificationSettingsScreenState
                 Container(
                   padding: const EdgeInsets.all(AppTheme.spacingSm),
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.15),
+                    color: AppTheme.primaryColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.notifications_active,
                     color: AppTheme.primaryColor,
                     size: 24,
@@ -264,7 +264,7 @@ class _NotificationSettingsScreenState
             ),
             if (!state.hasPermission) ...[
               const SizedBox(height: AppTheme.spacingSm),
-              Text(
+              const Text(
                 'Grant notification access to enable this feature',
                 style: TextStyle(fontSize: 12, color: AppTheme.warningColor),
               ),
@@ -377,7 +377,7 @@ class _NotificationSettingsScreenState
           ),
         ),
         const SizedBox(height: AppTheme.spacingSm),
-        Text(
+        const Text(
           'Choose which apps can send notifications to your watch',
           style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
         ),
@@ -399,7 +399,7 @@ class _NotificationSettingsScreenState
             Icon(
               Icons.apps,
               size: 48,
-              color: AppTheme.textSecondary.withOpacity(0.5),
+              color: AppTheme.textSecondary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: AppTheme.spacingMd),
             const Text(
@@ -493,7 +493,7 @@ class _AppFilterTile extends StatelessWidget {
             bytes,
             width: 40,
             height: 40,
-            errorBuilder: (_, __, ___) => _buildDefaultIcon(),
+            errorBuilder: (_, _, _) => _buildDefaultIcon(),
           ),
         );
       } catch (_) {

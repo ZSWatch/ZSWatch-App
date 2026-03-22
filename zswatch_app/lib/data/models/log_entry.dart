@@ -5,7 +5,7 @@ part 'log_entry.freezed.dart';
 /// Direction of the log entry (incoming from watch or outgoing to watch)
 enum LogDirection { incoming, outgoing }
 
-/// Log level parsed from log messages (<dbg>, <inf>, <wrn>, <err>)
+/// Log level parsed from log messages (`<dbg>`, `<inf>`, `<wrn>`, `<err>`)
 enum LogLevel {
   debug, // <dbg>
   info, // <inf>
@@ -183,7 +183,7 @@ abstract class LogEntry with _$LogEntry {
     }
   }
 
-  /// Log level parsed from message (<dbg>, <inf>, <wrn>, <err>)
+  /// Log level parsed from message (`<dbg>`, `<inf>`, `<wrn>`, `<err>`)
   /// Computed on-demand from message content to avoid issues with hot reload
   LogLevel get level {
     if (message.contains('<dbg>')) return LogLevel.debug;

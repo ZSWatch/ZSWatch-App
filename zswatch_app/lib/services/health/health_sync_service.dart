@@ -231,10 +231,10 @@ class HealthSyncService {
       // Subscribe to notifications
       await _hrMeasurementChar!.setNotifyValue(true);
 
-      _hrSubscription?.cancel();
+      await _hrSubscription?.cancel();
       _hrSubscription = _hrMeasurementChar!.onValueReceived.listen(
         _handleHeartRateData,
-        onError: (e) => debugPrint('[HealthSync] HR stream error: $e'),
+        onError: (Object e) => debugPrint('[HealthSync] HR stream error: $e'),
       );
 
       _isStreamingController.add(true);
@@ -250,7 +250,7 @@ class HealthSyncService {
     if (!_isStreamingController.value) return;
 
     try {
-      _hrSubscription?.cancel();
+      await _hrSubscription?.cancel();
       _hrSubscription = null;
 
       if (_hrMeasurementChar != null) {

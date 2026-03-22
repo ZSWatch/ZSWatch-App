@@ -1,8 +1,10 @@
+// ignore_for_file: avoid_slow_async_io
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -316,18 +318,20 @@ class FirmwareManager {
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final artifacts = (data['artifacts'] as List<dynamic>?) ?? [];
 
-      print(
+      debugPrint(
         '[FirmwareManager] Found ${artifacts.length} artifacts for run $runId',
       );
 
       return artifacts
           .map((a) {
             final artifact = a as Map<String, dynamic>;
-            print('[FirmwareManager] Artifact: ${artifact['name']}');
-            print('[FirmwareManager]   ID: ${artifact['id']}');
-            print('[FirmwareManager]   Size: ${artifact['size_in_bytes']}');
-            print('[FirmwareManager]   Expired: ${artifact['expired']}');
-            print(
+            debugPrint('[FirmwareManager] Artifact: ${artifact['name']}');
+            debugPrint('[FirmwareManager]   ID: ${artifact['id']}');
+            debugPrint(
+              '[FirmwareManager]   Size: ${artifact['size_in_bytes']}',
+            );
+            debugPrint('[FirmwareManager]   Expired: ${artifact['expired']}');
+            debugPrint(
               '[FirmwareManager]   archive_download_url: ${artifact['archive_download_url']}',
             );
 
@@ -357,10 +361,12 @@ class FirmwareManager {
     WorkflowRun run,
     WorkflowArtifact artifact,
   ) async {
-    print('[FirmwareManager] downloadArtifact called');
-    print('[FirmwareManager] Artifact: ${artifact.name}, ID: ${artifact.id}');
-    print('[FirmwareManager] Run ID: ${run.id}, Branch: ${run.branch}');
-    print(
+    debugPrint('[FirmwareManager] downloadArtifact called');
+    debugPrint(
+      '[FirmwareManager] Artifact: ${artifact.name}, ID: ${artifact.id}',
+    );
+    debugPrint('[FirmwareManager] Run ID: ${run.id}, Branch: ${run.branch}');
+    debugPrint(
       '[FirmwareManager] Archive Download URL from API: ${artifact.archiveDownloadUrl}',
     );
 
@@ -377,13 +383,13 @@ class FirmwareManager {
         artifact.archiveDownloadUrl ??
         '$_apiBase/repos/$_owner/$_repo/actions/artifacts/${artifact.id}/zip';
 
-    print('[FirmwareManager] Web UI URL: $webUiUrl');
-    print('[FirmwareManager] API URL: $apiUrl');
+    debugPrint('[FirmwareManager] Web UI URL: $webUiUrl');
+    debugPrint('[FirmwareManager] API URL: $apiUrl');
     _log('Web UI URL: $webUiUrl');
     _log('API URL: $apiUrl');
 
     // Start with web UI URL (same as website does)
-    var downloadUrl = webUiUrl;
+    final downloadUrl = webUiUrl;
 
     _updateProgress(
       DownloadProgress(0, artifact.sizeInBytes, DownloadStatus.downloading),
@@ -395,10 +401,12 @@ class FirmwareManager {
       // Follow redirects manually to handle GitHub's redirect chain
       var currentUrl = downloadUrl;
       http.StreamedResponse? response;
-      Map<String, String> cookies = {};
+      final Map<String, String> cookies = {};
 
       for (int redirectCount = 0; redirectCount < 15; redirectCount++) {
-        print('[FirmwareManager] Request #$redirectCount: GET $currentUrl');
+        debugPrint(
+          '[FirmwareManager] Request #$redirectCount: GET $currentUrl',
+        );
         _log('Request #$redirectCount: GET $currentUrl');
 
         final request = http.Request('GET', Uri.parse(currentUrl));
@@ -410,7 +418,7 @@ class FirmwareManager {
           request.headers['Cookie'] = cookies.entries
               .map((e) => '${e.key}=${e.value}')
               .join('; ');
-          print(
+          debugPrint(
             '[FirmwareManager] Sending cookies: ${request.headers['Cookie']}',
           );
           _log('Sending cookies: ${request.headers['Cookie']}');
@@ -423,7 +431,7 @@ class FirmwareManager {
 
         response = await _httpClient!.send(request);
 
-        print(
+        debugPrint(
           '[FirmwareManager] Response: ${response.statusCode} ${response.reasonPhrase}',
         );
         _log('Response: ${response.statusCode} ${response.reasonPhrase}');
@@ -445,10 +453,10 @@ class FirmwareManager {
 
         if (response.statusCode == 200) {
           // Success - download the file
-          print('[FirmwareManager] Success! Starting file download...');
+          debugPrint('[FirmwareManager] Success! Starting file download...');
           _log('Success! Starting file download...');
           final contentLength = response.headers['content-length'];
-          print('[FirmwareManager] Content-Length: $contentLength');
+          debugPrint('[FirmwareManager] Content-Length: $contentLength');
           _log('Content-Length: $contentLength');
           break;
         } else if (response.statusCode == 302 ||
@@ -458,7 +466,9 @@ class FirmwareManager {
           // Follow redirect (301, 302, 307, 308 are all redirect codes)
           final location = response.headers['location'];
           if (location == null) {
-            print('[FirmwareManager] ERROR: Redirect without location header!');
+            debugPrint(
+              '[FirmwareManager] ERROR: Redirect without location header!',
+            );
             _log('ERROR: Redirect without location header!');
             throw FirmwareDownloadException('Redirect without location header');
           }
@@ -471,21 +481,21 @@ class FirmwareManager {
             currentUrl = location;
           }
 
-          print(
+          debugPrint(
             '[FirmwareManager] Following ${response.statusCode} redirect to: $currentUrl',
           );
           _log('Following ${response.statusCode} redirect to: $currentUrl');
           // Drain the response body before following redirect
           await response.stream.drain<void>();
         } else if (response.statusCode == 404) {
-          print('[FirmwareManager] ERROR: Artifact not found (404)');
-          print('[FirmwareManager] URL was: $currentUrl');
+          debugPrint('[FirmwareManager] ERROR: Artifact not found (404)');
+          debugPrint('[FirmwareManager] URL was: $currentUrl');
           _log('ERROR: Artifact not found (404)');
           throw FirmwareDownloadException(
             'Artifact not found. It may have expired.',
           );
         } else if (response.statusCode == 401 || response.statusCode == 403) {
-          print(
+          debugPrint(
             '[FirmwareManager] ERROR: Authentication required (${response.statusCode})',
           );
           _log('ERROR: Authentication required (${response.statusCode})');
@@ -493,7 +503,7 @@ class FirmwareManager {
             'Authentication required. GitHub Actions artifacts may require login.',
           );
         } else {
-          print(
+          debugPrint(
             '[FirmwareManager] ERROR: Unexpected status code ${response.statusCode}',
           );
           _log('ERROR: Unexpected status code ${response.statusCode}');

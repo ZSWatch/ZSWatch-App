@@ -21,7 +21,7 @@ class ConnectionAnalyticsService {
   final WatchService _watchService;
   final ConnectionAnalyticsRepository _repository;
 
-  StreamSubscription? _connectionSubscription;
+  StreamSubscription<Connection>? _connectionSubscription;
 
   // Track current session for duration calculation
   String? _currentSessionId;
@@ -55,7 +55,7 @@ class ConnectionAnalyticsService {
     }
   }
 
-  void _onConnectionChange(Connection connection) async {
+  Future<void> _onConnectionChange(Connection connection) async {
     final state = connection.state;
     final watchId = connection.watchId;
 

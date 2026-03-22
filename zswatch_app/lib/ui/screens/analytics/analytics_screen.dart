@@ -372,7 +372,7 @@ class _BatteryChartCard extends StatelessWidget {
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: colorScheme.primary.withOpacity(0.2),
+              color: colorScheme.primary.withValues(alpha: 0.2),
             ),
           ),
         ],
@@ -754,7 +754,7 @@ class _RecentEventsCard extends StatelessWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: events.take(10).length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final event = events[index];
                   return _EventListTile(event: event);
@@ -779,7 +779,7 @@ class _EventListTile extends StatelessWidget {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(
-        backgroundColor: color.withOpacity(0.2),
+        backgroundColor: color.withValues(alpha: 0.2),
         child: Icon(icon, color: color, size: 20),
       ),
       title: Text(title),
@@ -1042,7 +1042,7 @@ class _TimelineBar extends StatelessWidget {
                 height: 36,
                 color: _segmentColor(
                   ConnectionSegmentType.appNotRunning,
-                ).withOpacity(0.3),
+                ).withValues(alpha: 0.3),
               ),
               // Segments
               for (final seg in segments)
@@ -1067,7 +1067,7 @@ class _TimelineBar extends StatelessWidget {
                 bottom: 0,
                 child: Container(
                   width: 2,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                 ),
               ),
             ],
@@ -1219,7 +1219,7 @@ class _TimeRangeDropdown extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingSm),
       decoration: BoxDecoration(
-        border: Border.all(color: colorScheme.outline.withOpacity(0.3)),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
       ),
       child: DropdownButton<TimeRangeOption>(

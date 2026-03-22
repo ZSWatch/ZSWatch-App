@@ -340,8 +340,9 @@ class GadgetbridgeProtocol implements ProtocolService {
     if (notification.body != null) data['body'] = notification.body;
     if (notification.sender != null) data['sender'] = notification.sender;
     if (notification.subject != null) data['subject'] = notification.subject;
-    if (notification.phoneNumber != null)
+    if (notification.phoneNumber != null) {
       data['tel'] = notification.phoneNumber;
+    }
     if (notification.canReply) data['reply'] = true;
 
     await _sendGb(data);

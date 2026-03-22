@@ -534,7 +534,11 @@ Widget? aiMemoryInfoBlock(BuildContext context, AiDebugInfo info) {
             ),
             if (isLowMemory || !isFullPrompt) ...[
               const SizedBox(width: 6),
-              Icon(Icons.warning_amber_rounded, size: 13, color: Colors.orange),
+              const Icon(
+                Icons.warning_amber_rounded,
+                size: 13,
+                color: Colors.orange,
+              ),
             ],
           ],
         ),

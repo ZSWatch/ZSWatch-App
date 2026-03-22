@@ -109,7 +109,7 @@ abstract class FilesystemImage with _$FilesystemImage {
 
   /// Check if the file exists
   Future<bool> exists() async {
-    return File(filePath).exists();
+    return File(filePath).existsSync();
   }
 
   /// Read the file contents

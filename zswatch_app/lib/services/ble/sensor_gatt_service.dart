@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -25,6 +24,7 @@ Guid _guid(String uuid) => Guid(uuid);
 ///
 /// Data is streamed via GATT notifications at ~10Hz when enabled.
 class SensorGattService {
+  // ignore: unused_field
   final BluetoothDevice _device;
   List<BluetoothService>? _services;
 
@@ -614,6 +614,7 @@ class StreamGroup {
       for (final sub in subscriptions) {
         await sub.cancel();
       }
+      await controller.close();
     };
 
     return controller.stream;

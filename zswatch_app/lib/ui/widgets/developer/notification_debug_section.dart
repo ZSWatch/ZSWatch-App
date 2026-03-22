@@ -168,9 +168,9 @@ class _NotificationDebugSectionState
     final isConnected = connection.isConnected;
     final theme = Theme.of(context);
 
-    final compactButtonStyle = ButtonStyle(
-      minimumSize: const WidgetStatePropertyAll(Size(0, 34)),
-      padding: const WidgetStatePropertyAll(
+    const compactButtonStyle = ButtonStyle(
+      minimumSize: WidgetStatePropertyAll(Size(0, 34)),
+      padding: WidgetStatePropertyAll(
         EdgeInsets.symmetric(horizontal: 12, vertical: 0),
       ),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -203,7 +203,7 @@ class _NotificationDebugSectionState
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    '#${_notificationId}',
+                    '#$_notificationId',
                     style: theme.textTheme.labelSmall?.copyWith(
                       fontFamily: 'monospace',
                       color: AppTheme.textSecondary,
@@ -221,7 +221,7 @@ class _NotificationDebugSectionState
             ),
             const SizedBox(height: AppTheme.spacingSm),
             DropdownButtonFormField<String>(
-              value: _selectedApp,
+              initialValue: _selectedApp,
               decoration: const InputDecoration(
                 labelText: 'Source',
                 border: OutlineInputBorder(),

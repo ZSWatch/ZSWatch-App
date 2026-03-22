@@ -71,7 +71,7 @@ class _PermissionOnboardingScreenState
                     ],
 
                     // Critical Permissions Section
-                    _SectionHeader(
+                    const _SectionHeader(
                       title: 'Required Permissions',
                       icon: Icons.warning_amber_rounded,
                       color: AppTheme.errorColor,
@@ -92,7 +92,7 @@ class _PermissionOnboardingScreenState
                     const SizedBox(height: AppTheme.spacingLg),
 
                     // Recommended Permissions Section
-                    _SectionHeader(
+                    const _SectionHeader(
                       title: 'Recommended Permissions',
                       icon: Icons.recommend_outlined,
                       color: AppTheme.warningColor,
@@ -131,7 +131,7 @@ class _PermissionOnboardingScreenState
                     const SizedBox(height: AppTheme.spacingLg),
 
                     // Optional Permissions Section
-                    _SectionHeader(
+                    const _SectionHeader(
                       title: 'Optional Permissions',
                       icon: Icons.add_circle_outline,
                       color: AppTheme.textSecondary,
