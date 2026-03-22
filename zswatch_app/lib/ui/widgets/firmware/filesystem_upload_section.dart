@@ -38,8 +38,8 @@ class FilesystemUploadSection extends StatelessWidget {
                   Text(
                     'Select .zip firmware file',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppTheme.primaryColor,
-                        ),
+                      color: AppTheme.primaryColor,
+                    ),
                   ),
                 ],
               ),
@@ -49,9 +49,9 @@ class FilesystemUploadSection extends StatelessWidget {
         const SizedBox(height: AppTheme.spacingSm),
         Text(
           'Select a firmware package .zip, e.g. watchdk@1_nrf5340_cpuapp_debug.zip.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
         ),
       ],
     );

@@ -48,7 +48,8 @@ abstract class HttpRequest with _$HttpRequest {
   }
 
   /// Whether the request is currently pending
-  bool get isPending => completedAt == null && error == null && response == null;
+  bool get isPending =>
+      completedAt == null && error == null && response == null;
 
   /// Whether the request completed successfully
   bool get isSuccess => response != null && error == null;

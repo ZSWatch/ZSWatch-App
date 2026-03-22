@@ -17,9 +17,12 @@ import '../../data/models/notification.dart';
 /// - This service provides a no-op implementation
 class NotificationService {
   static const _methodChannel = MethodChannel('dev.zswatch.app/notifications');
-  static const _eventChannel = EventChannel('dev.zswatch.app/notification_events');
+  static const _eventChannel = EventChannel(
+    'dev.zswatch.app/notification_events',
+  );
 
-  final _notificationPostedController = StreamController<PhoneNotification>.broadcast();
+  final _notificationPostedController =
+      StreamController<PhoneNotification>.broadcast();
   final _notificationRemovedController = StreamController<int>.broadcast();
   final _permissionStatusController = StreamController<bool>.broadcast();
 
@@ -28,7 +31,8 @@ class NotificationService {
   bool _permissionGranted = false;
 
   /// Stream of posted notifications
-  Stream<PhoneNotification> get notificationPosted => _notificationPostedController.stream;
+  Stream<PhoneNotification> get notificationPosted =>
+      _notificationPostedController.stream;
 
   /// Stream of removed notification IDs
   Stream<int> get notificationRemoved => _notificationRemovedController.stream;
@@ -69,7 +73,9 @@ class NotificationService {
       );
 
       _initialized = true;
-      debugPrint('NotificationService initialized, permission: $_permissionGranted');
+      debugPrint(
+        'NotificationService initialized, permission: $_permissionGranted',
+      );
     } catch (e) {
       debugPrint('NotificationService initialization failed: $e');
       rethrow;
@@ -90,7 +96,9 @@ class NotificationService {
               Map<String, dynamic>.from(notificationData),
             );
             _notificationPostedController.add(notification);
-            debugPrint('Notification posted: ${notification.appName} - ${notification.title}');
+            debugPrint(
+              'Notification posted: ${notification.appName} - ${notification.title}',
+            );
           } catch (e) {
             debugPrint('Error parsing notification: $e');
           }
@@ -112,7 +120,9 @@ class NotificationService {
     if (!Platform.isAndroid) return false;
 
     try {
-      final result = await _methodChannel.invokeMethod<bool>('isNotificationAccessEnabled');
+      final result = await _methodChannel.invokeMethod<bool>(
+        'isNotificationAccessEnabled',
+      );
       _permissionGranted = result ?? false;
       return _permissionGranted;
     } catch (e) {
@@ -137,7 +147,9 @@ class NotificationService {
     if (!Platform.isAndroid) return false;
 
     try {
-      final result = await _methodChannel.invokeMethod<bool>('isServiceRunning');
+      final result = await _methodChannel.invokeMethod<bool>(
+        'isServiceRunning',
+      );
       return result ?? false;
     } catch (e) {
       debugPrint('Error checking service status: $e');
@@ -150,12 +162,16 @@ class NotificationService {
     if (!Platform.isAndroid) return [];
 
     try {
-      final result = await _methodChannel.invokeMethod<List<dynamic>>('getActiveNotifications');
+      final result = await _methodChannel.invokeMethod<List<dynamic>>(
+        'getActiveNotifications',
+      );
       if (result == null) return [];
 
       return result
           .whereType<Map<Object?, Object?>>()
-          .map((map) => PhoneNotification.fromMap(Map<String, dynamic>.from(map)))
+          .map(
+            (map) => PhoneNotification.fromMap(Map<String, dynamic>.from(map)),
+          )
           .toList();
     } catch (e) {
       debugPrint('Error getting active notifications: $e');
@@ -168,7 +184,9 @@ class NotificationService {
     if (!Platform.isAndroid) return;
 
     try {
-      await _methodChannel.invokeMethod<void>('dismissNotification', {'key': key});
+      await _methodChannel.invokeMethod<void>('dismissNotification', {
+        'key': key,
+      });
     } catch (e) {
       debugPrint('Error dismissing notification: $e');
     }
@@ -179,12 +197,17 @@ class NotificationService {
     if (!Platform.isAndroid) return [];
 
     try {
-      final result = await _methodChannel.invokeMethod<List<dynamic>>('getNotificationApps');
+      final result = await _methodChannel.invokeMethod<List<dynamic>>(
+        'getNotificationApps',
+      );
       if (result == null) return [];
 
       return result
           .whereType<Map<Object?, Object?>>()
-          .map((map) => AppNotificationFilter.fromMap(Map<String, dynamic>.from(map)))
+          .map(
+            (map) =>
+                AppNotificationFilter.fromMap(Map<String, dynamic>.from(map)),
+          )
           .toList();
     } catch (e) {
       debugPrint('Error getting notification apps: $e');
@@ -202,10 +225,7 @@ class NotificationService {
     try {
       final result = await _methodChannel.invokeMapMethod<String, dynamic>(
         'sendTestNotification',
-        {
-          'title': title,
-          'body': body,
-        },
+        {'title': title, 'body': body},
       );
 
       return result;

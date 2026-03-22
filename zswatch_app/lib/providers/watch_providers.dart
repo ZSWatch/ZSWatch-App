@@ -31,8 +31,10 @@ final primaryWatchProvider = FutureProvider<WatchEntity?>((ref) async {
 });
 
 /// Provider for a specific watch by ID
-final watchByIdProvider =
-    FutureProvider.family<WatchEntity?, String>((ref, watchId) async {
+final watchByIdProvider = FutureProvider.family<WatchEntity?, String>((
+  ref,
+  watchId,
+) async {
   final db = ref.watch(databaseProvider);
   return db.getWatchById(watchId);
 });
@@ -66,16 +68,18 @@ class WatchNotifier extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = const AsyncValue.loading();
     try {
-      await _db.upsertWatch(WatchesCompanion(
-        id: Value(id),
-        name: Value(name),
-        firmwareVersion: Value(firmwareVersion),
-        hardwareVersion: Value(hardwareVersion),
-        batteryLevel: Value(batteryLevel),
-        isPrimary: Value(isPrimary),
-        supportsExtendedApi: Value(supportsExtendedApi),
-        createdAt: Value(DateTime.now()),
-      ));
+      await _db.upsertWatch(
+        WatchesCompanion(
+          id: Value(id),
+          name: Value(name),
+          firmwareVersion: Value(firmwareVersion),
+          hardwareVersion: Value(hardwareVersion),
+          batteryLevel: Value(batteryLevel),
+          isPrimary: Value(isPrimary),
+          supportsExtendedApi: Value(supportsExtendedApi),
+          createdAt: Value(DateTime.now()),
+        ),
+      );
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -123,7 +127,7 @@ class WatchNotifier extends StateNotifier<AsyncValue<void>> {
   }
 
   /// Rename a watch by setting its custom name (T114, T119)
-  /// 
+  ///
   /// If [customName] is null or empty, clears the custom name.
   Future<void> renameWatch(String watchId, String? customName) async {
     state = const AsyncValue.loading();
@@ -136,7 +140,7 @@ class WatchNotifier extends StateNotifier<AsyncValue<void>> {
   }
 
   /// Forget a watch completely (T115, T118)
-  /// 
+  ///
   /// Removes the watch from the database AND unbonds the BLE device.
   /// After calling this, the user will need to re-pair to use the watch again.
   Future<void> forgetWatch(String watchId) async {
@@ -162,9 +166,9 @@ class WatchNotifier extends StateNotifier<AsyncValue<void>> {
 /// Provider for watch operations notifier
 final watchNotifierProvider =
     StateNotifierProvider<WatchNotifier, AsyncValue<void>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return WatchNotifier(db);
-});
+      final db = ref.watch(databaseProvider);
+      return WatchNotifier(db);
+    });
 
 /// Provider for watch count
 final watchCountProvider = Provider<int>((ref) {
@@ -176,4 +180,3 @@ final watchCountProvider = Provider<int>((ref) {
 final hasWatchesProvider = Provider<bool>((ref) {
   return ref.watch(watchCountProvider) > 0;
 });
-

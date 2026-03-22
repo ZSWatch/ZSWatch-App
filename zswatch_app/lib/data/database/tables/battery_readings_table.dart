@@ -12,8 +12,7 @@ class BatteryReadings extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// Foreign key to source watch
-  TextColumn get watchId =>
-      text().references(Watches, #id).named('watch_id')();
+  TextColumn get watchId => text().references(Watches, #id).named('watch_id')();
 
   /// Battery percentage (0-100)
   IntColumn get level => integer()();
@@ -25,4 +24,3 @@ class BatteryReadings extends Table {
   /// When the sample was taken
   DateTimeColumn get timestamp => dateTime()();
 }
-

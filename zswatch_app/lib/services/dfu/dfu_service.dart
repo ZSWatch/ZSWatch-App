@@ -81,12 +81,16 @@ class DfuService {
 
       // Initialize update manager with device ID
       try {
-        _updateManager = await DeviceUpdateManager.getInstance(device.remoteId.str);
+        _updateManager = await DeviceUpdateManager.getInstance(
+          device.remoteId.str,
+        );
       } catch (e) {
         // If manager already exists, try to kill it and recreate
         _log('Manager may already exist, attempting cleanup: $e');
         try {
-          final existingManager = await DeviceUpdateManager.getInstance(device.remoteId.str);
+          final existingManager = await DeviceUpdateManager.getInstance(
+            device.remoteId.str,
+          );
           await existingManager.kill();
         } catch (e) {
           // kill() may fail if the manager is in a bad state — non-fatal, we'll retry.
@@ -95,7 +99,9 @@ class DfuService {
         // Retry after small delay
         await Future<void>.delayed(const Duration(milliseconds: 500));
         try {
-          _updateManager = await DeviceUpdateManager.getInstance(device.remoteId.str);
+          _updateManager = await DeviceUpdateManager.getInstance(
+            device.remoteId.str,
+          );
         } catch (e2) {
           // If we still can't get a manager, SMP is likely not available
           throw SmpNotAvailableException(e2);
@@ -119,24 +125,25 @@ class DfuService {
         }
         final Uint8List bytes = await file.readAsBytes();
         totalSize += bytes.length;
-        
+
         final imageIndex = image.slot ?? i;
-        _log('Preparing image: ${image.name} -> slot $imageIndex (${bytes.length} bytes)');
-        mcuImages.add(Image(
-          image: imageIndex,
-          data: bytes,
-        ));
+        _log(
+          'Preparing image: ${image.name} -> slot $imageIndex (${bytes.length} bytes)',
+        );
+        mcuImages.add(Image(image: imageIndex, data: bytes));
       }
 
       _log('Total firmware size: ${_formatBytes(totalSize)}');
 
       // Start the upload
-      _updateState(DfuState.uploading(
-        totalBytes: totalSize,
-        totalImages: firmwareImages.length,
-        currentImageName: firmwareImages.first.name,
-        startedAt: startTime,
-      ));
+      _updateState(
+        DfuState.uploading(
+          totalBytes: totalSize,
+          totalImages: firmwareImages.length,
+          currentImageName: firmwareImages.first.name,
+          startedAt: startTime,
+        ),
+      );
 
       // Start speed calculation timer
       _startSpeedTimer();
@@ -155,33 +162,35 @@ class DfuService {
       );
 
       // Subscribe to progress updates
-      _progressSubscription = _updateManager!.progressStream.listen(
-        (ProgressUpdate progress) {
-          var nextImage = currentState.currentImage;
-          var nextName = currentState.currentImageName;
+      _progressSubscription = _updateManager!.progressStream.listen((
+        ProgressUpdate progress,
+      ) {
+        var nextImage = currentState.currentImage;
+        var nextName = currentState.currentImageName;
 
-          // Detect image switch (bytesSent resets for new image)
-          if (progress.bytesSent < currentState.bytesTransferred &&
-              currentState.bytesTransferred > 1000) {
-            nextImage = currentState.currentImage + 1;
-            if (nextImage - 1 < _imageNames.length) {
-              nextName = _imageNames[nextImage - 1];
-            }
-            _lastBytesTransferred = 0;
-            _speedSamples.clear();
+        // Detect image switch (bytesSent resets for new image)
+        if (progress.bytesSent < currentState.bytesTransferred &&
+            currentState.bytesTransferred > 1000) {
+          nextImage = currentState.currentImage + 1;
+          if (nextImage - 1 < _imageNames.length) {
+            nextName = _imageNames[nextImage - 1];
           }
+          _lastBytesTransferred = 0;
+          _speedSamples.clear();
+        }
 
-          final double overallProgress = progress.bytesSent / progress.imageSize;
-          _updateState(currentState.copyWith(
+        final double overallProgress = progress.bytesSent / progress.imageSize;
+        _updateState(
+          currentState.copyWith(
             progress: overallProgress.clamp(0.0, 1.0),
             bytesTransferred: progress.bytesSent,
             totalBytes: progress.imageSize,
             currentImage: nextImage,
             currentImageName: nextName,
             speedBytesPerSecond: currentState.speedBytesPerSecond,
-          ));
-        },
-      );
+          ),
+        );
+      });
 
       // Configure upgrade mode - use confirmOnly to confirm images immediately after upload
       // This ensures the device boots the new firmware after reset
@@ -205,15 +214,11 @@ class DfuService {
       }
 
       _log('DFU upload initiated');
-
     } on DfuException {
       rethrow;
     } catch (e) {
       _log('DFU failed: $e');
-      _updateState(DfuState.failed(
-        e.toString(),
-        startedAt: startTime,
-      ));
+      _updateState(DfuState.failed(e.toString(), startedAt: startTime));
       rethrow;
     }
   }
@@ -268,7 +273,8 @@ class DfuService {
       final now = DateTime.now();
       final elapsed = now.difference(_lastSpeedUpdate!).inMilliseconds / 1000;
       if (elapsed > 0 && currentState.status.isInProgress) {
-        final bytesThisInterval = currentState.bytesTransferred - _lastBytesTransferred;
+        final bytesThisInterval =
+            currentState.bytesTransferred - _lastBytesTransferred;
         final speed = (bytesThisInterval / elapsed).round();
 
         if (bytesThisInterval > 0 || currentState.speedBytesPerSecond == 0) {
@@ -276,11 +282,14 @@ class DfuService {
           if (_speedSamples.length > _speedWindowSize) {
             _speedSamples.removeAt(0);
           }
-          final avg = _speedSamples.reduce((a, b) => a + b) ~/ _speedSamples.length;
-          _updateState(currentState.copyWith(
-            speedBytesPerSecond: avg,
-            speedHistory: [...currentState.speedHistory, avg],
-          ));
+          final avg =
+              _speedSamples.reduce((a, b) => a + b) ~/ _speedSamples.length;
+          _updateState(
+            currentState.copyWith(
+              speedBytesPerSecond: avg,
+              speedHistory: [...currentState.speedHistory, avg],
+            ),
+          );
         }
 
         _lastBytesTransferred = currentState.bytesTransferred;

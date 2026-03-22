@@ -75,10 +75,7 @@ abstract class Connection with _$Connection {
 
   /// Create connection in connecting state
   factory Connection.connecting(String watchId) {
-    return Connection(
-      watchId: watchId,
-      state: WatchConnectionState.connecting,
-    );
+    return Connection(watchId: watchId, state: WatchConnectionState.connecting);
   }
 
   /// Create connection in error state

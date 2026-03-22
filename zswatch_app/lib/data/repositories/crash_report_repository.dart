@@ -24,22 +24,28 @@ class CrashReportRepository {
       crashTime: summary.time,
     );
     if (existing != null) {
-      debugPrint('[CrashReportRepo] Duplicate crash, skipping: ${summary.file}:${summary.line}');
+      debugPrint(
+        '[CrashReportRepo] Duplicate crash, skipping: ${summary.file}:${summary.line}',
+      );
       return existing.id;
     }
 
-    final id = await _db.insertCrashReport(CrashReportsCompanion.insert(
-      watchId: watchId,
-      file: summary.file,
-      line: summary.line,
-      crashTime: summary.time,
-      fwVersion: summary.fwVersion,
-      fwCommitSha: summary.fwCommitSha,
-      board: summary.board,
-      buildType: summary.buildType,
-      receivedAt: DateTime.now(),
-    ));
-    debugPrint('[CrashReportRepo] Saved crash report #$id: ${summary.file}:${summary.line}');
+    final id = await _db.insertCrashReport(
+      CrashReportsCompanion.insert(
+        watchId: watchId,
+        file: summary.file,
+        line: summary.line,
+        crashTime: summary.time,
+        fwVersion: summary.fwVersion,
+        fwCommitSha: summary.fwCommitSha,
+        board: summary.board,
+        buildType: summary.buildType,
+        receivedAt: DateTime.now(),
+      ),
+    );
+    debugPrint(
+      '[CrashReportRepo] Saved crash report #$id: ${summary.file}:${summary.line}',
+    );
     return id;
   }
 

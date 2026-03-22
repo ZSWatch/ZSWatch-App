@@ -5,7 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/database/app_database.dart';
 
 /// Dialog for watch management (rename, forget) - T117
-/// 
+///
 /// Shows:
 /// - Editable watch name text field
 /// - "Save" button to save custom name
@@ -84,7 +84,7 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
       // If new name equals the original advertised name, clear customName
       final customName = newName == widget.watch.name ? null : newName;
       await widget.onRename(widget.watch.id, customName);
-      
+
       if (mounted) {
         Navigator.of(context).pop(false); // false = not forgotten
       }
@@ -137,7 +137,7 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
 
     try {
       await widget.onForget(widget.watch.id);
-      
+
       if (mounted) {
         Navigator.of(context).pop(true); // true = was forgotten
       }
@@ -172,7 +172,7 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
             // Watch info header
             _buildWatchInfo(),
             const SizedBox(height: AppTheme.spacingLg),
-            
+
             // Name text field
             TextField(
               controller: _nameController,
@@ -196,7 +196,7 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
               textCapitalization: TextCapitalization.words,
             ),
             const SizedBox(height: AppTheme.spacingLg),
-            
+
             // Forget watch button
             SizedBox(
               width: double.infinity,
@@ -264,23 +264,23 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
             children: [
               Text(
                 _displayName,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               if (widget.watch.customName != null)
                 Text(
                   'Original: ${widget.watch.name}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               if (widget.watch.firmwareVersion != null)
                 Text(
                   'v${widget.watch.firmwareVersion}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
             ],
           ),

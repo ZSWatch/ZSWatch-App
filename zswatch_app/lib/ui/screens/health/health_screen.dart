@@ -13,17 +13,17 @@ import '../../widgets/real_time_chart.dart';
 
 /// Activity state colors
 const _activityColors = {
-  ActivityState.unknown: Color(0xFF757575),     // Dark Gray
-  ActivityState.notWorn: Color(0xFF9E9E9E),     // Gray
-  ActivityState.deepSleep: Color(0xFF3F51B5),   // Indigo
-  ActivityState.lightSleep: Color(0xFF7986CB),  // Light Indigo
-  ActivityState.remSleep: Color(0xFF9C27B0),    // Purple
-  ActivityState.still: Color(0xFF2196F3),       // Blue
-  ActivityState.running: Color(0xFFFF5722),     // Deep Orange
-  ActivityState.walking: Color(0xFF4CAF50),     // Green
-  ActivityState.swimming: Color(0xFF00BCD4),    // Cyan
-  ActivityState.cycling: Color(0xFFFFEB3B),     // Yellow
-  ActivityState.exercise: Color(0xFFE91E63),    // Pink
+  ActivityState.unknown: Color(0xFF757575), // Dark Gray
+  ActivityState.notWorn: Color(0xFF9E9E9E), // Gray
+  ActivityState.deepSleep: Color(0xFF3F51B5), // Indigo
+  ActivityState.lightSleep: Color(0xFF7986CB), // Light Indigo
+  ActivityState.remSleep: Color(0xFF9C27B0), // Purple
+  ActivityState.still: Color(0xFF2196F3), // Blue
+  ActivityState.running: Color(0xFFFF5722), // Deep Orange
+  ActivityState.walking: Color(0xFF4CAF50), // Green
+  ActivityState.swimming: Color(0xFF00BCD4), // Cyan
+  ActivityState.cycling: Color(0xFFFFEB3B), // Yellow
+  ActivityState.exercise: Color(0xFFE91E63), // Pink
 };
 
 /// Health screen showing step counts and heart rate data
@@ -39,7 +39,8 @@ class HealthScreen extends ConsumerStatefulWidget {
   ConsumerState<HealthScreen> createState() => _HealthScreenState();
 }
 
-class _HealthScreenState extends ConsumerState<HealthScreen> with SingleTickerProviderStateMixin {
+class _HealthScreenState extends ConsumerState<HealthScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -151,8 +152,7 @@ class _HealthScreenState extends ConsumerState<HealthScreen> with SingleTickerPr
               const SizedBox(height: AppTheme.spacingLg),
 
               // Info about data sync
-              if (!isConnected)
-                const _ConnectionWarning(),
+              if (!isConnected) const _ConnectionWarning(),
             ],
           ),
         ),
@@ -187,9 +187,9 @@ class _StepsSummaryCard extends StatelessWidget {
           children: [
             Text(
               rangeLabel,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppTheme.textSecondary),
             ),
             const SizedBox(height: AppTheme.spacingSm),
             if (isLoading)
@@ -208,9 +208,9 @@ class _StepsSummaryCard extends StatelessWidget {
                   Text(
                     _formatSteps(totalSteps),
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                          color: AppTheme.primaryColor,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(width: AppTheme.spacingXs),
                   Padding(
@@ -218,8 +218,8 @@ class _StepsSummaryCard extends StatelessWidget {
                     child: Text(
                       'steps',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ),
                 ],
@@ -252,13 +252,13 @@ class _ActivityBreakdownCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasData = breakdown.totalDuration > Duration.zero;
-    
+
     final rangeLabel = switch (range) {
       StepsHistoryRange.day => "Today's",
       StepsHistoryRange.week => 'This Week',
       StepsHistoryRange.month => 'This Month',
     };
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppTheme.spacingMd),
@@ -274,14 +274,16 @@ class _ActivityBreakdownCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const Spacer(),
-                if (breakdown.currentState != null && range == StepsHistoryRange.day)
+                if (breakdown.currentState != null &&
+                    range == StepsHistoryRange.day)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppTheme.spacingSm,
                       vertical: AppTheme.spacingXs,
                     ),
                     decoration: BoxDecoration(
-                      color: _activityColors[breakdown.currentState]?.withValues(alpha: 0.2),
+                      color: _activityColors[breakdown.currentState]
+                          ?.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                     ),
                     child: Row(
@@ -298,10 +300,11 @@ class _ActivityBreakdownCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         Text(
                           breakdown.currentState!.displayName,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: _activityColors[breakdown.currentState],
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: _activityColors[breakdown.currentState],
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ],
                     ),
@@ -328,7 +331,7 @@ class _ActivityBreakdownCard extends StatelessWidget {
                       ),
                       const SizedBox(height: AppTheme.spacingSm),
                       Text(
-                        range == StepsHistoryRange.day 
+                        range == StepsHistoryRange.day
                             ? 'Waiting for activity data...'
                             : 'No activity data for this period',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -372,13 +375,13 @@ class _ActivityBreakdownCard extends StatelessWidget {
 
   List<PieChartSectionData> _buildPieSections() {
     final sections = <PieChartSectionData>[];
-    
+
     for (final state in ActivityState.values) {
       if (state == ActivityState.unknown) continue;
-      
+
       final percentage = breakdown.getPercentage(state);
       if (percentage <= 0) continue;
-      
+
       sections.add(
         PieChartSectionData(
           value: percentage * 100,
@@ -388,19 +391,19 @@ class _ActivityBreakdownCard extends StatelessWidget {
         ),
       );
     }
-    
+
     return sections;
   }
 
   List<Widget> _buildLegendItems(BuildContext context) {
     final items = <Widget>[];
-    
+
     for (final state in ActivityState.values) {
       if (state == ActivityState.unknown) continue;
-      
+
       final duration = breakdown.durations[state] ?? Duration.zero;
       final percentage = breakdown.getPercentage(state);
-      
+
       if (duration > Duration.zero || state == breakdown.currentState) {
         items.add(
           Padding(
@@ -445,25 +448,25 @@ class _ActivityBreakdownCard extends StatelessWidget {
         );
       }
     }
-    
+
     if (items.isEmpty) {
       items.add(
         Text(
           'No activity recorded',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: AppTheme.textSecondary,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
         ),
       );
     }
-    
+
     return items;
   }
 
   String _formatDuration(Duration duration) {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
-    
+
     if (hours > 0) {
       return '${hours}h ${minutes}m';
     }
@@ -542,10 +545,7 @@ class _StepsChartCard extends StatelessWidget {
         StepsHistoryRange.week => _formatWeekday(aggregate.periodStart),
         StepsHistoryRange.month => _formatDayOfMonth(aggregate.periodStart),
       };
-      return StepsBarData(
-        label: label,
-        steps: aggregate.total.round(),
-      );
+      return StepsBarData(label: label, steps: aggregate.total.round());
     }).toList();
   }
 
@@ -624,15 +624,15 @@ class _HeartRateCard extends StatelessWidget {
                       Text(
                         'No heart rate data today',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
                       const SizedBox(height: AppTheme.spacingSm),
                       Text(
                         'Tap to start live monitoring',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.primaryColor,
-                            ),
+                          color: AppTheme.primaryColor,
+                        ),
                       ),
                     ],
                   ),
@@ -668,8 +668,8 @@ class _HeartRateCard extends StatelessWidget {
                 Text(
                   '$sampleCount readings today',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
             ],
@@ -685,11 +685,7 @@ class _HrStatItem extends StatelessWidget {
   final int? value;
   final String unit;
 
-  const _HrStatItem({
-    required this.label,
-    this.value,
-    required this.unit,
-  });
+  const _HrStatItem({required this.label, this.value, required this.unit});
 
   @override
   Widget build(BuildContext context) {
@@ -697,9 +693,9 @@ class _HrStatItem extends StatelessWidget {
       children: [
         Text(
           label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: AppTheme.textSecondary),
         ),
         const SizedBox(height: 4),
         Row(
@@ -709,17 +705,17 @@ class _HrStatItem extends StatelessWidget {
             Text(
               value?.toString() ?? '--',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: AppTheme.errorColor,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: AppTheme.errorColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
                 unit,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: AppTheme.textSecondary),
               ),
             ),
           ],
@@ -739,16 +735,11 @@ class _ConnectionWarning extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.warningColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-        border: Border.all(
-          color: AppTheme.warningColor.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.bluetooth_disabled,
-            color: AppTheme.warningColor,
-          ),
+          const Icon(Icons.bluetooth_disabled, color: AppTheme.warningColor),
           const SizedBox(width: AppTheme.spacingSm),
           Expanded(
             child: Column(
@@ -757,15 +748,15 @@ class _ConnectionWarning extends StatelessWidget {
                 Text(
                   'Watch not connected',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.warningColor,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    color: AppTheme.warningColor,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 Text(
                   'Connect your watch to sync health data',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
             ),

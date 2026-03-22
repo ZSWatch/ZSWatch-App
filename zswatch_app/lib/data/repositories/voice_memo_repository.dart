@@ -53,8 +53,10 @@ class VoiceMemoRepository extends BaseRepository<VoiceMemo, VoiceMemoEntity> {
   Future<List<VoiceMemo>> getTranscribableMemos() async {
     final allMemos = await getAllMemos();
     return allMemos
-        .where((memo) =>
-            memo.convertedFilePath != null || memo.localFilePath != null)
+        .where(
+          (memo) =>
+              memo.convertedFilePath != null || memo.localFilePath != null,
+        )
         .toList();
   }
 
@@ -67,12 +69,14 @@ class VoiceMemoRepository extends BaseRepository<VoiceMemo, VoiceMemoEntity> {
     required int durationMs,
     required int sizeBytes,
   }) async {
-    await _db.upsertVoiceMemo(VoiceMemosCompanion(
-      filename: Value(filename),
-      timestampUtc: Value(timestampUtc),
-      durationMs: Value(durationMs),
-      sizeBytes: Value(sizeBytes),
-    ));
+    await _db.upsertVoiceMemo(
+      VoiceMemosCompanion(
+        filename: Value(filename),
+        timestampUtc: Value(timestampUtc),
+        durationMs: Value(durationMs),
+        sizeBytes: Value(sizeBytes),
+      ),
+    );
   }
 
   /// Mark a memo as downloaded
@@ -176,7 +180,9 @@ class VoiceMemoRepository extends BaseRepository<VoiceMemo, VoiceMemoEntity> {
           final file = File(entity.localFilePath!);
           if (await file.exists()) {
             await file.delete();
-            debugPrint('[VoiceMemoRepository] Deleted local file: ${entity.localFilePath}');
+            debugPrint(
+              '[VoiceMemoRepository] Deleted local file: ${entity.localFilePath}',
+            );
           }
         } catch (e) {
           debugPrint('[VoiceMemoRepository] Failed to delete local file: $e');
@@ -188,10 +194,14 @@ class VoiceMemoRepository extends BaseRepository<VoiceMemo, VoiceMemoEntity> {
           final file = File(entity.convertedFilePath!);
           if (await file.exists()) {
             await file.delete();
-            debugPrint('[VoiceMemoRepository] Deleted converted file: ${entity.convertedFilePath}');
+            debugPrint(
+              '[VoiceMemoRepository] Deleted converted file: ${entity.convertedFilePath}',
+            );
           }
         } catch (e) {
-          debugPrint('[VoiceMemoRepository] Failed to delete converted file: $e');
+          debugPrint(
+            '[VoiceMemoRepository] Failed to delete converted file: $e',
+          );
         }
       }
     }
@@ -207,9 +217,10 @@ class VoiceMemoRepository extends BaseRepository<VoiceMemo, VoiceMemoEntity> {
     return VoiceMemo(
       id: entity.id,
       filename: entity.filename,
-      timestampUtc:
-          DateTime.fromMillisecondsSinceEpoch(entity.timestampUtc * 1000,
-              isUtc: true),
+      timestampUtc: DateTime.fromMillisecondsSinceEpoch(
+        entity.timestampUtc * 1000,
+        isUtc: true,
+      ),
       durationMs: entity.durationMs,
       sizeBytes: entity.sizeBytes,
       localFilePath: entity.localFilePath,

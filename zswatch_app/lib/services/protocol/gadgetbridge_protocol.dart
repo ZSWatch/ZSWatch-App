@@ -138,10 +138,7 @@ class GadgetbridgeProtocol implements ProtocolService {
       case 'music':
         final action = _parseMusicControlAction(json['n'] as String?);
         if (action != null) {
-          return MusicControlMessage(
-            rawMessage: rawMessage,
-            action: action,
-          );
+          return MusicControlMessage(rawMessage: rawMessage, action: action);
         }
         return null;
 
@@ -165,7 +162,8 @@ class GadgetbridgeProtocol implements ProtocolService {
         return NotificationActionMessage(
           rawMessage: rawMessage,
           notificationId: json['id'] as int? ?? 0,
-          action: _parseNotificationAction(json['n'] as String?) ??
+          action:
+              _parseNotificationAction(json['n'] as String?) ??
               NotificationAction.dismiss,
           replyMessage: json['msg'] as String?,
           phoneNumber: json['tel'] as String?,
@@ -189,14 +187,10 @@ class GadgetbridgeProtocol implements ProtocolService {
         );
 
       case 'force_calendar_sync':
-        final ids = (json['ids'] as List<dynamic>?)
-                ?.map((e) => e as int)
-                .toList() ??
+        final ids =
+            (json['ids'] as List<dynamic>?)?.map((e) => e as int).toList() ??
             [];
-        return CalendarSyncMessage(
-          rawMessage: rawMessage,
-          existingIds: ids,
-        );
+        return CalendarSyncMessage(rawMessage: rawMessage, existingIds: ids);
 
       case 'http':
         return HttpRequestMessage(
@@ -346,7 +340,8 @@ class GadgetbridgeProtocol implements ProtocolService {
     if (notification.body != null) data['body'] = notification.body;
     if (notification.sender != null) data['sender'] = notification.sender;
     if (notification.subject != null) data['subject'] = notification.subject;
-    if (notification.phoneNumber != null) data['tel'] = notification.phoneNumber;
+    if (notification.phoneNumber != null)
+      data['tel'] = notification.phoneNumber;
     if (notification.canReply) data['reply'] = true;
 
     await _sendGb(data);
@@ -354,11 +349,7 @@ class GadgetbridgeProtocol implements ProtocolService {
 
   @override
   Future<void> updateNotification(int id, String body) async {
-    await _sendGb({
-      't': 'notify~',
-      'id': id,
-      'body': body,
-    });
+    await _sendGb({'t': 'notify~', 'id': id, 'body': body});
   }
 
   @override
@@ -417,12 +408,14 @@ class GadgetbridgeProtocol implements ProtocolService {
   @override
   Future<void> setAlarms(List<WatchAlarm> alarms) async {
     final alarmList = alarms
-        .map((a) => {
-              'h': a.hour,
-              'm': a.minute,
-              'rep': a.repeatDaysMask,
-              'on': a.enabled ? 1 : 0,
-            })
+        .map(
+          (a) => {
+            'h': a.hour,
+            'm': a.minute,
+            'rep': a.repeatDaysMask,
+            'on': a.enabled ? 1 : 0,
+          },
+        )
         .toList();
 
     await _sendGb({'t': 'alarm', 'd': alarmList});
@@ -452,11 +445,7 @@ class GadgetbridgeProtocol implements ProtocolService {
     bool steps = false,
     int? intervalSeconds,
   }) async {
-    final data = <String, dynamic>{
-      't': 'act',
-      'hrm': heartRate,
-      'stp': steps,
-    };
+    final data = <String, dynamic>{'t': 'act', 'hrm': heartRate, 'stp': steps};
     if (intervalSeconds != null) data['int'] = intervalSeconds;
 
     await _sendGb(data);
@@ -464,10 +453,7 @@ class GadgetbridgeProtocol implements ProtocolService {
 
   @override
   Future<void> fetchActivityData({int? sinceTimestampMs}) async {
-    await _sendGb({
-      't': 'actfetch',
-      'ts': sinceTimestampMs ?? 0,
-    });
+    await _sendGb({'t': 'actfetch', 'ts': sinceTimestampMs ?? 0});
   }
 
   @override
@@ -496,10 +482,7 @@ class GadgetbridgeProtocol implements ProtocolService {
 
   @override
   Future<void> sendCall(WatchCall call) async {
-    final data = <String, dynamic>{
-      't': 'call',
-      'cmd': call.state.name,
-    };
+    final data = <String, dynamic>{'t': 'call', 'cmd': call.state.name};
     if (call.name != null) data['name'] = call.name;
     if (call.number != null) data['number'] = call.number;
 
@@ -524,20 +507,11 @@ class GadgetbridgeProtocol implements ProtocolService {
 
   @override
   Future<void> sendHttpResponse(String requestId, String response) async {
-    await _sendGb({
-      't': 'http',
-      'id': requestId,
-      'resp': response,
-    });
+    await _sendGb({'t': 'http', 'id': requestId, 'resp': response});
   }
 
   @override
   Future<void> sendHttpError(String requestId, String error) async {
-    await _sendGb({
-      't': 'http',
-      'id': requestId,
-      'err': error,
-    });
+    await _sendGb({'t': 'http', 'id': requestId, 'err': error});
   }
 }
-

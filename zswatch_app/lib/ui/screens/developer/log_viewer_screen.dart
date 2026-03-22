@@ -44,7 +44,8 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
   }
 
   void _onScroll() {
-    final isAtBottom = _scrollController.position.pixels >=
+    final isAtBottom =
+        _scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 50;
     if (isAtBottom != _isAtBottom) {
       setState(() {
@@ -106,10 +107,7 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                 value: const _LogLevelFilter(null),
                 child: Row(
                   children: [
-                    Icon(
-                      _levelFilter == null ? Icons.check : null,
-                      size: 18,
-                    ),
+                    Icon(_levelFilter == null ? Icons.check : null, size: 18),
                     const SizedBox(width: 8),
                     const Text('All levels'),
                   ],
@@ -154,7 +152,10 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                       color: Colors.orange,
                     ),
                     const SizedBox(width: 8),
-                    const Text('Warning', style: TextStyle(color: Colors.orange)),
+                    const Text(
+                      'Warning',
+                      style: TextStyle(color: Colors.orange),
+                    ),
                   ],
                 ),
               ),
@@ -220,7 +221,9 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
                       size: 18,
                     ),
                     const SizedBox(width: 8),
-                    Text(_autoScroll ? 'Pause auto-scroll' : 'Resume auto-scroll'),
+                    Text(
+                      _autoScroll ? 'Pause auto-scroll' : 'Resume auto-scroll',
+                    ),
                   ],
                 ),
               ),
@@ -276,7 +279,9 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
   void _copyAllLogs(List<LogEntry> entries) {
     final buffer = StringBuffer();
     for (final entry in entries) {
-      buffer.writeln('[${entry.formattedTimestamp}] ${entry.directionArrow} ${entry.message}');
+      buffer.writeln(
+        '[${entry.formattedTimestamp}] ${entry.directionArrow} ${entry.message}',
+      );
     }
     Clipboard.setData(ClipboardData(text: buffer.toString()));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -309,9 +314,7 @@ class _LogStreamingBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
-          ),
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
         ),
       ),
       child: Row(
@@ -336,11 +339,11 @@ class _LogStreamingBar extends StatelessWidget {
                   streamingState.enabledOnWatch
                       ? 'Enabled'
                       : streamingState.pending
-                          ? 'Updating...'
-                          : 'Disabled',
+                      ? 'Updating...'
+                      : 'Disabled',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -373,7 +376,7 @@ class _StatsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isFiltered = levelFilter != null;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppTheme.spacingMd,
@@ -382,18 +385,18 @@ class _StatsBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
-          ),
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
         ),
       ),
       child: Row(
         children: [
           Text(
-            isFiltered ? '$entryCount / $totalCount entries' : '$entryCount entries',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            isFiltered
+                ? '$entryCount / $totalCount entries'
+                : '$entryCount entries',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
           ),
           if (isFiltered) ...[
             const SizedBox(width: 8),
@@ -406,9 +409,9 @@ class _StatsBar extends StatelessWidget {
               child: Text(
                 _getLevelName(levelFilter!),
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: _getLevelColor(levelFilter!),
-                      fontWeight: FontWeight.bold,
-                    ),
+                  color: _getLevelColor(levelFilter!),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -426,8 +429,8 @@ class _StatsBar extends StatelessWidget {
                 Text(
                   'Auto-scroll',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -506,10 +509,10 @@ class _LogEntryTile extends StatelessWidget {
             Text(
               entry.formattedTimestamp,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                    color: AppTheme.textSecondary,
-                    fontSize: 10,
-                  ),
+                fontFamily: 'monospace',
+                color: AppTheme.textSecondary,
+                fontSize: 10,
+              ),
             ),
 
             const SizedBox(width: 6),
@@ -519,10 +522,10 @@ class _LogEntryTile extends StatelessWidget {
               child: Text(
                 entry.message,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      fontSize: 11,
-                      color: levelColor,
-                    ),
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  color: levelColor,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -578,9 +581,9 @@ class _LogEntryTile extends StatelessWidget {
             Text(
               entry.formattedTimestamp,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                    fontFamily: 'monospace',
-                  ),
+                color: AppTheme.textSecondary,
+                fontFamily: 'monospace',
+              ),
             ),
           ],
         ),
@@ -588,10 +591,10 @@ class _LogEntryTile extends StatelessWidget {
           child: SelectableText(
             entry.message,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  color: levelColor,
-                ),
+              fontFamily: 'monospace',
+              fontSize: 12,
+              color: levelColor,
+            ),
           ),
         ),
         actions: [
@@ -637,9 +640,9 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'No log entries',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 8),
           Text(
@@ -647,8 +650,8 @@ class _EmptyState extends StatelessWidget {
                 ? 'Waiting for data from watch...'
                 : 'Connect to watch to see logs',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary.withValues(alpha: 0.7),
-                ),
+              color: AppTheme.textSecondary.withValues(alpha: 0.7),
+            ),
           ),
         ],
       ),

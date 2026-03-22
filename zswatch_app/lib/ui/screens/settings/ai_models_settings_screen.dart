@@ -24,13 +24,17 @@ import '../../widgets/ai_debug_widgets.dart';
 // Benchmark provider (screen-scoped singleton)
 // ---------------------------------------------------------------------------
 
-final _benchmarkServiceProvider = Provider.autoDispose<ModelBenchmarkService>((ref) {
+final _benchmarkServiceProvider = Provider.autoDispose<ModelBenchmarkService>((
+  ref,
+) {
   final service = ModelBenchmarkService();
   ref.onDispose(() => service.dispose());
   return service;
 });
 
-final _benchmarkStateProvider = StreamProvider.autoDispose<BenchmarkState>((ref) {
+final _benchmarkStateProvider = StreamProvider.autoDispose<BenchmarkState>((
+  ref,
+) {
   return ref.watch(_benchmarkServiceProvider).stateStream;
 });
 
@@ -81,7 +85,8 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             // ---- Calendar / Reminders section ----
             const _SectionHeader(
               title: 'Calendar Integration',
-              subtitle: 'When a voice memo mentions a meeting, deadline, or '
+              subtitle:
+                  'When a voice memo mentions a meeting, deadline, or '
                   'reminder, the AI can create it directly in your calendar. '
                   'Grant access below to enable this.',
             ),
@@ -131,16 +136,16 @@ class _SectionHeader extends StatelessWidget {
           Text(
             title,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: AppTheme.primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
+              color: AppTheme.primaryColor,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             subtitle,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
           ),
         ],
       ),
@@ -196,15 +201,15 @@ class _TranscriptionModelSelectorState
       await engine.initialize();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Downloaded ${info.name}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Downloaded ${info.name}')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
       }
     } finally {
       await sub?.cancel();
@@ -216,7 +221,8 @@ class _TranscriptionModelSelectorState
 
   Future<void> _deleteModel(TranscriptionEngineType type) async {
     final info = TranscriptionModelCatalog.info(type);
-    final shouldDelete = await showDialog<bool>(
+    final shouldDelete =
+        await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Delete model?'),
@@ -241,9 +247,9 @@ class _TranscriptionModelSelectorState
     try {
       await engine.deleteModel();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Deleted ${info.name}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Deleted ${info.name}')));
       }
     } finally {
       engine.dispose();
@@ -280,68 +286,68 @@ class _TranscriptionModelSelectorState
             decoration: const InputDecoration(
               labelText: 'Select model',
               border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
             ),
             items: () {
-                const all = TranscriptionModelCatalog.all;
-                // Rank within each language group (models already ordered
-                // best→worst, so first occurrence per language = rank 1).
-                final ranked = <TranscriptionEngineType, int>{};
-                final langCounters = <String, int>{};
-                for (final m in all) {
-                  final lang = m.language;
-                  final rank = (langCounters[lang] ?? 0) + 1;
-                  langCounters[lang] = rank;
-                  ranked[m.type] = rank;
+              const all = TranscriptionModelCatalog.all;
+              // Rank within each language group (models already ordered
+              // best→worst, so first occurrence per language = rank 1).
+              final ranked = <TranscriptionEngineType, int>{};
+              final langCounters = <String, int>{};
+              for (final m in all) {
+                final lang = m.language;
+                final rank = (langCounters[lang] ?? 0) + 1;
+                langCounters[lang] = rank;
+                ranked[m.type] = rank;
+              }
+              return all.map((info) {
+                final modelRank = ranked[info.type];
+                final Color rankColor;
+                switch (modelRank) {
+                  case 1:
+                    rankColor = const Color(0xFFFFD700);
+                  case 2:
+                    rankColor = const Color(0xFFC0C0C0);
+                  case 3:
+                    rankColor = const Color(0xFFCD7F32);
+                  default:
+                    rankColor = AppTheme.textSecondary;
                 }
-                return all.map((info) {
-                  final modelRank = ranked[info.type];
-                  final Color rankColor;
-                  switch (modelRank) {
-                    case 1:
-                      rankColor = const Color(0xFFFFD700);
-                    case 2:
-                      rankColor = const Color(0xFFC0C0C0);
-                    case 3:
-                      rankColor = const Color(0xFFCD7F32);
-                    default:
-                      rankColor = AppTheme.textSecondary;
-                  }
-                  return DropdownMenuItem<TranscriptionEngineType>(
-                    value: info.type,
-                    child: Row(
-                      children: [
-                        if (modelRank != null)
-                          Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: rankColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '#$modelRank',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(
-                                    color: rankColor,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
+                return DropdownMenuItem<TranscriptionEngineType>(
+                  value: info.type,
+                  child: Row(
+                    children: [
+                      if (modelRank != null)
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
                           ),
-                        Expanded(
+                          decoration: BoxDecoration(
+                            color: rankColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                           child: Text(
-                            info.name,
-                            overflow: TextOverflow.ellipsis,
+                            '#$modelRank',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: rankColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
                         ),
-                      ],
-                    ),
-                  );
-                }).toList();
-              }(),
+                      Expanded(
+                        child: Text(info.name, overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList();
+            }(),
             onChanged: _isDownloading
                 ? null
                 : (value) {
@@ -363,9 +369,9 @@ class _TranscriptionModelSelectorState
           child: Text(
             TranscriptionModelCatalog.info(selectedType).description,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                  fontStyle: FontStyle.italic,
-                ),
+              color: AppTheme.textSecondary,
+              fontStyle: FontStyle.italic,
+            ),
           ),
         ),
 
@@ -443,11 +449,11 @@ class _TranscriptionModelCard extends ConsumerWidget {
                     child: Text(
                       status.downloaded ? 'Downloaded' : 'Not downloaded',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: status.downloaded
-                                ? AppTheme.successColor
-                                : AppTheme.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        color: status.downloaded
+                            ? AppTheme.successColor
+                            : AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -487,8 +493,8 @@ class _TranscriptionModelCard extends ConsumerWidget {
                       ? 'Downloading... ${(downloadProgress * 100).toStringAsFixed(0)}%'
                       : 'Downloading...',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
 
@@ -531,7 +537,10 @@ class _TranscriptionModelCard extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(AppTheme.spacingMd),
-        child: Text('Error: $e', style: const TextStyle(color: AppTheme.errorColor)),
+        child: Text(
+          'Error: $e',
+          style: const TextStyle(color: AppTheme.errorColor),
+        ),
       ),
     );
   }
@@ -581,12 +590,15 @@ class _RetranscribeButton extends ConsumerWidget {
                 )
               : const Icon(Icons.refresh, size: 16),
           label: Text(
-            isBusy ? 'Re-transcribing...' : 'Re-transcribe all with selected model',
+            isBusy
+                ? 'Re-transcribing...'
+                : 'Re-transcribe all with selected model',
           ),
           onPressed: isBusy
               ? null
               : () async {
-                  final confirmed = await showDialog<bool>(
+                  final confirmed =
+                      await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
                           title: const Text('Re-transcribe all memos?'),
@@ -659,7 +671,9 @@ class _AiTogglesTile extends ConsumerWidget {
         SwitchListTile(
           secondary: Icon(
             Icons.auto_awesome,
-            color: localAiEnabled ? AppTheme.primaryColor : AppTheme.textSecondary,
+            color: localAiEnabled
+                ? AppTheme.primaryColor
+                : AppTheme.textSecondary,
           ),
           title: const Text('Enable Local AI'),
           subtitle: const Text('Process voice notes with on-device LLM'),
@@ -686,7 +700,9 @@ class _AiTogglesTile extends ConsumerWidget {
             value: autoProcess,
             onChanged: localAiEnabled
                 ? (value) {
-                    ref.read(autoProcessVoiceNotesProvider.notifier).setEnabled(value);
+                    ref
+                        .read(autoProcessVoiceNotesProvider.notifier)
+                        .setEnabled(value);
                   }
                 : null,
           ),
@@ -709,7 +725,9 @@ class _AiTogglesTile extends ConsumerWidget {
             value: autoCreate,
             onChanged: bothEnabled
                 ? (value) {
-                    ref.read(autoCreateActionsProvider.notifier).setEnabled(value);
+                    ref
+                        .read(autoCreateActionsProvider.notifier)
+                        .setEnabled(value);
                   }
                 : null,
           ),
@@ -732,7 +750,9 @@ class _AiTogglesTile extends ConsumerWidget {
             value: correctionEnabled,
             onChanged: localAiEnabled
                 ? (value) {
-                    ref.read(aiCorrectionEnabledProvider.notifier).setEnabled(value);
+                    ref
+                        .read(aiCorrectionEnabledProvider.notifier)
+                        .setEnabled(value);
                   }
                 : null,
           ),
@@ -767,26 +787,29 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
     try {
       await llm.downloadModel();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Model downloaded')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Model downloaded')));
       }
       _refreshProviders();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
       }
     }
   }
 
   Future<void> _deleteModel() async {
-    final shouldDelete = await showDialog<bool>(
+    final shouldDelete =
+        await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Delete model?'),
-            content: const Text('Delete the selected model from local storage?'),
+            content: const Text(
+              'Delete the selected model from local storage?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -806,16 +829,16 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
     try {
       await ref.read(llmServiceProvider).deleteModel();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Model deleted')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Model deleted')));
       }
       _refreshProviders();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
       }
     }
   }
@@ -836,14 +859,13 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
             final localSize = sizeAsync.whenOrNull(
               data: (s) => s != null ? _formatBytes(s) : null,
             );
-            final isDownloading = serviceAsync.whenOrNull(
+            final isDownloading =
+                serviceAsync.whenOrNull(
                   data: (s) => s.status == LlmServiceStatus.downloading,
                 ) ??
                 false;
-            final downloadProgress = serviceAsync.whenOrNull(
-                  data: (s) => s.downloadProgress,
-                ) ??
-                0.0;
+            final downloadProgress =
+                serviceAsync.whenOrNull(data: (s) => s.downloadProgress) ?? 0.0;
 
             return Column(
               children: [
@@ -860,76 +882,77 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                       value: models.any((m) => m.id == selectedModelId)
                           ? selectedModelId
                           : models.isNotEmpty
-                              ? models.first.id
-                              : null,
+                          ? models.first.id
+                          : null,
                       isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Select model',
                         border: OutlineInputBorder(),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                       ),
                       items: () {
-                                // Assign ranks only to catalog models that
-                                // have a benchmarkScore (already sorted best→worst).
-                                final ranked = <String, int>{};
-                                var rank = 1;
-                                for (final m in models) {
-                                  if (m.benchmarkScore != null) {
-                                    ranked[m.id] = rank++;
-                                  }
-                                }
-                                return models.map((m) {
-                                  final modelRank = ranked[m.id];
-                                  final Color rankColor;
-                                  switch (modelRank) {
-                                    case 1:
-                                      rankColor = const Color(0xFFFFD700);
-                                    case 2:
-                                      rankColor = const Color(0xFFC0C0C0);
-                                    case 3:
-                                      rankColor = const Color(0xFFCD7F32);
-                                    default:
-                                      rankColor = AppTheme.textSecondary;
-                                  }
-                                  return DropdownMenuItem<String>(
-                                    value: m.id,
-                                    child: Row(
-                                      children: [
-                                        if (modelRank != null)
-                                          Container(
-                                            margin: const EdgeInsets.only(
-                                                right: 8),
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: rankColor
-                                                  .withValues(alpha: 0.15),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              '#$modelRank',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .labelSmall
-                                                  ?.copyWith(
-                                                    color: rankColor,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                            ),
-                                          ),
-                                        Expanded(
-                                          child: Text(
-                                            m.displayName,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
+                        // Assign ranks only to catalog models that
+                        // have a benchmarkScore (already sorted best→worst).
+                        final ranked = <String, int>{};
+                        var rank = 1;
+                        for (final m in models) {
+                          if (m.benchmarkScore != null) {
+                            ranked[m.id] = rank++;
+                          }
+                        }
+                        return models.map((m) {
+                          final modelRank = ranked[m.id];
+                          final Color rankColor;
+                          switch (modelRank) {
+                            case 1:
+                              rankColor = const Color(0xFFFFD700);
+                            case 2:
+                              rankColor = const Color(0xFFC0C0C0);
+                            case 3:
+                              rankColor = const Color(0xFFCD7F32);
+                            default:
+                              rankColor = AppTheme.textSecondary;
+                          }
+                          return DropdownMenuItem<String>(
+                            value: m.id,
+                            child: Row(
+                              children: [
+                                if (modelRank != null)
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
                                     ),
-                                  );
-                                }).toList();
-                              }(),
+                                    decoration: BoxDecoration(
+                                      color: rankColor.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      '#$modelRank',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: rankColor,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                Expanded(
+                                  child: Text(
+                                    m.displayName,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList();
+                      }(),
                       onChanged: isDownloading
                           ? null
                           : (value) {
@@ -943,12 +966,16 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                   ),
                   loading: () => const Padding(
                     padding: EdgeInsets.all(AppTheme.spacingMd),
-                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    child: Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   ),
                   error: (e, _) => Padding(
                     padding: const EdgeInsets.all(AppTheme.spacingMd),
-                    child: Text('Error: $e',
-                        style: const TextStyle(color: AppTheme.errorColor)),
+                    child: Text(
+                      'Error: $e',
+                      style: const TextStyle(color: AppTheme.errorColor),
+                    ),
                   ),
                 ),
 
@@ -990,9 +1017,7 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                           Expanded(
                             child: Text(
                               isDownloaded ? 'Downloaded' : 'Not downloaded',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: isDownloaded
                                         ? AppTheme.successColor
@@ -1032,9 +1057,8 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                           downloadProgress > 0
                               ? 'Downloading... ${(downloadProgress * 100).toStringAsFixed(0)}%'
                               : 'Starting download...',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textSecondary,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppTheme.textSecondary),
                         ),
                       ],
 
@@ -1054,7 +1078,9 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                           else if (selectedModel.isDownloadable)
                             _CompactButton(
                               icon: isDownloading ? null : Icons.download,
-                              label: isDownloading ? 'Downloading...' : 'Download',
+                              label: isDownloading
+                                  ? 'Downloading...'
+                                  : 'Download',
                               onPressed: isDownloading ? null : _downloadModel,
                               showSpinner: isDownloading,
                             ),
@@ -1075,8 +1101,10 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
           ),
           error: (e, _) => Padding(
             padding: const EdgeInsets.all(AppTheme.spacingMd),
-            child: Text('Error: $e',
-                style: const TextStyle(color: AppTheme.errorColor)),
+            child: Text(
+              'Error: $e',
+              style: const TextStyle(color: AppTheme.errorColor),
+            ),
           ),
         );
       },
@@ -1086,8 +1114,10 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(AppTheme.spacingMd),
-        child: Text('Error: $e',
-            style: const TextStyle(color: AppTheme.errorColor)),
+        child: Text(
+          'Error: $e',
+          style: const TextStyle(color: AppTheme.errorColor),
+        ),
       ),
     );
   }
@@ -1116,7 +1146,8 @@ class _ImportModelTile extends ConsumerWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Only .gguf model files can be imported')),
+              content: Text('Only .gguf model files can be imported'),
+            ),
           );
         }
         return;
@@ -1138,9 +1169,9 @@ class _ImportModelTile extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Import failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Import failed: $e')));
       }
     }
   }
@@ -1188,51 +1219,52 @@ class _ProcessAllButton extends ConsumerWidget {
                 )
               : const Icon(Icons.auto_awesome, size: 16),
           label: Text(isBusy ? 'Processing...' : 'Process all unprocessed'),
-        onPressed: isBusy || !localAiEnabled
-            ? null
-            : () async {
-                final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Process all unprocessed?'),
-                        content: const Text(
-                          'All voice memos not yet AI-processed will be processed now.',
+          onPressed: isBusy || !localAiEnabled
+              ? null
+              : () async {
+                  final confirmed =
+                      await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Process all unprocessed?'),
+                          content: const Text(
+                            'All voice memos not yet AI-processed will be processed now.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: const Text('Process'),
+                            ),
+                          ],
                         ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(true),
-                            child: const Text('Process'),
-                          ),
-                        ],
-                      ),
-                    ) ??
-                    false;
+                      ) ??
+                      false;
 
-                if (!confirmed || !context.mounted) return;
+                  if (!confirmed || !context.mounted) return;
 
-                try {
-                  await ref
-                      .read(aiActionsProvider.notifier)
-                      .processAllUnprocessed();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Started processing unprocessed memos'),
-                      ),
-                    );
+                  try {
+                    await ref
+                        .read(aiActionsProvider.notifier)
+                        .processAllUnprocessed();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Started processing unprocessed memos'),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Processing failed: $e')),
+                      );
+                    }
                   }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Processing failed: $e')),
-                    );
-                  }
-                }
-              },
+                },
         ),
       ),
     );
@@ -1247,8 +1279,7 @@ class _BenchmarkSection extends ConsumerStatefulWidget {
   const _BenchmarkSection();
 
   @override
-  ConsumerState<_BenchmarkSection> createState() =>
-      _BenchmarkSectionState();
+  ConsumerState<_BenchmarkSection> createState() => _BenchmarkSectionState();
 }
 
 class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
@@ -1283,10 +1314,8 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
   @override
   Widget build(BuildContext context) {
     final benchState = ref.watch(_benchmarkStateProvider);
-    final isRunning =
-        benchState.whenOrNull(data: (s) => s.isRunning) ?? false;
-    final runningType =
-        benchState.whenOrNull(data: (s) => s.runningTestType);
+    final isRunning = benchState.whenOrNull(data: (s) => s.isRunning) ?? false;
+    final runningType = benchState.whenOrNull(data: (s) => s.runningTestType);
     final hasTranscript = _aiInputController.text.trim().isNotEmpty;
 
     return Padding(
@@ -1335,7 +1364,9 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
                 _aiInputController.text =
                     'Remind me to buy groceries tomorrow and call the dentist at 2 PM.';
               },
-              onRecordToggle: isRunning ? null : () => _toggleRecording(context),
+              onRecordToggle: isRunning
+                  ? null
+                  : () => _toggleRecording(context),
             ),
             const SizedBox(height: 14),
             _BenchmarkHintCard(
@@ -1373,10 +1404,8 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
                 return _LastResultTile(progress: progress);
               },
               loading: () => const SizedBox.shrink(),
-              error: (e, _) => _BenchmarkHintCard(
-                message: 'Error: $e',
-                isError: true,
-              ),
+              error: (e, _) =>
+                  _BenchmarkHintCard(message: 'Error: $e', isError: true),
             ),
           ],
         ),
@@ -1491,9 +1520,9 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
     } catch (e) {
       debugPrint('[Benchmark] Transcription error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Transcription failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Transcription failed: $e')));
       }
     } finally {
       engine.dispose();
@@ -1512,7 +1541,9 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
     _showBenchmarkSheet(context);
     final llm = ref.read(llmServiceProvider);
     unawaited(
-      ref.read(_benchmarkServiceProvider).benchmarkAiModel(
+      ref
+          .read(_benchmarkServiceProvider)
+          .benchmarkAiModel(
             llm,
             testInput: benchmarkInput,
             correctTranscription: ref.read(aiCorrectionEnabledProvider),
@@ -1533,9 +1564,8 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
         minChildSize: 0.3,
         maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollController) => _BenchmarkDebugSheet(
-          scrollController: scrollController,
-        ),
+        builder: (context, scrollController) =>
+            _BenchmarkDebugSheet(scrollController: scrollController),
       ),
     );
   }
@@ -1561,7 +1591,8 @@ class _AiBenchmarkInputEditor extends StatelessWidget {
     final theme = Theme.of(context);
     final minutes = recordingDuration.inMinutes.remainder(60);
     final seconds = recordingDuration.inSeconds.remainder(60);
-    final durationText = '${minutes.toString().padLeft(2, '0')}:'
+    final durationText =
+        '${minutes.toString().padLeft(2, '0')}:'
         '${seconds.toString().padLeft(2, '0')}';
 
     return Column(
@@ -1644,8 +1675,7 @@ class _LastResultTile extends StatelessWidget {
       'transcription' => Icons.mic,
       _ => Icons.psychology,
     };
-    final statusColor =
-        isError ? AppTheme.errorColor : AppTheme.successColor;
+    final statusColor = isError ? AppTheme.errorColor : AppTheme.successColor;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1682,7 +1712,7 @@ class _LastResultTile extends StatelessWidget {
                     isError
                         ? 'Failed'
                         : '${(progress.elapsed.inMilliseconds / 1000).toStringAsFixed(1)}s'
-                            '${progress.tokensPerSecond != null ? '  •  ${progress.tokensPerSecond!.toStringAsFixed(1)} t/s' : ''}',
+                              '${progress.tokensPerSecond != null ? '  •  ${progress.tokensPerSecond!.toStringAsFixed(1)} t/s' : ''}',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: AppTheme.textSecondary,
                     ),
@@ -1724,9 +1754,9 @@ class _BenchmarkPill extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -1738,10 +1768,7 @@ class _BenchmarkHintCard extends StatelessWidget {
   final String message;
   final bool isError;
 
-  const _BenchmarkHintCard({
-    required this.message,
-    this.isError = false,
-  });
+  const _BenchmarkHintCard({required this.message, this.isError = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1766,9 +1793,9 @@ class _BenchmarkHintCard extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: color,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: color),
             ),
           ),
         ],
@@ -1788,10 +1815,8 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final benchState = ref.watch(_benchmarkStateProvider);
-    final progress =
-        benchState.whenOrNull(data: (s) => s.current);
-    final isRunning =
-        benchState.whenOrNull(data: (s) => s.isRunning) ?? false;
+    final progress = benchState.whenOrNull(data: (s) => s.current);
+    final isRunning = benchState.whenOrNull(data: (s) => s.isRunning) ?? false;
 
     return Column(
       children: [
@@ -1880,7 +1905,8 @@ class _BenchmarkDebugSheet extends ConsumerWidget {
         const SizedBox(height: 12),
         aiDebugBlock(
           context,
-          title: 'Corrected Transcription'
+          title:
+              'Corrected Transcription'
               '${progress.correctionTokensPerSecond != null ? '  (${progress.correctionTokens} tokens, ${progress.correctionTokensPerSecond!.toStringAsFixed(1)} t/s, ${(progress.correctionElapsed.inMilliseconds / 1000).toStringAsFixed(1)}s)' : ''}',
           content: progress.correctedTranscription!,
           icon: Icons.spellcheck,
@@ -2003,16 +2029,13 @@ class _DetailRow extends StatelessWidget {
             width: 90,
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            child: Text(value, style: Theme.of(context).textTheme.bodySmall),
           ),
         ],
       ),
@@ -2049,8 +2072,8 @@ class _CompactButton extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : icon != null
-              ? Icon(icon, size: 16)
-              : const SizedBox.shrink(),
+          ? Icon(icon, size: 16)
+          : const SizedBox.shrink(),
       label: Text(label),
     );
   }
@@ -2100,9 +2123,9 @@ class _ModelMemoryFitBanner extends ConsumerWidget {
                 child: Text(
                   label,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    color: color,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -2299,7 +2322,9 @@ class _CalendarPickerTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final calendarsAsync = ref.watch(writableCalendarsProvider);
-    final selectedCalendarId = ref.watch(selectedProductivityCalendarIdProvider);
+    final selectedCalendarId = ref.watch(
+      selectedProductivityCalendarIdProvider,
+    );
 
     return calendarsAsync.when(
       data: (calendars) {
@@ -2323,8 +2348,9 @@ class _CalendarPickerTile extends ConsumerWidget {
         return ListTile(
           leading: Icon(
             cal.looksLocal ? Icons.event_busy : Icons.calendar_today,
-            color:
-                cal.looksLocal ? AppTheme.warningColor : AppTheme.primaryColor,
+            color: cal.looksLocal
+                ? AppTheme.warningColor
+                : AppTheme.primaryColor,
           ),
           title: const Text('Default Calendar'),
           subtitle: Text(
@@ -2342,8 +2368,7 @@ class _CalendarPickerTile extends ConsumerWidget {
         subtitle: Text('Loading calendars...'),
       ),
       error: (error, _) => ListTile(
-        leading:
-            const Icon(Icons.calendar_today, color: AppTheme.warningColor),
+        leading: const Icon(Icons.calendar_today, color: AppTheme.warningColor),
         title: const Text('Default Calendar'),
         subtitle: Text('Error: $error'),
         trailing: IconButton(
@@ -2369,8 +2394,7 @@ class _CalendarPickerTile extends ConsumerWidget {
             children: [
               const ListTile(
                 title: Text('Choose Calendar'),
-                subtitle:
-                    Text('Used for events and reminders created by AI.'),
+                subtitle: Text('Used for events and reminders created by AI.'),
               ),
               for (final calendar in calendars)
                 ListTile(

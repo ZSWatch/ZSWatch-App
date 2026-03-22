@@ -56,26 +56,20 @@ sealed class ConnectionPhase with _$ConnectionPhase {
   /// Map to the existing WatchConnectionState enum for backwards compatibility
   /// with UI code that reads the Connection model.
   WatchConnectionState get watchConnectionState => switch (this) {
-        Disconnected() => WatchConnectionState.disconnected,
-        Scanning() => WatchConnectionState.scanning,
-        Connecting() => WatchConnectionState.connecting,
-        SettingUp(step: final step) => switch (step) {
-            SetupStep.bonding => WatchConnectionState.bonding,
-            SetupStep.discoveringServices =>
-              WatchConnectionState.discoveringServices,
-            SetupStep.negotiating => WatchConnectionState.negotiating,
-            SetupStep.syncing => WatchConnectionState.syncing,
-          },
-        Connected() => WatchConnectionState.connected,
-        Reconnecting() => WatchConnectionState.reconnecting,
-        PhaseError() => WatchConnectionState.error,
-      };
+    Disconnected() => WatchConnectionState.disconnected,
+    Scanning() => WatchConnectionState.scanning,
+    Connecting() => WatchConnectionState.connecting,
+    SettingUp(step: final step) => switch (step) {
+      SetupStep.bonding => WatchConnectionState.bonding,
+      SetupStep.discoveringServices => WatchConnectionState.discoveringServices,
+      SetupStep.negotiating => WatchConnectionState.negotiating,
+      SetupStep.syncing => WatchConnectionState.syncing,
+    },
+    Connected() => WatchConnectionState.connected,
+    Reconnecting() => WatchConnectionState.reconnecting,
+    PhaseError() => WatchConnectionState.error,
+  };
 }
 
 /// Sub-steps within the SettingUp phase, for UI status display.
-enum SetupStep {
-  bonding,
-  discoveringServices,
-  negotiating,
-  syncing,
-}
+enum SetupStep { bonding, discoveringServices, negotiating, syncing }

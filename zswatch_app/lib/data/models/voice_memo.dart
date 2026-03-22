@@ -42,13 +42,7 @@ enum VoiceNoteProcessingStatus {
 }
 
 /// Category assigned by AI to a voice note
-enum VoiceNoteCategory {
-  idea,
-  task,
-  reminder,
-  meeting,
-  note,
-}
+enum VoiceNoteCategory { idea, task, reminder, meeting, note }
 
 /// Domain model for a voice memo recording
 @freezed

@@ -36,7 +36,9 @@ abstract class SensorFusionData with _$SensorFusionData {
   /// Data format from firmware: [w, x, y, z] as float32 little-endian
   factory SensorFusionData.fromBleData(List<int> data) {
     if (data.length < 16) {
-      throw ArgumentError('Sensor fusion data requires 16 bytes, got ${data.length}');
+      throw ArgumentError(
+        'Sensor fusion data requires 16 bytes, got ${data.length}',
+      );
     }
 
     final bytes = ByteData.sublistView(Uint8List.fromList(data));
@@ -79,13 +81,7 @@ abstract class SensorFusionData with _$SensorFusionData {
   /// Get conjugate (inverse for unit quaternions)
   /// q* = (w, -x, -y, -z)
   SensorFusionData get conjugate {
-    return SensorFusionData(
-      w: w,
-      x: -x,
-      y: -y,
-      z: -z,
-      timestamp: timestamp,
-    );
+    return SensorFusionData(w: w, x: -x, y: -y, z: -z, timestamp: timestamp);
   }
 
   /// Get inverse quaternion
@@ -146,11 +142,7 @@ abstract class SensorFusionData with _$SensorFusionData {
     final cosyCosp = 1 - 2 * (y * y + z * z);
     final yaw = math.atan2(sinyCosp, cosyCosp);
 
-    return EulerAngles(
-      roll: roll,
-      pitch: pitch,
-      yaw: yaw,
-    );
+    return EulerAngles(roll: roll, pitch: pitch, yaw: yaw);
   }
 
   /// Format for display with specified decimal places

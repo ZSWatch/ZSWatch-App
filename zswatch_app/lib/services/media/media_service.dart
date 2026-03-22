@@ -29,7 +29,8 @@ class MediaPlaybackState {
   }
 
   @override
-  String toString() => 'MediaPlaybackState(state: $state, position: $positionSeconds)';
+  String toString() =>
+      'MediaPlaybackState(state: $state, position: $positionSeconds)';
 }
 
 /// Media track metadata
@@ -78,7 +79,8 @@ class MediaService {
   static const _methodChannel = MethodChannel('dev.zswatch.app/media');
   static const _eventChannel = EventChannel('dev.zswatch.app/media_events');
 
-  final _playbackStateController = StreamController<MediaPlaybackState>.broadcast();
+  final _playbackStateController =
+      StreamController<MediaPlaybackState>.broadcast();
   final _metadataController = StreamController<MediaMetadata>.broadcast();
 
   StreamSubscription<dynamic>? _eventSubscription;
@@ -88,7 +90,8 @@ class MediaService {
   MediaMetadata? _currentMetadata;
 
   /// Stream of playback state changes
-  Stream<MediaPlaybackState> get playbackStateStream => _playbackStateController.stream;
+  Stream<MediaPlaybackState> get playbackStateStream =>
+      _playbackStateController.stream;
 
   /// Stream of metadata changes
   Stream<MediaMetadata> get metadataStream => _metadataController.stream;
@@ -151,7 +154,9 @@ class MediaService {
       case 'playbackState':
         if (data != null) {
           try {
-            _currentState = MediaPlaybackState.fromMap(Map<String, dynamic>.from(data));
+            _currentState = MediaPlaybackState.fromMap(
+              Map<String, dynamic>.from(data),
+            );
             _playbackStateController.add(_currentState!);
             debugPrint('Playback state: ${_currentState!.state}');
           } catch (e) {
@@ -163,7 +168,9 @@ class MediaService {
       case 'metadata':
         if (data != null) {
           try {
-            _currentMetadata = MediaMetadata.fromMap(Map<String, dynamic>.from(data));
+            _currentMetadata = MediaMetadata.fromMap(
+              Map<String, dynamic>.from(data),
+            );
             _metadataController.add(_currentMetadata!);
             debugPrint('Metadata: ${_currentMetadata!.track}');
           } catch (e) {
@@ -176,18 +183,24 @@ class MediaService {
 
   Future<void> _fetchCurrentState() async {
     try {
-      final result = await _methodChannel.invokeMethod<Map<dynamic, dynamic>>('getCurrentState');
+      final result = await _methodChannel.invokeMethod<Map<dynamic, dynamic>>(
+        'getCurrentState',
+      );
       if (result != null) {
         final playback = result['playback'] as Map?;
         final metadata = result['metadata'] as Map?;
 
         if (playback != null) {
-          _currentState = MediaPlaybackState.fromMap(Map<String, dynamic>.from(playback));
+          _currentState = MediaPlaybackState.fromMap(
+            Map<String, dynamic>.from(playback),
+          );
           _playbackStateController.add(_currentState!);
         }
 
         if (metadata != null) {
-          _currentMetadata = MediaMetadata.fromMap(Map<String, dynamic>.from(metadata));
+          _currentMetadata = MediaMetadata.fromMap(
+            Map<String, dynamic>.from(metadata),
+          );
           _metadataController.add(_currentMetadata!);
         }
       }
@@ -197,7 +210,7 @@ class MediaService {
   }
 
   /// Fetch current state from native side with freshly calculated position.
-  /// 
+  ///
   /// This queries the native MediaSession to get the current state with
   /// position calculated based on elapsed time since last update.
   /// Use this when you need an up-to-date position (e.g., for initial sync).
@@ -295,7 +308,9 @@ class MediaService {
   Future<bool> seekTo(int positionSeconds) async {
     if (!Platform.isAndroid) return false;
     try {
-      final result = await _methodChannel.invokeMethod<bool>('seekTo', {'position': positionSeconds});
+      final result = await _methodChannel.invokeMethod<bool>('seekTo', {
+        'position': positionSeconds,
+      });
       return result ?? false;
     } catch (e) {
       debugPrint('Error sending seekTo: $e');
@@ -307,7 +322,9 @@ class MediaService {
   Future<bool> hasActiveSession() async {
     if (!Platform.isAndroid) return false;
     try {
-      final result = await _methodChannel.invokeMethod<bool>('hasActiveSession');
+      final result = await _methodChannel.invokeMethod<bool>(
+        'hasActiveSession',
+      );
       return result ?? false;
     } catch (e) {
       debugPrint('Error checking active session: $e');
@@ -331,4 +348,3 @@ class MediaService {
     _initialized = false;
   }
 }
-

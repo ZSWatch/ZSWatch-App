@@ -19,12 +19,13 @@ class NotificationSettingsScreen extends ConsumerStatefulWidget {
   const NotificationSettingsScreen({super.key});
 
   @override
-  ConsumerState<NotificationSettingsScreen> createState() => _NotificationSettingsScreenState();
+  ConsumerState<NotificationSettingsScreen> createState() =>
+      _NotificationSettingsScreenState();
 }
 
-class _NotificationSettingsScreenState extends ConsumerState<NotificationSettingsScreen>
+class _NotificationSettingsScreenState
+    extends ConsumerState<NotificationSettingsScreen>
     with WidgetsBindingObserver {
-  
   List<AppNotificationFilter>? _apps;
   bool _loadingApps = false;
 
@@ -53,9 +54,11 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
   Future<void> _loadApps() async {
     if (_loadingApps) return;
     setState(() => _loadingApps = true);
-    
+
     try {
-      final apps = await ref.read(notificationForwardingProvider.notifier).getNotificationApps();
+      final apps = await ref
+          .read(notificationForwardingProvider.notifier)
+          .getNotificationApps();
       if (mounted) {
         setState(() {
           _apps = apps;
@@ -72,7 +75,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
   @override
   Widget build(BuildContext context) {
     final isSupported = ref.watch(isNotificationForwardingSupported);
-    
+
     if (!isSupported) {
       return Scaffold(
         appBar: AppBar(title: const Text('Notifications')),
@@ -112,10 +115,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
               'On iOS, notifications are forwarded directly from your iPhone to ZSWatch using Apple Notification Center Service (ANCS).\n\n'
               'No app configuration is needed - just make sure your watch is connected and paired.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: AppTheme.textSecondary,
-              ),
+              style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
             ),
           ],
         ),
@@ -128,7 +128,9 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
 
     return RefreshIndicator(
       onRefresh: () async {
-        await ref.read(notificationForwardingProvider.notifier).refreshPermission();
+        await ref
+            .read(notificationForwardingProvider.notifier)
+            .refreshPermission();
         await _loadApps();
       },
       child: ListView(
@@ -136,18 +138,18 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
         children: [
           // Permission status card
           if (!state.hasPermission) _buildPermissionCard(),
-          
+
           // Main toggle
           _buildMainToggle(state),
-          
+
           const SizedBox(height: AppTheme.spacingMd),
-          
+
           // Statistics
           if (state.hasPermission && state.isEnabled)
             _buildStatisticsCard(state),
-          
+
           const SizedBox(height: AppTheme.spacingMd),
-          
+
           // App filter list
           if (state.hasPermission && state.isEnabled)
             _buildAppFilterSection(state),
@@ -190,7 +192,9 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  ref.read(notificationForwardingProvider.notifier).requestPermission();
+                  ref
+                      .read(notificationForwardingProvider.notifier)
+                      .requestPermission();
                 },
                 icon: const Icon(Icons.settings),
                 label: const Text('Grant Permission'),
@@ -250,7 +254,9 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
                   value: state.isEnabled,
                   onChanged: state.hasPermission
                       ? (value) {
-                          ref.read(notificationForwardingProvider.notifier).setEnabled(value);
+                          ref
+                              .read(notificationForwardingProvider.notifier)
+                              .setEnabled(value);
                         }
                       : null,
                 ),
@@ -260,10 +266,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
               const SizedBox(height: AppTheme.spacingSm),
               Text(
                 'Grant notification access to enable this feature',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.warningColor,
-                ),
+                style: TextStyle(fontSize: 12, color: AppTheme.warningColor),
               ),
             ],
           ],
@@ -376,10 +379,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
         const SizedBox(height: AppTheme.spacingSm),
         Text(
           'Choose which apps can send notifications to your watch',
-          style: TextStyle(
-            fontSize: 14,
-            color: AppTheme.textSecondary,
-          ),
+          style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
         ),
         const SizedBox(height: AppTheme.spacingMd),
         if (_apps == null || _apps!.isEmpty)
@@ -404,17 +404,12 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
             const SizedBox(height: AppTheme.spacingMd),
             const Text(
               'No apps with notifications yet',
-              style: TextStyle(
-                color: AppTheme.textSecondary,
-              ),
+              style: TextStyle(color: AppTheme.textSecondary),
             ),
             const SizedBox(height: AppTheme.spacingSm),
             const Text(
               'Apps will appear here as they send notifications',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.textDisabled,
-              ),
+              style: TextStyle(fontSize: 12, color: AppTheme.textDisabled),
               textAlign: TextAlign.center,
             ),
           ],
@@ -431,14 +426,16 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
           final app = entry.value;
           final isBlocked = state.blockedApps.contains(app.packageName);
           final isLast = index == _apps!.length - 1;
-          
+
           return Column(
             children: [
               _AppFilterTile(
                 app: app,
                 isEnabled: !isBlocked,
                 onChanged: (enabled) {
-                  final notifier = ref.read(notificationForwardingProvider.notifier);
+                  final notifier = ref.read(
+                    notificationForwardingProvider.notifier,
+                  );
                   if (enabled) {
                     notifier.unblockApp(app.packageName);
                   } else {
@@ -446,8 +443,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
                   }
                 },
               ),
-              if (!isLast)
-                const Divider(height: 1, indent: 72),
+              if (!isLast) const Divider(height: 1, indent: 72),
             ],
           );
         }).toList(),
@@ -479,17 +475,11 @@ class _AppFilterTile extends StatelessWidget {
       ),
       subtitle: Text(
         app.packageName,
-        style: const TextStyle(
-          fontSize: 11,
-          color: AppTheme.textDisabled,
-        ),
+        style: const TextStyle(fontSize: 11, color: AppTheme.textDisabled),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Switch(
-        value: isEnabled,
-        onChanged: onChanged,
-      ),
+      trailing: Switch(value: isEnabled, onChanged: onChanged),
     );
   }
 
@@ -521,12 +511,7 @@ class _AppFilterTile extends StatelessWidget {
         color: AppTheme.surfaceColor,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Icon(
-        Icons.android,
-        color: AppTheme.textSecondary,
-        size: 24,
-      ),
+      child: const Icon(Icons.android, color: AppTheme.textSecondary, size: 24),
     );
   }
 }
-

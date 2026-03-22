@@ -15,8 +15,7 @@ class ConnectionEvents extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// Foreign key to source watch
-  TextColumn get watchId =>
-      text().references(Watches, #id).named('watch_id')();
+  TextColumn get watchId => text().references(Watches, #id).named('watch_id')();
 
   /// Type of event: connected, disconnected, reconnect_attempt, reconnect_failed
   TextColumn get eventType => text().named('event_type')();
@@ -25,7 +24,7 @@ class ConnectionEvents extends Table {
   DateTimeColumn get timestamp => dateTime()();
 
   /// Reason for disconnection (only for disconnect events)
-  /// Values: user_requested, connection_lost, device_unavailable, 
+  /// Values: user_requested, connection_lost, device_unavailable,
   ///         bluetooth_disabled, app_terminated, unknown
   TextColumn get reason => text().nullable()();
 

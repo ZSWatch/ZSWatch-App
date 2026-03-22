@@ -35,9 +35,5 @@ void main() async {
   };
 
   // Run the app with Riverpod provider scope
-  runApp(
-    const ProviderScope(
-      child: ZSWatchApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: ZSWatchApp()));
 }

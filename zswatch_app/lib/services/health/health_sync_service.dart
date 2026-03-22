@@ -10,7 +10,7 @@ import '../../data/repositories/health_repository.dart';
 import '../watch_service.dart';
 
 /// Activity states from the watch
-/// 
+///
 /// Values match the integer stored in database for activity samples.
 /// Based on Gadgetbridge ActivityKind.java values.
 enum ActivityState {
@@ -19,16 +19,16 @@ enum ActivityState {
   deepSleep(2),
   lightSleep(3),
   remSleep(4),
-  still(5),      // ACTIVITY in Gadgetbridge
+  still(5), // ACTIVITY in Gadgetbridge
   running(6),
   walking(7),
   swimming(8),
   cycling(9),
   exercise(10);
-  
+
   final int value;
   const ActivityState(this.value);
-  
+
   static ActivityState fromString(String? value) {
     return switch (value) {
       'UNKNOWN' => ActivityState.unknown,
@@ -45,14 +45,14 @@ enum ActivityState {
       _ => ActivityState.unknown,
     };
   }
-  
+
   static ActivityState fromValue(int value) {
     return ActivityState.values.firstWhere(
       (s) => s.value == value,
       orElse: () => ActivityState.unknown,
     );
   }
-  
+
   String get displayName {
     return switch (this) {
       ActivityState.unknown => 'Unknown',
@@ -75,13 +75,13 @@ class ActivityBreakdown {
   final Map<ActivityState, Duration> durations;
   final ActivityState? currentState;
   final DateTime? lastUpdate;
-  
+
   const ActivityBreakdown({
     this.durations = const {},
     this.currentState,
     this.lastUpdate,
   });
-  
+
   ActivityBreakdown copyWith({
     Map<ActivityState, Duration>? durations,
     ActivityState? currentState,
@@ -93,12 +93,12 @@ class ActivityBreakdown {
       lastUpdate: lastUpdate ?? this.lastUpdate,
     );
   }
-  
+
   /// Total tracked duration
   Duration get totalDuration {
     return durations.values.fold(Duration.zero, (a, b) => a + b);
   }
-  
+
   /// Get percentage for a state (0.0 to 1.0)
   double getPercentage(ActivityState state) {
     final total = totalDuration;
@@ -124,14 +124,13 @@ class HealthSyncService {
   // Heart rate streaming state
   final _heartRateController = BehaviorSubject<int?>.seeded(null);
   final _isStreamingController = BehaviorSubject<bool>.seeded(false);
-  
+
   // Step count state (from activity messages)
   final _stepsController = BehaviorSubject<int>.seeded(0);
-  
+
   // Activity state tracking (breakdown is calculated from database)
-  final _activityBreakdownController = BehaviorSubject<ActivityBreakdown>.seeded(
-    const ActivityBreakdown(),
-  );
+  final _activityBreakdownController =
+      BehaviorSubject<ActivityBreakdown>.seeded(const ActivityBreakdown());
 
   BluetoothDevice? _device;
   BluetoothCharacteristic? _hrMeasurementChar;
@@ -147,30 +146,34 @@ class HealthSyncService {
 
   /// Current streaming state
   bool get isStreaming => _isStreamingController.value;
-  
+
   /// Stream of step count updates
   Stream<int> get stepsStream => _stepsController.stream;
-  
+
   /// Current step count
   int get currentSteps => _stepsController.value;
-  
+
   /// Stream of activity breakdown updates
-  Stream<ActivityBreakdown> get activityBreakdownStream => _activityBreakdownController.stream;
-  
+  Stream<ActivityBreakdown> get activityBreakdownStream =>
+      _activityBreakdownController.stream;
+
   /// Current activity breakdown
-  ActivityBreakdown get currentActivityBreakdown => _activityBreakdownController.value;
+  ActivityBreakdown get currentActivityBreakdown =>
+      _activityBreakdownController.value;
 
   HealthSyncService({
     required WatchService watchService,
     required HealthRepository healthRepository,
-  })  : _watchService = watchService,
-        _healthRepository = healthRepository {
+  }) : _watchService = watchService,
+       _healthRepository = healthRepository {
     _initialize();
   }
 
   void _initialize() {
     // Listen for activity messages from watch (Gadgetbridge protocol)
-    _activitySubscription = _watchService.incomingMessages.listen(_handleActivityMessage);
+    _activitySubscription = _watchService.incomingMessages.listen(
+      _handleActivityMessage,
+    );
   }
 
   /// Start heart rate streaming
@@ -189,7 +192,9 @@ class HealthSyncService {
       // Check if already connected
       final isConnected = _device!.isConnected;
       if (!isConnected) {
-        debugPrint('[HealthSync] Device not connected, cannot start HR streaming');
+        debugPrint(
+          '[HealthSync] Device not connected, cannot start HR streaming',
+        );
         return;
       }
 
@@ -201,9 +206,9 @@ class HealthSyncService {
 
       // Find Heart Rate Service
       final hrService = services.cast<BluetoothService?>().firstWhere(
-            (s) => s?.uuid == Guid(HeartRateUuids.service),
-            orElse: () => null,
-          );
+        (s) => s?.uuid == Guid(HeartRateUuids.service),
+        orElse: () => null,
+      );
 
       if (hrService == null) {
         debugPrint('[HealthSync] Heart Rate Service not found');
@@ -225,7 +230,7 @@ class HealthSyncService {
 
       // Subscribe to notifications
       await _hrMeasurementChar!.setNotifyValue(true);
-      
+
       _hrSubscription?.cancel();
       _hrSubscription = _hrMeasurementChar!.onValueReceived.listen(
         _handleHeartRateData,
@@ -234,7 +239,6 @@ class HealthSyncService {
 
       _isStreamingController.add(true);
       debugPrint('[HealthSync] HR streaming started');
-
     } catch (e) {
       debugPrint('[HealthSync] Failed to start HR streaming: $e');
       _isStreamingController.add(false);
@@ -262,7 +266,6 @@ class HealthSyncService {
       _isStreamingController.add(false);
       _heartRateController.add(null);
       debugPrint('[HealthSync] HR streaming stopped');
-
     } catch (e) {
       debugPrint('[HealthSync] Error stopping HR streaming: $e');
     }
@@ -306,7 +309,6 @@ class HealthSyncService {
 
       // Persist to repository
       _persistHeartRate(heartRate);
-
     } catch (e) {
       debugPrint('[HealthSync] Error parsing HR data: $e');
     }
@@ -327,13 +329,17 @@ class HealthSyncService {
       debugPrint('[HealthSync] Error persisting HR: $e');
     }
   }
-  
+
   /// Persist step count to database
-  /// 
+  ///
   /// Note: The watch sends cumulative daily steps, so we store
   /// the latest value with a "daily" granularity, updating the same
   /// record throughout the day.
-  Future<void> _persistSteps(String watchId, int steps, [DateTime? timestamp]) async {
+  Future<void> _persistSteps(
+    String watchId,
+    int steps, [
+    DateTime? timestamp,
+  ]) async {
     try {
       final ts = timestamp ?? DateTime.now();
       await _healthRepository.insertSteps(
@@ -378,10 +384,10 @@ class HealthSyncService {
 
     // Parse timestamp - use provided ts or current time
     final tsMillis = message['ts'] as int?;
-    final timestamp = tsMillis != null 
+    final timestamp = tsMillis != null
         ? DateTime.fromMillisecondsSinceEpoch(tsMillis)
         : DateTime.now();
-    
+
     final steps = message['stp'] as int?;
     final heartRate = message['hrm'] as int?;
     final activityString = message['act'] as String?;
@@ -392,22 +398,24 @@ class HealthSyncService {
     }
 
     if (heartRate != null) {
-      debugPrint('[HealthSync] Activity update - HR: $heartRate, ts: $timestamp');
+      debugPrint(
+        '[HealthSync] Activity update - HR: $heartRate, ts: $timestamp',
+      );
       _heartRateController.add(heartRate);
       _persistHeartRate(heartRate, timestamp);
     }
-    
+
     // Track activity state
     if (activityString != null) {
       final newState = ActivityState.fromString(activityString);
       _persistAndUpdateActivityState(watchId, newState, timestamp);
     }
   }
-  
+
   /// Persist activity state to database and update breakdown
   Future<void> _persistAndUpdateActivityState(
-    String watchId, 
-    ActivityState state, 
+    String watchId,
+    ActivityState state,
     DateTime timestamp,
   ) async {
     try {
@@ -417,14 +425,14 @@ class HealthSyncService {
         activityStateValue: state.value,
         timestamp: timestamp,
       );
-      
+
       // Refresh breakdown from database
       await _refreshActivityBreakdown(watchId);
     } catch (e) {
       debugPrint('[HealthSync] Error persisting activity: $e');
     }
   }
-  
+
   /// Refresh activity breakdown from database
   Future<void> _refreshActivityBreakdown(String watchId) async {
     try {
@@ -433,40 +441,42 @@ class HealthSyncService {
         watchId: watchId,
         date: now,
       );
-      
+
       // Convert int keys to ActivityState
       final durations = <ActivityState, Duration>{};
       for (final entry in breakdownMap.entries) {
         final state = ActivityState.fromValue(entry.key);
         durations[state] = entry.value;
       }
-      
+
       // Get current state from most recent sample
       final todayActivity = await _healthRepository.getDailyActivity(
         watchId: watchId,
         date: now,
       );
-      final currentState = todayActivity.isNotEmpty 
+      final currentState = todayActivity.isNotEmpty
           ? ActivityState.fromValue(todayActivity.last.intValue)
           : null;
-      
-      _activityBreakdownController.add(ActivityBreakdown(
-        durations: durations,
-        currentState: currentState,
-        lastUpdate: now,
-      ));
+
+      _activityBreakdownController.add(
+        ActivityBreakdown(
+          durations: durations,
+          currentState: currentState,
+          lastUpdate: now,
+        ),
+      );
     } catch (e) {
       debugPrint('[HealthSync] Error refreshing activity breakdown: $e');
     }
   }
-  
+
   /// Load activity breakdown from database (call on startup/reconnect)
   Future<void> loadActivityBreakdown() async {
     final watchId = _watchService.currentWatch?.id;
     if (watchId == null) return;
     await _refreshActivityBreakdown(watchId);
   }
-  
+
   /// Reset activity tracking (e.g., at start of day)
   void resetActivityTracking() {
     _activityBreakdownController.add(const ActivityBreakdown());
@@ -493,7 +503,9 @@ class HealthSyncService {
   /// NOTE: Not yet implemented in watch firmware.
   /// This would send a request for historical activity data.
   Future<void> requestActivitySync() async {
-    debugPrint('[HealthSync] requestActivitySync - Not yet implemented in firmware');
+    debugPrint(
+      '[HealthSync] requestActivitySync - Not yet implemented in firmware',
+    );
     // TODO: Send actfetch request when firmware supports this
     // await _watchService.sendGb({'t': 'actfetch'});
   }

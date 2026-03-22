@@ -37,8 +37,13 @@ class BleConnectionService {
   );
 
   // Callback for post-connection setup (NUS, battery, sync) — owned by WatchService.
-  Future<void> Function(BluetoothDevice device, List<BluetoothService> services,
-      String watchId, String name)? onSetupRequired;
+  Future<void> Function(
+    BluetoothDevice device,
+    List<BluetoothService> services,
+    String watchId,
+    String name,
+  )?
+  onSetupRequired;
 
   int _reconnectAttempts = 0;
   static const int _maxQuickReconnectAttempts = 3;
@@ -82,25 +87,33 @@ class BleConnectionService {
   String get watchId => _watchId;
 
   /// Connect to a scanned device.
-  Future<void> connect(ScannedWatch scannedDevice,
-      {bool autoConnect = false}) async {
+  Future<void> connect(
+    ScannedWatch scannedDevice, {
+    bool autoConnect = false,
+  }) async {
     if (!autoConnect) {
       _isCancelled = false;
     }
     await _connectToDevice(
-        scannedDevice.device, scannedDevice.id, scannedDevice.name,
-        autoConnect: autoConnect);
+      scannedDevice.device,
+      scannedDevice.id,
+      scannedDevice.name,
+      autoConnect: autoConnect,
+    );
   }
 
   /// Connect by device ID (for saved watches / auto-reconnect).
-  Future<void> connectById(String deviceId,
-      {bool autoConnect = false}) async {
+  Future<void> connectById(String deviceId, {bool autoConnect = false}) async {
     if (!autoConnect) {
       _isCancelled = false;
     }
     final device = BluetoothDevice.fromId(deviceId);
-    await _connectToDevice(device, deviceId, 'ZSWatch',
-        autoConnect: autoConnect);
+    await _connectToDevice(
+      device,
+      deviceId,
+      'ZSWatch',
+      autoConnect: autoConnect,
+    );
   }
 
   /// Cancel any pending connection attempt.
@@ -136,8 +149,7 @@ class BleConnectionService {
       try {
         await device.disconnect();
       } catch (e) {
-        debugPrint(
-            '[BleConnectionService] disconnect() error (ignored): $e');
+        debugPrint('[BleConnectionService] disconnect() error (ignored): $e');
       }
     }
 
@@ -152,7 +164,8 @@ class BleConnectionService {
       _services = await _device!.discoverServices();
       final hasSmp = _findService(_guid(McumgrUuids.service)) != null;
       debugPrint(
-          '[BleConnectionService] Re-discovery complete. SMP available: $hasSmp');
+        '[BleConnectionService] Re-discovery complete. SMP available: $hasSmp',
+      );
       return hasSmp;
     } catch (e) {
       debugPrint('[BleConnectionService] Re-discovery failed: $e');
@@ -193,9 +206,10 @@ class BleConnectionService {
     bool isReconnectAttempt = false,
   }) async {
     debugPrint(
-        '[BleConnectionService] _connectToDevice: watchId=$watchId, '
-        'autoConnect=$autoConnect, isReconnect=$isReconnectAttempt, '
-        'phase=$currentPhase');
+      '[BleConnectionService] _connectToDevice: watchId=$watchId, '
+      'autoConnect=$autoConnect, isReconnect=$isReconnectAttempt, '
+      'phase=$currentPhase',
+    );
 
     if (_isCancelled) return;
 
@@ -230,7 +244,8 @@ class BleConnectionService {
         await device.disconnect();
       } catch (e) {
         debugPrint(
-            '[BleConnectionService] Pre-connect disconnect (ignored): $e');
+          '[BleConnectionService] Pre-connect disconnect (ignored): $e',
+        );
       }
 
       _device = device;
@@ -241,20 +256,21 @@ class BleConnectionService {
         // fire-and-forget and we rely on the listener for state changes.
         _connectionSubscription = device.connectionState
             .skip(1) // Skip initial state emission from FBP
-            .listen(
-          (state) => _handleBleStateChange(state, watchId, name),
+            .listen((state) => _handleBleStateChange(state, watchId, name));
+        unawaited(
+          device
+              .connect(
+                license: License.free,
+                timeout: const Duration(seconds: 0),
+                mtu: null,
+                autoConnect: true,
+              )
+              .catchError((Object e) {
+                debugPrint(
+                  '[BleConnectionService] AutoConnect error (ignored): $e',
+                );
+              }),
         );
-        unawaited(device
-            .connect(
-          license: License.free,
-          timeout: const Duration(seconds: 0),
-          mtu: null,
-          autoConnect: true,
-        )
-            .catchError((Object e) {
-          debugPrint(
-              '[BleConnectionService] AutoConnect error (ignored): $e');
-        }));
       } else {
         if (_isCancelled) return;
         // For direct connect, set up the listener with skip(1) to avoid
@@ -262,9 +278,7 @@ class BleConnectionService {
         // _handleDisconnect while connect() is still in progress.
         _connectionSubscription = device.connectionState
             .skip(1) // Skip initial state emission from FBP
-            .listen(
-          (state) => _handleBleStateChange(state, watchId, name),
-        );
+            .listen((state) => _handleBleStateChange(state, watchId, name));
         final timeout = isReconnectAttempt
             ? const Duration(seconds: 10)
             : BleConfig.connectionTimeout;
@@ -276,10 +290,12 @@ class BleConnectionService {
         await _runSetup(watchId, name);
       }
     } catch (e) {
-      _setPhase(ConnectionPhase.error(
-        type: ConnectionErrorType.timeout,
-        details: e.toString(),
-      ));
+      _setPhase(
+        ConnectionPhase.error(
+          type: ConnectionErrorType.timeout,
+          details: e.toString(),
+        ),
+      );
       rethrow;
     }
   }
@@ -309,16 +325,16 @@ class BleConnectionService {
       }
 
       // Service discovery
-      _setPhase(const ConnectionPhase.settingUp(
-          step: SetupStep.discoveringServices));
+      _setPhase(
+        const ConnectionPhase.settingUp(step: SetupStep.discoveringServices),
+      );
       if (!_shouldContinue()) return;
       _services = await _device!.discoverServices();
 
       // MTU negotiation
       int mtu;
       if (Platform.isAndroid) {
-        _setPhase(
-            const ConnectionPhase.settingUp(step: SetupStep.negotiating));
+        _setPhase(const ConnectionPhase.settingUp(step: SetupStep.negotiating));
         if (!_shouldContinue()) return;
         mtu = await _device!.requestMtu(BleConfig.preferredMtu);
       } else {
@@ -330,10 +346,9 @@ class BleConnectionService {
       if (!_shouldContinue()) return;
 
       // Update connection model with MTU before callback
-      _updateConnectionModel(currentConnection.copyWith(
-        mtu: mtu,
-        connectedAt: DateTime.now(),
-      ));
+      _updateConnectionModel(
+        currentConnection.copyWith(mtu: mtu, connectedAt: DateTime.now()),
+      );
 
       // Let WatchService do NUS setup, battery, time sync, device info
       if (onSetupRequired != null) {
@@ -380,7 +395,8 @@ class BleConnectionService {
     String name,
   ) {
     debugPrint(
-        '[BleConnectionService] BLE state: $state, phase: $currentPhase');
+      '[BleConnectionService] BLE state: $state, phase: $currentPhase',
+    );
 
     if (_isCancelled) {
       if (state == BluetoothConnectionState.connected) {
@@ -426,9 +442,10 @@ class BleConnectionService {
 
   void _handleDisconnect(String watchId, String name) {
     debugPrint(
-        '[BleConnectionService] _handleDisconnect: phase=$currentPhase, '
-        'cancelled=$_isCancelled, autoReconnect=$_autoReconnect, '
-        'attempts=$_reconnectAttempts');
+      '[BleConnectionService] _handleDisconnect: phase=$currentPhase, '
+      'cancelled=$_isCancelled, autoReconnect=$_autoReconnect, '
+      'attempts=$_reconnectAttempts',
+    );
 
     if (_isCancelled) {
       _setPhase(const ConnectionPhase.disconnected());
@@ -456,13 +473,11 @@ class BleConnectionService {
     _stopRssiUpdates();
 
     // Was previously connected, setting up, or in a connecting state
-    final shouldReconnect = _autoReconnect &&
-        (phase is Connected ||
-            phase is SettingUp ||
-            phase.isTryingToConnect);
+    final shouldReconnect =
+        _autoReconnect &&
+        (phase is Connected || phase is SettingUp || phase.isTryingToConnect);
 
-    if (shouldReconnect &&
-        _reconnectAttempts < _maxQuickReconnectAttempts) {
+    if (shouldReconnect && _reconnectAttempts < _maxQuickReconnectAttempts) {
       _scheduleReconnect(watchId, name);
     } else if (shouldReconnect) {
       _startBackgroundReconnect(watchId, name);
@@ -485,11 +500,11 @@ class BleConnectionService {
 
       try {
         final device = BluetoothDevice.fromId(watchId);
-        await _connectToDevice(device, watchId, name,
-            isReconnectAttempt: true);
+        await _connectToDevice(device, watchId, name, isReconnectAttempt: true);
       } catch (e) {
         debugPrint(
-            '[BleConnectionService] Reconnect attempt $_reconnectAttempts failed: $e');
+          '[BleConnectionService] Reconnect attempt $_reconnectAttempts failed: $e',
+        );
         if (_isCancelled) {
           _cleanup();
           return;
@@ -507,10 +522,12 @@ class BleConnectionService {
     if (_isCancelled) return;
     _reconnectTimer?.cancel();
 
-    _setPhase(ConnectionPhase.reconnecting(
-      attempt: _reconnectAttempts,
-      isBackground: true,
-    ));
+    _setPhase(
+      ConnectionPhase.reconnecting(
+        attempt: _reconnectAttempts,
+        isBackground: true,
+      ),
+    );
 
     _scheduleBackgroundAttempt(watchId, name);
   }
@@ -530,7 +547,8 @@ class BleConnectionService {
 
       _reconnectAttempts++;
       debugPrint(
-          '[BleConnectionService] Background reconnect attempt $_reconnectAttempts');
+        '[BleConnectionService] Background reconnect attempt $_reconnectAttempts',
+      );
 
       // Cancel old subscription — we create a new one below.
       await _connectionSubscription?.cancel();
@@ -548,9 +566,7 @@ class BleConnectionService {
       // Set up listener with skip(1) to avoid initial state emission
       _connectionSubscription = device.connectionState
           .skip(1)
-          .listen(
-        (state) => _handleBleStateChange(state, watchId, name),
-      );
+          .listen((state) => _handleBleStateChange(state, watchId, name));
 
       try {
         await device.connect(
@@ -562,8 +578,7 @@ class BleConnectionService {
         // connect() call here (not going through _connectToDevice).
         await _runSetup(watchId, name);
       } catch (e) {
-        debugPrint(
-            '[BleConnectionService] Background reconnect failed: $e');
+        debugPrint('[BleConnectionService] Background reconnect failed: $e');
         if (!_isCancelled) {
           final cp = currentPhase;
           if (cp is Reconnecting && cp.isBackground) {
@@ -600,21 +615,23 @@ class BleConnectionService {
   void _setPhase(ConnectionPhase phase) {
     _phaseController.add(phase);
     // Keep Connection model in sync for backwards compat
-    _updateConnectionModel(Connection(
-      watchId: _watchId,
-      watchName: _watchName,
-      state: phase.watchConnectionState,
-      rssi: currentConnection.rssi,
-      mtu: currentConnection.mtu,
-      phyMode: currentConnection.phyMode,
-      dleEnabled: currentConnection.dleEnabled,
-      isCharging: currentConnection.isCharging,
-      reconnectionCount: _reconnectAttempts,
-      connectedAt: phase is Connected ? currentConnection.connectedAt : null,
-      lastActivityAt: currentConnection.lastActivityAt,
-      errorType: phase is PhaseError ? phase.type : null,
-      errorDetails: phase is PhaseError ? phase.details : null,
-    ));
+    _updateConnectionModel(
+      Connection(
+        watchId: _watchId,
+        watchName: _watchName,
+        state: phase.watchConnectionState,
+        rssi: currentConnection.rssi,
+        mtu: currentConnection.mtu,
+        phyMode: currentConnection.phyMode,
+        dleEnabled: currentConnection.dleEnabled,
+        isCharging: currentConnection.isCharging,
+        reconnectionCount: _reconnectAttempts,
+        connectedAt: phase is Connected ? currentConnection.connectedAt : null,
+        lastActivityAt: currentConnection.lastActivityAt,
+        errorType: phase is PhaseError ? phase.type : null,
+        errorDetails: phase is PhaseError ? phase.details : null,
+      ),
+    );
   }
 
   /// Update connection model fields (e.g. isCharging from protocol messages).
@@ -630,9 +647,9 @@ class BleConnectionService {
 
   BluetoothService? _findService(Guid uuid) {
     return _services?.cast<BluetoothService?>().firstWhere(
-          (s) => s?.uuid == uuid,
-          orElse: () => null,
-        );
+      (s) => s?.uuid == uuid,
+      orElse: () => null,
+    );
   }
 }
 

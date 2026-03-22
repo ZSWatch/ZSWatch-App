@@ -45,6 +45,7 @@ class AutoReconnectService {
 
   bool _isEnabled = true;
   bool _isCancelled = false;
+
   /// Whether auto-reconnect is suppressed for this session (until app restart)
   /// Set when user explicitly cancels or disconnects
   bool _isSuppressedForSession = false;
@@ -73,12 +74,13 @@ class AutoReconnectService {
   bool get isReconnecting => _state == AutoReconnectState.waiting;
 
   AutoReconnectService({
-    required Future<void> Function(String watchId, {bool autoConnect}) connectById,
+    required Future<void> Function(String watchId, {bool autoConnect})
+    connectById,
     required Future<Watch?> Function() getLastConnectedWatch,
     required void Function() cancelConnection,
-  })  : _connectById = connectById,
-        _getLastConnectedWatch = getLastConnectedWatch,
-        _cancelConnection = cancelConnection;
+  }) : _connectById = connectById,
+       _getLastConnectedWatch = getLastConnectedWatch,
+       _cancelConnection = cancelConnection;
 
   /// Start auto-reconnect to last connected watch (FR-071)
   ///
@@ -87,15 +89,19 @@ class AutoReconnectService {
   /// - System handles reconnection when device appears
   /// - Doesn't time out
   Future<void> startAutoReconnect() async {
-    debugPrint('[AutoReconnect:$hashCode] startAutoReconnect() called: _isEnabled=$_isEnabled, _isSuppressedForSession=$_isSuppressedForSession, _state=$_state');
-    
+    debugPrint(
+      '[AutoReconnect:$hashCode] startAutoReconnect() called: _isEnabled=$_isEnabled, _isSuppressedForSession=$_isSuppressedForSession, _state=$_state',
+    );
+
     if (!_isEnabled) {
       debugPrint('[AutoReconnect:$hashCode] Disabled, skipping');
       return;
     }
 
     if (_isSuppressedForSession) {
-      debugPrint('[AutoReconnect:$hashCode] Suppressed for this session (user cancelled/disconnected)');
+      debugPrint(
+        '[AutoReconnect:$hashCode] Suppressed for this session (user cancelled/disconnected)',
+      );
       return;
     }
 
@@ -115,7 +121,9 @@ class AutoReconnectService {
       return;
     }
 
-    debugPrint('[AutoReconnect] Starting auto-connect for ${_targetWatch!.displayName}');
+    debugPrint(
+      '[AutoReconnect] Starting auto-connect for ${_targetWatch!.displayName}',
+    );
 
     // Wait initial delay before attempting
     await Future<void>.delayed(AutoReconnectConfig.initialDelay);
@@ -131,7 +139,9 @@ class AutoReconnectService {
       // Use flutter_blue_plus's autoConnect feature
       // This returns immediately and the system handles reconnection
       await _connectById(_targetWatch!.id, autoConnect: true);
-      debugPrint('[AutoReconnect] Auto-connect initiated for ${_targetWatch!.id}');
+      debugPrint(
+        '[AutoReconnect] Auto-connect initiated for ${_targetWatch!.id}',
+      );
       // Note: We stay in 'waiting' state until connection actually happens
       // The watch_service will notify us when connected
     } catch (e) {
@@ -145,7 +155,9 @@ class AutoReconnectService {
   /// Call this when user manually selects a different watch or cancels reconnection.
   /// This suppresses auto-reconnect for the rest of this session.
   void cancel() {
-    debugPrint('[AutoReconnect:$hashCode] Cancelled by user - setting _isSuppressedForSession=true');
+    debugPrint(
+      '[AutoReconnect:$hashCode] Cancelled by user - setting _isSuppressedForSession=true',
+    );
     _isCancelled = true;
     _isSuppressedForSession = true; // Don't auto-restart until app restart
     _cancelConnection();

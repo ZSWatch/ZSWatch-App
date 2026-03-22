@@ -26,8 +26,9 @@ final coredumpServiceProvider = Provider<CoredumpService>((ref) {
 });
 
 /// Stream of coredump analysis state updates.
-final coredumpAnalysisStateProvider =
-    StreamProvider<CoredumpAnalysisState>((ref) {
+final coredumpAnalysisStateProvider = StreamProvider<CoredumpAnalysisState>((
+  ref,
+) {
   final service = ref.watch(coredumpServiceProvider);
   return service.stateStream;
 });
@@ -39,15 +40,15 @@ final crashReportRepositoryProvider = Provider<CrashReportRepository>((ref) {
 });
 
 /// Stream of all crash reports (history), newest first.
-final crashReportHistoryProvider =
-    StreamProvider<List<CrashReportEntity>>((ref) {
+final crashReportHistoryProvider = StreamProvider<List<CrashReportEntity>>((
+  ref,
+) {
   final repo = ref.watch(crashReportRepositoryProvider);
   return repo.watchAllCrashReports(limit: 50);
 });
 
 /// Crash file frequency stats.
-final crashFileStatsProvider =
-    FutureProvider<List<CrashFileStats>>((ref) {
+final crashFileStatsProvider = FutureProvider<List<CrashFileStats>>((ref) {
   final repo = ref.watch(crashReportRepositoryProvider);
   return repo.getCrashFileStats();
 });
@@ -76,8 +77,10 @@ final crashReportPersistenceProvider = Provider<void>((ref) {
     final watchId = watchService.device?.remoteId.str;
     if (watchId == null) return;
 
-    lastSavedReportId =
-        await repo.saveCrashSummary(watchId: watchId, summary: summary);
+    lastSavedReportId = await repo.saveCrashSummary(
+      watchId: watchId,
+      summary: summary,
+    );
   });
 
   // Persist analysis results when analysis completes

@@ -38,12 +38,10 @@ class ExtractedActions extends Table {
       integer().nullable().named('reminder_minutes')();
 
   /// Whether this action has been created in the OS (calendar / reminders)
-  BoolColumn get created =>
-      boolean().withDefault(const Constant(false))();
+  BoolColumn get created => boolean().withDefault(const Constant(false))();
 
   /// Whether the user dismissed this suggestion
-  BoolColumn get dismissed =>
-      boolean().withDefault(const Constant(false))();
+  BoolColumn get dismissed => boolean().withDefault(const Constant(false))();
 
   /// Platform-specific ID after creation (e.g. calendar event ID)
   TextColumn get platformTargetId =>

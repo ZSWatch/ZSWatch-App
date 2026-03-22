@@ -46,8 +46,9 @@ class GpsNotifier extends StateNotifier<GpsState> {
 
   void _init() {
     debugPrint('[GpsNotifier] Initializing - listening to watch messages');
-    _messageSubscription =
-        _watchService.incomingMessages.listen(_handleWatchMessage);
+    _messageSubscription = _watchService.incomingMessages.listen(
+      _handleWatchMessage,
+    );
   }
 
   void _handleWatchMessage(Map<String, dynamic> message) {
@@ -123,10 +124,7 @@ class GpsNotifier extends StateNotifier<GpsState> {
         await _sendGpsToWatch(position);
       } else {
         debugPrint('[GpsNotifier] GPS error: ${result.error}');
-        state = state.copyWith(
-          isRequesting: false,
-          lastError: result.error,
-        );
+        state = state.copyWith(isRequesting: false, lastError: result.error);
       }
     } catch (e) {
       debugPrint('[GpsNotifier] Exception getting location: $e');
@@ -151,7 +149,8 @@ class GpsNotifier extends StateNotifier<GpsState> {
     );
 
     debugPrint(
-        '[GpsNotifier] Sending GPS: ${position.latitude}, ${position.longitude}');
+      '[GpsNotifier] Sending GPS: ${position.latitude}, ${position.longitude}',
+    );
     await _watchService.sendGpsData(gpsData);
   }
 
@@ -161,14 +160,14 @@ class GpsNotifier extends StateNotifier<GpsState> {
   }
 
   /// Open app settings so user can enable location permission
-  /// 
+  ///
   /// Call this when [GpsError.permissionDeniedForever] is encountered.
   Future<bool> openAppSettings() async {
     return _gpsService.openAppSettings();
   }
 
   /// Open system location settings
-  /// 
+  ///
   /// Call this when [GpsError.serviceDisabled] is encountered.
   Future<bool> openLocationSettings() async {
     return _gpsService.openLocationSettings();
@@ -184,8 +183,7 @@ class GpsNotifier extends StateNotifier<GpsState> {
 }
 
 /// Provider for GPS state and control
-final gpsNotifierProvider =
-    StateNotifierProvider<GpsNotifier, GpsState>((ref) {
+final gpsNotifierProvider = StateNotifierProvider<GpsNotifier, GpsState>((ref) {
   final gpsService = ref.watch(gpsServiceProvider);
   final watchService = ref.watch(watchServiceProvider);
   return GpsNotifier(gpsService, watchService);

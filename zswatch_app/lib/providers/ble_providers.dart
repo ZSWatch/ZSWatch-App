@@ -16,8 +16,9 @@ final bleScannerProvider = Provider<BleScanner>((ref) {
 });
 
 /// Provider for Bluetooth adapter state.
-final bluetoothAdapterStateProvider =
-    StreamProvider<BluetoothAdapterState>((ref) {
+final bluetoothAdapterStateProvider = StreamProvider<BluetoothAdapterState>((
+  ref,
+) {
   return FlutterBluePlus.adapterState;
 });
 
@@ -94,14 +95,15 @@ class BleNotifier extends BaseAsyncNotifier {
 
   /// Initialize BLE (check adapter state).
   Future<void> initialize() => run(() async {
-        await FlutterBluePlus.adapterState.first;
-      });
+    await FlutterBluePlus.adapterState.first;
+  });
 
   /// Request Bluetooth permissions.
   Future<bool> requestPermissions() async {
     try {
       await FlutterBluePlus.startScan(
-          timeout: const Duration(milliseconds: 100));
+        timeout: const Duration(milliseconds: 100),
+      );
       await FlutterBluePlus.stopScan();
       return true;
     } catch (e) {
@@ -114,7 +116,7 @@ class BleNotifier extends BaseAsyncNotifier {
 
       final hasBluetooth =
           (results[Permission.bluetoothScan]?.isGranted ?? false) ||
-              (results[Permission.bluetooth]?.isGranted ?? false);
+          (results[Permission.bluetooth]?.isGranted ?? false);
       final hasConnect =
           results[Permission.bluetoothConnect]?.isGranted ?? true;
 
@@ -137,10 +139,8 @@ class BleNotifier extends BaseAsyncNotifier {
 
   /// Start scanning for devices.
   Future<void> startScan({Duration? timeout}) => run(() async {
-        await _scanner.startScan(
-          timeout: timeout ?? const Duration(seconds: 15),
-        );
-      });
+    await _scanner.startScan(timeout: timeout ?? const Duration(seconds: 15));
+  });
 
   /// Stop scanning.
   Future<void> stopScan() async {
@@ -166,9 +166,9 @@ class BleNotifier extends BaseAsyncNotifier {
 /// Provider for BLE operations notifier.
 final bleNotifierProvider =
     StateNotifierProvider<BleNotifier, AsyncValue<void>>((ref) {
-  final scanner = ref.watch(bleScannerProvider);
-  return BleNotifier(scanner);
-});
+      final scanner = ref.watch(bleScannerProvider);
+      return BleNotifier(scanner);
+    });
 
 /// Provider for BLE permission status.
 final blePermissionsProvider = FutureProvider<bool>((ref) async {

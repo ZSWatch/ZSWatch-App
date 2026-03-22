@@ -45,7 +45,8 @@ abstract final class HeartRateUuids {
   static const String measurement = '00002a37-0000-1000-8000-00805f9b34fb';
 
   /// Body Sensor Location Characteristic (0x2A38)
-  static const String bodySensorLocation = '00002a38-0000-1000-8000-00805f9b34fb';
+  static const String bodySensorLocation =
+      '00002a38-0000-1000-8000-00805f9b34fb';
 }
 
 /// ZSWatch Sensor Service UUIDs (Adafruit Bluefruit format)
@@ -55,50 +56,55 @@ abstract final class HeartRateUuids {
 /// Each sensor is a separate GATT service with one characteristic.
 abstract final class SensorServiceUuids {
   /// Temperature Service UUID (ADAFRUIT_SERVICE_TEMPERATURE 0xADAF0100)
-  static const String temperatureService = 'adaf0100-c332-42a8-93bd-25e905756cb8';
-  
+  static const String temperatureService =
+      'adaf0100-c332-42a8-93bd-25e905756cb8';
+
   /// Temperature Characteristic UUID (ADAFRUIT_CHAR_TEMPERATURE 0xADAF0101)
   static const String temperatureChar = 'adaf0101-c332-42a8-93bd-25e905756cb8';
 
   /// Accelerometer Service UUID (ADAFRUIT_SERVICE_ACCEL 0xADAF0200)
-  static const String accelerometerService = 'adaf0200-c332-42a8-93bd-25e905756cb8';
-  
+  static const String accelerometerService =
+      'adaf0200-c332-42a8-93bd-25e905756cb8';
+
   /// Accelerometer Characteristic UUID (ADAFRUIT_CHAR_ACCEL 0xADAF0201)
-  static const String accelerometerChar = 'adaf0201-c332-42a8-93bd-25e905756cb8';
+  static const String accelerometerChar =
+      'adaf0201-c332-42a8-93bd-25e905756cb8';
 
   /// Light Sensor Service UUID (ADAFRUIT_SERVICE_LIGHT 0xADAF0300)
   static const String lightService = 'adaf0300-c332-42a8-93bd-25e905756cb8';
-  
+
   /// Light Sensor Characteristic UUID (ADAFRUIT_CHAR_LIGHT 0xADAF0301)
   static const String lightChar = 'adaf0301-c332-42a8-93bd-25e905756cb8';
 
   /// Gyroscope Service UUID (ADAFRUIT_SERVICE_GYRO 0xADAF0400)
   static const String gyroscopeService = 'adaf0400-c332-42a8-93bd-25e905756cb8';
-  
+
   /// Gyroscope Characteristic UUID (ADAFRUIT_CHAR_GYRO 0xADAF0401)
   static const String gyroscopeChar = 'adaf0401-c332-42a8-93bd-25e905756cb8';
 
   /// Magnetometer Service UUID (ADAFRUIT_SERVICE_MAG 0xADAF0500)
-  static const String magnetometerService = 'adaf0500-c332-42a8-93bd-25e905756cb8';
-  
+  static const String magnetometerService =
+      'adaf0500-c332-42a8-93bd-25e905756cb8';
+
   /// Magnetometer Characteristic UUID (ADAFRUIT_CHAR_MAG 0xADAF0501)
   static const String magnetometerChar = 'adaf0501-c332-42a8-93bd-25e905756cb8';
 
   /// Humidity Service UUID (ADAFRUIT_SERVICE_HUMIDITY 0xADAF0700)
   static const String humidityService = 'adaf0700-c332-42a8-93bd-25e905756cb8';
-  
+
   /// Humidity Characteristic UUID (ADAFRUIT_CHAR_HUMIDITY 0xADAF0701)
   static const String humidityChar = 'adaf0701-c332-42a8-93bd-25e905756cb8';
 
   /// Pressure Service UUID (ADAFRUIT_SERVICE_PRESSURE 0xADAF0800)
   static const String pressureService = 'adaf0800-c332-42a8-93bd-25e905756cb8';
-  
+
   /// Pressure Characteristic UUID (ADAFRUIT_CHAR_PRESSURE 0xADAF0801)
   static const String pressureChar = 'adaf0801-c332-42a8-93bd-25e905756cb8';
 
   /// 3D/Sensor Fusion Service UUID (ADAFRUIT_SERVICE_3D 0xADAF0D00)
-  static const String sensorFusionService = 'adaf0d00-c332-42a8-93bd-25e905756cb8';
-  
+  static const String sensorFusionService =
+      'adaf0d00-c332-42a8-93bd-25e905756cb8';
+
   /// 3D/Sensor Fusion Characteristic UUID (ADAFRUIT_CHAR_3D 0xADAF0D01)
   /// Data: quaternion [w, x, y, z] as 4x float32 little-endian (16 bytes)
   static const String sensorFusionChar = 'adaf0d01-c332-42a8-93bd-25e905756cb8';
@@ -174,4 +180,3 @@ abstract final class BleConfig {
   /// Alternative device name pattern
   static const String deviceNamePattern = 'ZSWatch';
 }
-

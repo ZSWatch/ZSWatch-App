@@ -29,8 +29,12 @@ class TimeSyncService {
   }
 
   /// Sync a specific time to the watch
-  Future<void> syncSpecificTime(DateTime time, {double? timezoneOffsetHours}) async {
-    final tzOffset = timezoneOffsetHours ?? time.timeZoneOffset.inMinutes / 60.0;
+  Future<void> syncSpecificTime(
+    DateTime time, {
+    double? timezoneOffsetHours,
+  }) async {
+    final tzOffset =
+        timezoneOffsetHours ?? time.timeZoneOffset.inMinutes / 60.0;
 
     debugPrint('Syncing specific time: $time (TZ offset: $tzOffset hours)');
 
@@ -74,4 +78,3 @@ extension TimeSyncServiceExtension on ProtocolService {
     return TimeSyncService(this);
   }
 }
-

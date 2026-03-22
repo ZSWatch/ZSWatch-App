@@ -67,7 +67,8 @@ final downloadProgressStreamProvider = StreamProvider<DownloadProgress>((ref) {
 /// Provider for current download progress
 final downloadProgressProvider = Provider<DownloadProgress>((ref) {
   final asyncValue = ref.watch(downloadProgressStreamProvider);
-  return asyncValue.valueOrNull ?? const DownloadProgress(0, 0, DownloadStatus.idle);
+  return asyncValue.valueOrNull ??
+      const DownloadProgress(0, 0, DownloadStatus.idle);
 });
 
 /// Provider for whether download is in progress
@@ -89,14 +90,16 @@ class ReleasesNotifier extends StateNotifier<AsyncValue<List<GitHubRelease>>> {
 
 /// Provider for available GitHub releases (manual fetch)
 final releasesProvider =
-    StateNotifierProvider<ReleasesNotifier, AsyncValue<List<GitHubRelease>>>(
-        (ref) {
-  final manager = ref.watch(firmwareManagerProvider);
-  return ReleasesNotifier(manager);
-});
+    StateNotifierProvider<ReleasesNotifier, AsyncValue<List<GitHubRelease>>>((
+      ref,
+    ) {
+      final manager = ref.watch(firmwareManagerProvider);
+      return ReleasesNotifier(manager);
+    });
 
 /// State notifier for workflow runs (manual fetch to avoid rate limiting)
-class WorkflowRunsNotifier extends StateNotifier<AsyncValue<List<WorkflowRun>>> {
+class WorkflowRunsNotifier
+    extends StateNotifier<AsyncValue<List<WorkflowRun>>> {
   final FirmwareManager _manager;
 
   WorkflowRunsNotifier(this._manager) : super(const AsyncValue.data([]));
@@ -109,11 +112,12 @@ class WorkflowRunsNotifier extends StateNotifier<AsyncValue<List<WorkflowRun>>> 
 
 /// Provider for GitHub Actions workflow runs (manual fetch)
 final workflowRunsProvider =
-    StateNotifierProvider<WorkflowRunsNotifier, AsyncValue<List<WorkflowRun>>>(
-        (ref) {
-  final manager = ref.watch(firmwareManagerProvider);
-  return WorkflowRunsNotifier(manager);
-});
+    StateNotifierProvider<WorkflowRunsNotifier, AsyncValue<List<WorkflowRun>>>((
+      ref,
+    ) {
+      final manager = ref.watch(firmwareManagerProvider);
+      return WorkflowRunsNotifier(manager);
+    });
 
 /// State notifier for DFU operations
 class DfuNotifier extends StateNotifier<DfuOperationState> {
@@ -122,10 +126,13 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
   final Ref _ref;
 
   DfuNotifier(this._dfuService, this._firmwareManager, this._ref)
-      : super(const DfuOperationState());
+    : super(const DfuOperationState());
 
   /// Download firmware from a GitHub release asset
-  Future<void> downloadReleaseAsset(GitHubRelease release, ReleaseAsset asset) async {
+  Future<void> downloadReleaseAsset(
+    GitHubRelease release,
+    ReleaseAsset asset,
+  ) async {
     state = state.copyWith(
       selectedRelease: release,
       isDownloading: true,
@@ -133,26 +140,33 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     );
 
     try {
-      final result = await _firmwareManager.downloadReleaseAsset(release, asset);
+      final result = await _firmwareManager.downloadReleaseAsset(
+        release,
+        asset,
+      );
       state = state.copyWith(
         downloadedImage: result.firmwareImage,
         filesystemImage: result.filesystemImage,
         isDownloading: false,
       );
     } catch (e) {
-      state = state.copyWith(
-        isDownloading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isDownloading: false, error: e.toString());
     }
   }
 
   /// Download firmware from a GitHub Actions artifact
-  Future<void> downloadArtifact(WorkflowRun run, WorkflowArtifact artifact) async {
+  Future<void> downloadArtifact(
+    WorkflowRun run,
+    WorkflowArtifact artifact,
+  ) async {
     debugPrint('[DfuNotifier] downloadArtifact called');
-    debugPrint('[DfuNotifier] Run: ${run.id}, Branch: ${run.branch}, SHA: ${run.shortSha}');
-    debugPrint('[DfuNotifier] Artifact: ${artifact.name}, ID: ${artifact.id}, Size: ${artifact.sizeInBytes}');
-    
+    debugPrint(
+      '[DfuNotifier] Run: ${run.id}, Branch: ${run.branch}, SHA: ${run.shortSha}',
+    );
+    debugPrint(
+      '[DfuNotifier] Artifact: ${artifact.name}, ID: ${artifact.id}, Size: ${artifact.sizeInBytes}',
+    );
+
     state = state.copyWith(
       selectedWorkflowRun: run,
       selectedArtifact: artifact,
@@ -169,10 +183,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       );
     } catch (e) {
       debugPrint('[DfuNotifier] downloadArtifact error: $e');
-      state = state.copyWith(
-        isDownloading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isDownloading: false, error: e.toString());
     }
   }
 
@@ -183,10 +194,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 
   /// Load a local firmware file
   Future<void> loadLocalFile(String filePath) async {
-    state = state.copyWith(
-      isDownloading: true,
-      error: null,
-    );
+    state = state.copyWith(isDownloading: true, error: null);
 
     try {
       final result = await _firmwareManager.loadLocalFile(filePath);
@@ -196,10 +204,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
         isDownloading: false,
       );
     } catch (e) {
-      state = state.copyWith(
-        isDownloading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isDownloading: false, error: e.toString());
     }
   }
 
@@ -235,10 +240,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       return;
     }
 
-    state = state.copyWith(
-      isUpdating: true,
-      error: null,
-    );
+    state = state.copyWith(isUpdating: true, error: null);
 
     try {
       // Prepare firmware (extract if needed)
@@ -271,12 +273,8 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       );
 
       state = state.copyWith(isUpdating: false);
-
     } catch (e) {
-      state = state.copyWith(
-        isUpdating: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isUpdating: false, error: e.toString());
     }
   }
 
@@ -288,10 +286,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       return;
     }
 
-    state = state.copyWith(
-      isFilesystemUploading: true,
-      error: null,
-    );
+    state = state.copyWith(isFilesystemUploading: true, error: null);
 
     try {
       // Get the connected device
@@ -311,15 +306,10 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 
       // Start the filesystem upload
       final fsService = _ref.read(filesystemUploadServiceProvider);
-      await fsService.startUpload(
-        deviceId: deviceId,
-        image: fsImage,
-      );
+      await fsService.startUpload(deviceId: deviceId, image: fsImage);
 
       // Wait for filesystem upload to complete before restarting
-      await fsService.stateStream.firstWhere(
-        (s) => s.status.isTerminal,
-      );
+      await fsService.stateStream.firstWhere((s) => s.status.isTerminal);
 
       if (fsService.currentState.status == FilesystemUploadStatus.completed) {
         // Restart the watch so the new filesystem resources take effect
@@ -329,18 +319,16 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
           await OsManager.reset(deviceId);
           debugPrint('[DfuNotifier] Watch restart command sent');
         } catch (e) {
-          debugPrint('[DfuNotifier] Failed to restart watch after FS upload: $e');
+          debugPrint(
+            '[DfuNotifier] Failed to restart watch after FS upload: $e',
+          );
           // Don't fail the overall operation — the upload itself succeeded
         }
       }
 
       state = state.copyWith(isFilesystemUploading: false);
-
     } catch (e) {
-      state = state.copyWith(
-        isFilesystemUploading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isFilesystemUploading: false, error: e.toString());
     }
   }
 
@@ -380,23 +368,18 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       // Step 1: Upload filesystem if available
       if (fsImage != null) {
         state = state.copyWith(currentStep: 1);
-        
+
         final fsService = _ref.read(filesystemUploadServiceProvider);
-        await fsService.startUpload(
-          deviceId: deviceId,
-          image: fsImage,
-        );
+        await fsService.startUpload(deviceId: deviceId, image: fsImage);
 
         // Wait for filesystem upload to complete
-        await fsService.stateStream.firstWhere(
-          (s) => s.status.isTerminal,
-        );
+        await fsService.stateStream.firstWhere((s) => s.status.isTerminal);
 
         final fsState = fsService.currentState;
         if (fsState.status != FilesystemUploadStatus.completed) {
           throw Exception('Filesystem upload failed: ${fsState.errorMessage}');
         }
-        
+
         // Give BLE transport time to fully release before DFU
         await Future<void>.delayed(const Duration(milliseconds: 500));
       }
@@ -404,14 +387,14 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       // Step 2: Start firmware update if available
       if (fwImage != null) {
         state = state.copyWith(currentStep: 2);
-        
+
         // Prepare firmware (extract if needed)
         final images = await _firmwareManager.prepareFirmware(fwImage);
         state = state.copyWith(preparedImages: images);
 
         // Create a BluetoothDevice from the ID
         final bluetoothDevice = BluetoothDevice.fromId(deviceId);
-        
+
         // Start the DFU
         await _dfuService.startUpdate(
           device: bluetoothDevice,
@@ -420,12 +403,8 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       }
 
       state = state.copyWith(isBothUpdating: false);
-
     } catch (e) {
-      state = state.copyWith(
-        isBothUpdating: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isBothUpdating: false, error: e.toString());
     }
   }
 
@@ -434,12 +413,12 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     if (_dfuService.isInProgress) {
       await _dfuService.cancel();
     }
-    
+
     final fsService = _ref.read(filesystemUploadServiceProvider);
     if (fsService.isInProgress) {
       await fsService.cancel();
     }
-    
+
     _firmwareManager.cancelDownload();
     state = state.copyWith(
       isDownloading: false,
@@ -471,10 +450,10 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 /// Provider for DFU notifier
 final dfuNotifierProvider =
     StateNotifierProvider<DfuNotifier, DfuOperationState>((ref) {
-  final dfuService = ref.watch(dfuServiceProvider);
-  final firmwareManager = ref.watch(firmwareManagerProvider);
-  return DfuNotifier(dfuService, firmwareManager, ref);
-});
+      final dfuService = ref.watch(dfuServiceProvider);
+      final firmwareManager = ref.watch(firmwareManagerProvider);
+      return DfuNotifier(dfuService, firmwareManager, ref);
+    });
 
 /// State for DFU operations
 @freezed
@@ -562,4 +541,3 @@ final dfuLogsProvider = StreamProvider<String>((ref) {
     fsService.logStream,
   ]);
 });
-

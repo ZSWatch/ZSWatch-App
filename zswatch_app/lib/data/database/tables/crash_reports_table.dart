@@ -12,8 +12,7 @@ class CrashReports extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// Foreign key to source watch
-  TextColumn get watchId =>
-      text().references(Watches, #id).named('watch_id')();
+  TextColumn get watchId => text().references(Watches, #id).named('watch_id')();
 
   /// Source file that crashed
   TextColumn get file => text()();
@@ -40,8 +39,7 @@ class CrashReports extends Table {
   DateTimeColumn get receivedAt => dateTime().named('received_at')();
 
   /// Whether analysis has been performed
-  BoolColumn get analyzed =>
-      boolean().withDefault(const Constant(false))();
+  BoolColumn get analyzed => boolean().withDefault(const Constant(false))();
 
   /// Decoded backtrace from server (null if not analyzed)
   TextColumn get backtrace => text().nullable()();
@@ -53,8 +51,7 @@ class CrashReports extends Table {
   TextColumn get rawOutput => text().nullable().named('raw_output')();
 
   /// Error message if analysis failed
-  TextColumn get analysisError =>
-      text().nullable().named('analysis_error')();
+  TextColumn get analysisError => text().nullable().named('analysis_error')();
 
   /// Whether ELF was available for analysis
   BoolColumn get elfAvailable =>

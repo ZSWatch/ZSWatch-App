@@ -82,9 +82,7 @@ abstract class SensorReading with _$SensorReading {
   }
 
   /// Create a temperature reading
-  factory SensorReading.temperature({
-    required double celsius,
-  }) {
+  factory SensorReading.temperature({required double celsius}) {
     return SensorReading(
       timestamp: DateTime.now(),
       type: SensorType.temperature,
@@ -108,9 +106,7 @@ abstract class SensorReading with _$SensorReading {
   }
 
   /// Create a pressure reading
-  factory SensorReading.pressure({
-    required double hPa,
-  }) {
+  factory SensorReading.pressure({required double hPa}) {
     return SensorReading(
       timestamp: DateTime.now(),
       type: SensorType.pressure,
@@ -119,9 +115,7 @@ abstract class SensorReading with _$SensorReading {
   }
 
   /// Create a light sensor reading
-  factory SensorReading.light({
-    required double lux,
-  }) {
+  factory SensorReading.light({required double lux}) {
     return SensorReading(
       timestamp: DateTime.now(),
       type: SensorType.light,
@@ -130,9 +124,7 @@ abstract class SensorReading with _$SensorReading {
   }
 
   /// Create a humidity reading
-  factory SensorReading.humidity({
-    required double percent,
-  }) {
+  factory SensorReading.humidity({required double percent}) {
     return SensorReading(
       timestamp: DateTime.now(),
       type: SensorType.humidity,
@@ -211,10 +203,7 @@ class SensorBuffer {
   /// List of readings (oldest first, newest last)
   final List<SensorReading> _readings = [];
 
-  SensorBuffer({
-    this.maxSize = 200,
-    required this.type,
-  });
+  SensorBuffer({this.maxSize = 200, required this.type});
 
   /// Get all readings
   List<SensorReading> get readings => List.unmodifiable(_readings);

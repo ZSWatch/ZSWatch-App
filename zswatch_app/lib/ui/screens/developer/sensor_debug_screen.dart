@@ -27,7 +27,7 @@ class SensorDebugScreen extends ConsumerStatefulWidget {
 class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
   final Map<SensorType, List<SensorReading>> _sensorHistory = {};
   final int _maxHistoryLength = 100;
-  
+
   SensorGattService? _sensorService;
   final Map<SensorType, bool> _enabledSensors = {};
   final Map<SensorType, StreamSubscription<SensorReading>?> _subscriptions = {};
@@ -46,24 +46,24 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
       _sensorHistory[type] = [];
       _enabledSensors[type] = false;
     }
-    
+
     // Initialize sensor service after frame is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeSensorService();
     });
   }
-  
+
   Future<void> _initializeSensorService() async {
     final watchService = ref.read(watchServiceProvider);
     final device = watchService.device;
     if (device == null) return;
-    
+
     final services = watchService.services;
     if (services == null || services.isEmpty) return;
-    
+
     _sensorService = SensorGattService(device);
     final success = await _sensorService!.initialize(services);
-    
+
     if (success && mounted) {
       setState(() {});
       debugPrint('[SensorDebug] Sensor service initialized');
@@ -84,11 +84,11 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
   // Sensor fusion methods
   Future<void> _toggleSensorFusion(bool enable) async {
     if (_sensorService == null) return;
-    
+
     setState(() {
       _fusionEnabled = enable;
     });
-    
+
     try {
       if (enable) {
         await _sensorService!.startSensorFusion();
@@ -139,42 +139,56 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
 
   Future<void> _toggleSensor(SensorType type, bool enable) async {
     if (_sensorService == null) return;
-    
+
     setState(() {
       _enabledSensors[type] = enable;
     });
-    
+
     try {
       if (enable) {
         // Start the sensor and subscribe to its stream
         switch (type) {
           case SensorType.temperature:
             await _sensorService!.startTemperature();
-            _subscriptions[type] = _sensorService!.temperatureStream.listen(_addReading);
+            _subscriptions[type] = _sensorService!.temperatureStream.listen(
+              _addReading,
+            );
           case SensorType.accelerometer:
             await _sensorService!.startAccelerometer();
-            _subscriptions[type] = _sensorService!.accelerometerStream.listen(_addReading);
+            _subscriptions[type] = _sensorService!.accelerometerStream.listen(
+              _addReading,
+            );
           case SensorType.gyroscope:
             await _sensorService!.startGyroscope();
-            _subscriptions[type] = _sensorService!.gyroscopeStream.listen(_addReading);
+            _subscriptions[type] = _sensorService!.gyroscopeStream.listen(
+              _addReading,
+            );
           case SensorType.magnetometer:
             await _sensorService!.startMagnetometer();
-            _subscriptions[type] = _sensorService!.magnetometerStream.listen(_addReading);
+            _subscriptions[type] = _sensorService!.magnetometerStream.listen(
+              _addReading,
+            );
           case SensorType.light:
             await _sensorService!.startLight();
-            _subscriptions[type] = _sensorService!.lightStream.listen(_addReading);
+            _subscriptions[type] = _sensorService!.lightStream.listen(
+              _addReading,
+            );
           case SensorType.humidity:
             await _sensorService!.startHumidity();
-            _subscriptions[type] = _sensorService!.humidityStream.listen(_addReading);
+            _subscriptions[type] = _sensorService!.humidityStream.listen(
+              _addReading,
+            );
           case SensorType.pressure:
             await _sensorService!.startPressure();
-            _subscriptions[type] = _sensorService!.pressureStream.listen(_addReading);
+            _subscriptions[type] = _sensorService!.pressureStream.listen(
+              _addReading,
+            );
         }
       } else {
         // Cancel subscription and stop sensor
         await _subscriptions[type]?.cancel();
         _subscriptions[type] = null;
-        
+
         switch (type) {
           case SensorType.temperature:
             await _sensorService!.stopTemperature();
@@ -271,7 +285,8 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
                   hasXYZ: true,
                   enabled: _enabledSensors[SensorType.accelerometer]!,
                   available: _sensorService?.hasAccelerometer ?? false,
-                  onToggle: (enable) => _toggleSensor(SensorType.accelerometer, enable),
+                  onToggle: (enable) =>
+                      _toggleSensor(SensorType.accelerometer, enable),
                 ),
 
                 _SensorCard(
@@ -283,7 +298,8 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
                   hasXYZ: true,
                   enabled: _enabledSensors[SensorType.gyroscope]!,
                   available: _sensorService?.hasGyroscope ?? false,
-                  onToggle: (enable) => _toggleSensor(SensorType.gyroscope, enable),
+                  onToggle: (enable) =>
+                      _toggleSensor(SensorType.gyroscope, enable),
                 ),
 
                 _SensorCard(
@@ -295,7 +311,8 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
                   hasXYZ: true,
                   enabled: _enabledSensors[SensorType.magnetometer]!,
                   available: _sensorService?.hasMagnetometer ?? false,
-                  onToggle: (enable) => _toggleSensor(SensorType.magnetometer, enable),
+                  onToggle: (enable) =>
+                      _toggleSensor(SensorType.magnetometer, enable),
                 ),
 
                 _SensorCard(
@@ -307,7 +324,8 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
                   hasXYZ: false,
                   enabled: _enabledSensors[SensorType.temperature]!,
                   available: _sensorService?.hasTemperature ?? false,
-                  onToggle: (enable) => _toggleSensor(SensorType.temperature, enable),
+                  onToggle: (enable) =>
+                      _toggleSensor(SensorType.temperature, enable),
                 ),
 
                 _SensorCard(
@@ -319,7 +337,8 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
                   hasXYZ: false,
                   enabled: _enabledSensors[SensorType.humidity]!,
                   available: _sensorService?.hasHumidity ?? false,
-                  onToggle: (enable) => _toggleSensor(SensorType.humidity, enable),
+                  onToggle: (enable) =>
+                      _toggleSensor(SensorType.humidity, enable),
                 ),
 
                 _SensorCard(
@@ -331,7 +350,8 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
                   hasXYZ: false,
                   enabled: _enabledSensors[SensorType.pressure]!,
                   available: _sensorService?.hasPressure ?? false,
-                  onToggle: (enable) => _toggleSensor(SensorType.pressure, enable),
+                  onToggle: (enable) =>
+                      _toggleSensor(SensorType.pressure, enable),
                 ),
 
                 _SensorCard(
@@ -363,16 +383,16 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
           const SizedBox(height: 16),
           Text(
             'Sensor service not available',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 8),
           Text(
             'Connect to a watch to access sensors',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary.withValues(alpha: 0.7),
-                ),
+              color: AppTheme.textSecondary.withValues(alpha: 0.7),
+            ),
           ),
         ],
       ),
@@ -385,24 +405,18 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
       decoration: BoxDecoration(
         color: AppTheme.infoColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-        border: Border.all(
-          color: AppTheme.infoColor.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppTheme.infoColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.info_outline,
-            color: AppTheme.infoColor,
-            size: 20,
-          ),
+          Icon(Icons.info_outline, color: AppTheme.infoColor, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Toggle sensors to enable GATT notifications. The watch will stream data when enabled.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ),
         ],
@@ -427,7 +441,9 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
         children: [
           Icon(
             Icons.sensors,
-            color: activeSensors > 0 ? AppTheme.successColor : AppTheme.textSecondary,
+            color: activeSensors > 0
+                ? AppTheme.successColor
+                : AppTheme.textSecondary,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -441,8 +457,8 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
                 Text(
                   '$totalSamples total samples received',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -493,7 +509,9 @@ class _SensorCard extends StatelessWidget {
               children: [
                 Icon(
                   icon,
-                  color: enabled ? AppTheme.primaryColor : AppTheme.textSecondary,
+                  color: enabled
+                      ? AppTheme.primaryColor
+                      : AppTheme.textSecondary,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -507,17 +525,13 @@ class _SensorCard extends StatelessWidget {
                       if (!available)
                         Text(
                           'Not available on this device',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.warningColor,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppTheme.warningColor),
                         ),
                     ],
                   ),
                 ),
-                Switch(
-                  value: enabled,
-                  onChanged: available ? onToggle : null,
-                ),
+                Switch(value: enabled, onChanged: available ? onToggle : null),
               ],
             ),
 
@@ -566,10 +580,7 @@ class _SensorCard extends StatelessWidget {
               // Mini chart
               SizedBox(
                 height: 60,
-                child: _MiniChart(
-                  history: history,
-                  hasXYZ: hasXYZ,
-                ),
+                child: _MiniChart(history: history, hasXYZ: hasXYZ),
               ),
 
               // Stats
@@ -580,15 +591,15 @@ class _SensorCard extends StatelessWidget {
                   Text(
                     '${history.length} samples',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                   if (history.isNotEmpty)
                     Text(
                       'Rate: ${_calculateRate(history).toStringAsFixed(1)} Hz',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                 ],
               ),
@@ -612,8 +623,8 @@ class _SensorCard extends StatelessWidget {
                     Text(
                       'Waiting for data...',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -666,25 +677,25 @@ class _ValueChip extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                  ),
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
           Text(
             value.toStringAsFixed(2),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'monospace',
-                  fontSize: large ? 18 : 14,
-                  fontWeight: FontWeight.bold,
-                ),
+              fontFamily: 'monospace',
+              fontSize: large ? 18 : 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           Text(
             unit,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                  fontSize: 10,
-                ),
+              color: AppTheme.textSecondary,
+              fontSize: 10,
+            ),
           ),
         ],
       ),
@@ -696,10 +707,7 @@ class _MiniChart extends StatelessWidget {
   final List<SensorReading> history;
   final bool hasXYZ;
 
-  const _MiniChart({
-    required this.history,
-    required this.hasXYZ,
-  });
+  const _MiniChart({required this.history, required this.hasXYZ});
 
   @override
   Widget build(BuildContext context) {
@@ -708,10 +716,7 @@ class _MiniChart extends StatelessWidget {
     }
 
     return CustomPaint(
-      painter: _ChartPainter(
-        history: history,
-        hasXYZ: hasXYZ,
-      ),
+      painter: _ChartPainter(history: history, hasXYZ: hasXYZ),
       size: const Size(double.infinity, 60),
     );
   }
@@ -796,9 +801,15 @@ class _ChartPainter extends CustomPainter {
       final reading = history[i];
 
       if (hasXYZ) {
-        final yX = size.height - (reading.x - minVal) / (maxVal - minVal) * size.height;
-        final yY = size.height - ((reading.y ?? 0) - minVal) / (maxVal - minVal) * size.height;
-        final yZ = size.height - ((reading.z ?? 0) - minVal) / (maxVal - minVal) * size.height;
+        final yX =
+            size.height -
+            (reading.x - minVal) / (maxVal - minVal) * size.height;
+        final yY =
+            size.height -
+            ((reading.y ?? 0) - minVal) / (maxVal - minVal) * size.height;
+        final yZ =
+            size.height -
+            ((reading.z ?? 0) - minVal) / (maxVal - minVal) * size.height;
 
         if (i == 0) {
           pathX.moveTo(x, yX);
@@ -810,7 +821,9 @@ class _ChartPainter extends CustomPainter {
           pathZ.lineTo(x, yZ);
         }
       } else {
-        final yVal = size.height - (reading.x - minVal) / (maxVal - minVal) * size.height;
+        final yVal =
+            size.height -
+            (reading.x - minVal) / (maxVal - minVal) * size.height;
         if (i == 0) {
           pathValue.moveTo(x, yVal);
         } else {
@@ -831,8 +844,9 @@ class _ChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ChartPainter oldDelegate) {
     return oldDelegate.history.length != history.length ||
-        (history.isNotEmpty && oldDelegate.history.isNotEmpty &&
-         oldDelegate.history.last != history.last);
+        (history.isNotEmpty &&
+            oldDelegate.history.isNotEmpty &&
+            oldDelegate.history.last != history.last);
   }
 }
 
@@ -874,7 +888,9 @@ class _SensorFusionCard extends StatelessWidget {
               children: [
                 Icon(
                   Icons.threed_rotation,
-                  color: enabled ? AppTheme.primaryColor : AppTheme.textSecondary,
+                  color: enabled
+                      ? AppTheme.primaryColor
+                      : AppTheme.textSecondary,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -888,17 +904,13 @@ class _SensorFusionCard extends StatelessWidget {
                       if (!available)
                         Text(
                           'Not available on this device',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.warningColor,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppTheme.warningColor),
                         ),
                     ],
                   ),
                 ),
-                Switch(
-                  value: enabled,
-                  onChanged: available ? onToggle : null,
-                ),
+                Switch(value: enabled, onChanged: available ? onToggle : null),
               ],
             ),
 
@@ -909,8 +921,8 @@ class _SensorFusionCard extends StatelessWidget {
               Text(
                 'Quaternion',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
+                  color: AppTheme.textSecondary,
+                ),
               ),
               const SizedBox(height: 4),
               if (latestData != null) ...[
@@ -940,8 +952,8 @@ class _SensorFusionCard extends StatelessWidget {
                       Text(
                         'Waiting for data...',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -977,17 +989,28 @@ class _SensorFusionCard extends StatelessWidget {
                       children: [
                         Text(
                           'Euler Angles${hasOffset ? ' (corrected)' : ''}',
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                color: AppTheme.textSecondary,
-                              ),
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: AppTheme.textSecondary),
                         ),
                         const SizedBox(height: 8),
                         if (euler != null) ...[
-                          _EulerRow(label: 'Roll', value: euler.rollDegrees, color: Colors.red),
+                          _EulerRow(
+                            label: 'Roll',
+                            value: euler.rollDegrees,
+                            color: Colors.red,
+                          ),
                           const SizedBox(height: 4),
-                          _EulerRow(label: 'Pitch', value: euler.pitchDegrees, color: Colors.green),
+                          _EulerRow(
+                            label: 'Pitch',
+                            value: euler.pitchDegrees,
+                            color: Colors.green,
+                          ),
                           const SizedBox(height: 4),
-                          _EulerRow(label: 'Yaw', value: euler.yawDegrees, color: Colors.blue),
+                          _EulerRow(
+                            label: 'Yaw',
+                            value: euler.yawDegrees,
+                            color: Colors.blue,
+                          ),
                         ],
                       ],
                     ),
@@ -1026,8 +1049,8 @@ class _SensorFusionCard extends StatelessWidget {
                   child: Text(
                     'Orientation offset applied',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.successColor,
-                        ),
+                      color: AppTheme.successColor,
+                    ),
                   ),
                 ),
             ],
@@ -1058,16 +1081,16 @@ class _QuatChip extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppTheme.primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
+              color: AppTheme.primaryColor,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           Text(
             value.toStringAsFixed(3),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
-                ),
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -1100,16 +1123,16 @@ class _EulerChip extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                ),
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           Text(
             '${value.toStringAsFixed(1)}°',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
-                ),
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -1136,28 +1159,25 @@ class _EulerRow extends StatelessWidget {
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 8),
         SizedBox(
           width: 40,
           child: Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
           ),
         ),
         Expanded(
           child: Text(
             '${value.toStringAsFixed(1)}°',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'monospace',
-                  fontWeight: FontWeight.bold,
-                ),
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -1171,11 +1191,7 @@ class _AxisPainter extends CustomPainter {
   final double pitch;
   final double yaw;
 
-  _AxisPainter({
-    required this.roll,
-    required this.pitch,
-    required this.yaw,
-  });
+  _AxisPainter({required this.roll, required this.pitch, required this.yaw});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1184,10 +1200,10 @@ class _AxisPainter extends CustomPainter {
 
     // Apply rotations to get axis endpoints
     // We'll use a simplified 3D to 2D projection
-    
+
     // X-axis (red) - points right initially
     final xEnd = _rotateAndProject(1, 0, 0, axisLength, center);
-    // Y-axis (green) - points up initially  
+    // Y-axis (green) - points up initially
     final yEnd = _rotateAndProject(0, 1, 0, axisLength, center);
     // Z-axis (blue) - points out of screen initially
     final zEnd = _rotateAndProject(0, 0, 1, axisLength, center);
@@ -1221,10 +1237,22 @@ class _AxisPainter extends CustomPainter {
       ..color = Colors.white
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, 3, centerPaint);
-    canvas.drawCircle(center, 3, Paint()..color = Colors.grey..style = PaintingStyle.stroke);
+    canvas.drawCircle(
+      center,
+      3,
+      Paint()
+        ..color = Colors.grey
+        ..style = PaintingStyle.stroke,
+    );
   }
 
-  Offset _rotateAndProject(double x, double y, double z, double scale, Offset center) {
+  Offset _rotateAndProject(
+    double x,
+    double y,
+    double z,
+    double scale,
+    Offset center,
+  ) {
     // Apply Euler rotations (ZXY order: yaw, roll, pitch)
     // Yaw (around Z)
     final cosYaw = math.cos(yaw);
@@ -1275,7 +1303,13 @@ class _AxisPainter extends CustomPainter {
     return z3;
   }
 
-  void _drawAxis(Canvas canvas, Offset start, Offset end, Color color, String label) {
+  void _drawAxis(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    Color color,
+    String label,
+  ) {
     // Draw axis line
     final paint = Paint()
       ..color = color
@@ -1291,16 +1325,25 @@ class _AxisPainter extends CustomPainter {
       final perpendicular = Offset(-normalized.dy, normalized.dx);
       final arrowSize = 6.0;
       final arrowBase = end - normalized * arrowSize;
-      
+
       final path = Path()
         ..moveTo(end.dx, end.dy)
-        ..lineTo(arrowBase.dx + perpendicular.dx * arrowSize * 0.5, 
-                 arrowBase.dy + perpendicular.dy * arrowSize * 0.5)
-        ..lineTo(arrowBase.dx - perpendicular.dx * arrowSize * 0.5,
-                 arrowBase.dy - perpendicular.dy * arrowSize * 0.5)
+        ..lineTo(
+          arrowBase.dx + perpendicular.dx * arrowSize * 0.5,
+          arrowBase.dy + perpendicular.dy * arrowSize * 0.5,
+        )
+        ..lineTo(
+          arrowBase.dx - perpendicular.dx * arrowSize * 0.5,
+          arrowBase.dy - perpendicular.dy * arrowSize * 0.5,
+        )
         ..close();
-      
-      canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.fill);
+
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.fill,
+      );
     }
 
     // Draw label
@@ -1316,11 +1359,14 @@ class _AxisPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     );
     textPainter.layout();
-    
+
     final labelOffset = end + (end - start) / (end - start).distance * 8;
     textPainter.paint(
       canvas,
-      Offset(labelOffset.dx - textPainter.width / 2, labelOffset.dy - textPainter.height / 2),
+      Offset(
+        labelOffset.dx - textPainter.width / 2,
+        labelOffset.dy - textPainter.height / 2,
+      ),
     );
   }
 

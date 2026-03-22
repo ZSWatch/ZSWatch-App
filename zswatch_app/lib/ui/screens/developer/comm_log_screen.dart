@@ -24,7 +24,8 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _autoScroll = true;
   bool _isAtBottom = true;
-  CommDirection? _directionFilter; // null = all, rx = incoming only, tx = outgoing only
+  CommDirection?
+  _directionFilter; // null = all, rx = incoming only, tx = outgoing only
   bool _showHex = false;
 
   @override
@@ -41,7 +42,8 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
   }
 
   void _onScroll() {
-    final isAtBottom = _scrollController.position.pixels >=
+    final isAtBottom =
+        _scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 50;
     if (isAtBottom != _isAtBottom) {
       setState(() {
@@ -131,7 +133,11 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
                     else
                       const SizedBox(width: 18),
                     const SizedBox(width: 8),
-                    Icon(Icons.arrow_downward, size: 16, color: AppTheme.successColor),
+                    Icon(
+                      Icons.arrow_downward,
+                      size: 16,
+                      color: AppTheme.successColor,
+                    ),
                     const SizedBox(width: 4),
                     const Text('RX (Incoming)'),
                   ],
@@ -146,7 +152,11 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
                     else
                       const SizedBox(width: 18),
                     const SizedBox(width: 8),
-                    Icon(Icons.arrow_upward, size: 16, color: AppTheme.primaryColor),
+                    Icon(
+                      Icons.arrow_upward,
+                      size: 16,
+                      color: AppTheme.primaryColor,
+                    ),
                     const SizedBox(width: 4),
                     const Text('TX (Outgoing)'),
                   ],
@@ -249,16 +259,16 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
           const SizedBox(height: 16),
           Text(
             'No communication data',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 8),
           Text(
             'BLE traffic will appear here',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary.withValues(alpha: 0.7),
-                ),
+              color: AppTheme.textSecondary.withValues(alpha: 0.7),
+            ),
           ),
         ],
       ),
@@ -268,7 +278,9 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
   void _copyAllEntries(List<CommLogEntry> entries) {
     final buffer = StringBuffer();
     for (final entry in entries) {
-      buffer.writeln('[${entry.formattedTimestamp}] ${entry.directionArrow} ${entry.data}');
+      buffer.writeln(
+        '[${entry.formattedTimestamp}] ${entry.directionArrow} ${entry.data}',
+      );
     }
     Clipboard.setData(ClipboardData(text: buffer.toString()));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -305,9 +317,7 @@ class _StatsBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor,
-          ),
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
         ),
       ),
       child: Row(
@@ -364,24 +374,20 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(
-          icon,
-          size: 16,
-          color: color ?? AppTheme.textSecondary,
-        ),
+        Icon(icon, size: 16, color: color ?? AppTheme.textSecondary),
         const SizedBox(height: 2),
         Text(
           value,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppTheme.textSecondary,
-                fontSize: 10,
-              ),
+            color: AppTheme.textSecondary,
+            fontSize: 10,
+          ),
         ),
       ],
     );
@@ -392,10 +398,7 @@ class _CommLogEntryTile extends StatelessWidget {
   final CommLogEntry entry;
   final bool showHex;
 
-  const _CommLogEntryTile({
-    required this.entry,
-    required this.showHex,
-  });
+  const _CommLogEntryTile({required this.entry, required this.showHex});
 
   @override
   Widget build(BuildContext context) {
@@ -440,25 +443,27 @@ class _CommLogEntryTile extends StatelessWidget {
                   Text(
                     entry.formattedTimestamp,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontFamily: 'monospace',
-                          color: AppTheme.textSecondary,
-                          fontSize: 10,
-                        ),
+                      fontFamily: 'monospace',
+                      color: AppTheme.textSecondary,
+                      fontSize: 10,
+                    ),
                   ),
                   Row(
                     children: [
                       Icon(
                         isIncoming ? Icons.arrow_downward : Icons.arrow_upward,
                         size: 12,
-                        color: isIncoming ? AppTheme.successColor : AppTheme.primaryColor,
+                        color: isIncoming
+                            ? AppTheme.successColor
+                            : AppTheme.primaryColor,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '${entry.sizeBytes} B',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: AppTheme.textSecondary,
-                              fontSize: 10,
-                            ),
+                          color: AppTheme.textSecondary,
+                          fontSize: 10,
+                        ),
                       ),
                     ],
                   ),
@@ -471,9 +476,9 @@ class _CommLogEntryTile extends StatelessWidget {
               child: Text(
                 data,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                      fontSize: 11,
-                    ),
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                ),
                 maxLines: 5,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -491,8 +496,14 @@ class _CommLogEntryTile extends StatelessWidget {
         .toUpperCase();
   }
 
-  void _showFullEntryDialog(BuildContext context, String displayData, bool isIncoming) {
-    final directionColor = isIncoming ? AppTheme.successColor : AppTheme.primaryColor;
+  void _showFullEntryDialog(
+    BuildContext context,
+    String displayData,
+    bool isIncoming,
+  ) {
+    final directionColor = isIncoming
+        ? AppTheme.successColor
+        : AppTheme.primaryColor;
 
     showDialog(
       context: context,
@@ -518,16 +529,16 @@ class _CommLogEntryTile extends StatelessWidget {
             Text(
               entry.formattedTimestamp,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                    fontFamily: 'monospace',
-                  ),
+                color: AppTheme.textSecondary,
+                fontFamily: 'monospace',
+              ),
             ),
             const Spacer(),
             Text(
               entry.formattedSize,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ],
         ),
@@ -535,9 +546,9 @@ class _CommLogEntryTile extends StatelessWidget {
           child: SelectableText(
             displayData,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                ),
+              fontFamily: 'monospace',
+              fontSize: 12,
+            ),
           ),
         ),
         actions: [

@@ -12,8 +12,7 @@ class HealthSamples extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// Foreign key to source watch
-  TextColumn get watchId =>
-      text().references(Watches, #id).named('watch_id')();
+  TextColumn get watchId => text().references(Watches, #id).named('watch_id')();
 
   /// Type of health data (steps, heartRate, sleep)
   TextColumn get type => text()();
@@ -30,4 +29,3 @@ class HealthSamples extends Table {
   /// When the data was received by the app
   DateTimeColumn get syncedAt => dateTime().named('synced_at')();
 }
-

@@ -49,7 +49,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
     // Only start once per widget instance
     if (_autoReconnectStarted) return;
     _autoReconnectStarted = true;
-    
+
     final enabled = await ref.read(autoReconnectEnabledProvider.future);
     if (enabled && mounted) {
       final notifier = ref.read(autoReconnectNotifierProvider.notifier);
@@ -116,7 +116,9 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
       context: context,
       watch: watch,
       onRename: (watchId, customName) async {
-        await ref.read(db.watchNotifierProvider.notifier).renameWatch(watchId, customName);
+        await ref
+            .read(db.watchNotifierProvider.notifier)
+            .renameWatch(watchId, customName);
         if (mounted) {
           final newName = customName ?? watch.name;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -134,10 +136,10 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
         if (currentDeviceId == watchId) {
           await watchService.disconnect();
         }
-        
+
         // Forget the watch (removes from DB and unbonds BLE)
         await ref.read(db.watchNotifierProvider.notifier).forgetWatch(watchId);
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -168,10 +170,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: SvgPicture.asset(
-          'assets/images/ZSWatch_Text.svg',
-          height: 24,
-        ),
+        title: SvgPicture.asset('assets/images/ZSWatch_Text.svg', height: 24),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -224,9 +223,9 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
             Text(
               'Add your ZSWatch to get started.\n'
               'Make sure your watch is turned on and nearby.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
@@ -242,7 +241,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
       // Primary watch first
       if (a.isPrimary && !b.isPrimary) return -1;
       if (!a.isPrimary && b.isPrimary) return 1;
-      
+
       // Then by last connected time (most recent first)
       if (a.lastConnectedAt == null && b.lastConnectedAt == null) return 0;
       if (a.lastConnectedAt == null) return 1;
@@ -288,9 +287,9 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
             const SizedBox(height: AppTheme.spacingSm),
             Text(
               error,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
@@ -317,38 +316,38 @@ class _WatchListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final displayName = watch.customName ?? watch.name;
-    
+
     return ListTile(
-        leading: _buildLeadingIcon(),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                displayName,
-                style: const TextStyle(fontWeight: FontWeight.w500),
+      leading: _buildLeadingIcon(),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              displayName,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+          if (watch.isPrimary)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'Primary',
+                style: TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-            if (watch.isPrimary)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'Primary',
-                  style: TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        subtitle: _buildSubtitle(),
-        trailing: _buildTrailing(),
-        onTap: isConnecting ? null : onTap,
+        ],
+      ),
+      subtitle: _buildSubtitle(),
+      trailing: _buildTrailing(),
+      onTap: isConnecting ? null : onTap,
     );
   }
 
@@ -360,7 +359,7 @@ class _WatchListTile extends StatelessWidget {
         child: CircularProgressIndicator(strokeWidth: 2),
       );
     }
-    
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -374,10 +373,7 @@ class _WatchListTile extends StatelessWidget {
           onPressed: onConfig,
           tooltip: 'Watch Settings',
         ),
-        const Icon(
-          Icons.chevron_right,
-          color: AppTheme.textSecondary,
-        ),
+        const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
       ],
     );
   }
@@ -417,7 +413,7 @@ class _WatchListTile extends StatelessWidget {
   Widget _buildBatteryIndicator() {
     final level = watch.batteryLevel ?? 0;
     final color = AppTheme.getBatteryColor(level);
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
       decoration: BoxDecoration(
@@ -438,35 +434,32 @@ class _WatchListTile extends StatelessWidget {
 
   Widget _buildSubtitle() {
     final parts = <String>[];
-    
+
     // Show firmware version if available
     if (watch.firmwareVersion != null) {
       parts.add('v${watch.firmwareVersion}');
     }
-    
+
     // Show last connected time
     if (watch.lastConnectedAt != null) {
       parts.add(_formatLastConnected(watch.lastConnectedAt!));
     }
-    
+
     // Show ID as fallback
     if (parts.isEmpty) {
       parts.add(watch.id);
     }
-    
+
     return Text(
       parts.join(' • '),
-      style: const TextStyle(
-        color: AppTheme.textSecondary,
-        fontSize: 12,
-      ),
+      style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
     );
   }
 
   String _formatLastConnected(DateTime lastConnected) {
     final now = DateTime.now();
     final diff = now.difference(lastConnected);
-    
+
     if (diff.inMinutes < 1) {
       return 'Just now';
     } else if (diff.inHours < 1) {

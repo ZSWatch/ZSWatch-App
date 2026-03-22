@@ -24,7 +24,13 @@ class VoiceNoteAiPipeline {
 
   /// Called after successful AI processing with (filename, summary, actionType, datetime).
   /// Used to send the result toast back to the watch.
-  void Function(String filename, String title, String? actionType, String? datetime)? onProcessingComplete;
+  void Function(
+    String filename,
+    String title,
+    String? actionType,
+    String? datetime,
+  )?
+  onProcessingComplete;
 
   /// Stream of debug info from the most recent AI processing runs.
   final _debugInfoSubject = BehaviorSubject<AiDebugInfo?>.seeded(null);
@@ -182,7 +188,9 @@ class VoiceNoteAiPipeline {
       }
 
       // Notify watch with round-trip confirmation toast
-      final firstAction = result.actions.isNotEmpty ? result.actions.first : null;
+      final firstAction = result.actions.isNotEmpty
+          ? result.actions.first
+          : null;
       final actionDatetime = firstAction?.startTime ?? firstAction?.dueDate;
       onProcessingComplete?.call(
         filename,

@@ -74,8 +74,8 @@ class ProgressCard extends StatelessWidget {
     final progressColor = error
         ? AppTheme.errorColor
         : complete
-            ? AppTheme.successColor
-            : color ?? AppTheme.primaryColor;
+        ? AppTheme.successColor
+        : color ?? AppTheme.primaryColor;
 
     return Card(
       child: Padding(
@@ -161,14 +161,11 @@ class ProgressCard extends StatelessWidget {
                   Text(
                     '${(progress * 100).toInt()}%',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 if (infoText != null && !error)
-                  Text(
-                    infoText!,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  Text(infoText!, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
 
@@ -224,19 +221,13 @@ class ProgressCard extends StatelessWidget {
       return const SizedBox(
         width: 24,
         height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.5,
-        ),
+        child: CircularProgressIndicator(strokeWidth: 2.5),
       );
     } else {
       icon = Icons.download_rounded;
     }
 
-    return Icon(
-      icon,
-      color: color,
-      size: 24,
-    );
+    return Icon(icon, color: color, size: 24);
   }
 }
 
@@ -258,10 +249,7 @@ class InlineProgress extends StatelessWidget {
     return Row(
       children: [
         if (label != null) ...[
-          Text(
-            label!,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
+          Text(label!, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(width: AppTheme.spacingSm),
         ],
         Expanded(
@@ -285,4 +273,3 @@ class InlineProgress extends StatelessWidget {
     );
   }
 }
-

@@ -48,10 +48,11 @@ abstract class NotificationForwardingState with _$NotificationForwardingState {
 }
 
 /// Notifier for notification forwarding state and actions
-class NotificationForwardingNotifier extends StateNotifier<NotificationForwardingState> {
+class NotificationForwardingNotifier
+    extends StateNotifier<NotificationForwardingState> {
   final NotificationService _notificationService;
   final WatchService _watchService;
-  
+
   StreamSubscription<PhoneNotification>? _notificationSubscription;
   StreamSubscription<int>? _notificationRemovedSubscription;
   StreamSubscription<Map<String, dynamic>>? _watchMessageSubscription;
@@ -64,10 +65,8 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
   // Key: notification id (int), Value: notification key (String)
   final Map<int, String> _notificationIdToKey = {};
 
-  NotificationForwardingNotifier(
-    this._notificationService,
-    this._watchService,
-  ) : super(const NotificationForwardingState()) {
+  NotificationForwardingNotifier(this._notificationService, this._watchService)
+    : super(const NotificationForwardingState()) {
     _initialize();
   }
 
@@ -80,12 +79,14 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
     try {
       // Load saved settings
       final prefs = await SharedPreferences.getInstance();
-      final isEnabled = prefs.getBool(_notificationForwardingEnabledKey) ?? false;
+      final isEnabled =
+          prefs.getBool(_notificationForwardingEnabledKey) ?? false;
       final blockedApps = prefs.getStringList(_blockedAppsKey)?.toSet() ?? {};
 
       // Check permission status
       await _notificationService.initialize();
-      final hasPermission = await _notificationService.isNotificationAccessEnabled();
+      final hasPermission = await _notificationService
+          .isNotificationAccessEnabled();
       final isServiceRunning = await _notificationService.isServiceRunning();
 
       state = state.copyWith(
@@ -101,7 +102,9 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
       }
 
       // Listen for notification actions from watch
-      _watchMessageSubscription = _watchService.incomingMessages.listen(_handleWatchMessage);
+      _watchMessageSubscription = _watchService.incomingMessages.listen(
+        _handleWatchMessage,
+      );
     } catch (e) {
       debugPrint('NotificationForwardingNotifier init error: $e');
     }
@@ -117,7 +120,7 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
     final key = id != null ? _notificationIdToKey[id] : null;
 
     if (action == null) return;
-    
+
     debugPrint('Watch notification action: $action, id: $id, key: $key');
 
     switch (action) {
@@ -148,12 +151,15 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
 
   void _startForwarding() {
     _notificationSubscription?.cancel();
-    _notificationSubscription = _notificationService.notificationPosted.listen(_forwardNotification);
-    
+    _notificationSubscription = _notificationService.notificationPosted.listen(
+      _forwardNotification,
+    );
+
     // Also listen for notification removals to sync dismissals to watch
     _notificationRemovedSubscription?.cancel();
-    _notificationRemovedSubscription = _notificationService.notificationRemoved.listen(_handleNotificationRemoved);
-    
+    _notificationRemovedSubscription = _notificationService.notificationRemoved
+        .listen(_handleNotificationRemoved);
+
     debugPrint('Started notification forwarding');
   }
 
@@ -170,10 +176,10 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
     if (!_watchService.isConnected) {
       return;
     }
-    
+
     // Remove from id-to-key map since it's dismissed
     _notificationIdToKey.remove(id);
-    
+
     // Send dismiss to watch
     _watchService.removeNotification(id);
     debugPrint('Synced notification dismissal to watch: $id');
@@ -203,22 +209,25 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
     }
 
     // Deduplication: Skip if we recently sent this notification
-    final dedupeKey = '${notification.id}_${notification.packageName}_${notification.title}';
+    final dedupeKey =
+        '${notification.id}_${notification.packageName}_${notification.title}';
     final now = DateTime.now();
     final lastSent = _recentlySentNotifications[dedupeKey];
     if (lastSent != null) {
       final elapsed = now.difference(lastSent).inMilliseconds;
       if (elapsed < _deduplicationWindowMs) {
-        debugPrint('Notification skipped (duplicate within ${elapsed}ms): ${notification.appName}');
+        debugPrint(
+          'Notification skipped (duplicate within ${elapsed}ms): ${notification.appName}',
+        );
         return;
       }
     }
-    
+
     // Clean up old entries periodically
-    _recentlySentNotifications.removeWhere((key, time) => 
-      now.difference(time).inSeconds > 10
+    _recentlySentNotifications.removeWhere(
+      (key, time) => now.difference(time).inSeconds > 10,
     );
-    
+
     // Record this send
     _recentlySentNotifications[dedupeKey] = now;
 
@@ -227,7 +236,9 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
       _notificationIdToKey[notification.id] = notification.key!;
       // Clean up old entries (keep last 200 notifications)
       if (_notificationIdToKey.length > 200) {
-        final keysToRemove = _notificationIdToKey.keys.take(_notificationIdToKey.length - 150).toList();
+        final keysToRemove = _notificationIdToKey.keys
+            .take(_notificationIdToKey.length - 150)
+            .toList();
         for (final k in keysToRemove) {
           _notificationIdToKey.remove(k);
         }
@@ -262,7 +273,9 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
         phoneNumber: notification.phoneNumber,
         canReply: notification.canReply,
       );
-      debugPrint('Forwarded notification: ${notification.source} - ${notification.title}');
+      debugPrint(
+        'Forwarded notification: ${notification.source} - ${notification.title}',
+      );
     } catch (e) {
       debugPrint('Error forwarding notification: $e');
     }
@@ -295,9 +308,10 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
 
   /// Refresh permission status
   Future<void> refreshPermission() async {
-    final hasPermission = await _notificationService.isNotificationAccessEnabled();
+    final hasPermission = await _notificationService
+        .isNotificationAccessEnabled();
     final isServiceRunning = await _notificationService.isServiceRunning();
-    
+
     state = state.copyWith(
       hasPermission: hasPermission,
       isServiceRunning: isServiceRunning,
@@ -330,9 +344,13 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
   /// Get list of apps with notification access
   Future<List<AppNotificationFilter>> getNotificationApps() async {
     final apps = await _notificationService.getNotificationApps();
-    return apps.map((app) => app.copyWith(
-      enabled: !state.blockedApps.contains(app.packageName),
-    )).toList();
+    return apps
+        .map(
+          (app) => app.copyWith(
+            enabled: !state.blockedApps.contains(app.packageName),
+          ),
+        )
+        .toList();
   }
 
   @override
@@ -345,12 +363,15 @@ class NotificationForwardingNotifier extends StateNotifier<NotificationForwardin
 }
 
 /// Provider for notification forwarding notifier
-final notificationForwardingProvider = 
-    StateNotifierProvider<NotificationForwardingNotifier, NotificationForwardingState>((ref) {
-  final notificationService = ref.watch(notificationServiceProvider);
-  final watchService = ref.watch(watchServiceProvider);
-  return NotificationForwardingNotifier(notificationService, watchService);
-});
+final notificationForwardingProvider =
+    StateNotifierProvider<
+      NotificationForwardingNotifier,
+      NotificationForwardingState
+    >((ref) {
+      final notificationService = ref.watch(notificationServiceProvider);
+      final watchService = ref.watch(watchServiceProvider);
+      return NotificationForwardingNotifier(notificationService, watchService);
+    });
 
 /// State class for media control
 @freezed
@@ -375,24 +396,26 @@ abstract class MediaControlState with _$MediaControlState {
 class MediaControlNotifier extends StateNotifier<MediaControlState> {
   final MediaService _mediaService;
   final WatchService _watchService;
-  
+
   StreamSubscription<MediaPlaybackState>? _playbackSubscription;
   StreamSubscription<MediaMetadata>? _metadataSubscription;
   StreamSubscription<Map<String, dynamic>>? _watchMessageSubscription;
   StreamSubscription<Connection>? _connectionSubscription;
-  
+
   /// Track previous connection state to detect state changes (not just RSSI updates)
   bool _wasConnected = false;
 
   MediaControlNotifier(this._mediaService, this._watchService)
-      : super(const MediaControlState()) {
+    : super(const MediaControlState()) {
     _initialize();
   }
 
   Future<void> _initialize() async {
     // Listen for connection changes to sync on connect (FR-085)
     // Note: connectionStream emits on RSSI updates too, so we track state changes
-    _connectionSubscription = _watchService.connectionStream.listen((connection) {
+    _connectionSubscription = _watchService.connectionStream.listen((
+      connection,
+    ) {
       final isNowConnected = connection.isConnected;
       // Only sync when transitioning from disconnected to connected
       if (isNowConnected && !_wasConnected) {
@@ -415,17 +438,20 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
 
       if (success) {
         // Listen for playback state changes
-        _playbackSubscription = _mediaService.playbackStateStream.listen((playbackState) {
+        _playbackSubscription = _mediaService.playbackStateStream.listen((
+          playbackState,
+        ) {
           final oldState = state.playbackState;
           final oldPosition = state.positionSeconds;
-          
+
           state = state.copyWith(
             playbackState: playbackState.state,
             positionSeconds: playbackState.positionSeconds,
           );
-          
+
           // Only send if state actually changed
-          if (oldState != playbackState.state || oldPosition != playbackState.positionSeconds) {
+          if (oldState != playbackState.state ||
+              oldPosition != playbackState.positionSeconds) {
             _sendStateToWatch();
           }
         });
@@ -435,22 +461,26 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
           final oldTrack = state.track;
           final oldArtist = state.artist;
           final oldAlbum = state.album;
-          
+
           state = state.copyWith(
             artist: metadata.artist,
             album: metadata.album,
             track: metadata.track,
             durationSeconds: metadata.durationSeconds,
           );
-          
+
           // Only send if metadata actually changed
-          if (oldTrack != metadata.track || oldArtist != metadata.artist || oldAlbum != metadata.album) {
+          if (oldTrack != metadata.track ||
+              oldArtist != metadata.artist ||
+              oldAlbum != metadata.album) {
             _sendInfoToWatch();
           }
         });
 
         // Listen for music control from watch
-        _watchMessageSubscription = _watchService.incomingMessages.listen(_handleWatchMessage);
+        _watchMessageSubscription = _watchService.incomingMessages.listen(
+          _handleWatchMessage,
+        );
       }
     } catch (e) {
       debugPrint('MediaControlNotifier init error: $e');
@@ -491,7 +521,7 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
   Future<void> _sendStateToWatch() async {
     if (!_watchService.isConnected) return;
     if (state.playbackState == null) return;
-    
+
     try {
       await _watchService.sendMusicState(
         state: state.playbackState!,
@@ -506,7 +536,7 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
   Future<void> _sendInfoToWatch() async {
     if (!_watchService.isConnected) return;
     if (state.track == null) return;
-    
+
     try {
       await _watchService.sendMusicInfo(
         artist: state.artist,
@@ -566,12 +596,12 @@ class MediaControlNotifier extends StateNotifier<MediaControlState> {
 }
 
 /// Provider for media control notifier
-final mediaControlProvider = 
+final mediaControlProvider =
     StateNotifierProvider<MediaControlNotifier, MediaControlState>((ref) {
-  final mediaService = ref.watch(mediaServiceProvider);
-  final watchService = ref.watch(watchServiceProvider);
-  return MediaControlNotifier(mediaService, watchService);
-});
+      final mediaService = ref.watch(mediaServiceProvider);
+      final watchService = ref.watch(watchServiceProvider);
+      return MediaControlNotifier(mediaService, watchService);
+    });
 
 /// Provider for whether notification forwarding is supported
 final isNotificationForwardingSupported = Provider<bool>((ref) {
@@ -582,4 +612,3 @@ final isNotificationForwardingSupported = Provider<bool>((ref) {
 final isMediaControlSupported = Provider<bool>((ref) {
   return Platform.isAndroid;
 });
-

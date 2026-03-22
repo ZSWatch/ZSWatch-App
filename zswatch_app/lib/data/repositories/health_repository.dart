@@ -10,7 +10,8 @@ import 'base_repository.dart';
 /// Provides a clean interface for CRUD operations on health samples,
 /// abstracting the database layer from the rest of the app.
 /// Includes 60-day data retention with automatic cleanup.
-class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> {
+class HealthRepository
+    extends BaseRepository<HealthSample, HealthSampleEntity> {
   final AppDatabase _db;
 
   HealthRepository(this._db);
@@ -60,7 +61,7 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
   }) async {
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    
+
     return getSamples(
       watchId: watchId,
       type: HealthType.steps,
@@ -76,7 +77,7 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
   }) async {
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    
+
     return getSamples(
       watchId: watchId,
       type: HealthType.heartRate,
@@ -130,7 +131,7 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
   }
 
   /// Get today's total steps
-  /// 
+  ///
   /// Note: The watch sends cumulative daily steps, so we return the maximum
   /// (most recent) value rather than summing all samples.
   Future<int> getTodaySteps(String watchId) async {
@@ -142,7 +143,7 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
       from: startOfDay,
       to: now,
     );
-    
+
     if (samples.isEmpty) return 0;
     // Return the maximum value since the watch sends cumulative daily steps
     return samples.map((s) => s.intValue).reduce((a, b) => a > b ? a : b);
@@ -158,7 +159,7 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
       from: oneHourAgo,
       to: now,
     );
-    
+
     if (samples.isEmpty) return null;
     return samples.last;
   }
@@ -227,7 +228,7 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
   }) async {
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    
+
     return getSamples(
       watchId: watchId,
       type: HealthType.activity,
@@ -237,7 +238,7 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
   }
 
   /// Calculate activity breakdown (time spent in each state) for a day
-  /// 
+  ///
   /// Returns a Map of activity state value to duration spent in that state.
   /// The calculation works by assuming each sample represents the state until
   /// the next sample arrives (or end of day).
@@ -246,25 +247,25 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
     required DateTime date,
   }) async {
     final samples = await getDailyActivity(watchId: watchId, date: date);
-    
+
     if (samples.isEmpty) {
       return {};
     }
-    
+
     final breakdown = <int, Duration>{};
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
     final now = DateTime.now();
     final effectiveEnd = now.isBefore(endOfDay) ? now : endOfDay;
-    
+
     // Sort by timestamp
     final sortedSamples = List<HealthSample>.from(samples)
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    
+
     for (int i = 0; i < sortedSamples.length; i++) {
       final sample = sortedSamples[i];
       final stateValue = sample.intValue;
-      
+
       // Calculate duration until next sample or end of day
       final DateTime nextTime;
       if (i + 1 < sortedSamples.length) {
@@ -272,18 +273,19 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
       } else {
         nextTime = effectiveEnd;
       }
-      
+
       final duration = nextTime.difference(sample.timestamp);
       if (duration.isNegative) continue;
-      
-      breakdown[stateValue] = (breakdown[stateValue] ?? Duration.zero) + duration;
+
+      breakdown[stateValue] =
+          (breakdown[stateValue] ?? Duration.zero) + duration;
     }
-    
+
     return breakdown;
   }
 
   /// Calculate activity breakdown for a date range (week/month)
-  /// 
+  ///
   /// Returns a Map of activity state value to duration spent in that state,
   /// aggregated across all days in the range.
   Future<Map<int, Duration>> getActivityBreakdownForRange({
@@ -297,23 +299,23 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
       from: from,
       to: to,
     );
-    
+
     if (samples.isEmpty) {
       return {};
     }
-    
+
     final breakdown = <int, Duration>{};
     final now = DateTime.now();
     final effectiveEnd = now.isBefore(to) ? now : to;
-    
+
     // Sort by timestamp
     final sortedSamples = List<HealthSample>.from(samples)
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    
+
     for (int i = 0; i < sortedSamples.length; i++) {
       final sample = sortedSamples[i];
       final stateValue = sample.intValue;
-      
+
       // Calculate duration until next sample or end of range
       final DateTime nextTime;
       if (i + 1 < sortedSamples.length) {
@@ -321,13 +323,14 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
       } else {
         nextTime = effectiveEnd;
       }
-      
+
       final duration = nextTime.difference(sample.timestamp);
       if (duration.isNegative) continue;
-      
-      breakdown[stateValue] = (breakdown[stateValue] ?? Duration.zero) + duration;
+
+      breakdown[stateValue] =
+          (breakdown[stateValue] ?? Duration.zero) + duration;
     }
-    
+
     return breakdown;
   }
 
@@ -335,7 +338,9 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
 
   /// Delete old data (60-day retention policy)
   Future<int> cleanupOldData() async {
-    final cutoff = DateTime.now().subtract(const Duration(days: AppConstants.analyticsRetentionDays));
+    final cutoff = DateTime.now().subtract(
+      const Duration(days: AppConstants.analyticsRetentionDays),
+    );
     return _db.deleteOldHealthSamples(cutoff);
   }
 
@@ -403,31 +408,39 @@ class HealthRepository extends BaseRepository<HealthSample, HealthSampleEntity> 
 
     while (periodStart.isBefore(to)) {
       final periodEnd = periodStart.add(periodDuration);
-      
-      final periodSamples = samples.where((s) =>
-          s.timestamp.isAfter(periodStart) && 
-          s.timestamp.isBefore(periodEnd.add(const Duration(seconds: 1)))).toList();
+
+      final periodSamples = samples
+          .where(
+            (s) =>
+                s.timestamp.isAfter(periodStart) &&
+                s.timestamp.isBefore(periodEnd.add(const Duration(seconds: 1))),
+          )
+          .toList();
 
       if (periodSamples.isNotEmpty) {
-        aggregates.add(HealthAggregate.fromSamples(
-          samples: periodSamples,
-          periodStart: periodStart,
-          periodEnd: periodEnd,
-          granularity: granularity,
-        ));
+        aggregates.add(
+          HealthAggregate.fromSamples(
+            samples: periodSamples,
+            periodStart: periodStart,
+            periodEnd: periodEnd,
+            granularity: granularity,
+          ),
+        );
       } else {
         // Add empty aggregate for periods with no data
-        aggregates.add(HealthAggregate(
-          type: type,
-          periodStart: periodStart,
-          periodEnd: periodEnd,
-          granularity: granularity,
-          total: 0,
-          average: 0,
-          min: 0,
-          max: 0,
-          sampleCount: 0,
-        ));
+        aggregates.add(
+          HealthAggregate(
+            type: type,
+            periodStart: periodStart,
+            periodEnd: periodEnd,
+            granularity: granularity,
+            total: 0,
+            average: 0,
+            min: 0,
+            max: 0,
+            sampleCount: 0,
+          ),
+        );
       }
 
       periodStart = periodEnd;

@@ -30,7 +30,9 @@ class ShellService {
 
     debugPrint('[ShellService] Execute: $command');
     final result = await ShellManager.execute(deviceId, command);
-    debugPrint('[ShellService] Result (rc=${result.returnCode}): ${result.output.length} chars');
+    debugPrint(
+      '[ShellService] Result (rc=${result.returnCode}): ${result.output.length} chars',
+    );
     return result;
   }
 

@@ -41,7 +41,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen>
   @override
   Widget build(BuildContext context) {
     final selectedWatchId = ref.watch(selectedWatchIdProvider);
-    
+
     // Ensure analytics services are started
     ref.watch(analyticsServicesInitializedProvider);
 
@@ -96,8 +96,8 @@ class _NoWatchSelected extends StatelessWidget {
           Text(
             'Connect to a watch to view analytics',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
+              color: Theme.of(context).colorScheme.outline,
+            ),
           ),
         ],
       ),
@@ -171,7 +171,7 @@ class _BatteryStatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppTheme.spacingMd),
@@ -180,9 +180,9 @@ class _BatteryStatsCard extends StatelessWidget {
           children: [
             Text(
               'Battery Stats',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppTheme.spacingMd),
             Row(
@@ -254,15 +254,12 @@ class _BatteryChartCard extends StatelessWidget {
           children: [
             Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppTheme.spacingMd),
-            SizedBox(
-              height: 200,
-              child: _buildContent(context, colorScheme),
-            ),
+            SizedBox(height: 200, child: _buildContent(context, colorScheme)),
           ],
         ),
       ),
@@ -276,10 +273,7 @@ class _BatteryChartCard extends StatelessWidget {
 
     if (error != null) {
       return Center(
-        child: Text(
-          error!,
-          style: TextStyle(color: colorScheme.error),
-        ),
+        child: Text(error!, style: TextStyle(color: colorScheme.error)),
       );
     }
 
@@ -288,25 +282,21 @@ class _BatteryChartCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.battery_unknown,
-              size: 48,
-              color: colorScheme.outline,
-            ),
+            Icon(Icons.battery_unknown, size: 48, color: colorScheme.outline),
             const SizedBox(height: AppTheme.spacingSm),
             Text(
               'No battery data yet',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.outline,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: colorScheme.outline),
             ),
             const SizedBox(height: AppTheme.spacingXs),
             Text(
               'Battery level is recorded when\nthe watch sends status updates',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.outline,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: colorScheme.outline),
             ),
           ],
         ),
@@ -359,8 +349,12 @@ class _BatteryChartCard extends StatelessWidget {
               },
             ),
           ),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
         ),
         borderData: FlBorderData(show: false),
         minY: 0,
@@ -422,19 +416,15 @@ class _BatteryInfoCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppTheme.spacingMd),
         child: Row(
           children: [
-            Icon(
-              Icons.info_outline,
-              color: colorScheme.outline,
-              size: 20,
-            ),
+            Icon(Icons.info_outline, color: colorScheme.outline, size: 20),
             const SizedBox(width: AppTheme.spacingSm),
             Expanded(
               child: Text(
                 'Battery data is recorded when the watch sends status updates. '
                 'More accurate estimates require at least 1 hour of data.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.outline,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colorScheme.outline),
               ),
             ),
           ],
@@ -528,9 +518,9 @@ class _UptimeCard extends StatelessWidget {
           children: [
             Text(
               'Connection Uptime',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppTheme.spacingMd),
             if (isLoading)
@@ -598,18 +588,15 @@ class _UptimeIndicator extends StatelessWidget {
               Text(
                 '${percentage.toStringAsFixed(0)}%',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: AppTheme.spacingSm),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }
@@ -625,10 +612,7 @@ class _ConnectionStatsCard extends StatelessWidget {
   final ConnectionStats? stats;
   final bool isLoading;
 
-  const _ConnectionStatsCard({
-    required this.stats,
-    required this.isLoading,
-  });
+  const _ConnectionStatsCard({required this.stats, required this.isLoading});
 
   @override
   Widget build(BuildContext context) {
@@ -642,9 +626,9 @@ class _ConnectionStatsCard extends StatelessWidget {
           children: [
             Text(
               'Last 24 Hours',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppTheme.spacingMd),
             if (isLoading)
@@ -682,7 +666,9 @@ class _ConnectionStatsCard extends StatelessWidget {
                     iconColor: Colors.blue,
                     label: 'Reconnects',
                     value: stats != null
-                        ? (stats!.successfulReconnections + stats!.failedReconnections).toString()
+                        ? (stats!.successfulReconnections +
+                                  stats!.failedReconnections)
+                              .toString()
                         : '0',
                   ),
                 ),
@@ -724,10 +710,7 @@ class _RecentEventsCard extends StatelessWidget {
   final List<ConnectionEventEntity> events;
   final bool isLoading;
 
-  const _RecentEventsCard({
-    required this.events,
-    required this.isLoading,
-  });
+  const _RecentEventsCard({required this.events, required this.isLoading});
 
   @override
   Widget build(BuildContext context) {
@@ -741,9 +724,9 @@ class _RecentEventsCard extends StatelessWidget {
           children: [
             Text(
               'Recent Events',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppTheme.spacingMd),
             if (isLoading)
@@ -754,17 +737,13 @@ class _RecentEventsCard extends StatelessWidget {
                   padding: const EdgeInsets.all(AppTheme.spacingLg),
                   child: Column(
                     children: [
-                      Icon(
-                        Icons.history,
-                        size: 48,
-                        color: colorScheme.outline,
-                      ),
+                      Icon(Icons.history, size: 48, color: colorScheme.outline),
                       const SizedBox(height: AppTheme.spacingSm),
                       Text(
                         'No connection events yet',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.outline,
-                            ),
+                          color: colorScheme.outline,
+                        ),
                       ),
                     ],
                   ),
@@ -883,8 +862,8 @@ class _ConnectionTimelineCard extends ConsumerWidget {
                 Text(
                   'Connection Timeline',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(width: AppTheme.spacingMd),
                 _TimeRangeDropdown(watchId: watchId),
@@ -903,17 +882,32 @@ class _ConnectionTimelineCard extends ConsumerWidget {
             // Legend
             Row(
               children: [
-                _LegendDot(color: _segmentColor(ConnectionSegmentType.connected)),
+                _LegendDot(
+                  color: _segmentColor(ConnectionSegmentType.connected),
+                ),
                 const SizedBox(width: 4),
-                Text('Connected', style: Theme.of(context).textTheme.labelSmall),
+                Text(
+                  'Connected',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
                 const SizedBox(width: AppTheme.spacingMd),
-                _LegendDot(color: _segmentColor(ConnectionSegmentType.disconnected)),
+                _LegendDot(
+                  color: _segmentColor(ConnectionSegmentType.disconnected),
+                ),
                 const SizedBox(width: 4),
-                Text('Disconnected', style: Theme.of(context).textTheme.labelSmall),
+                Text(
+                  'Disconnected',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
                 const SizedBox(width: AppTheme.spacingMd),
-                _LegendDot(color: _segmentColor(ConnectionSegmentType.appNotRunning)),
+                _LegendDot(
+                  color: _segmentColor(ConnectionSegmentType.appNotRunning),
+                ),
                 const SizedBox(width: 4),
-                Text('App not running', style: Theme.of(context).textTheme.labelSmall),
+                Text(
+                  'App not running',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
               ],
             ),
             const SizedBox(height: AppTheme.spacingMd),
@@ -928,9 +922,9 @@ class _ConnectionTimelineCard extends ConsumerWidget {
                 child: Center(
                   child: Text(
                     'No connection data yet',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.outline,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: colorScheme.outline),
                   ),
                 ),
               )
@@ -1030,7 +1024,10 @@ class _TimelineBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final totalMs = windowEnd.difference(windowStart).inMilliseconds.toDouble();
+        final totalMs = windowEnd
+            .difference(windowStart)
+            .inMilliseconds
+            .toDouble();
         if (totalMs <= 0) return const SizedBox.shrink();
 
         final barWidth = constraints.maxWidth;
@@ -1043,7 +1040,9 @@ class _TimelineBar extends StatelessWidget {
               Container(
                 width: barWidth,
                 height: 36,
-                color: _segmentColor(ConnectionSegmentType.appNotRunning).withOpacity(0.3),
+                color: _segmentColor(
+                  ConnectionSegmentType.appNotRunning,
+                ).withOpacity(0.3),
               ),
               // Segments
               for (final seg in segments)
@@ -1051,15 +1050,14 @@ class _TimelineBar extends StatelessWidget {
                   left: math.max(0.0, _xFor(seg.start, totalMs, barWidth)),
                   width: math.max(
                     2.0,
-                    _xFor(seg.end, totalMs, barWidth) - _xFor(seg.start, totalMs, barWidth),
+                    _xFor(seg.end, totalMs, barWidth) -
+                        _xFor(seg.start, totalMs, barWidth),
                   ),
                   top: 0,
                   bottom: 0,
                   child: Tooltip(
                     message: _segmentTooltip(seg),
-                    child: Container(
-                      color: _segmentColor(seg.type),
-                    ),
+                    child: Container(color: _segmentColor(seg.type)),
                   ),
                 ),
               // Current time indicator (right edge tick)
@@ -1067,7 +1065,10 @@ class _TimelineBar extends StatelessWidget {
                 right: 0,
                 top: 0,
                 bottom: 0,
-                child: Container(width: 2, color: Colors.white.withOpacity(0.8)),
+                child: Container(
+                  width: 2,
+                  color: Colors.white.withOpacity(0.8),
+                ),
               ),
             ],
           ),
@@ -1082,8 +1083,10 @@ class _TimelineBar extends StatelessWidget {
   }
 
   String _segmentTooltip(ConnectionSegment seg) {
-    final start = '${seg.start.hour.toString().padLeft(2, '0')}:${seg.start.minute.toString().padLeft(2, '0')}';
-    final end = '${seg.end.hour.toString().padLeft(2, '0')}:${seg.end.minute.toString().padLeft(2, '0')}';
+    final start =
+        '${seg.start.hour.toString().padLeft(2, '0')}:${seg.start.minute.toString().padLeft(2, '0')}';
+    final end =
+        '${seg.end.hour.toString().padLeft(2, '0')}:${seg.end.minute.toString().padLeft(2, '0')}';
     final durationStr = _fmtDuration(seg.duration);
     switch (seg.type) {
       case ConnectionSegmentType.connected:
@@ -1117,17 +1120,14 @@ class _TimelineLabels extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: colorScheme.outline,
-        );
+    final style = Theme.of(
+      context,
+    ).textTheme.labelSmall?.copyWith(color: colorScheme.outline);
     final ticks = _buildTicks();
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        for (final tick in ticks)
-          Text(_label(tick), style: style),
-      ],
+      children: [for (final tick in ticks) Text(_label(tick), style: style)],
     );
   }
 
@@ -1136,7 +1136,9 @@ class _TimelineLabels extends StatelessWidget {
     const tickCount = 5;
     final totalMs = windowEnd.difference(windowStart).inMilliseconds;
     return List.generate(tickCount, (i) {
-      return windowStart.add(Duration(milliseconds: (totalMs * i ~/ (tickCount - 1))));
+      return windowStart.add(
+        Duration(milliseconds: (totalMs * i ~/ (tickCount - 1))),
+      );
     });
   }
 
@@ -1186,17 +1188,17 @@ class _StatTile extends StatelessWidget {
               Text(
                 label,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
+                  color: Theme.of(context).colorScheme.outline,
+                ),
               ),
             ],
           ),
           const SizedBox(height: AppTheme.spacingXs),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -1226,17 +1228,20 @@ class _TimeRangeDropdown extends ConsumerWidget {
         isDense: true,
         onChanged: (TimeRangeOption? newValue) {
           if (newValue != null) {
-            ref.read(connectionTimelineRangeProvider(watchId).notifier).state = newValue;
+            ref.read(connectionTimelineRangeProvider(watchId).notifier).state =
+                newValue;
           }
         },
         items: TimeRangeOption.values
-            .map((option) => DropdownMenuItem<TimeRangeOption>(
-                  value: option,
-                  child: Text(
-                    option.label,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ))
+            .map(
+              (option) => DropdownMenuItem<TimeRangeOption>(
+                value: option,
+                child: Text(
+                  option.label,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            )
             .toList(),
       ),
     );

@@ -22,9 +22,7 @@ class DeveloperScreen extends ConsumerWidget {
     final crashSummary = ref.watch(crashSummaryProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Developer Tools'),
-      ),
+      appBar: AppBar(title: const Text('Developer Tools')),
       body: _DeveloperToolsBody(
         diagnostics: diagnostics,
         connection: connection,
@@ -67,7 +65,9 @@ class _DeveloperToolsBody extends ConsumerWidget {
         title: 'Shell',
         subtitle: 'SMP commands',
         accent: Colors.lightGreenAccent.shade400,
-        onTap: connection.isConnected ? () => context.push(AppRoutes.shell) : null,
+        onTap: connection.isConnected
+            ? () => context.push(AppRoutes.shell)
+            : null,
       ),
       _BlendToolTile(
         icon: Icons.bug_report_outlined,
@@ -81,7 +81,9 @@ class _DeveloperToolsBody extends ConsumerWidget {
         title: 'Sensors',
         subtitle: 'Real-time data',
         accent: Colors.tealAccent.shade400,
-        onTap: connection.isConnected ? () => context.push(AppRoutes.sensors) : null,
+        onTap: connection.isConnected
+            ? () => context.push(AppRoutes.sensors)
+            : null,
       ),
     ];
 
@@ -187,11 +189,11 @@ class _BlendTerminalSectionTitle extends StatelessWidget {
     return Text(
       '< $label',
       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: AppTheme.primaryColor,
-            fontFamily: 'monospace',
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.3,
-          ),
+        color: AppTheme.primaryColor,
+        fontFamily: 'monospace',
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.3,
+      ),
     );
   }
 }
@@ -244,9 +246,9 @@ class _BlendToolTile extends StatelessWidget {
                 const Spacer(),
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -254,9 +256,9 @@ class _BlendToolTile extends StatelessWidget {
                 Text(
                   subtitle,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
-                      ),
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -274,11 +276,7 @@ class _BlendActionChip extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
 
-  const _BlendActionChip({
-    required this.icon,
-    required this.label,
-    this.onTap,
-  });
+  const _BlendActionChip({required this.icon, required this.label, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -311,9 +309,9 @@ class _BlendActionChip extends StatelessWidget {
                   label,
                   maxLines: 1,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                      ),
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -344,17 +342,21 @@ class _CompactDebugToolsHub extends StatelessWidget {
                 color: AppTheme.primaryColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.tune, size: 18, color: AppTheme.primaryColor),
+              child: const Icon(
+                Icons.tune,
+                size: 18,
+                color: AppTheme.primaryColor,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Debug Tools',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'monospace',
-                      color: AppTheme.primaryColor,
-                    ),
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'monospace',
+                  color: AppTheme.primaryColor,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -387,9 +389,8 @@ class _CompactDebugToolsHub extends StatelessWidget {
                   children: [
                     Text(
                       'Debug Tools',
-                      style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                      style: Theme.of(sheetContext).textTheme.titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 16),
                     Container(
@@ -416,7 +417,9 @@ class _CompactDebugToolsHub extends StatelessWidget {
                     Expanded(
                       child: TabBarView(
                         children: const [
-                          _DebugToolSheetPage(child: NotificationDebugSection()),
+                          _DebugToolSheetPage(
+                            child: NotificationDebugSection(),
+                          ),
                           _DebugToolSheetPage(child: MusicDebugSection()),
                         ],
                       ),
@@ -441,9 +444,7 @@ class _DebugToolSheetPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ScrollConfiguration(
       behavior: const MaterialScrollBehavior().copyWith(overscroll: false),
-      child: SingleChildScrollView(
-        child: child,
-      ),
+      child: SingleChildScrollView(child: child),
     );
   }
 }
@@ -505,7 +506,10 @@ class _DiagnosticsCard extends ConsumerWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: diagnostics.isConnected
                         ? AppTheme.successColor.withValues(alpha: 0.2)
@@ -515,10 +519,10 @@ class _DiagnosticsCard extends ConsumerWidget {
                   child: Text(
                     diagnostics.isConnected ? 'Connected' : 'Disconnected',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: diagnostics.isConnected
-                              ? AppTheme.successColor
-                              : AppTheme.errorColor,
-                        ),
+                      color: diagnostics.isConnected
+                          ? AppTheme.successColor
+                          : AppTheme.errorColor,
+                    ),
                   ),
                 ),
               ],
@@ -541,7 +545,8 @@ class _DiagnosticsCard extends ConsumerWidget {
             ),
             _DiagnosticRow(
               label: 'RSSI',
-              value: '${diagnostics.rssiDisplay} (${diagnostics.signalStrength})',
+              value:
+                  '${diagnostics.rssiDisplay} (${diagnostics.signalStrength})',
               icon: Icons.signal_cellular_alt,
             ),
             _DiagnosticRow(
@@ -577,17 +582,17 @@ class _DiagnosticRow extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               value,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontFamily: 'monospace',
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontFamily: 'monospace'),
               textAlign: TextAlign.end,
               overflow: TextOverflow.ellipsis,
             ),

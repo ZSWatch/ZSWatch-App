@@ -244,8 +244,8 @@ class _TerminalTabState extends ConsumerState<_TerminalTab> {
                           color: line.isError
                               ? AppTheme.errorColor
                               : line.isCommand
-                                  ? AppTheme.primaryColor
-                                  : AppTheme.textPrimary,
+                              ? AppTheme.primaryColor
+                              : AppTheme.textPrimary,
                           fontWeight: line.isCommand
                               ? FontWeight.bold
                               : FontWeight.normal,
@@ -277,10 +277,7 @@ class _TerminalTabState extends ConsumerState<_TerminalTab> {
                 child: TextField(
                   controller: _commandController,
                   focusNode: _focusNode,
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 14,
-                  ),
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     hintText: 'Enter command...',
@@ -303,11 +300,15 @@ class _TerminalTabState extends ConsumerState<_TerminalTab> {
                   icon: const Icon(Icons.send, size: 20),
                   onPressed: _submit,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                 ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, size: 20),
-                onPressed: () => ref.read(shellTerminalProvider.notifier).clear(),
+                onPressed: () =>
+                    ref.read(shellTerminalProvider.notifier).clear(),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
               ),
@@ -440,9 +441,9 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppTheme.spacingSm),
       child: Text(
         title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: AppTheme.textSecondary,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.titleSmall?.copyWith(color: AppTheme.textSecondary),
       ),
     );
   }
@@ -480,10 +481,16 @@ class _QuickActionCardState extends State<_QuickActionCard> {
           title: const Text('Confirm'),
           content: Text('Execute "${widget.command}"?'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Execute', style: TextStyle(color: AppTheme.errorColor)),
+              child: const Text(
+                'Execute',
+                style: TextStyle(color: AppTheme.errorColor),
+              ),
             ),
           ],
         ),
@@ -535,17 +542,23 @@ class _QuickActionCardState extends State<_QuickActionCard> {
                   Icon(
                     widget.icon,
                     size: 20,
-                    color: widget.isDestructive ? AppTheme.errorColor : AppTheme.primaryColor,
+                    color: widget.isDestructive
+                        ? AppTheme.errorColor
+                        : AppTheme.primaryColor,
                   ),
                   const SizedBox(width: AppTheme.spacingSm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.title, style: Theme.of(context).textTheme.bodyMedium),
+                        Text(
+                          widget.title,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                         Text(
                           widget.command,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
                                 fontFamily: 'monospace',
                                 color: AppTheme.textSecondary,
                                 fontSize: 11,
@@ -561,7 +574,11 @@ class _QuickActionCardState extends State<_QuickActionCard> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   else
-                    const Icon(Icons.play_arrow, size: 20, color: AppTheme.textSecondary),
+                    const Icon(
+                      Icons.play_arrow,
+                      size: 20,
+                      color: AppTheme.textSecondary,
+                    ),
                 ],
               ),
               if (_result != null) ...[
@@ -578,7 +595,9 @@ class _QuickActionCardState extends State<_QuickActionCard> {
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 11,
-                      color: _isError ? AppTheme.errorColor : AppTheme.textPrimary,
+                      color: _isError
+                          ? AppTheme.errorColor
+                          : AppTheme.textPrimary,
                     ),
                   ),
                 ),
@@ -659,7 +678,9 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
       if (mounted) {
         // Parse app names from firmware output.
         // Format: "  [0] AppName (stopped)" or "  [1] My App (visible) [hidden]"
-        final nameRegex = RegExp(r'\[\d+\]\s+(.+?)\s+\((?:stopped|visible|hidden|unknown)\)');
+        final nameRegex = RegExp(
+          r'\[\d+\]\s+(.+?)\s+\((?:stopped|visible|hidden|unknown)\)',
+        );
         final names = <String>[];
         for (final line in result.output.split('\n')) {
           final match = nameRegex.firstMatch(line);
@@ -697,7 +718,9 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      physics: _touchpadScrollLocked ? const NeverScrollableScrollPhysics() : null,
+      physics: _touchpadScrollLocked
+          ? const NeverScrollableScrollPhysics()
+          : null,
       padding: const EdgeInsets.all(AppTheme.spacingMd),
       children: [
         // Touchpad in center, hardware buttons at 45° corners (like the watch)
@@ -772,9 +795,9 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
             _status!,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondary,
-                  fontFamily: 'monospace',
-                ),
+              color: AppTheme.textSecondary,
+              fontFamily: 'monospace',
+            ),
           ),
         ],
 
@@ -795,7 +818,8 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
                         ),
                 ),
               )
-            else ...[              Expanded(
+            else ...[
+              Expanded(
                 child: ElevatedButton.icon(
                   onPressed: _loadApps,
                   icon: const Icon(Icons.refresh, size: 16),
@@ -805,19 +829,26 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
             ],
           ],
         ),
-        if (_appList != null) ...[          const SizedBox(height: AppTheme.spacingSm),
-          ...(_appList!.map((app) => Card(
-                margin: const EdgeInsets.only(bottom: AppTheme.spacingXs),
-                child: ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.apps, size: 20, color: AppTheme.primaryColor),
-                  title: Text(app),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.launch, size: 18),
-                    onPressed: () => _launchApp(app),
-                  ),
+        if (_appList != null) ...[
+          const SizedBox(height: AppTheme.spacingSm),
+          ...(_appList!.map(
+            (app) => Card(
+              margin: const EdgeInsets.only(bottom: AppTheme.spacingXs),
+              child: ListTile(
+                dense: true,
+                leading: const Icon(
+                  Icons.apps,
+                  size: 20,
+                  color: AppTheme.primaryColor,
                 ),
-              ))),
+                title: Text(app),
+                trailing: IconButton(
+                  icon: const Icon(Icons.launch, size: 18),
+                  onPressed: () => _launchApp(app),
+                ),
+              ),
+            ),
+          )),
         ],
       ],
     );
@@ -904,8 +935,14 @@ class _WatchTouchpadState extends State<_WatchTouchpad> {
         ? center + fromCenter / fromCenter.distance * radius
         : local;
     setState(() => _pointerPos = clamped);
-    final x = (clamped.dx / _displaySize * _watchSize).round().clamp(0, _watchSize - 1);
-    final y = (clamped.dy / _displaySize * _watchSize).round().clamp(0, _watchSize - 1);
+    final x = (clamped.dx / _displaySize * _watchSize).round().clamp(
+      0,
+      _watchSize - 1,
+    );
+    final y = (clamped.dy / _displaySize * _watchSize).round().clamp(
+      0,
+      _watchSize - 1,
+    );
     return (x, y);
   }
 
@@ -959,9 +996,9 @@ class _WatchTouchpadState extends State<_WatchTouchpad> {
         gestures: {
           _EagerGestureRecognizer:
               GestureRecognizerFactoryWithHandlers<_EagerGestureRecognizer>(
-            _EagerGestureRecognizer.new,
-            (_) {},
-          ),
+                _EagerGestureRecognizer.new,
+                (_) {},
+              ),
         },
         child: SizedBox(
           width: _displaySize,
@@ -1006,11 +1043,7 @@ class _TouchpadPainter extends CustomPainter {
     final radius = size.shortestSide / 2;
 
     // Background circle
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()..color = Colors.white10,
-    );
+    canvas.drawCircle(center, radius, Paint()..color = Colors.white10);
 
     // Border
     canvas.drawCircle(
@@ -1026,10 +1059,16 @@ class _TouchpadPainter extends CustomPainter {
     final linePaint = Paint()
       ..color = Colors.white12
       ..strokeWidth = 1;
-    canvas.drawLine(Offset(center.dx, center.dy - radius * 0.8),
-        Offset(center.dx, center.dy + radius * 0.8), linePaint);
-    canvas.drawLine(Offset(center.dx - radius * 0.8, center.dy),
-        Offset(center.dx + radius * 0.8, center.dy), linePaint);
+    canvas.drawLine(
+      Offset(center.dx, center.dy - radius * 0.8),
+      Offset(center.dx, center.dy + radius * 0.8),
+      linePaint,
+    );
+    canvas.drawLine(
+      Offset(center.dx - radius * 0.8, center.dy),
+      Offset(center.dx + radius * 0.8, center.dy),
+      linePaint,
+    );
 
     // Touch indicator dot
     if (pointerPos != null) {
@@ -1083,7 +1122,9 @@ class _LiveMonitorTab extends ConsumerWidget {
               Icon(
                 monitor.isEnabled ? Icons.circle : Icons.circle_outlined,
                 size: 12,
-                color: monitor.isEnabled ? AppTheme.successColor : AppTheme.textSecondary,
+                color: monitor.isEnabled
+                    ? AppTheme.successColor
+                    : AppTheme.textSecondary,
               ),
               const SizedBox(width: AppTheme.spacingSm),
               Expanded(
@@ -1091,16 +1132,18 @@ class _LiveMonitorTab extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      monitor.isEnabled ? 'Monitoring active' : 'Monitoring paused',
+                      monitor.isEnabled
+                          ? 'Monitoring active'
+                          : 'Monitoring paused',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     if (monitor.lastUpdate != null)
                       Text(
                         'Last update: ${_formatTime(monitor.lastUpdate!)}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.textSecondary,
-                              fontSize: 11,
-                            ),
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
                       ),
                   ],
                 ),
@@ -1109,13 +1152,18 @@ class _LiveMonitorTab extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.restart_alt, size: 20),
                   tooltip: 'Reset history',
-                  onPressed: () => ref.read(liveMonitorProvider.notifier).resetHistory(),
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  onPressed: () =>
+                      ref.read(liveMonitorProvider.notifier).resetHistory(),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                   padding: EdgeInsets.zero,
                 ),
               Switch(
                 value: monitor.isEnabled,
-                onChanged: (_) => ref.read(liveMonitorProvider.notifier).toggle(),
+                onChanged: (_) =>
+                    ref.read(liveMonitorProvider.notifier).toggle(),
                 activeThumbColor: AppTheme.primaryColor,
               ),
             ],
@@ -1142,35 +1190,42 @@ class _LiveMonitorTab extends ConsumerWidget {
                   ),
                 )
               : monitor.isEnabled && monitor.lastUpdate == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(AppTheme.spacingSm),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // System info row
-                          _SystemInfoCard(monitor: monitor),
-                          const SizedBox(height: AppTheme.spacingSm),
-                          // Threads (stack bars + state + priority + cycles/s)
-                          if (monitor.threadHistories.isNotEmpty) ...[
-                            _ThreadsCard(histories: monitor.threadHistories),
-                            const SizedBox(height: AppTheme.spacingSm),
-                          ],
-                          // Cycles/s chart
-                          if (monitor.pollCount > 1 && monitor.threadHistories.isNotEmpty)
-                            _CyclesChartCard(histories: monitor.threadHistories, pollCount: monitor.pollCount),
-                          if (monitor.threadHistories.isEmpty && monitor.isEnabled)
-                            const Padding(
-                              padding: EdgeInsets.all(AppTheme.spacingMd),
-                              child: Text(
-                                'Thread data not available — check firmware thread monitor support',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                              ),
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppTheme.spacingSm),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // System info row
+                      _SystemInfoCard(monitor: monitor),
+                      const SizedBox(height: AppTheme.spacingSm),
+                      // Threads (stack bars + state + priority + cycles/s)
+                      if (monitor.threadHistories.isNotEmpty) ...[
+                        _ThreadsCard(histories: monitor.threadHistories),
+                        const SizedBox(height: AppTheme.spacingSm),
+                      ],
+                      // Cycles/s chart
+                      if (monitor.pollCount > 1 &&
+                          monitor.threadHistories.isNotEmpty)
+                        _CyclesChartCard(
+                          histories: monitor.threadHistories,
+                          pollCount: monitor.pollCount,
+                        ),
+                      if (monitor.threadHistories.isEmpty && monitor.isEnabled)
+                        const Padding(
+                          padding: EdgeInsets.all(AppTheme.spacingMd),
+                          child: Text(
+                            'Thread data not available — check firmware thread monitor support',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
                             ),
-                        ],
-                      ),
-                    ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
         ),
       ],
     );
@@ -1205,7 +1260,11 @@ class _SystemInfoCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.info_outline, size: 16, color: AppTheme.primaryColor),
+                const Icon(
+                  Icons.info_outline,
+                  size: 16,
+                  color: AppTheme.primaryColor,
+                ),
                 const SizedBox(width: AppTheme.spacingSm),
                 Text('System', style: Theme.of(context).textTheme.titleSmall),
               ],
@@ -1218,7 +1277,9 @@ class _SystemInfoCard extends StatelessWidget {
                     icon: Icons.speed,
                     label: 'CPU',
                     value: cpuFreq ?? '—',
-                    color: cpuFreq == 'fast' ? AppTheme.warningColor : AppTheme.successColor,
+                    color: cpuFreq == 'fast'
+                        ? AppTheme.warningColor
+                        : AppTheme.successColor,
                   ),
                 ),
                 Expanded(
@@ -1226,7 +1287,9 @@ class _SystemInfoCard extends StatelessWidget {
                     icon: Icons.power_settings_new,
                     label: 'Power',
                     value: power?.state ?? '—',
-                    color: power?.state == 'Active' ? AppTheme.successColor : AppTheme.textSecondary,
+                    color: power?.state == 'Active'
+                        ? AppTheme.successColor
+                        : AppTheme.textSecondary,
                   ),
                 ),
                 Expanded(
@@ -1252,9 +1315,9 @@ class _SystemInfoCard extends StatelessWidget {
               Text(
                 'Scheduler: ${monitor.schedulerCycles} cycles since last call',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
-                      fontSize: 10,
-                    ),
+                  color: AppTheme.textSecondary,
+                  fontSize: 10,
+                ),
               ),
             ],
           ],
@@ -1294,17 +1357,17 @@ class _InfoTile extends StatelessWidget {
         Text(
           value,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: color,
-                fontSize: 11,
-              ),
+            fontWeight: FontWeight.bold,
+            color: color,
+            fontSize: 11,
+          ),
         ),
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-                fontSize: 9,
-              ),
+            color: AppTheme.textSecondary,
+            fontSize: 9,
+          ),
         ),
       ],
     );
@@ -1337,9 +1400,16 @@ class _ThreadsCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.memory, size: 16, color: AppTheme.primaryColor),
+                const Icon(
+                  Icons.memory,
+                  size: 16,
+                  color: AppTheme.primaryColor,
+                ),
                 const SizedBox(width: AppTheme.spacingSm),
-                Text('Threads (${sorted.length})', style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  'Threads (${sorted.length})',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
                 const Spacer(),
                 Container(
                   width: 8,
@@ -1350,7 +1420,13 @@ class _ThreadsCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 4),
-                Text('max', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 9, color: AppTheme.textSecondary)),
+                Text(
+                  'max',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontSize: 9,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: AppTheme.spacingSm),
@@ -1370,8 +1446,12 @@ class _ThreadEntry extends StatelessWidget {
   Widget build(BuildContext context) {
     final isRemoved = thread.removed;
     final dimAlpha = isRemoved ? 0.4 : 1.0;
-    final currentFrac = thread.stackSize > 0 ? thread.currentStackUsed / thread.stackSize : 0.0;
-    final maxFrac = thread.stackSize > 0 ? thread.maxStackUsed / thread.stackSize : 0.0;
+    final currentFrac = thread.stackSize > 0
+        ? thread.currentStackUsed / thread.stackSize
+        : 0.0;
+    final maxFrac = thread.stackSize > 0
+        ? thread.maxStackUsed / thread.stackSize
+        : 0.0;
     final maxPct = thread.stackSize > 0
         ? ((thread.maxStackUsed / thread.stackSize) * 100).round()
         : 0;
@@ -1393,106 +1473,132 @@ class _ThreadEntry extends StatelessWidget {
     final cpsText = lastCps > 1e6
         ? '${(lastCps / 1e6).toStringAsFixed(1)}M/s'
         : lastCps > 1e3
-            ? '${(lastCps / 1e3).toStringAsFixed(1)}K/s'
-            : '${lastCps.toStringAsFixed(0)}/s';
+        ? '${(lastCps / 1e3).toStringAsFixed(1)}K/s'
+        : '${lastCps.toStringAsFixed(0)}/s';
 
     return Opacity(
       opacity: dimAlpha,
       child: Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Row 1: name, state, priority, cycles/s
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  thread.name,
-                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.w600),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  thread.state,
-                  style: const TextStyle(fontSize: 8, color: AppTheme.textSecondary),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'P${thread.priority}',
-                style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                cpsText,
-                style: TextStyle(fontSize: 9, color: AppTheme.primaryColor.withValues(alpha: 0.8)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 3),
-          // Row 2: stack bar with labels
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 10,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final maxWidth = constraints.maxWidth;
-                      return Stack(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                          Container(
-                            width: maxWidth * currentFrac.clamp(0.0, 1.0),
-                            decoration: BoxDecoration(
-                              color: barColor.withValues(alpha: 0.7),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                          if (maxFrac > currentFrac)
-                            Positioned(
-                              left: (maxWidth * maxFrac.clamp(0.0, 1.0)) - 1,
-                              top: 0,
-                              bottom: 0,
-                              child: Container(
-                                width: 2,
-                                color: AppTheme.warningColor.withValues(alpha: 0.8),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Row 1: name, state, priority, cycles/s
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    thread.name,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '${thread.currentStackUsed}/${thread.stackSize}',
-                style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary, fontFamily: 'monospace'),
-              ),
-              if (maxPct > thread.currentUsagePercent) ...[                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    thread.state,
+                    style: const TextStyle(
+                      fontSize: 8,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
                 Text(
-                  '(max $maxPct%)',
-                  style: TextStyle(fontSize: 8, color: AppTheme.warningColor.withValues(alpha: 0.8)),
+                  'P${thread.priority}',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  cpsText,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: AppTheme.primaryColor.withValues(alpha: 0.8),
+                  ),
                 ),
               ],
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 3),
+            // Row 2: stack bar with labels
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 10,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final maxWidth = constraints.maxWidth;
+                        return Stack(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                            Container(
+                              width: maxWidth * currentFrac.clamp(0.0, 1.0),
+                              decoration: BoxDecoration(
+                                color: barColor.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                            if (maxFrac > currentFrac)
+                              Positioned(
+                                left: (maxWidth * maxFrac.clamp(0.0, 1.0)) - 1,
+                                top: 0,
+                                bottom: 0,
+                                child: Container(
+                                  width: 2,
+                                  color: AppTheme.warningColor.withValues(
+                                    alpha: 0.8,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${thread.currentStackUsed}/${thread.stackSize}',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppTheme.textSecondary,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+                if (maxPct > thread.currentUsagePercent) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    '(max $maxPct%)',
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: AppTheme.warningColor.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
     );
   }
 }
@@ -1522,18 +1628,19 @@ class _CyclesChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Only show threads that have had non-zero cycles and are not removed.
-    final active = histories.entries.where((e) {
-      return !e.value.removed && e.value.cyclesPerSecHistory.any((v) => v > 0);
-    }).toList()
-      ..sort((a, b) {
-        final aMax = a.value.cyclesPerSecHistory.isEmpty
-            ? 0.0
-            : a.value.cyclesPerSecHistory.reduce((a, b) => a > b ? a : b);
-        final bMax = b.value.cyclesPerSecHistory.isEmpty
-            ? 0.0
-            : b.value.cyclesPerSecHistory.reduce((a, b) => a > b ? a : b);
-        return bMax.compareTo(aMax);
-      });
+    final active =
+        histories.entries.where((e) {
+          return !e.value.removed &&
+              e.value.cyclesPerSecHistory.any((v) => v > 0);
+        }).toList()..sort((a, b) {
+          final aMax = a.value.cyclesPerSecHistory.isEmpty
+              ? 0.0
+              : a.value.cyclesPerSecHistory.reduce((a, b) => a > b ? a : b);
+          final bMax = b.value.cyclesPerSecHistory.isEmpty
+              ? 0.0
+              : b.value.cyclesPerSecHistory.reduce((a, b) => a > b ? a : b);
+          return bMax.compareTo(aMax);
+        });
 
     if (active.isEmpty) return const SizedBox.shrink();
 
@@ -1556,16 +1663,18 @@ class _CyclesChartCard extends StatelessWidget {
         spots.add(FlSpot(x, history[i]));
       }
       if (spots.isEmpty) continue;
-      lines.add(LineChartBarData(
-        spots: spots,
-        isCurved: true,
-        preventCurveOverShooting: true,
-        color: _chartColors[idx % _chartColors.length],
-        barWidth: 1.5,
-        isStrokeCapRound: true,
-        dotData: const FlDotData(show: false),
-        belowBarData: BarAreaData(show: false),
-      ));
+      lines.add(
+        LineChartBarData(
+          spots: spots,
+          isCurved: true,
+          preventCurveOverShooting: true,
+          color: _chartColors[idx % _chartColors.length],
+          barWidth: 1.5,
+          isStrokeCapRound: true,
+          dotData: const FlDotData(show: false),
+          belowBarData: BarAreaData(show: false),
+        ),
+      );
     }
 
     return Card(
@@ -1577,7 +1686,11 @@ class _CyclesChartCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.show_chart, size: 16, color: AppTheme.primaryColor),
+                const Icon(
+                  Icons.show_chart,
+                  size: 16,
+                  color: AppTheme.primaryColor,
+                ),
                 const SizedBox(width: AppTheme.spacingSm),
                 Text('Cycles/s', style: Theme.of(context).textTheme.titleSmall),
               ],
@@ -1600,7 +1713,10 @@ class _CyclesChartCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         shown[idx].key,
-                        style: const TextStyle(fontSize: 9, fontFamily: 'monospace'),
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontFamily: 'monospace',
+                        ),
                       ),
                     ],
                   ),
@@ -1641,13 +1757,25 @@ class _CyclesChartCard extends StatelessWidget {
                           } else {
                             text = value.toInt().toString();
                           }
-                          return Text(text, style: const TextStyle(fontSize: 8, color: AppTheme.textSecondary));
+                          return Text(
+                            text,
+                            style: const TextStyle(
+                              fontSize: 8,
+                              color: AppTheme.textSecondary,
+                            ),
+                          );
                         },
                       ),
                     ),
-                    bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   lineTouchData: LineTouchData(
@@ -1660,7 +1788,9 @@ class _CyclesChartCard extends StatelessWidget {
                             '$name: ${spot.y.toStringAsFixed(0)}',
                             TextStyle(
                               fontSize: 10,
-                              color: _chartColors[spot.barIndex % _chartColors.length],
+                              color:
+                                  _chartColors[spot.barIndex %
+                                      _chartColors.length],
                             ),
                           );
                         }).toList();
@@ -1676,5 +1806,3 @@ class _CyclesChartCard extends StatelessWidget {
     );
   }
 }
-
-

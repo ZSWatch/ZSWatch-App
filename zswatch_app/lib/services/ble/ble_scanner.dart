@@ -63,9 +63,7 @@ class ScannedWatch {
   /// Display name without status suffix
   String get displayName {
     // Remove (Connected) or (Paired) suffix if present
-    return name
-        .replaceAll(' (Connected)', '')
-        .replaceAll(' (Paired)', '');
+    return name.replaceAll(' (Connected)', '').replaceAll(' (Paired)', '');
   }
 
   /// Status text for display
@@ -104,7 +102,8 @@ class ScannedWatch {
 /// BLE Scanner for discovering ZSWatch devices
 class BleScanner {
   final _scannedDevices = <String, ScannedWatch>{};
-  final _scanResultsController = StreamController<List<ScannedWatch>>.broadcast();
+  final _scanResultsController =
+      StreamController<List<ScannedWatch>>.broadcast();
   StreamSubscription<List<ScanResult>>? _scanSubscription;
   Timer? _staleDeviceTimer;
   bool _isScanning = false;
@@ -116,14 +115,14 @@ class BleScanner {
   Stream<List<ScannedWatch>> get scanResults => _scanResultsController.stream;
 
   /// Current list of discovered devices
-  List<ScannedWatch> get discoveredDevices => _scannedDevices.values.toList()
-    ..sort((a, b) {
-      // Connected devices first, then by RSSI
-      if (a.isConnected != b.isConnected) {
-        return a.isConnected ? -1 : 1;
-      }
-      return b.rssi.compareTo(a.rssi);
-    });
+  List<ScannedWatch> get discoveredDevices =>
+      _scannedDevices.values.toList()..sort((a, b) {
+        // Connected devices first, then by RSSI
+        if (a.isConnected != b.isConnected) {
+          return a.isConnected ? -1 : 1;
+        }
+        return b.rssi.compareTo(a.rssi);
+      });
 
   /// Whether currently scanning
   bool get isScanning => _isScanning;
@@ -179,17 +178,19 @@ class BleScanner {
     try {
       // Get system-connected devices that we know about
       final connectedDevices = FlutterBluePlus.connectedDevices;
-      
+
       for (final device in connectedDevices) {
         final deviceId = device.remoteId.str;
-        final deviceName = device.advName.isNotEmpty 
-            ? device.advName 
+        final deviceName = device.advName.isNotEmpty
+            ? device.advName
             : device.platformName;
-        
+
         // Only show connected devices that are in our database OR are ZSWatch devices
         final isKnown = _knownWatchIds.contains(deviceId);
-        final isZsWatch = deviceName.toLowerCase().contains(BleConfig.deviceNamePrefix.toLowerCase());
-        
+        final isZsWatch = deviceName.toLowerCase().contains(
+          BleConfig.deviceNamePrefix.toLowerCase(),
+        );
+
         if (isKnown || isZsWatch) {
           _scannedDevices[deviceId] = ScannedWatch(
             id: deviceId,
@@ -207,29 +208,29 @@ class BleScanner {
       // Only show bonded devices that are in our app database
       if (_knownWatchIds.isNotEmpty) {
         final bondedDevices = await FlutterBluePlus.bondedDevices;
-        
+
         for (final device in bondedDevices) {
           final deviceId = device.remoteId.str;
-          
+
           // Skip if already added as connected
           if (_scannedDevices.containsKey(deviceId)) continue;
-          
+
           // Only show if it's in our database
           if (_knownWatchIds.contains(deviceId)) {
-            final deviceName = device.advName.isNotEmpty 
-                ? device.advName 
+            final deviceName = device.advName.isNotEmpty
+                ? device.advName
                 : device.platformName;
-            
-          _scannedDevices[deviceId] = ScannedWatch(
-            id: deviceId,
-            name: deviceName.isNotEmpty ? deviceName : 'ZSWatch',
-            rssi: -100, // Low priority for paired-only devices
-            device: device,
-            discoveredAt: DateTime.now(),
-            isConnected: false,
-            isBonded: true,
-            isAdvertising: false, // Not from scan, from bonded list
-          );
+
+            _scannedDevices[deviceId] = ScannedWatch(
+              id: deviceId,
+              name: deviceName.isNotEmpty ? deviceName : 'ZSWatch',
+              rssi: -100, // Low priority for paired-only devices
+              device: device,
+              discoveredAt: DateTime.now(),
+              isConnected: false,
+              isBonded: true,
+              isAdvertising: false, // Not from scan, from bonded list
+            );
           }
         }
       }
@@ -250,7 +251,9 @@ class BleScanner {
 
       // Filter for ZSWatch devices
       if (deviceName.isEmpty ||
-          !deviceName.toLowerCase().contains(BleConfig.deviceNamePrefix.toLowerCase())) {
+          !deviceName.toLowerCase().contains(
+            BleConfig.deviceNamePrefix.toLowerCase(),
+          )) {
         continue;
       }
 
@@ -258,8 +261,9 @@ class BleScanner {
 
       if (_scannedDevices.containsKey(deviceId)) {
         // Update existing device
-        _scannedDevices[deviceId] =
-            _scannedDevices[deviceId]!.updateRssi(result.rssi);
+        _scannedDevices[deviceId] = _scannedDevices[deviceId]!.updateRssi(
+          result.rssi,
+        );
       } else {
         // Add new device
         _scannedDevices[deviceId] = ScannedWatch(
@@ -322,4 +326,3 @@ class BleScanner {
     await _scanResultsController.close();
   }
 }
-

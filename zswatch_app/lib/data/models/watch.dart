@@ -43,15 +43,8 @@ abstract class Watch with _$Watch {
   }) = _Watch;
 
   /// Create a Watch from a scanned device (before pairing)
-  factory Watch.fromScan({
-    required String id,
-    required String name,
-  }) {
-    return Watch(
-      id: id,
-      name: name,
-      createdAt: DateTime.now(),
-    );
+  factory Watch.fromScan({required String id, required String name}) {
+    return Watch(id: id, name: name, createdAt: DateTime.now());
   }
 
   /// Whether the watch has been connected at least once

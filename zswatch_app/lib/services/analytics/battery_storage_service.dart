@@ -22,11 +22,11 @@ class BatteryStorageService {
 
   StreamSubscription<int>? _batterySubscription;
   StreamSubscription<Connection>? _connectionSubscription;
-  
+
   String? _currentWatchId;
   int? _lastStoredLevel;
   DateTime? _lastStoredTime;
-  
+
   /// Minimum time between stored readings (5 minutes)
   /// This prevents storing too many readings if the watch sends frequent updates
   static const _minStorageInterval = Duration(minutes: 5);
@@ -36,14 +36,16 @@ class BatteryStorageService {
   /// Start listening for battery updates
   void start() {
     // Track connection to get watch ID and charging status
-    _connectionSubscription = _watchService.connectionStream.listen((connection) {
+    _connectionSubscription = _watchService.connectionStream.listen((
+      connection,
+    ) {
       if (connection.isConnected) {
         _currentWatchId = connection.watchId;
       } else {
         _currentWatchId = null;
       }
     });
-    
+
     // Store initial watch ID if already connected
     if (_watchService.isConnected) {
       _currentWatchId = _watchService.currentConnection.watchId;
@@ -64,11 +66,11 @@ class BatteryStorageService {
   Future<void> _onBatteryUpdate(int level) async {
     final watchId = _currentWatchId;
     if (watchId == null || watchId.isEmpty) return;
-    
+
     // Throttle storage: only store if enough time has passed or level changed significantly
     final now = DateTime.now();
     final shouldStore = _shouldStoreReading(level, now);
-    
+
     if (!shouldStore) return;
 
     final isCharging = _watchService.currentConnection.isCharging;
@@ -79,28 +81,27 @@ class BatteryStorageService {
         level: level,
         isCharging: isCharging,
       );
-      
+
       _lastStoredLevel = level;
       _lastStoredTime = now;
-      
     } catch (e) {
       debugPrint('[BatteryStorage] Failed to store: $e');
     }
   }
-  
+
   bool _shouldStoreReading(int level, DateTime now) {
     // Always store first reading
     if (_lastStoredTime == null) return true;
-    
+
     // Store if enough time has passed
     if (now.difference(_lastStoredTime!) >= _minStorageInterval) return true;
-    
+
     // Store if level changed significantly (5% or more)
     if (_lastStoredLevel != null) {
       final delta = (level - _lastStoredLevel!).abs();
       if (delta >= 5) return true;
     }
-    
+
     return false;
   }
 
@@ -114,13 +115,13 @@ class BatteryStorageService {
 final batteryStorageServiceProvider = Provider<BatteryStorageService>((ref) {
   final watchService = ref.watch(watchServiceProvider);
   final batteryRepository = ref.watch(batteryRepositoryProvider);
-  
+
   final service = BatteryStorageService(watchService, batteryRepository);
   service.start();
-  
+
   ref.onDispose(() {
     service.dispose();
   });
-  
+
   return service;
 });

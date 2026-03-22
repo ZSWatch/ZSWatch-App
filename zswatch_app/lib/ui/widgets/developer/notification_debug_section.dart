@@ -19,14 +19,19 @@ class NotificationDebugSection extends ConsumerStatefulWidget {
   const NotificationDebugSection({super.key});
 
   @override
-  ConsumerState<NotificationDebugSection> createState() => _NotificationDebugSectionState();
+  ConsumerState<NotificationDebugSection> createState() =>
+      _NotificationDebugSectionState();
 }
 
-class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSection> {
+class _NotificationDebugSectionState
+    extends ConsumerState<NotificationDebugSection> {
   final _titleController = TextEditingController(text: 'Test Notification');
-  final _bodyController = TextEditingController(text: 'This is a debug notification from the companion app.');
+  final _bodyController = TextEditingController(
+    text: 'This is a debug notification from the companion app.',
+  );
   String _selectedApp = 'Messages';
-  int _notificationId = 1000; // Start from 1000 to avoid conflicts with real notifications
+  int _notificationId =
+      1000; // Start from 1000 to avoid conflicts with real notifications
   int? _nativeNotificationId;
   String? _nativeNotificationTag;
   bool _isSending = false;
@@ -100,7 +105,10 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
   Future<void> _sendNativeAndroidNotification() async {
     if (_isPostingNative) return;
     if (!Platform.isAndroid) {
-      _showSnackBar('Native notification testing is only available on Android', isError: true);
+      _showSnackBar(
+        'Native notification testing is only available on Android',
+        isError: true,
+      );
       return;
     }
 
@@ -110,8 +118,12 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
 
     try {
       final result = await notificationService.sendNativeTestNotification(
-        title: _titleController.text.isNotEmpty ? _titleController.text : 'ZSWatch Debug',
-        body: _bodyController.text.isNotEmpty ? _bodyController.text : 'Debug notification from ZSWatch app',
+        title: _titleController.text.isNotEmpty
+            ? _titleController.text
+            : 'ZSWatch Debug',
+        body: _bodyController.text.isNotEmpty
+            ? _bodyController.text
+            : 'Debug notification from ZSWatch app',
       );
 
       final id = result?['id'] as int?;
@@ -179,13 +191,13 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
                   size: 20,
                 ),
                 const SizedBox(width: AppTheme.spacingSm),
-                Text(
-                  'Notification Debug',
-                  style: theme.textTheme.titleMedium,
-                ),
+                Text('Notification Debug', style: theme.textTheme.titleMedium),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppTheme.surfaceColor,
                     borderRadius: BorderRadius.circular(999),
@@ -220,10 +232,7 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
                 ),
               ),
               items: _appOptions.map((app) {
-                return DropdownMenuItem<String>(
-                  value: app,
-                  child: Text(app),
-                );
+                return DropdownMenuItem<String>(value: app, child: Text(app));
               }).toList(),
               onChanged: (value) {
                 if (value != null) {
@@ -263,7 +272,9 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
               runSpacing: AppTheme.spacingSm,
               children: [
                 FilledButton.icon(
-                  onPressed: isConnected && !_isSending ? _sendNotification : null,
+                  onPressed: isConnected && !_isSending
+                      ? _sendNotification
+                      : null,
                   style: compactButtonStyle,
                   icon: _isSending
                       ? const SizedBox(
@@ -281,7 +292,9 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
                   label: const Text('Clear'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: _isPostingNative ? null : _sendNativeAndroidNotification,
+                  onPressed: _isPostingNative
+                      ? null
+                      : _sendNativeAndroidNotification,
                   style: compactButtonStyle,
                   icon: _isPostingNative
                       ? const SizedBox(
@@ -296,16 +309,24 @@ class _NotificationDebugSectionState extends ConsumerState<NotificationDebugSect
             ),
             const SizedBox(height: AppTheme.spacingSm),
             Text(
-              isConnected ? 'Send directly to the watch or post a local Android notification.' : 'Connect to watch to send notification data.',
+              isConnected
+                  ? 'Send directly to the watch or post a local Android notification.'
+                  : 'Connect to watch to send notification data.',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: isConnected ? AppTheme.textSecondary : AppTheme.warningColor,
+                color: isConnected
+                    ? AppTheme.textSecondary
+                    : AppTheme.warningColor,
               ),
             ),
             if (_nativeNotificationId != null) ...[
               const SizedBox(height: AppTheme.spacingSm),
               Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 14, color: AppTheme.textSecondary),
+                  const Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: AppTheme.textSecondary,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(

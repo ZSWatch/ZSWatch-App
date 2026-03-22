@@ -610,8 +610,11 @@ class _CrashDetectedCard extends StatelessWidget {
           padding: const EdgeInsets.all(AppTheme.spacingMd),
           child: Row(
             children: [
-              const Icon(Icons.warning_amber_rounded,
-                  color: AppTheme.errorColor, size: 32),
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: AppTheme.errorColor,
+                size: 32,
+              ),
               const SizedBox(width: AppTheme.spacingMd),
               Expanded(
                 child: Column(
@@ -620,9 +623,9 @@ class _CrashDetectedCard extends StatelessWidget {
                     Text(
                       'Crash Detected',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: AppTheme.errorColor,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        color: AppTheme.errorColor,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     Text(
                       '${summary.file}:${summary.line} — ${summary.time}',

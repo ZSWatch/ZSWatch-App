@@ -32,12 +32,7 @@ class CrashReportScreen extends ConsumerWidget {
             ],
           ),
         ),
-        body: const TabBarView(
-          children: [
-            _CurrentCrashTab(),
-            _HistoryTab(),
-          ],
-        ),
+        body: const TabBarView(children: [_CurrentCrashTab(), _HistoryTab()]),
       ),
     );
   }
@@ -62,18 +57,22 @@ class _CurrentCrashTab extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_outline,
-                size: 64, color: AppTheme.successColor.withValues(alpha: 0.5)),
+            Icon(
+              Icons.check_circle_outline,
+              size: 64,
+              color: AppTheme.successColor.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: 16),
-            Text('No active crash',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'No active crash',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Text(
               'Crash reports appear here when a crash\nis detected on the watch.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppTheme.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],
@@ -118,19 +117,22 @@ class _HistoryTab extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.history,
-                    size: 64,
-                    color: AppTheme.textSecondary.withValues(alpha: 0.5)),
+                Icon(
+                  Icons.history,
+                  size: 64,
+                  color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                ),
                 const SizedBox(height: 16),
-                Text('No crash history',
-                    style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'No crash history',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   'Past crashes will be recorded here.',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppTheme.textSecondary),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -142,8 +144,9 @@ class _HistoryTab extends ConsumerWidget {
             // Stats section
             SliverToBoxAdapter(
               child: statsAsync.when(
-                data: (stats) =>
-                    stats.isEmpty ? const SizedBox.shrink() : _StatsCard(stats: stats, totalCrashes: reports.length),
+                data: (stats) => stats.isEmpty
+                    ? const SizedBox.shrink()
+                    : _StatsCard(stats: stats, totalCrashes: reports.length),
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
               ),
@@ -165,9 +168,9 @@ class _HistoryTab extends ConsumerWidget {
                       Text(
                         'Recent Crashes (${reports.length})',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: AppTheme.primaryColor,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const Spacer(),
                       TextButton.icon(
@@ -202,8 +205,9 @@ class _HistoryTab extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Clear Crash History?'),
         content: const Text(
-            'This will delete all stored crash reports from the app. '
-            'This cannot be undone.'),
+          'This will delete all stored crash reports from the app. '
+          'This cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -211,9 +215,7 @@ class _HistoryTab extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.errorColor),
             child: const Text('Clear All'),
           ),
         ],
@@ -228,9 +230,9 @@ class _HistoryTab extends ConsumerWidget {
     ref.invalidate(crashFileStatsProvider);
 
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cleared $count crash reports')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Cleared $count crash reports')));
     }
   }
 }
@@ -254,22 +256,26 @@ class _StatsCard extends StatelessWidget {
                 children: [
                   const Icon(Icons.bar_chart, color: AppTheme.primaryColor),
                   const SizedBox(width: AppTheme.spacingSm),
-                  Text('Crash Stats',
-                      style: Theme.of(context).textTheme.titleSmall),
+                  Text(
+                    'Crash Stats',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                   const Spacer(),
-                  Text('$totalCrashes total',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppTheme.textSecondary)),
+                  Text(
+                    '$totalCrashes total',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
                 ],
               ),
               const Divider(),
-              Text('Top crashing files:',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppTheme.textSecondary)),
+              Text(
+                'Top crashing files:',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+              ),
               const SizedBox(height: 4),
               for (final stat in stats)
                 Padding(
@@ -279,9 +285,7 @@ class _StatsCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           stat.file,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
+                          style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(fontFamily: 'monospace'),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -289,16 +293,16 @@ class _StatsCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.errorColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '${stat.count}x',
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
+                          style: Theme.of(context).textTheme.labelSmall
                               ?.copyWith(
                                 color: AppTheme.errorColor,
                                 fontWeight: FontWeight.bold,
@@ -334,29 +338,27 @@ class _CrashHistoryTile extends StatelessWidget {
         leading: Icon(
           report.analyzed
               ? (report.backtrace != null
-                  ? Icons.check_circle
-                  : Icons.info_outline)
+                    ? Icons.check_circle
+                    : Icons.info_outline)
               : Icons.warning_amber_rounded,
           color: report.analyzed
               ? (report.backtrace != null
-                  ? AppTheme.successColor
-                  : Colors.amber)
+                    ? AppTheme.successColor
+                    : Colors.amber)
               : AppTheme.errorColor,
           size: 20,
         ),
         title: Text(
           '${report.file}:${report.line}',
-          style: Theme.of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(fontFamily: 'monospace'),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontFamily: 'monospace'),
         ),
         subtitle: Text(
           '$receivedStr  ·  ${report.fwVersion}-${_shortSha(report.fwCommitSha)}',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: AppTheme.textSecondary),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
         ),
         childrenPadding: const EdgeInsets.fromLTRB(
           AppTheme.spacingMd,
@@ -375,33 +377,33 @@ class _CrashHistoryTile extends StatelessWidget {
           if (report.analyzed && report.analysisError != null)
             Text(
               report.analysisError!,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppTheme.errorColor),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.errorColor),
             ),
           if (!report.analyzed)
             Text(
               'Not analyzed',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppTheme.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           const SizedBox(height: 4),
           Row(
             children: [
-              Text('Watch time: ${report.crashTime}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppTheme.textSecondary)),
+              Text(
+                'Watch time: ${report.crashTime}',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+              ),
               const Spacer(),
-              Text('${report.board} (${report.buildType})',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppTheme.textSecondary)),
+              Text(
+                '${report.board} (${report.buildType})',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+              ),
             ],
           ),
           if (report.backtrace != null) ...[
@@ -455,15 +457,18 @@ class _SummaryCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.warning_amber_rounded,
-                    color: AppTheme.errorColor, size: 28),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppTheme.errorColor,
+                  size: 28,
+                ),
                 const SizedBox(width: AppTheme.spacingSm),
                 Text(
                   'Crash Summary',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppTheme.errorColor,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: AppTheme.errorColor,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -503,19 +508,17 @@ class _InfoRow extends StatelessWidget {
             width: 60,
             child: Text(
               '$label:',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(fontFamily: 'monospace'),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
             ),
           ),
         ],
@@ -542,8 +545,10 @@ class _AnalyzeSection extends ConsumerWidget {
               padding: const EdgeInsets.all(AppTheme.spacingMd),
               child: Column(
                 children: [
-                  Text(_phaseLabel(state.phase),
-                      style: Theme.of(context).textTheme.bodyMedium),
+                  Text(
+                    _phaseLabel(state.phase),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
                   const SizedBox(height: AppTheme.spacingSm),
                   if (state.phase == CoredumpAnalysisPhase.downloading)
                     LinearProgressIndicator(value: state.downloadProgress)
@@ -563,20 +568,25 @@ class _AnalyzeSection extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.error_outline,
-                          color: AppTheme.errorColor),
+                      const Icon(
+                        Icons.error_outline,
+                        color: AppTheme.errorColor,
+                      ),
                       const SizedBox(width: AppTheme.spacingSm),
-                      Text('Analysis Failed',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(color: AppTheme.errorColor)),
+                      Text(
+                        'Analysis Failed',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: AppTheme.errorColor,
+                        ),
+                      ),
                     ],
                   ),
                   if (state.errorMessage != null) ...[
                     const SizedBox(height: AppTheme.spacingSm),
-                    Text(state.errorMessage!,
-                        style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      state.errorMessage!,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
                   const SizedBox(height: AppTheme.spacingSm),
                   FilledButton.icon(
@@ -593,8 +603,9 @@ class _AnalyzeSection extends ConsumerWidget {
         ] else ...[
           CheckboxListTile(
             value: useLatestElf,
-            onChanged: (v) =>
-                ref.read(coredumpUseLatestElfProvider.notifier).setEnabled(v ?? false),
+            onChanged: (v) => ref
+                .read(coredumpUseLatestElfProvider.notifier)
+                .setEnabled(v ?? false),
             title: const Text('Use latest server ELF (dev)'),
             subtitle: const Text('Skip hash matching, use last uploaded ELF'),
             dense: true,
@@ -644,8 +655,10 @@ class _AnalysisResultCard extends ConsumerWidget {
         color: AppTheme.errorColor.withValues(alpha: 0.1),
         child: Padding(
           padding: const EdgeInsets.all(AppTheme.spacingMd),
-          child: Text(result.error ?? 'Analysis failed',
-              style: Theme.of(context).textTheme.bodySmall),
+          child: Text(
+            result.error ?? 'Analysis failed',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ),
       );
     }
@@ -662,8 +675,10 @@ class _AnalysisResultCard extends ConsumerWidget {
                   const Icon(Icons.info_outline, color: Colors.amber),
                   const SizedBox(width: AppTheme.spacingSm),
                   Expanded(
-                    child: Text('ELF Not Available',
-                        style: Theme.of(context).textTheme.titleSmall),
+                    child: Text(
+                      'ELF Not Available',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
                   ),
                 ],
               ),
@@ -695,15 +710,14 @@ class _AnalysisResultCard extends ConsumerWidget {
           OutlinedButton.icon(
             onPressed: () {
               final text = [
-                if (result.backtrace != null)
-                  'Backtrace:\n${result.backtrace}',
-                if (result.registers != null)
-                  'Registers:\n${result.registers}',
+                if (result.backtrace != null) 'Backtrace:\n${result.backtrace}',
+                if (result.registers != null) 'Registers:\n${result.registers}',
               ].join('\n\n');
               Clipboard.setData(ClipboardData(text: text));
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                    content: Text('Analysis result copied to clipboard')),
+                  content: Text('Analysis result copied to clipboard'),
+                ),
               );
             },
             icon: const Icon(Icons.copy),
@@ -713,7 +727,6 @@ class _AnalysisResultCard extends ConsumerWidget {
       ],
     );
   }
-
 }
 
 class _CodeBlock extends StatelessWidget {
@@ -773,7 +786,8 @@ class _ActionButtons extends ConsumerWidget {
       children: [
         FilledButton.icon(
           onPressed: () {
-            final text = 'Crash: ${summary.file}:${summary.line}\n'
+            final text =
+                'Crash: ${summary.file}:${summary.line}\n'
                 'Time: ${summary.time}\n'
                 'FW: ${summary.fwVersion}-${summary.fwCommitSha}\n'
                 'Board: ${summary.board} (${summary.buildType})';
@@ -798,8 +812,7 @@ class _ActionButtons extends ConsumerWidget {
           onPressed: () => _eraseCoredump(context, ref),
           icon: const Icon(Icons.delete_outline),
           label: const Text('Erase on Watch'),
-          style:
-              OutlinedButton.styleFrom(foregroundColor: AppTheme.errorColor),
+          style: OutlinedButton.styleFrom(foregroundColor: AppTheme.errorColor),
         ),
       ],
     );
@@ -821,9 +834,9 @@ class _ActionButtons extends ConsumerWidget {
     await File(savePath).writeAsString(coredumpTxt);
 
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Coredump saved to $savePath')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Coredump saved to $savePath')));
     }
   }
 
@@ -833,7 +846,8 @@ class _ActionButtons extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Erase Coredump?'),
         content: const Text(
-            'This will delete the coredump from the watch. Make sure you have exported it if needed.'),
+          'This will delete the coredump from the watch. Make sure you have exported it if needed.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -854,9 +868,9 @@ class _ActionButtons extends ConsumerWidget {
     await watchService.eraseCoredump();
 
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Coredump erased')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Coredump erased')));
     }
   }
 }

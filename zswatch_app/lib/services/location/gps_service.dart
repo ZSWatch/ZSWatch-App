@@ -85,7 +85,8 @@ class GpsService {
         ),
       );
       debugPrint(
-          '[GpsService] Got position: ${position.latitude}, ${position.longitude}');
+        '[GpsService] Got position: ${position.latitude}, ${position.longitude}',
+      );
       return GpsResult.success(position);
     } catch (e) {
       debugPrint('[GpsService] Error getting location: $e');
@@ -118,14 +119,14 @@ class GpsService {
   }
 
   /// Open app settings so user can manually enable location permission
-  /// 
+  ///
   /// Returns true if settings were opened successfully.
   Future<bool> openAppSettings() async {
     return Geolocator.openAppSettings();
   }
 
   /// Open location settings (system location toggle)
-  /// 
+  ///
   /// Returns true if settings were opened successfully.
   Future<bool> openLocationSettings() async {
     return Geolocator.openLocationSettings();

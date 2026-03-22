@@ -27,11 +27,11 @@ abstract class WatchState with _$WatchState {
   }) = _WatchState;
 
   factory WatchState.initial() => const WatchState(
-        connection: Connection(
-          watchId: '',
-          state: WatchConnectionState.disconnected,
-        ),
-      );
+    connection: Connection(
+      watchId: '',
+      state: WatchConnectionState.disconnected,
+    ),
+  );
 
   bool get isConnected => connection.state == WatchConnectionState.connected;
   bool get isConnecting => connection.state.isConnectingOrReconnecting;
@@ -45,7 +45,7 @@ class WatchStateNotifier extends StateNotifier<WatchState> {
   StreamSubscription<Connection>? _connectionSubscription;
 
   WatchStateNotifier(this._connectionService, this._watchRepository)
-      : super(WatchState.initial()) {
+    : super(WatchState.initial()) {
     _init();
   }
 
@@ -64,10 +64,7 @@ class WatchStateNotifier extends StateNotifier<WatchState> {
       _fetchWatchInfo(connection.watchId);
     } else if (connection.state == WatchConnectionState.disconnected) {
       // Clear watch when disconnected (but keep in DB)
-      state = state.copyWith(
-        watch: null,
-        connection: connection,
-      );
+      state = state.copyWith(watch: null, connection: connection);
     }
   }
 
@@ -79,27 +76,16 @@ class WatchStateNotifier extends StateNotifier<WatchState> {
       Watch? watch = await _watchRepository?.getWatchById(watchId);
 
       // New watch - create a basic entry if not in DB
-      watch ??= Watch(
-        id: watchId,
-        name: 'ZSWatch',
-        createdAt: DateTime.now(),
-      );
+      watch ??= Watch(id: watchId, name: 'ZSWatch', createdAt: DateTime.now());
 
       // Update state with watch info
-      state = state.copyWith(
-        watch: watch,
-        isLoading: false,
-      );
+      state = state.copyWith(watch: watch, isLoading: false);
 
       // TODO: Request device info via protocol to get firmware version, battery, etc.
       // This will be done when we wire up the protocol service
-
     } catch (e) {
       debugPrint('Error fetching watch info: $e');
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -132,9 +118,7 @@ class WatchStateNotifier extends StateNotifier<WatchState> {
   void updateBatteryLevel(int level) {
     if (state.watch == null) return;
 
-    state = state.copyWith(
-      watch: state.watch!.copyWith(batteryLevel: level),
-    );
+    state = state.copyWith(watch: state.watch!.copyWith(batteryLevel: level));
 
     // Persist to database
     _watchRepository?.updateBatteryLevel(state.watch!.id, level);
@@ -167,10 +151,10 @@ final watchRepositoryProvider = Provider<WatchRepository>((ref) {
 /// Provider for the watch state notifier
 final watchStateProvider =
     StateNotifierProvider<WatchStateNotifier, WatchState>((ref) {
-  final connectionService = ref.watch(bleConnectionServiceProvider);
-  final watchRepository = ref.watch(watchRepositoryProvider);
-  return WatchStateNotifier(connectionService, watchRepository);
-});
+      final connectionService = ref.watch(bleConnectionServiceProvider);
+      final watchRepository = ref.watch(watchRepositoryProvider);
+      return WatchStateNotifier(connectionService, watchRepository);
+    });
 
 /// Convenience providers for specific watch state properties
 final connectedWatchProvider = Provider<Watch?>((ref) {
@@ -188,4 +172,3 @@ final watchFirmwareProvider = Provider<String?>((ref) {
 final isWatchConnectedProvider = Provider<bool>((ref) {
   return ref.watch(watchStateProvider).isConnected;
 });
-

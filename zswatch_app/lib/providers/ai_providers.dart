@@ -19,19 +19,21 @@ import 'watch_providers.dart';
 /// Singleton LLM service backed by fllama.
 final llmServiceProvider = Provider<LlmService>((ref) {
   final service = LlmService();
-  
+
   // Update model gracefully without completely destroying the LlmService
   ref.listen<String>(selectedAiModelIdProvider, (previous, next) {
     service.selectModel(next);
   });
-  
+
   service.selectModel(ref.read(selectedAiModelIdProvider));
-  
+
   ref.onDispose(() => service.dispose());
   return service;
 });
 
-final llmAvailableModelsProvider = FutureProvider<List<LlmModelInfo>>((ref) async {
+final llmAvailableModelsProvider = FutureProvider<List<LlmModelInfo>>((
+  ref,
+) async {
   final service = ref.watch(llmServiceProvider);
   return service.availableModels();
 });
@@ -70,18 +72,21 @@ final llmModelFitProvider = FutureProvider<ModelFitResult>((ref) async {
 // Extracted-action repository
 // ---------------------------------------------------------------------------
 
-final extractedActionRepositoryProvider =
-    Provider<ExtractedActionRepository>((ref) {
+final extractedActionRepositoryProvider = Provider<ExtractedActionRepository>((
+  ref,
+) {
   final db = ref.watch(databaseProvider);
   return ExtractedActionRepository(db);
 });
 
 final extractedActionCreationServiceProvider =
     Provider<ExtractedActionCreationService>((ref) {
-  return const ExtractedActionCreationService();
-});
+      return const ExtractedActionCreationService();
+    });
 
-final writableCalendarsProvider = FutureProvider<List<PlatformCalendar>>((ref) async {
+final writableCalendarsProvider = FutureProvider<List<PlatformCalendar>>((
+  ref,
+) async {
   final service = ref.watch(extractedActionCreationServiceProvider);
   return service.listWritableCalendars();
 });
@@ -93,8 +98,8 @@ class ExtractedActionOperations {
   const ExtractedActionOperations({
     required ExtractedActionRepository actionRepository,
     required ExtractedActionCreationService creationService,
-  })  : _actionRepository = actionRepository,
-        _creationService = creationService;
+  }) : _actionRepository = actionRepository,
+       _creationService = creationService;
 
   Future<String> createAction({
     required ExtractedAction action,
@@ -117,8 +122,9 @@ class ExtractedActionOperations {
   }
 }
 
-final extractedActionOperationsProvider =
-    Provider<ExtractedActionOperations>((ref) {
+final extractedActionOperationsProvider = Provider<ExtractedActionOperations>((
+  ref,
+) {
   return ExtractedActionOperations(
     actionRepository: ref.watch(extractedActionRepositoryProvider),
     creationService: ref.watch(extractedActionCreationServiceProvider),
@@ -144,8 +150,7 @@ final voiceNoteAiPipelineProvider = Provider<VoiceNoteAiPipeline>((ref) {
 });
 
 /// Stream of debug info from the most recent AI processing run.
-final aiProcessingDebugInfoProvider =
-    StreamProvider<AiDebugInfo?>((ref) {
+final aiProcessingDebugInfoProvider = StreamProvider<AiDebugInfo?>((ref) {
   final pipeline = ref.watch(voiceNoteAiPipelineProvider);
   return pipeline.debugInfoStream;
 });
@@ -161,9 +166,9 @@ class _AiActionsNotifier extends StateNotifier<AsyncValue<void>> {
   _AiActionsNotifier({
     required VoiceNoteAiPipeline pipeline,
     required VoiceMemoRepository memoRepo,
-  })  : _pipeline = pipeline,
-        _memoRepo = memoRepo,
-        super(const AsyncData(null));
+  }) : _pipeline = pipeline,
+       _memoRepo = memoRepo,
+       super(const AsyncData(null));
 
   /// Process a single voice memo identified by [filename].
   Future<void> processVoiceMemo(String filename) async {
@@ -210,10 +215,10 @@ class _AiActionsNotifier extends StateNotifier<AsyncValue<void>> {
 
 final aiActionsProvider =
     StateNotifierProvider<_AiActionsNotifier, AsyncValue<void>>((ref) {
-  final pipeline = ref.watch(voiceNoteAiPipelineProvider);
-  final memoRepo = ref.watch(voiceMemoRepositoryProvider);
-  return _AiActionsNotifier(pipeline: pipeline, memoRepo: memoRepo);
-});
+      final pipeline = ref.watch(voiceNoteAiPipelineProvider);
+      final memoRepo = ref.watch(voiceMemoRepositoryProvider);
+      return _AiActionsNotifier(pipeline: pipeline, memoRepo: memoRepo);
+    });
 
 // ---------------------------------------------------------------------------
 // Extracted actions per memo (for the detail screen)
@@ -221,6 +226,6 @@ final aiActionsProvider =
 
 final extractedActionsForMemoProvider =
     StreamProvider.family<List<ExtractedAction>, int>((ref, memoId) {
-  final repo = ref.watch(extractedActionRepositoryProvider);
-  return repo.watchActionsForMemo(memoId);
-});
+      final repo = ref.watch(extractedActionRepositoryProvider);
+      return repo.watchActionsForMemo(memoId);
+    });

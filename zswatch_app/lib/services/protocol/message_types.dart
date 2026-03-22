@@ -4,18 +4,10 @@
 library;
 
 /// Direction of BLE communication
-enum CommDirection {
-  incoming,
-  outgoing,
-}
+enum CommDirection { incoming, outgoing }
 
 /// Protocol type for BLE messages
-enum ProtocolType {
-  gadgetbridge,
-  extended,
-  mcumgr,
-  unknown,
-}
+enum ProtocolType { gadgetbridge, extended, mcumgr, unknown }
 
 /// Gadgetbridge message types (Phone → Watch)
 enum GadgetbridgeOutgoingType {
@@ -75,49 +67,19 @@ enum ExtendedApiType {
 }
 
 /// Music player state
-enum MusicState {
-  play,
-  pause,
-  stop,
-}
+enum MusicState { play, pause, stop }
 
 /// Music control actions (from watch)
-enum MusicControlAction {
-  play,
-  pause,
-  next,
-  previous,
-  volumeUp,
-  volumeDown,
-}
+enum MusicControlAction { play, pause, next, previous, volumeUp, volumeDown }
 
 /// Call state
-enum CallState {
-  accept,
-  incoming,
-  outgoing,
-  reject,
-  start,
-  end,
-  ignore,
-}
+enum CallState { accept, incoming, outgoing, reject, start, end, ignore }
 
 /// Notification action (from watch)
-enum NotificationAction {
-  dismiss,
-  dismissAll,
-  open,
-  mute,
-  reply,
-}
+enum NotificationAction { dismiss, dismissAll, open, mute, reply }
 
 /// Log level for streaming logs
-enum LogLevel {
-  debug,
-  info,
-  warning,
-  error,
-}
+enum LogLevel { debug, info, warning, error }
 
 /// Activity type from watch
 enum ActivityType {
@@ -153,10 +115,8 @@ abstract class GadgetbridgeMessage {
   final String rawMessage;
   final DateTime receivedAt;
 
-  GadgetbridgeMessage({
-    required this.rawMessage,
-    DateTime? receivedAt,
-  }) : receivedAt = receivedAt ?? DateTime.now();
+  GadgetbridgeMessage({required this.rawMessage, DateTime? receivedAt})
+    : receivedAt = receivedAt ?? DateTime.now();
 }
 
 /// Version message from watch (includes fw_info fields: sha, dbg)
@@ -209,10 +169,7 @@ class StatusMessage extends GadgetbridgeMessage {
 class MusicControlMessage extends GadgetbridgeMessage {
   final MusicControlAction action;
 
-  MusicControlMessage({
-    required super.rawMessage,
-    required this.action,
-  });
+  MusicControlMessage({required super.rawMessage, required this.action});
 }
 
 /// Activity data message from watch
@@ -239,10 +196,7 @@ class ActivityDataMessage extends GadgetbridgeMessage {
 class FindPhoneMessage extends GadgetbridgeMessage {
   final bool findEnabled;
 
-  FindPhoneMessage({
-    required super.rawMessage,
-    required this.findEnabled,
-  });
+  FindPhoneMessage({required super.rawMessage, required this.findEnabled});
 }
 
 /// Notification action message from watch
@@ -265,10 +219,7 @@ class NotificationActionMessage extends GadgetbridgeMessage {
 class CallControlMessage extends GadgetbridgeMessage {
   final CallState callState;
 
-  CallControlMessage({
-    required super.rawMessage,
-    required this.callState,
-  });
+  CallControlMessage({required super.rawMessage, required this.callState});
 }
 
 /// Info/Warning/Error message from watch
@@ -303,19 +254,12 @@ class HttpRequestMessage extends GadgetbridgeMessage {
 class GpsPowerMessage extends GadgetbridgeMessage {
   final bool enabled;
 
-  GpsPowerMessage({
-    required super.rawMessage,
-    required this.enabled,
-  });
+  GpsPowerMessage({required super.rawMessage, required this.enabled});
 }
 
 /// Calendar sync request message from watch
 class CalendarSyncMessage extends GadgetbridgeMessage {
   final List<int> existingIds;
 
-  CalendarSyncMessage({
-    required super.rawMessage,
-    required this.existingIds,
-  });
+  CalendarSyncMessage({required super.rawMessage, required this.existingIds});
 }
-

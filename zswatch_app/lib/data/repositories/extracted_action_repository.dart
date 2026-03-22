@@ -22,9 +22,9 @@ class ExtractedActionRepository
 
   /// Watch extracted actions for a voice memo (reactive stream)
   Stream<List<ExtractedAction>> watchActionsForMemo(int memoId) {
-    return _db.watchActionsForMemo(memoId).map(
-      (entities) => entities.map(_entityToModel).toList(),
-    );
+    return _db
+        .watchActionsForMemo(memoId)
+        .map((entities) => entities.map(_entityToModel).toList());
   }
 
   /// Get all pending (not created, not dismissed) actions
@@ -47,18 +47,22 @@ class ExtractedActionRepository
     String? location,
     int? reminderMinutes,
   }) async {
-    final id = await _db.insertExtractedAction(ExtractedActionsCompanion(
-      memoId: Value(memoId),
-      actionType: Value(ExtractedAction.typeToString(actionType)),
-      title: Value(title),
-      notes: Value(notes),
-      startTime: Value(startTime),
-      endTime: Value(endTime),
-      dueDate: Value(dueDate),
-      location: Value(location),
-      reminderMinutes: Value(reminderMinutes),
-    ));
-    debugPrint('[ExtractedActionRepository] Inserted action $id for memo $memoId');
+    final id = await _db.insertExtractedAction(
+      ExtractedActionsCompanion(
+        memoId: Value(memoId),
+        actionType: Value(ExtractedAction.typeToString(actionType)),
+        title: Value(title),
+        notes: Value(notes),
+        startTime: Value(startTime),
+        endTime: Value(endTime),
+        dueDate: Value(dueDate),
+        location: Value(location),
+        reminderMinutes: Value(reminderMinutes),
+      ),
+    );
+    debugPrint(
+      '[ExtractedActionRepository] Inserted action $id for memo $memoId',
+    );
     return id;
   }
 

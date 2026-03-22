@@ -4,17 +4,20 @@ import '../data/models/filesystem_image.dart';
 import '../services/dfu/filesystem_upload_service.dart';
 
 /// Provider for the filesystem upload service singleton
-final filesystemUploadServiceProvider = Provider<FilesystemUploadService>((ref) {
+final filesystemUploadServiceProvider = Provider<FilesystemUploadService>((
+  ref,
+) {
   final service = FilesystemUploadService();
   ref.onDispose(() => service.dispose());
   return service;
 });
 
 /// Stream provider for filesystem upload state
-final filesystemUploadStateStreamProvider = StreamProvider<FilesystemUploadState>((ref) {
-  final service = ref.watch(filesystemUploadServiceProvider);
-  return service.stateStream;
-});
+final filesystemUploadStateStreamProvider =
+    StreamProvider<FilesystemUploadState>((ref) {
+      final service = ref.watch(filesystemUploadServiceProvider);
+      return service.stateStream;
+    });
 
 /// Provider for current filesystem upload state
 final filesystemUploadStateProvider = Provider<FilesystemUploadState>((ref) {
@@ -37,4 +40,3 @@ final filesystemUploadLogsProvider = StreamProvider<String>((ref) {
   final service = ref.watch(filesystemUploadServiceProvider);
   return service.logStream;
 });
-
