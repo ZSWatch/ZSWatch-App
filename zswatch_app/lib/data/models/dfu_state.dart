@@ -141,6 +141,9 @@ abstract class DfuState with _$DfuState {
     /// Current upload speed in bytes per second
     @Default(0) int speedBytesPerSecond,
 
+    /// Speed history for chart (bytes per second samples)
+    @Default([]) List<int> speedHistory,
+
     /// Current image being uploaded (for multi-image updates)
     @Default(0) int currentImage,
 
@@ -257,6 +260,7 @@ abstract class DfuState with _$DfuState {
       status: DfuStatus.uploading,
       totalBytes: totalBytes,
       totalImages: totalImages,
+      currentImage: 1,
       currentImageName: currentImageName,
       startedAt: startedAt ?? DateTime.now(),
     );

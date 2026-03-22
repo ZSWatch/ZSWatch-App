@@ -303,7 +303,8 @@ mixin _$FilesystemUploadState {
  double get progress;/// Bytes transferred
  int get bytesTransferred;/// Total bytes to transfer
  int get totalBytes;/// Upload speed in bytes per second
- int get speedBytesPerSecond;/// When the upload started
+ int get speedBytesPerSecond;/// Speed history for chart (bytes per second samples)
+ List<int> get speedHistory;/// When the upload started
  DateTime? get startedAt;/// Error message (if failed)
  String? get errorMessage;/// Current image being uploaded
  String? get imageName;
@@ -317,16 +318,16 @@ $FilesystemUploadStateCopyWith<FilesystemUploadState> get copyWith => _$Filesyst
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is FilesystemUploadState&&(identical(other.status, status) || other.status == status)&&(identical(other.progress, progress) || other.progress == progress)&&(identical(other.bytesTransferred, bytesTransferred) || other.bytesTransferred == bytesTransferred)&&(identical(other.totalBytes, totalBytes) || other.totalBytes == totalBytes)&&(identical(other.speedBytesPerSecond, speedBytesPerSecond) || other.speedBytesPerSecond == speedBytesPerSecond)&&(identical(other.startedAt, startedAt) || other.startedAt == startedAt)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.imageName, imageName) || other.imageName == imageName));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FilesystemUploadState&&(identical(other.status, status) || other.status == status)&&(identical(other.progress, progress) || other.progress == progress)&&(identical(other.bytesTransferred, bytesTransferred) || other.bytesTransferred == bytesTransferred)&&(identical(other.totalBytes, totalBytes) || other.totalBytes == totalBytes)&&(identical(other.speedBytesPerSecond, speedBytesPerSecond) || other.speedBytesPerSecond == speedBytesPerSecond)&&const DeepCollectionEquality().equals(other.speedHistory, speedHistory)&&(identical(other.startedAt, startedAt) || other.startedAt == startedAt)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.imageName, imageName) || other.imageName == imageName));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,status,progress,bytesTransferred,totalBytes,speedBytesPerSecond,startedAt,errorMessage,imageName);
+int get hashCode => Object.hash(runtimeType,status,progress,bytesTransferred,totalBytes,speedBytesPerSecond,const DeepCollectionEquality().hash(speedHistory),startedAt,errorMessage,imageName);
 
 @override
 String toString() {
-  return 'FilesystemUploadState(status: $status, progress: $progress, bytesTransferred: $bytesTransferred, totalBytes: $totalBytes, speedBytesPerSecond: $speedBytesPerSecond, startedAt: $startedAt, errorMessage: $errorMessage, imageName: $imageName)';
+  return 'FilesystemUploadState(status: $status, progress: $progress, bytesTransferred: $bytesTransferred, totalBytes: $totalBytes, speedBytesPerSecond: $speedBytesPerSecond, speedHistory: $speedHistory, startedAt: $startedAt, errorMessage: $errorMessage, imageName: $imageName)';
 }
 
 
@@ -337,7 +338,7 @@ abstract mixin class $FilesystemUploadStateCopyWith<$Res>  {
   factory $FilesystemUploadStateCopyWith(FilesystemUploadState value, $Res Function(FilesystemUploadState) _then) = _$FilesystemUploadStateCopyWithImpl;
 @useResult
 $Res call({
- FilesystemUploadStatus status, double progress, int bytesTransferred, int totalBytes, int speedBytesPerSecond, DateTime? startedAt, String? errorMessage, String? imageName
+ FilesystemUploadStatus status, double progress, int bytesTransferred, int totalBytes, int speedBytesPerSecond, List<int> speedHistory, DateTime? startedAt, String? errorMessage, String? imageName
 });
 
 
@@ -354,14 +355,15 @@ class _$FilesystemUploadStateCopyWithImpl<$Res>
 
 /// Create a copy of FilesystemUploadState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? status = null,Object? progress = null,Object? bytesTransferred = null,Object? totalBytes = null,Object? speedBytesPerSecond = null,Object? startedAt = freezed,Object? errorMessage = freezed,Object? imageName = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? status = null,Object? progress = null,Object? bytesTransferred = null,Object? totalBytes = null,Object? speedBytesPerSecond = null,Object? speedHistory = null,Object? startedAt = freezed,Object? errorMessage = freezed,Object? imageName = freezed,}) {
   return _then(_self.copyWith(
 status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as FilesystemUploadStatus,progress: null == progress ? _self.progress : progress // ignore: cast_nullable_to_non_nullable
 as double,bytesTransferred: null == bytesTransferred ? _self.bytesTransferred : bytesTransferred // ignore: cast_nullable_to_non_nullable
 as int,totalBytes: null == totalBytes ? _self.totalBytes : totalBytes // ignore: cast_nullable_to_non_nullable
 as int,speedBytesPerSecond: null == speedBytesPerSecond ? _self.speedBytesPerSecond : speedBytesPerSecond // ignore: cast_nullable_to_non_nullable
-as int,startedAt: freezed == startedAt ? _self.startedAt : startedAt // ignore: cast_nullable_to_non_nullable
+as int,speedHistory: null == speedHistory ? _self.speedHistory : speedHistory // ignore: cast_nullable_to_non_nullable
+as List<int>,startedAt: freezed == startedAt ? _self.startedAt : startedAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
 as String?,imageName: freezed == imageName ? _self.imageName : imageName // ignore: cast_nullable_to_non_nullable
 as String?,
@@ -449,10 +451,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( FilesystemUploadStatus status,  double progress,  int bytesTransferred,  int totalBytes,  int speedBytesPerSecond,  DateTime? startedAt,  String? errorMessage,  String? imageName)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( FilesystemUploadStatus status,  double progress,  int bytesTransferred,  int totalBytes,  int speedBytesPerSecond,  List<int> speedHistory,  DateTime? startedAt,  String? errorMessage,  String? imageName)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _FilesystemUploadState() when $default != null:
-return $default(_that.status,_that.progress,_that.bytesTransferred,_that.totalBytes,_that.speedBytesPerSecond,_that.startedAt,_that.errorMessage,_that.imageName);case _:
+return $default(_that.status,_that.progress,_that.bytesTransferred,_that.totalBytes,_that.speedBytesPerSecond,_that.speedHistory,_that.startedAt,_that.errorMessage,_that.imageName);case _:
   return orElse();
 
 }
@@ -470,10 +472,10 @@ return $default(_that.status,_that.progress,_that.bytesTransferred,_that.totalBy
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( FilesystemUploadStatus status,  double progress,  int bytesTransferred,  int totalBytes,  int speedBytesPerSecond,  DateTime? startedAt,  String? errorMessage,  String? imageName)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( FilesystemUploadStatus status,  double progress,  int bytesTransferred,  int totalBytes,  int speedBytesPerSecond,  List<int> speedHistory,  DateTime? startedAt,  String? errorMessage,  String? imageName)  $default,) {final _that = this;
 switch (_that) {
 case _FilesystemUploadState():
-return $default(_that.status,_that.progress,_that.bytesTransferred,_that.totalBytes,_that.speedBytesPerSecond,_that.startedAt,_that.errorMessage,_that.imageName);case _:
+return $default(_that.status,_that.progress,_that.bytesTransferred,_that.totalBytes,_that.speedBytesPerSecond,_that.speedHistory,_that.startedAt,_that.errorMessage,_that.imageName);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -490,10 +492,10 @@ return $default(_that.status,_that.progress,_that.bytesTransferred,_that.totalBy
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( FilesystemUploadStatus status,  double progress,  int bytesTransferred,  int totalBytes,  int speedBytesPerSecond,  DateTime? startedAt,  String? errorMessage,  String? imageName)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( FilesystemUploadStatus status,  double progress,  int bytesTransferred,  int totalBytes,  int speedBytesPerSecond,  List<int> speedHistory,  DateTime? startedAt,  String? errorMessage,  String? imageName)?  $default,) {final _that = this;
 switch (_that) {
 case _FilesystemUploadState() when $default != null:
-return $default(_that.status,_that.progress,_that.bytesTransferred,_that.totalBytes,_that.speedBytesPerSecond,_that.startedAt,_that.errorMessage,_that.imageName);case _:
+return $default(_that.status,_that.progress,_that.bytesTransferred,_that.totalBytes,_that.speedBytesPerSecond,_that.speedHistory,_that.startedAt,_that.errorMessage,_that.imageName);case _:
   return null;
 
 }
@@ -505,7 +507,7 @@ return $default(_that.status,_that.progress,_that.bytesTransferred,_that.totalBy
 
 
 class _FilesystemUploadState extends FilesystemUploadState {
-  const _FilesystemUploadState({this.status = FilesystemUploadStatus.idle, this.progress = 0.0, this.bytesTransferred = 0, this.totalBytes = 0, this.speedBytesPerSecond = 0, this.startedAt, this.errorMessage, this.imageName}): super._();
+  const _FilesystemUploadState({this.status = FilesystemUploadStatus.idle, this.progress = 0.0, this.bytesTransferred = 0, this.totalBytes = 0, this.speedBytesPerSecond = 0, final  List<int> speedHistory = const [], this.startedAt, this.errorMessage, this.imageName}): _speedHistory = speedHistory,super._();
   
 
 /// Current status
@@ -518,6 +520,15 @@ class _FilesystemUploadState extends FilesystemUploadState {
 @override@JsonKey() final  int totalBytes;
 /// Upload speed in bytes per second
 @override@JsonKey() final  int speedBytesPerSecond;
+/// Speed history for chart (bytes per second samples)
+ final  List<int> _speedHistory;
+/// Speed history for chart (bytes per second samples)
+@override@JsonKey() List<int> get speedHistory {
+  if (_speedHistory is EqualUnmodifiableListView) return _speedHistory;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_speedHistory);
+}
+
 /// When the upload started
 @override final  DateTime? startedAt;
 /// Error message (if failed)
@@ -535,16 +546,16 @@ _$FilesystemUploadStateCopyWith<_FilesystemUploadState> get copyWith => __$Files
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FilesystemUploadState&&(identical(other.status, status) || other.status == status)&&(identical(other.progress, progress) || other.progress == progress)&&(identical(other.bytesTransferred, bytesTransferred) || other.bytesTransferred == bytesTransferred)&&(identical(other.totalBytes, totalBytes) || other.totalBytes == totalBytes)&&(identical(other.speedBytesPerSecond, speedBytesPerSecond) || other.speedBytesPerSecond == speedBytesPerSecond)&&(identical(other.startedAt, startedAt) || other.startedAt == startedAt)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.imageName, imageName) || other.imageName == imageName));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FilesystemUploadState&&(identical(other.status, status) || other.status == status)&&(identical(other.progress, progress) || other.progress == progress)&&(identical(other.bytesTransferred, bytesTransferred) || other.bytesTransferred == bytesTransferred)&&(identical(other.totalBytes, totalBytes) || other.totalBytes == totalBytes)&&(identical(other.speedBytesPerSecond, speedBytesPerSecond) || other.speedBytesPerSecond == speedBytesPerSecond)&&const DeepCollectionEquality().equals(other._speedHistory, _speedHistory)&&(identical(other.startedAt, startedAt) || other.startedAt == startedAt)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.imageName, imageName) || other.imageName == imageName));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,status,progress,bytesTransferred,totalBytes,speedBytesPerSecond,startedAt,errorMessage,imageName);
+int get hashCode => Object.hash(runtimeType,status,progress,bytesTransferred,totalBytes,speedBytesPerSecond,const DeepCollectionEquality().hash(_speedHistory),startedAt,errorMessage,imageName);
 
 @override
 String toString() {
-  return 'FilesystemUploadState(status: $status, progress: $progress, bytesTransferred: $bytesTransferred, totalBytes: $totalBytes, speedBytesPerSecond: $speedBytesPerSecond, startedAt: $startedAt, errorMessage: $errorMessage, imageName: $imageName)';
+  return 'FilesystemUploadState(status: $status, progress: $progress, bytesTransferred: $bytesTransferred, totalBytes: $totalBytes, speedBytesPerSecond: $speedBytesPerSecond, speedHistory: $speedHistory, startedAt: $startedAt, errorMessage: $errorMessage, imageName: $imageName)';
 }
 
 
@@ -555,7 +566,7 @@ abstract mixin class _$FilesystemUploadStateCopyWith<$Res> implements $Filesyste
   factory _$FilesystemUploadStateCopyWith(_FilesystemUploadState value, $Res Function(_FilesystemUploadState) _then) = __$FilesystemUploadStateCopyWithImpl;
 @override @useResult
 $Res call({
- FilesystemUploadStatus status, double progress, int bytesTransferred, int totalBytes, int speedBytesPerSecond, DateTime? startedAt, String? errorMessage, String? imageName
+ FilesystemUploadStatus status, double progress, int bytesTransferred, int totalBytes, int speedBytesPerSecond, List<int> speedHistory, DateTime? startedAt, String? errorMessage, String? imageName
 });
 
 
@@ -572,14 +583,15 @@ class __$FilesystemUploadStateCopyWithImpl<$Res>
 
 /// Create a copy of FilesystemUploadState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? status = null,Object? progress = null,Object? bytesTransferred = null,Object? totalBytes = null,Object? speedBytesPerSecond = null,Object? startedAt = freezed,Object? errorMessage = freezed,Object? imageName = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? status = null,Object? progress = null,Object? bytesTransferred = null,Object? totalBytes = null,Object? speedBytesPerSecond = null,Object? speedHistory = null,Object? startedAt = freezed,Object? errorMessage = freezed,Object? imageName = freezed,}) {
   return _then(_FilesystemUploadState(
 status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as FilesystemUploadStatus,progress: null == progress ? _self.progress : progress // ignore: cast_nullable_to_non_nullable
 as double,bytesTransferred: null == bytesTransferred ? _self.bytesTransferred : bytesTransferred // ignore: cast_nullable_to_non_nullable
 as int,totalBytes: null == totalBytes ? _self.totalBytes : totalBytes // ignore: cast_nullable_to_non_nullable
 as int,speedBytesPerSecond: null == speedBytesPerSecond ? _self.speedBytesPerSecond : speedBytesPerSecond // ignore: cast_nullable_to_non_nullable
-as int,startedAt: freezed == startedAt ? _self.startedAt : startedAt // ignore: cast_nullable_to_non_nullable
+as int,speedHistory: null == speedHistory ? _self._speedHistory : speedHistory // ignore: cast_nullable_to_non_nullable
+as List<int>,startedAt: freezed == startedAt ? _self.startedAt : startedAt // ignore: cast_nullable_to_non_nullable
 as DateTime?,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
 as String?,imageName: freezed == imageName ? _self.imageName : imageName // ignore: cast_nullable_to_non_nullable
 as String?,

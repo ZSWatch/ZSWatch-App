@@ -24,6 +24,9 @@ class DfuService {
   Timer? _speedTimer;
   int _lastBytesTransferred = 0;
   DateTime? _lastSpeedUpdate;
+  final List<int> _speedSamples = [];
+  static const int _speedWindowSize = 5;
+  List<String> _imageNames = [];
 
   final _stateController = BehaviorSubject<DfuState>.seeded(DfuState.idle);
   final _logController = StreamController<String>.broadcast();
@@ -103,7 +106,8 @@ class DfuService {
       // Calculate total size and prepare images
       int totalSize = 0;
       final List<Image> mcuImages = [];
-      
+      _imageNames = firmwareImages.map((e) => e.name).toList();
+
       for (int i = 0; i < firmwareImages.length; i++) {
         final image = firmwareImages[i];
         final file = File(image.filePath);
@@ -153,13 +157,28 @@ class DfuService {
       // Subscribe to progress updates
       _progressSubscription = _updateManager!.progressStream.listen(
         (ProgressUpdate progress) {
+          var nextImage = currentState.currentImage;
+          var nextName = currentState.currentImageName;
+
+          // Detect image switch (bytesSent resets for new image)
+          if (progress.bytesSent < currentState.bytesTransferred &&
+              currentState.bytesTransferred > 1000) {
+            nextImage = currentState.currentImage + 1;
+            if (nextImage - 1 < _imageNames.length) {
+              nextName = _imageNames[nextImage - 1];
+            }
+            _lastBytesTransferred = 0;
+            _speedSamples.clear();
+          }
+
           final double overallProgress = progress.bytesSent / progress.imageSize;
-          // Preserve speed value during progress updates
           _updateState(currentState.copyWith(
             progress: overallProgress.clamp(0.0, 1.0),
             bytesTransferred: progress.bytesSent,
             totalBytes: progress.imageSize,
-            speedBytesPerSecond: currentState.speedBytesPerSecond, // Preserve speed
+            currentImage: nextImage,
+            currentImageName: nextName,
+            speedBytesPerSecond: currentState.speedBytesPerSecond,
           ));
         },
       );
@@ -243,6 +262,7 @@ class DfuService {
   void _startSpeedTimer() {
     _lastBytesTransferred = 0;
     _lastSpeedUpdate = DateTime.now();
+    _speedSamples.clear();
 
     _speedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       final now = DateTime.now();
@@ -251,9 +271,16 @@ class DfuService {
         final bytesThisInterval = currentState.bytesTransferred - _lastBytesTransferred;
         final speed = (bytesThisInterval / elapsed).round();
 
-        // Only update speed if we have actual progress, otherwise keep the last value
         if (bytesThisInterval > 0 || currentState.speedBytesPerSecond == 0) {
-          _updateState(currentState.copyWith(speedBytesPerSecond: speed));
+          _speedSamples.add(speed);
+          if (_speedSamples.length > _speedWindowSize) {
+            _speedSamples.removeAt(0);
+          }
+          final avg = _speedSamples.reduce((a, b) => a + b) ~/ _speedSamples.length;
+          _updateState(currentState.copyWith(
+            speedBytesPerSecond: avg,
+            speedHistory: [...currentState.speedHistory, avg],
+          ));
         }
 
         _lastBytesTransferred = currentState.bytesTransferred;

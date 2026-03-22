@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -150,10 +151,6 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                       _ConnectionWarningCard(
                         onReconnect: () => context.go(AppRoutes.scan),
                       ),
-
-                    // SMP auto-enable info (non-blocking)
-                    if (isConnected && !hasSmp)
-                      const _SmpInfoCard(),
 
                     // Firmware selection sections (shown when idle)
                     if (dfuState.status == DfuStatus.idle &&
@@ -452,32 +449,7 @@ class _ConnectionWarningCard extends StatelessWidget {
   }
 }
 
-class _SmpInfoCard extends StatelessWidget {
-  const _SmpInfoCard();
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.spacingMd),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline,
-                color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: AppTheme.spacingSm),
-            Expanded(
-              child: Text(
-                'Update mode will be enabled automatically when you start the update.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 class _StatusCard extends ConsumerWidget {
   final DfuState dfuState;
   final DownloadProgress downloadProgress;
@@ -507,6 +479,7 @@ class _StatusCard extends ConsumerWidget {
     String? speedText;
     String? timeRemainingText;
     String? subStatusText;
+    List<int> speedHistory = const [];
 
     if (isDownloading) {
       statusTitle = 'Downloading...';
@@ -521,6 +494,7 @@ class _StatusCard extends ConsumerWidget {
       speedText = 'Speed: ${fsUploadState.formattedSpeed}';
       timeRemainingText = 'Remaining: ${fsUploadState.formattedTimeRemaining}';
       subStatusText = fsUploadState.imageName;
+      speedHistory = fsUploadState.speedHistory;
     } else {
       statusTitle = dfuState.status.statusText;
       progress = dfuState.progress;
@@ -531,6 +505,7 @@ class _StatusCard extends ConsumerWidget {
         timeRemainingText = 'Remaining: ${dfuState.formattedTimeRemaining}';
       }
       subStatusText = dfuState.currentImageName;
+      speedHistory = dfuState.speedHistory;
     }
 
     // Show step indicator for "both" updates
@@ -606,6 +581,13 @@ class _StatusCard extends ConsumerWidget {
                 ),
               ),
 
+            // Speed chart
+            if (speedHistory.length >= 2)
+              Padding(
+                padding: const EdgeInsets.only(top: AppTheme.spacingSm),
+                child: _SpeedChart(speedHistory: speedHistory),
+              ),
+
             // Multi-image progress (DFU only)
             if (isDfuInProgress && dfuState.totalImages > 1)
               Padding(
@@ -615,6 +597,47 @@ class _StatusCard extends ConsumerWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SpeedChart extends StatelessWidget {
+  final List<int> speedHistory;
+
+  const _SpeedChart({required this.speedHistory});
+
+  @override
+  Widget build(BuildContext context) {
+    final spots = <FlSpot>[];
+    for (int i = 0; i < speedHistory.length; i++) {
+      spots.add(FlSpot(i.toDouble(), speedHistory[i] / 1024));
+    }
+
+    return SizedBox(
+      height: 60,
+      child: LineChart(
+        LineChartData(
+          gridData: const FlGridData(show: false),
+          titlesData: const FlTitlesData(show: false),
+          borderData: FlBorderData(show: false),
+          lineTouchData: const LineTouchData(enabled: false),
+          clipData: const FlClipData.all(),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              preventCurveOverShooting: true,
+              color: Theme.of(context).colorScheme.primary,
+              barWidth: 1.5,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+              ),
+            ),
           ],
         ),
       ),

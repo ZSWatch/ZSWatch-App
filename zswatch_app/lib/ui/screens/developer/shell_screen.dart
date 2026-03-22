@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -38,8 +37,23 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
   }
 
   @override
+  void deactivate() {
+    // Cancel the timer immediately (no state change — safe during teardown).
+    // Then defer the full state update to after the frame completes.
+    final monitorNotifier = ref.read(liveMonitorProvider.notifier);
+    final monitor = ref.read(liveMonitorProvider);
+    if (monitor.isEnabled) {
+      monitorNotifier.cancelPolling();
+      Future(monitorNotifier.stop);
+    }
+
+    final watchService = ref.read(watchServiceProvider);
+    unawaited(watchService.disableSmp());
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
-    _disableSmp();
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
@@ -52,17 +66,24 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
       final watchService = ref.read(watchServiceProvider);
       await watchService.enableSmp();
       await Future<void>.delayed(const Duration(seconds: 2));
-      await watchService.rediscoverServices();
+      final hasSmp = await watchService.rediscoverServices();
+      if (!hasSmp && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'SMP service not found. If your watch firmware is older, '
+              'you may need to manually enable it: '
+              'on the watch go to Apps → Update → Enable FW Update.',
+            ),
+            duration: Duration(seconds: 8),
+          ),
+        );
+      }
     } catch (e) {
       debugPrint('[ShellScreen] Failed to enable SMP: $e');
     } finally {
       _setSmpEnabling(false);
     }
-  }
-
-  Future<void> _disableSmp() async {
-    final watchService = ref.read(watchServiceProvider);
-    await watchService.disableSmp();
   }
 
   void _onTabChanged() {
@@ -81,6 +102,14 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
 
     // Re-enable SMP whenever the watch reconnects while this screen is open.
     ref.listen<Connection>(watchConnectionProvider, (prev, next) {
+      if (!next.isConnected) {
+        final monitor = ref.read(liveMonitorProvider);
+        if (monitor.isEnabled) {
+          ref.read(liveMonitorProvider.notifier).stop();
+        }
+        return;
+      }
+
       if (next.isConnected && prev != null && !prev.isConnected) {
         _enableSmp();
       }
@@ -187,7 +216,7 @@ class _TerminalTabState extends ConsumerState<_TerminalTab> {
       children: [
         // Terminal output
         Expanded(
-          child: Container(
+          child: ColoredBox(
             color: Colors.black,
             child: terminalState.lines.isEmpty
                 ? Center(
@@ -236,7 +265,7 @@ class _TerminalTabState extends ConsumerState<_TerminalTab> {
           ),
           child: Row(
             children: [
-              Text(
+              const Text(
                 '\$ ',
                 style: TextStyle(
                   fontFamily: 'monospace',
@@ -302,7 +331,7 @@ class _QuickActionsTab extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(AppTheme.spacingMd),
       children: [
-        _SectionHeader(title: 'System Info'),
+        const _SectionHeader(title: 'System Info'),
         _QuickActionCard(
           icon: Icons.battery_full,
           title: 'Battery Status',
@@ -335,7 +364,7 @@ class _QuickActionsTab extends ConsumerWidget {
         ),
 
         const SizedBox(height: AppTheme.spacingMd),
-        _SectionHeader(title: 'Hardware'),
+        const _SectionHeader(title: 'Hardware'),
         _QuickActionCard(
           icon: Icons.light_mode,
           title: 'Get Brightness',
@@ -368,7 +397,7 @@ class _QuickActionsTab extends ConsumerWidget {
         ),
 
         const SizedBox(height: AppTheme.spacingMd),
-        _SectionHeader(title: 'Debug'),
+        const _SectionHeader(title: 'Debug'),
         _QuickActionCard(
           icon: Icons.bug_report,
           title: 'Coredump Summary',
@@ -454,7 +483,7 @@ class _QuickActionCardState extends State<_QuickActionCard> {
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Execute', style: TextStyle(color: AppTheme.errorColor)),
+              child: const Text('Execute', style: TextStyle(color: AppTheme.errorColor)),
             ),
           ],
         ),
@@ -532,7 +561,7 @@ class _QuickActionCardState extends State<_QuickActionCard> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   else
-                    Icon(Icons.play_arrow, size: 20, color: AppTheme.textSecondary),
+                    const Icon(Icons.play_arrow, size: 20, color: AppTheme.textSecondary),
                 ],
               ),
               if (_result != null) ...[
@@ -672,7 +701,7 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
       padding: const EdgeInsets.all(AppTheme.spacingMd),
       children: [
         // Touchpad in center, hardware buttons at 45° corners (like the watch)
-        _SectionHeader(title: 'Input'),
+        const _SectionHeader(title: 'Input'),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(AppTheme.spacingMd),
@@ -751,7 +780,7 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
 
         const SizedBox(height: AppTheme.spacingLg),
         // App launcher
-        _SectionHeader(title: 'App Launcher'),
+        const _SectionHeader(title: 'App Launcher'),
         Row(
           children: [
             if (_appList == null)
@@ -781,7 +810,7 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
                 margin: const EdgeInsets.only(bottom: AppTheme.spacingXs),
                 child: ListTile(
                   dense: true,
-                  leading: Icon(Icons.apps, size: 20, color: AppTheme.primaryColor),
+                  leading: const Icon(Icons.apps, size: 20, color: AppTheme.primaryColor),
                   title: Text(app),
                   trailing: IconButton(
                     icon: const Icon(Icons.launch, size: 18),
@@ -823,7 +852,7 @@ class _RemoteButton extends StatelessWidget {
               Icon(icon, size: 20, color: AppTheme.textSecondary),
               Text(
                 label,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 9,
                   color: AppTheme.textSecondary,
                 ),
@@ -1076,10 +1105,18 @@ class _LiveMonitorTab extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (monitor.threadHistories.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.restart_alt, size: 20),
+                  tooltip: 'Reset history',
+                  onPressed: () => ref.read(liveMonitorProvider.notifier).resetHistory(),
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  padding: EdgeInsets.zero,
+                ),
               Switch(
                 value: monitor.isEnabled,
                 onChanged: (_) => ref.read(liveMonitorProvider.notifier).toggle(),
-                activeColor: AppTheme.primaryColor,
+                activeThumbColor: AppTheme.primaryColor,
               ),
             ],
           ),
@@ -1090,57 +1127,50 @@ class _LiveMonitorTab extends ConsumerWidget {
             padding: const EdgeInsets.all(AppTheme.spacingSm),
             child: Text(
               monitor.error!,
-              style: TextStyle(color: AppTheme.errorColor, fontSize: 12),
+              style: const TextStyle(color: AppTheme.errorColor, fontSize: 12),
             ),
           ),
 
         // Data display
         Expanded(
-          child: monitor.cpuData == null && !monitor.isEnabled
-              ? Center(
+          child: !monitor.isEnabled && monitor.lastUpdate == null
+              ? const Center(
                   child: Text(
                     'Enable monitoring to see live status\ndata from the watch',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppTheme.textSecondary),
                   ),
                 )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppTheme.spacingSm),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (monitor.threadData != null) ...[
-                        _MonitorSection(
-                          title: 'Threads',
-                          icon: Icons.account_tree,
-                          data: monitor.threadData!,
-                        ),
-                        const SizedBox(height: AppTheme.spacingSm),
-                      ],
-                      if (monitor.cpuData != null) ...[
-                        _MonitorSection(
-                          title: 'CPU',
-                          icon: Icons.speed,
-                          data: monitor.cpuData!,
-                        ),
-                        const SizedBox(height: AppTheme.spacingSm),
-                      ],
-                      if (monitor.powerData != null)
-                        _MonitorSection(
-                          title: 'Power',
-                          icon: Icons.power_settings_new,
-                          data: monitor.powerData!,
-                        ),
-                      if (monitor.isEnabled && monitor.cpuData == null)
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(32),
-                            child: CircularProgressIndicator(),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+              : monitor.isEnabled && monitor.lastUpdate == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(AppTheme.spacingSm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // System info row
+                          _SystemInfoCard(monitor: monitor),
+                          const SizedBox(height: AppTheme.spacingSm),
+                          // Threads (stack bars + state + priority + cycles/s)
+                          if (monitor.threadHistories.isNotEmpty) ...[
+                            _ThreadsCard(histories: monitor.threadHistories),
+                            const SizedBox(height: AppTheme.spacingSm),
+                          ],
+                          // Cycles/s chart
+                          if (monitor.pollCount > 1 && monitor.threadHistories.isNotEmpty)
+                            _CyclesChartCard(histories: monitor.threadHistories, pollCount: monitor.pollCount),
+                          if (monitor.threadHistories.isEmpty && monitor.isEnabled)
+                            const Padding(
+                              padding: EdgeInsets.all(AppTheme.spacingMd),
+                              child: Text(
+                                'Thread data not available — check firmware thread monitor support',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
         ),
       ],
     );
@@ -1153,66 +1183,498 @@ class _LiveMonitorTab extends ConsumerWidget {
   }
 }
 
-class _MonitorSection extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final String data;
+// =============================================================================
+// System Info Card (CPU + Power as labels)
+// =============================================================================
 
-  const _MonitorSection({
-    required this.title,
+class _SystemInfoCard extends StatelessWidget {
+  final LiveMonitorState monitor;
+  const _SystemInfoCard({required this.monitor});
+
+  @override
+  Widget build(BuildContext context) {
+    final power = monitor.powerInfo;
+    final cpuFreq = monitor.cpuFreq;
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingSm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.info_outline, size: 16, color: AppTheme.primaryColor),
+                const SizedBox(width: AppTheme.spacingSm),
+                Text('System', style: Theme.of(context).textTheme.titleSmall),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spacingSm),
+            Row(
+              children: [
+                Expanded(
+                  child: _InfoTile(
+                    icon: Icons.speed,
+                    label: 'CPU',
+                    value: cpuFreq ?? '—',
+                    color: cpuFreq == 'fast' ? AppTheme.warningColor : AppTheme.successColor,
+                  ),
+                ),
+                Expanded(
+                  child: _InfoTile(
+                    icon: Icons.power_settings_new,
+                    label: 'Power',
+                    value: power?.state ?? '—',
+                    color: power?.state == 'Active' ? AppTheme.successColor : AppTheme.textSecondary,
+                  ),
+                ),
+                Expanded(
+                  child: _InfoTile(
+                    icon: Icons.timer_outlined,
+                    label: 'Sleep in',
+                    value: power != null ? '${power.timeToSleepSec}s' : '—',
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                Expanded(
+                  child: _InfoTile(
+                    icon: Icons.schedule,
+                    label: 'Uptime',
+                    value: power != null ? _formatUptime(power.uptimeSec) : '—',
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            if (monitor.schedulerCycles != null) ...[
+              const SizedBox(height: AppTheme.spacingXs),
+              Text(
+                'Scheduler: ${monitor.schedulerCycles} cycles since last call',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                      fontSize: 10,
+                    ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatUptime(int seconds) {
+    if (seconds < 60) return '${seconds}s';
+    if (seconds < 3600) return '${seconds ~/ 60}m';
+    final h = seconds ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    return '${h}h ${m}m';
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _InfoTile({
     required this.icon,
-    required this.data,
+    required this.label,
+    required this.value,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+                fontSize: 11,
+              ),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.textSecondary,
+                fontSize: 9,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+// =============================================================================
+// Stack Usage Card (horizontal bars with max marker)
+// =============================================================================
+
+class _ThreadsCard extends StatelessWidget {
+  final Map<String, ThreadHistory> histories;
+  const _ThreadsCard({required this.histories});
+
+  @override
+  Widget build(BuildContext context) {
+    final sorted = histories.values.toList()
+      ..sort((a, b) {
+        // Active threads first, removed threads at the bottom.
+        if (a.removed != b.removed) return a.removed ? 1 : -1;
+        return b.currentUsagePercent.compareTo(a.currentUsagePercent);
+      });
+
     return Card(
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(AppTheme.spacingSm),
-            child: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingSm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Icon(icon, size: 16, color: AppTheme.primaryColor),
+                const Icon(Icons.memory, size: 16, color: AppTheme.primaryColor),
                 const SizedBox(width: AppTheme.spacingSm),
-                Text(title, style: Theme.of(context).textTheme.titleSmall),
+                Text('Threads (${sorted.length})', style: Theme.of(context).textTheme.titleSmall),
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.copy, size: 16),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: data));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Copied'),
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
-                  },
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  padding: EdgeInsets.zero,
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: AppTheme.warningColor.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                  ),
                 ),
+                const SizedBox(width: 4),
+                Text('max', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 9, color: AppTheme.textSecondary)),
               ],
             ),
-          ),
-          Container(
-            width: double.infinity,
-            color: Colors.black.withValues(alpha: 0.3),
-            padding: const EdgeInsets.all(AppTheme.spacingSm),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SelectableText(
-                data,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ),
-        ],
+            const SizedBox(height: AppTheme.spacingSm),
+            ...sorted.map((t) => _ThreadEntry(thread: t)),
+          ],
+        ),
       ),
     );
   }
 }
+
+class _ThreadEntry extends StatelessWidget {
+  final ThreadHistory thread;
+  const _ThreadEntry({required this.thread});
+
+  @override
+  Widget build(BuildContext context) {
+    final isRemoved = thread.removed;
+    final dimAlpha = isRemoved ? 0.4 : 1.0;
+    final currentFrac = thread.stackSize > 0 ? thread.currentStackUsed / thread.stackSize : 0.0;
+    final maxFrac = thread.stackSize > 0 ? thread.maxStackUsed / thread.stackSize : 0.0;
+    final maxPct = thread.stackSize > 0
+        ? ((thread.maxStackUsed / thread.stackSize) * 100).round()
+        : 0;
+
+    Color barColor;
+    if (isRemoved) {
+      barColor = AppTheme.textSecondary;
+    } else if (currentFrac > 0.85) {
+      barColor = AppTheme.errorColor;
+    } else if (currentFrac > 0.65) {
+      barColor = AppTheme.warningColor;
+    } else {
+      barColor = AppTheme.primaryColor;
+    }
+
+    final lastCps = thread.cyclesPerSecHistory.isNotEmpty
+        ? thread.cyclesPerSecHistory.last
+        : 0.0;
+    final cpsText = lastCps > 1e6
+        ? '${(lastCps / 1e6).toStringAsFixed(1)}M/s'
+        : lastCps > 1e3
+            ? '${(lastCps / 1e3).toStringAsFixed(1)}K/s'
+            : '${lastCps.toStringAsFixed(0)}/s';
+
+    return Opacity(
+      opacity: dimAlpha,
+      child: Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Row 1: name, state, priority, cycles/s
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  thread.name,
+                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Text(
+                  thread.state,
+                  style: const TextStyle(fontSize: 8, color: AppTheme.textSecondary),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'P${thread.priority}',
+                style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                cpsText,
+                style: TextStyle(fontSize: 9, color: AppTheme.primaryColor.withValues(alpha: 0.8)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          // Row 2: stack bar with labels
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 10,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final maxWidth = constraints.maxWidth;
+                      return Stack(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                          Container(
+                            width: maxWidth * currentFrac.clamp(0.0, 1.0),
+                            decoration: BoxDecoration(
+                              color: barColor.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                          if (maxFrac > currentFrac)
+                            Positioned(
+                              left: (maxWidth * maxFrac.clamp(0.0, 1.0)) - 1,
+                              top: 0,
+                              bottom: 0,
+                              child: Container(
+                                width: 2,
+                                color: AppTheme.warningColor.withValues(alpha: 0.8),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${thread.currentStackUsed}/${thread.stackSize}',
+                style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary, fontFamily: 'monospace'),
+              ),
+              if (maxPct > thread.currentUsagePercent) ...[                const SizedBox(width: 4),
+                Text(
+                  '(max $maxPct%)',
+                  style: TextStyle(fontSize: 8, color: AppTheme.warningColor.withValues(alpha: 0.8)),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    ),
+    );
+  }
+}
+
+// =============================================================================
+// Cycles/s Line Chart
+// =============================================================================
+
+class _CyclesChartCard extends StatelessWidget {
+  final Map<String, ThreadHistory> histories;
+  final int pollCount;
+  const _CyclesChartCard({required this.histories, required this.pollCount});
+
+  static const int _windowSize = 30;
+
+  static const _chartColors = [
+    AppTheme.primaryColor,
+    AppTheme.warningColor,
+    AppTheme.errorColor,
+    AppTheme.successColor,
+    AppTheme.infoColor,
+    Color(0xFFE040FB), // purple
+    Color(0xFFFF6E40), // deep orange
+    Color(0xFF64FFDA), // teal accent
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    // Only show threads that have had non-zero cycles and are not removed.
+    final active = histories.entries.where((e) {
+      return !e.value.removed && e.value.cyclesPerSecHistory.any((v) => v > 0);
+    }).toList()
+      ..sort((a, b) {
+        final aMax = a.value.cyclesPerSecHistory.isEmpty
+            ? 0.0
+            : a.value.cyclesPerSecHistory.reduce((a, b) => a > b ? a : b);
+        final bMax = b.value.cyclesPerSecHistory.isEmpty
+            ? 0.0
+            : b.value.cyclesPerSecHistory.reduce((a, b) => a > b ? a : b);
+        return bMax.compareTo(aMax);
+      });
+
+    if (active.isEmpty) return const SizedBox.shrink();
+
+    // Limit to top 8 most active threads for readability
+    final shown = active.take(8).toList();
+
+    // Rolling window: only show the last _windowSize samples
+    final xMax = (pollCount - 1).toDouble();
+    final xMin = (pollCount - _windowSize).toDouble();
+
+    final lines = <LineChartBarData>[];
+    for (int idx = 0; idx < shown.length; idx++) {
+      final th = shown[idx].value;
+      final history = th.cyclesPerSecHistory;
+      final offset = pollCount - history.length;
+      final spots = <FlSpot>[];
+      for (int i = 0; i < history.length; i++) {
+        final x = (offset + i).toDouble();
+        if (x < xMin) continue;
+        spots.add(FlSpot(x, history[i]));
+      }
+      if (spots.isEmpty) continue;
+      lines.add(LineChartBarData(
+        spots: spots,
+        isCurved: true,
+        preventCurveOverShooting: true,
+        color: _chartColors[idx % _chartColors.length],
+        barWidth: 1.5,
+        isStrokeCapRound: true,
+        dotData: const FlDotData(show: false),
+        belowBarData: BarAreaData(show: false),
+      ));
+    }
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingSm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.show_chart, size: 16, color: AppTheme.primaryColor),
+                const SizedBox(width: AppTheme.spacingSm),
+                Text('Cycles/s', style: Theme.of(context).textTheme.titleSmall),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spacingSm),
+            // Legend
+            Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              children: [
+                for (int idx = 0; idx < shown.length; idx++)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 3,
+                        color: _chartColors[idx % _chartColors.length],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        shown[idx].key,
+                        style: const TextStyle(fontSize: 9, fontFamily: 'monospace'),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spacingSm),
+            SizedBox(
+              height: 150,
+              child: LineChart(
+                duration: Duration.zero,
+                LineChartData(
+                  minX: xMin,
+                  maxX: xMax,
+                  lineBarsData: lines,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: null,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      strokeWidth: 1,
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) {
+                          if (value == meta.min || value == meta.max) {
+                            return const SizedBox.shrink();
+                          }
+                          String text;
+                          if (value >= 1000000) {
+                            text = '${(value / 1000000).toStringAsFixed(1)}M';
+                          } else if (value >= 1000) {
+                            text = '${(value / 1000).toStringAsFixed(1)}k';
+                          } else {
+                            text = value.toInt().toString();
+                          }
+                          return Text(text, style: const TextStyle(fontSize: 8, color: AppTheme.textSecondary));
+                        },
+                      ),
+                    ),
+                    bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) => AppTheme.elevatedSurfaceColor,
+                      getTooltipItems: (touchedSpots) {
+                        return touchedSpots.map((spot) {
+                          final name = shown[spot.barIndex].key;
+                          return LineTooltipItem(
+                            '$name: ${spot.y.toStringAsFixed(0)}',
+                            TextStyle(
+                              fontSize: 10,
+                              color: _chartColors[spot.barIndex % _chartColors.length],
+                            ),
+                          );
+                        }).toList();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
