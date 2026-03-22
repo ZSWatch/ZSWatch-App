@@ -1121,23 +1121,48 @@ class FirmwareManager {
   }
 
   /// Get a cached ELF file for the given commit SHA (gzipped).
-  /// Returns null if not cached.
+  /// Returns null if not cached. Supports prefix matching for truncated SHAs
+  /// (the watch reports a short SHA, but the cache uses the full SHA from CI).
   Future<File?> getCachedElf(String commitSha) async {
     final dir = await _getElfCacheDirectory();
+    // Try exact match first
     final file = File(path.join(dir.path, '$commitSha.elf.gz'));
     if (await file.exists()) {
       _log('ELF cache hit for commit $commitSha');
       return file;
     }
+    // Prefix match for truncated SHAs
+    final entries = dir.listSync().whereType<File>().where(
+        (f) => f.path.endsWith('.elf.gz'));
+    for (final entry in entries) {
+      final name = path.basenameWithoutExtension(
+          path.basenameWithoutExtension(entry.path)); // strip .elf.gz
+      if (name.startsWith(commitSha) || commitSha.startsWith(name)) {
+        _log('ELF cache prefix hit: $commitSha matched $name');
+        return entry;
+      }
+    }
     return null;
   }
 
   /// Get the cached elf_hash for a given commit SHA, if known from manifest.
+  /// Supports prefix matching for truncated SHAs.
   Future<String?> getCachedElfHash(String commitSha) async {
     final dir = await _getElfCacheDirectory();
+    // Try exact match first
     final metaFile = File(path.join(dir.path, '$commitSha.meta'));
     if (await metaFile.exists()) {
       return (await metaFile.readAsString()).trim();
+    }
+    // Prefix match for truncated SHAs
+    final entries = dir.listSync().whereType<File>().where(
+        (f) => f.path.endsWith('.meta'));
+    for (final entry in entries) {
+      final name = path.basenameWithoutExtension(entry.path); // strip .meta
+      if (name.startsWith(commitSha) || commitSha.startsWith(name)) {
+        _log('ELF meta prefix hit: $commitSha matched $name');
+        return (await entry.readAsString()).trim();
+      }
     }
     return null;
   }
