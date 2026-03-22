@@ -133,7 +133,7 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
                     else
                       const SizedBox(width: 18),
                     const SizedBox(width: 8),
-                    Icon(
+                    const Icon(
                       Icons.arrow_downward,
                       size: 16,
                       color: AppTheme.successColor,
@@ -152,7 +152,7 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
                     else
                       const SizedBox(width: 18),
                     const SizedBox(width: 8),
-                    Icon(
+                    const Icon(
                       Icons.arrow_upward,
                       size: 16,
                       color: AppTheme.primaryColor,
@@ -505,7 +505,7 @@ class _CommLogEntryTile extends StatelessWidget {
         ? AppTheme.successColor
         : AppTheme.primaryColor;
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(

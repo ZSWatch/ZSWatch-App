@@ -393,7 +393,7 @@ class _CompactDebugToolsHub extends StatelessWidget {
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 16),
-                    Container(
+                    DecoratedBox(
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.04),
                         borderRadius: BorderRadius.circular(12),
@@ -414,9 +414,9 @@ class _CompactDebugToolsHub extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Expanded(
+                    const Expanded(
                       child: TabBarView(
-                        children: const [
+                        children: [
                           _DebugToolSheetPage(
                             child: NotificationDebugSection(),
                           ),

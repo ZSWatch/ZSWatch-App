@@ -148,7 +148,7 @@ class _HistoryTab extends ConsumerWidget {
                     ? const SizedBox.shrink()
                     : _StatsCard(stats: stats, totalCrashes: reports.length),
                 loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
               ),
             ),
 

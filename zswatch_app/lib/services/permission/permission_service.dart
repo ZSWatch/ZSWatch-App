@@ -69,8 +69,9 @@ class AppPermissionsStatus {
   List<String> get missingRecommendedPermissions {
     final missing = <String>[];
     if (!bluetoothGranted) missing.add('Bluetooth');
-    if (!isNotificationGranted && Platform.isAndroid)
+    if (!isNotificationGranted && Platform.isAndroid) {
       missing.add('Notifications');
+    }
     if (!batteryOptimizationDisabled && Platform.isAndroid) {
       missing.add('Battery Optimization');
     }
@@ -82,8 +83,9 @@ class AppPermissionsStatus {
     final missing = <String>[];
     if (!bluetoothGranted) missing.add('Bluetooth');
     if (!isLocationGranted) missing.add('Location');
-    if (!isNotificationGranted && Platform.isAndroid)
+    if (!isNotificationGranted && Platform.isAndroid) {
       missing.add('Notifications');
+    }
     if (!notificationListenerEnabled && Platform.isAndroid) {
       missing.add('Notification Access');
     }

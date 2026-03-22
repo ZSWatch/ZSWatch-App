@@ -409,7 +409,7 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, color: AppTheme.infoColor, size: 20),
+          const Icon(Icons.info_outline, color: AppTheme.infoColor, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -495,7 +495,6 @@ class _SensorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lastReading = history.isNotEmpty ? history.last : null;
-    final hasData = history.isNotEmpty;
 
     return Card(
       margin: const EdgeInsets.only(bottom: AppTheme.spacingMd),
@@ -611,7 +610,7 @@ class _SensorCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(
+                    const SizedBox(
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
@@ -940,7 +939,7 @@ class _SensorFusionCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
+                      const SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
@@ -1088,48 +1087,6 @@ class _QuatChip extends StatelessWidget {
           Text(
             value.toStringAsFixed(3),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontFamily: 'monospace',
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EulerChip extends StatelessWidget {
-  final String label;
-  final double value;
-  final Color color;
-
-  const _EulerChip({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            '${value.toStringAsFixed(1)}°',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontFamily: 'monospace',
               fontWeight: FontWeight.bold,
             ),
@@ -1293,7 +1250,8 @@ class _AxisPainter extends CustomPainter {
 
     final cosRoll = math.cos(roll);
     final sinRoll = math.sin(roll);
-    final y2 = y1 * cosRoll - z1 * sinRoll;
+    // y2 intentionally unused — only z2 feeds the pitch rotation below.
+    final _ = y1 * cosRoll - z1 * sinRoll;
     final z2 = y1 * sinRoll + z1 * cosRoll;
 
     final cosPitch = math.cos(pitch);
@@ -1323,7 +1281,7 @@ class _AxisPainter extends CustomPainter {
     if (length > 10) {
       final normalized = direction / length;
       final perpendicular = Offset(-normalized.dy, normalized.dx);
-      final arrowSize = 6.0;
+      const arrowSize = 6.0;
       final arrowBase = end - normalized * arrowSize;
 
       final path = Path()

@@ -40,7 +40,7 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         children: [
           // Connection Settings
-          _SectionHeader(title: 'Connection'),
+          const _SectionHeader(title: 'Connection'),
           _SettingsTile(
             leading: Icon(
               ref.watch(backgroundConnectionEnabledProvider)
@@ -81,7 +81,7 @@ class SettingsScreen extends ConsumerWidget {
                     .setEnabled(value);
                 // If disabling while connected, the service will keep running
                 // until the watch is disconnected
-                if (!value) {
+                if (!value && context.mounted) {
                   _showPersistentConnectionDisabledDialog(context);
                 }
               },
@@ -91,13 +91,13 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(height: 32),
 
           // Permissions Section (consolidated)
-          _SectionHeader(title: 'Permissions'),
+          const _SectionHeader(title: 'Permissions'),
           _PermissionsSummaryTile(),
 
           const Divider(height: 32),
 
           // Firmware Update Settings
-          _SectionHeader(title: 'Firmware Update'),
+          const _SectionHeader(title: 'Firmware Update'),
           _SettingsTile(
             leading: const Icon(
               Icons.screen_lock_portrait,
@@ -118,13 +118,13 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(height: 32),
 
           // Voice Memo AI (sub-page)
-          _SectionHeader(title: 'Voice Memo AI'),
+          const _SectionHeader(title: 'Voice Memo AI'),
           _AiTranscriptionNavTile(),
 
           const Divider(height: 32),
 
           // About Section
-          _SectionHeader(title: 'About'),
+          const _SectionHeader(title: 'About'),
           _SettingsTile(
             leading: const Icon(
               Icons.info_outline,
@@ -169,7 +169,7 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(height: 32),
 
           // Demo Mode (for app store reviewers without hardware)
-          _SectionHeader(title: 'Developer'),
+          const _SectionHeader(title: 'Developer'),
           _SettingsTile(
             leading: Icon(
               Icons.science,
@@ -242,13 +242,13 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('App Version'),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _InfoRow(label: 'Version', value: _appVersion),
             _InfoRow(label: 'Build', value: _buildNumber),
-            const _InfoRow(label: 'Platform', value: 'Flutter'),
+            _InfoRow(label: 'Platform', value: 'Flutter'),
           ],
         ),
         actions: [

@@ -156,8 +156,9 @@ class ZswOpusParser {
       final frameLen = bd.getUint16(0, Endian.little);
 
       if (frameLen == 0) break; // Zero-length frame = end marker or corruption
-      if (offset + 2 + frameLen > data.length)
+      if (offset + 2 + frameLen > data.length) {
         break; // Truncated frame (dirty stop)
+      }
 
       final frameData = Uint8List.sublistView(
         data,

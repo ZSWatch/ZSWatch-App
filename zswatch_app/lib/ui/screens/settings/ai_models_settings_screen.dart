@@ -281,7 +281,7 @@ class _TranscriptionModelSelectorState
             0,
           ),
           child: DropdownButtonFormField<TranscriptionEngineType>(
-            value: selectedType,
+            initialValue: selectedType,
             isExpanded: true,
             decoration: const InputDecoration(
               labelText: 'Select model',
@@ -879,7 +879,7 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                       0,
                     ),
                     child: DropdownButtonFormField<String>(
-                      value: models.any((m) => m.id == selectedModelId)
+                      initialValue: models.any((m) => m.id == selectedModelId)
                           ? selectedModelId
                           : models.isNotEmpty
                           ? models.first.id

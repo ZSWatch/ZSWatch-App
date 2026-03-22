@@ -329,21 +329,16 @@ class VoiceMemoActionState {
       error = null;
 
   const VoiceMemoActionState.loading({
-    required VoiceMemoActionType actionType,
-    String? activeFilename,
+    required this.actionType,
+    this.activeFilename,
   }) : isLoading = true,
-       actionType = actionType,
-       activeFilename = activeFilename,
        error = null;
 
   const VoiceMemoActionState.error({
-    required VoiceMemoActionType actionType,
-    String? activeFilename,
-    required Object error,
-  }) : isLoading = false,
-       actionType = actionType,
-       activeFilename = activeFilename,
-       error = error;
+    required this.actionType,
+    this.activeFilename,
+    required this.error,
+  }) : isLoading = false;
 
   bool isTranscribingMemo(String filename) {
     return isLoading &&

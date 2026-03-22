@@ -18,7 +18,6 @@ import '../../../providers/voice_memo_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../../services/ai/ai_debug_info.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
-import '../../../services/voice_memo/voice_memo_sync_service.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/voice_memos/memo_list_item.dart';
 import '../../widgets/voice_memos/sync_progress_bar.dart';
@@ -728,8 +727,8 @@ class _AiDebugSheet extends ConsumerWidget {
               Text('AI Debug Info', style: theme.textTheme.titleMedium),
               const Spacer(),
               if (debugInfo != null && !debugInfo.isComplete)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                const Padding(
+                  padding: EdgeInsets.only(right: 8),
                   child: SizedBox(
                     width: 16,
                     height: 16,
@@ -906,7 +905,7 @@ class _AiDebugSheet extends ConsumerWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              SizedBox(
+              const SizedBox(
                 width: 14,
                 height: 14,
                 child: CircularProgressIndicator(
@@ -949,7 +948,11 @@ class _AiDebugSheet extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, size: 16, color: AppTheme.textSecondary),
+          const Icon(
+            Icons.info_outline,
+            size: 16,
+            color: AppTheme.textSecondary,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1305,7 +1308,7 @@ class _AiDebugSheet extends ConsumerWidget {
       children: [
         Row(
           children: [
-            Icon(
+            const Icon(
               Icons.check_circle_outline,
               size: 16,
               color: AppTheme.textSecondary,

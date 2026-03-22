@@ -202,9 +202,9 @@ class _LogViewerScreenState extends ConsumerState<LogViewerScreen> {
               }
             },
             itemBuilder: (context) => [
-              PopupMenuItem(
+              const PopupMenuItem(
                 value: 'copy',
-                child: const Row(
+                child: Row(
                   children: [
                     Icon(Icons.copy, size: 18),
                     SizedBox(width: 8),
@@ -420,7 +420,7 @@ class _StatsBar extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.arrow_downward,
                   size: 12,
                   color: AppTheme.textSecondary,
@@ -554,7 +554,7 @@ class _LogEntryTile extends StatelessWidget {
   void _showFullLogDialog(BuildContext context) {
     final levelColor = _getLevelColor(entry.level);
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(

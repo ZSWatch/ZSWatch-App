@@ -79,10 +79,14 @@ class RealTimeChart extends StatelessWidget {
               calculatedMaxY,
             ),
             verticalInterval: timeWindowSeconds / 6,
-            getDrawingHorizontalLine: (value) =>
-                FlLine(color: AppTheme.elevatedSurfaceColor, strokeWidth: 1),
-            getDrawingVerticalLine: (value) =>
-                FlLine(color: AppTheme.elevatedSurfaceColor, strokeWidth: 1),
+            getDrawingHorizontalLine: (value) => const FlLine(
+              color: AppTheme.elevatedSurfaceColor,
+              strokeWidth: 1,
+            ),
+            getDrawingVerticalLine: (value) => const FlLine(
+              color: AppTheme.elevatedSurfaceColor,
+              strokeWidth: 1,
+            ),
           ),
           titlesData: FlTitlesData(
             show: true,
@@ -295,8 +299,10 @@ class StepsBarChart extends StatelessWidget {
             show: showGrid,
             drawVerticalLine: false,
             horizontalInterval: calculatedMaxY / 5,
-            getDrawingHorizontalLine: (value) =>
-                FlLine(color: AppTheme.elevatedSurfaceColor, strokeWidth: 1),
+            getDrawingHorizontalLine: (value) => const FlLine(
+              color: AppTheme.elevatedSurfaceColor,
+              strokeWidth: 1,
+            ),
           ),
           titlesData: FlTitlesData(
             show: true,

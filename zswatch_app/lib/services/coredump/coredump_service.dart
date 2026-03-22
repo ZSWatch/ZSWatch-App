@@ -120,7 +120,7 @@ class CoredumpService {
 
       // The file has a binary header (zsw_coredump_sumary_t struct) before the
       // text coredump data. Find the #CD:BEGIN# marker and strip everything before it.
-      final marker = '#CD:BEGIN#';
+      const marker = '#CD:BEGIN#';
       final markerBytes = marker.codeUnits;
       int markerIndex = -1;
       for (int i = 0; i <= coredumpBytes.length - markerBytes.length; i++) {
@@ -141,7 +141,7 @@ class CoredumpService {
       if (markerIndex >= 0) {
         coredumpTxt = String.fromCharCodes(coredumpBytes, markerIndex);
         debugPrint(
-          '[CoredumpService] Stripped ${markerIndex} byte binary header',
+          '[CoredumpService] Stripped $markerIndex byte binary header',
         );
       } else {
         coredumpTxt = String.fromCharCodes(coredumpBytes);
@@ -167,7 +167,7 @@ class CoredumpService {
       _state.add(
         const CoredumpAnalysisState(phase: CoredumpAnalysisPhase.analyzing),
       );
-      var result = await _apiService.analyze(
+      final result = await _apiService.analyze(
         coredumpTxt: coredumpTxt,
         summary: summary,
         elfHash: elfHash,
