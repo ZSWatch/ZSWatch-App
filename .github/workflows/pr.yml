@@ -14,10 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
-
-      - name: Fetch submodules
-        run: git -c credential.helper= -c core.askPass= -c credential.interactive=never submodule update --init --force --depth=1 --recursive
+          submodules: recursive
 
       - uses: subosito/flutter-action@v2
         with:
@@ -54,10 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
-
-      - name: Fetch submodules
-        run: git -c credential.helper= -c core.askPass= -c credential.interactive=never submodule update --init --force --depth=1 --recursive
+          submodules: recursive
 
       - uses: subosito/flutter-action@v2
         with:
@@ -90,10 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
-
-      - name: Fetch submodules
-        run: git -c credential.helper= -c core.askPass= -c credential.interactive=never submodule update --init --force --depth=1 --recursive
+          submodules: recursive
 
       - uses: subosito/flutter-action@v2
         with:
@@ -141,10 +132,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
-
-      - name: Fetch submodules
-        run: git -c credential.helper= -c core.askPass= -c credential.interactive=never submodule update --init --force --depth=1 --recursive
+          submodules: recursive
 
       - uses: subosito/flutter-action@v2
         with:
