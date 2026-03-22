@@ -72,9 +72,8 @@ class _DeveloperToolsBody extends ConsumerWidget {
       _BlendToolTile(
         icon: Icons.bug_report_outlined,
         title: 'Crash Reports',
-        subtitle: crashSummary != null ? 'Coredump available' : 'History & stats',
+        subtitle: 'History & stats',
         accent: Colors.redAccent.shade200,
-        badgeLabel: crashSummary != null ? 'Dump' : null,
         onTap: () => context.push(AppRoutes.crashReport),
       ),
       _BlendToolTile(
@@ -202,7 +201,6 @@ class _BlendToolTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color accent;
-  final String? badgeLabel;
   final VoidCallback? onTap;
 
   const _BlendToolTile({
@@ -210,7 +208,6 @@ class _BlendToolTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.accent,
-    this.badgeLabel,
     this.onTap,
   });
 
@@ -242,25 +239,6 @@ class _BlendToolTile extends StatelessWidget {
                       child: Icon(icon, size: 22, color: accent),
                     ),
                     const Spacer(),
-                    if (badgeLabel != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: accent.withValues(alpha: 0.28),
-                          ),
-                        ),
-                        child: Text(
-                          badgeLabel!,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: accent,
-                                fontFamily: 'monospace',
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                      ),
                   ],
                 ),
                 const Spacer(),

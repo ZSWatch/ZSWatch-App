@@ -1,10 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/thread_monitor_data.dart';
 import '../services/shell/shell_service.dart';
 import 'watch_service_provider.dart';
+
+// The interactive terminal surfaces non-zero return codes in the UI; the live
+// monitor handles them separately so it can stop polling when a capability is
+// missing.
 
 /// Provider for the shell service singleton.
 final shellServiceProvider = Provider<ShellService>((ref) {
@@ -210,7 +215,10 @@ class LiveMonitorState {
 class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
   final ShellService _shellService;
   Timer? _pollTimer;
-  static const _pollInterval = Duration(seconds: 5);
+  bool _polling = false;
+  int _consecutiveErrors = 0;
+  static const _pollInterval = Duration(seconds: 1);
+  static const _maxConsecutiveErrors = 5;
 
   LiveMonitorNotifier(this._shellService)
       : super(const LiveMonitorState());
@@ -224,14 +232,22 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
   }
 
   void start() {
+    if (state.isEnabled) return;
+    _consecutiveErrors = 0;
     state = state.copyWith(isEnabled: true, error: null);
     _poll();
     _pollTimer = Timer.periodic(_pollInterval, (_) => _poll());
   }
 
-  void stop() {
+  /// Cancel the polling timer without modifying provider state.
+  /// Safe to call during widget lifecycle (build/deactivate/dispose).
+  void cancelPolling() {
     _pollTimer?.cancel();
     _pollTimer = null;
+  }
+
+  void stop() {
+    cancelPolling();
     state = LiveMonitorState(
       isEnabled: false,
       cpuFreq: state.cpuFreq,
@@ -251,7 +267,8 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
   }
 
   Future<void> _poll() async {
-    if (!state.isEnabled) return;
+    if (!state.isEnabled || _polling) return;
+    _polling = true;
 
     try {
       // Power status
@@ -279,8 +296,17 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
         final threadResult = await _shellService.execute('kernel thread list');
         if (state.isEnabled) {
           parsed = parseThreadList(threadResult.output);
+          debugPrint(
+              '[LiveMonitor] Parsed ${parsed.threads.length} threads from ${threadResult.output.length} chars');
+          if (parsed.threads.isEmpty) {
+            debugPrint(
+                '[LiveMonitor] Raw output (first 300): ${threadResult.output.substring(0, threadResult.output.length.clamp(0, 300))}');
+          }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[LiveMonitor] Thread parse error: $e');
+      }
+      if (!state.isEnabled) return;
 
       if (!state.isEnabled) return;
 
@@ -289,8 +315,10 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
       final pollSec = _pollInterval.inMilliseconds / 1000.0;
 
       if (parsed != null) {
+        final seenKeys = <String>{};
         for (final snapshot in parsed.threads) {
           final key = snapshot.name;
+          seenKeys.add(key);
           final existing = histories[key];
           if (existing != null) {
             existing.update(snapshot, pollSec);
@@ -304,11 +332,21 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
               state: snapshot.state,
               priority: snapshot.priority,
               initialCycles: snapshot.totalCycles,
+              firstSeenPoll: state.pollCount,
             );
+          }
+        }
+        // Mark threads no longer reported as removed (keep their last state).
+        for (final entry in histories.entries) {
+          if (!seenKeys.contains(entry.key) && !entry.value.removed) {
+            entry.value.removed = true;
+            entry.value.removedAt = DateTime.now();
+            entry.value.state = 'removed';
           }
         }
       }
 
+      _consecutiveErrors = 0;
       state = state.copyWith(
         cpuFreq: cpuFreq,
         powerInfo: powerInfo,
@@ -319,9 +357,18 @@ class LiveMonitorNotifier extends StateNotifier<LiveMonitorState> {
         pollCount: state.pollCount + 1,
       );
     } catch (e) {
+      _consecutiveErrors++;
       if (state.isEnabled) {
-        state = state.copyWith(error: e.toString());
+        if (_consecutiveErrors >= _maxConsecutiveErrors) {
+          debugPrint('[LiveMonitor] Too many consecutive errors ($_consecutiveErrors), stopping');
+          stop();
+          state = state.copyWith(error: 'Stopped: SMP connection failed repeatedly');
+        } else {
+          state = state.copyWith(error: e.toString());
+        }
       }
+    } finally {
+      _polling = false;
     }
   }
 

@@ -8,6 +8,11 @@ gadgetbridge_api.txt
 # Development notes
 Issues:.md
 
+# Android signing keys (use GitHub Secrets in CI instead)
+zswatch_app/android/key.properties
+zswatch_app/android/*.keystore
+zswatch_app/android/*.jks
+
 # IDE and editor directories
 .idea/
 .vscode/
