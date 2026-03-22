@@ -15,6 +15,24 @@ export '../services/analytics/battery_storage_service.dart' show batteryStorageS
 export '../services/analytics/connection_analytics_service.dart' show connectionAnalyticsServiceProvider;
 
 // ============================================================================
+// Enums and Constants
+// ============================================================================
+
+/// Time range options for connection analytics timeline
+enum TimeRangeOption {
+  oneHour(Duration(hours: 1), '1h'),
+  sixHours(Duration(hours: 6), '6h'),
+  twelveHours(Duration(hours: 12), '12h'),
+  twentyFourHours(Duration(hours: 24), '24h'),
+  sevenDays(Duration(days: 7), '7d');
+
+  final Duration duration;
+  final String label;
+
+  const TimeRangeOption(this.duration, this.label);
+}
+
+// ============================================================================
 // Battery Analytics Providers
 // ============================================================================
 
@@ -99,6 +117,17 @@ final currentWatchEstimatedTimeProvider = FutureProvider.autoDispose<Duration?>(
   final repository = ref.watch(batteryRepositoryProvider);
   return repository.estimateRemainingTime(selectedWatchId);
 });
+
+// ============================================================================
+// Connection Timeline Time Range Selection
+// ============================================================================
+
+/// Provider to track the selected time range for connection timeline per watch.
+/// Defaults to full range (7 days).
+final connectionTimelineRangeProvider = StateProvider.autoDispose
+    .family<TimeRangeOption, String>(
+      (ref, watchId) => TimeRangeOption.sevenDays,
+    );
 
 // ============================================================================
 // Connection Analytics Providers
@@ -188,19 +217,15 @@ final oldestConnectionEventTimeProvider = FutureProvider.autoDispose
 });
 
 /// Provider for the connection timeline segments.
-/// The window spans from the oldest recorded event (or up to 24h back) to now.
+/// The window is determined by the selected time range from connectionTimelineRangeProvider.
 final connectionTimelineProvider = FutureProvider.autoDispose
     .family<({List<ConnectionSegment> segments, DateTime windowStart, DateTime windowEnd}), String>(
         (ref, watchId) async {
   final repository = ref.watch(connectionAnalyticsRepositoryProvider);
+  final selectedRange = ref.watch(connectionTimelineRangeProvider(watchId));
   final now = DateTime.now();
-  final oldest = await repository.getOldestEventTime(watchId);
-  // Use oldest event as window start, but cap at 7 days to avoid an absurdly wide chart.
-  final windowStart = oldest != null
-      ? (now.difference(oldest) > const Duration(days: 7)
-          ? now.subtract(const Duration(days: 7))
-          : oldest)
-      : now.subtract(const Duration(hours: 1));
+  final windowStart = now.subtract(selectedRange.duration);
+  
   final segments = await repository.getConnectionTimeline(
     watchId: watchId,
     from: windowStart,
