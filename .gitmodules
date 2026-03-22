@@ -3,4 +3,4 @@
 	url = https://github.com/ZSWatch/Flutter-nRF-Connect-Device-Manager.git
 [submodule "third_party/fllama"]
 	path = third_party/fllama
-	url = git@github.com:ZSWatch/fllama.git
+	url = https://github.com/ZSWatch/fllama.git
