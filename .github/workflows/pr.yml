@@ -107,6 +107,9 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('zswatch_app/android/**/*.gradle*', 'zswatch_app/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
 
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
       - name: Get dependencies
         working-directory: zswatch_app
         run: flutter pub get
