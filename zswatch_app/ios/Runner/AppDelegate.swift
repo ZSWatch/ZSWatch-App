@@ -110,17 +110,17 @@ import UIKit
       guard let self else { return }
 
       if let error {
-        result(FlutterError(code: "PERMISSION_ERROR", message: error.localizedDescription, details: nil))
+        DispatchQueue.main.async { result(FlutterError(code: "PERMISSION_ERROR", message: error.localizedDescription, details: nil)) }
         return
       }
 
       guard granted else {
-        result(FlutterError(code: "PERMISSION_DENIED", message: "Calendar access was denied.", details: nil))
+        DispatchQueue.main.async { result(FlutterError(code: "PERMISSION_DENIED", message: "Calendar access was denied.", details: nil)) }
         return
       }
 
       guard let calendar = self.eventStore.defaultCalendarForNewEvents else {
-        result(FlutterError(code: "NO_CALENDAR", message: "No writable calendar was found.", details: nil))
+        DispatchQueue.main.async { result(FlutterError(code: "NO_CALENDAR", message: "No writable calendar was found.", details: nil)) }
         return
       }
 
@@ -144,12 +144,14 @@ import UIKit
 
       do {
         try self.eventStore.save(event, span: .thisEvent, commit: true)
-        result([
-          "platformId": event.calendarItemIdentifier,
-          "targetType": "calendar_event",
-        ])
+        DispatchQueue.main.async {
+          result([
+            "platformId": event.calendarItemIdentifier,
+            "targetType": "calendar_event",
+          ])
+        }
       } catch {
-        result(FlutterError(code: "CREATE_ACTION_FAILED", message: error.localizedDescription, details: nil))
+        DispatchQueue.main.async { result(FlutterError(code: "CREATE_ACTION_FAILED", message: error.localizedDescription, details: nil)) }
       }
     }
   }
@@ -165,17 +167,17 @@ import UIKit
       guard let self else { return }
 
       if let error {
-        result(FlutterError(code: "PERMISSION_ERROR", message: error.localizedDescription, details: nil))
+        DispatchQueue.main.async { result(FlutterError(code: "PERMISSION_ERROR", message: error.localizedDescription, details: nil)) }
         return
       }
 
       guard granted else {
-        result(FlutterError(code: "PERMISSION_DENIED", message: "Reminder access was denied.", details: nil))
+        DispatchQueue.main.async { result(FlutterError(code: "PERMISSION_DENIED", message: "Reminder access was denied.", details: nil)) }
         return
       }
 
       guard let calendar = self.eventStore.defaultCalendarForNewReminders() else {
-        result(FlutterError(code: "NO_CALENDAR", message: "No reminders list was found.", details: nil))
+        DispatchQueue.main.async { result(FlutterError(code: "NO_CALENDAR", message: "No reminders list was found.", details: nil)) }
         return
       }
 
@@ -198,12 +200,14 @@ import UIKit
 
       do {
         try self.eventStore.save(reminder, commit: true)
-        result([
-          "platformId": reminder.calendarItemIdentifier,
-          "targetType": "reminder",
-        ])
+        DispatchQueue.main.async {
+          result([
+            "platformId": reminder.calendarItemIdentifier,
+            "targetType": "reminder",
+          ])
+        }
       } catch {
-        result(FlutterError(code: "CREATE_ACTION_FAILED", message: error.localizedDescription, details: nil))
+        DispatchQueue.main.async { result(FlutterError(code: "CREATE_ACTION_FAILED", message: error.localizedDescription, details: nil)) }
       }
     }
   }

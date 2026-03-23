@@ -28,11 +28,6 @@
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
 
-    <!-- Sync settings permissions for triggering Google Calendar sync after event creation -->
-    <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
-    <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
-    <uses-permission android:name="android.permission.READ_SYNC_STATS" />
-
     <!-- Network access for firmware downloads -->
     <uses-permission android:name="android.permission.INTERNET" />
 
