@@ -31,6 +31,9 @@
     <!-- Network access for firmware downloads -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Required to launch system timer/alarm intents -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+
     <!-- BLE feature declaration -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
@@ -107,6 +110,13 @@
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="http"/>
+        </intent>
+        <!-- Required for timer/alarm creation via system clock app -->
+        <intent>
+            <action android:name="android.intent.action.SET_TIMER"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_ALARM"/>
         </intent>
     </queries>
 </manifest>

@@ -47,6 +47,10 @@ class ExtractedActions extends Table {
   TextColumn get platformTargetId =>
       text().nullable().named('platform_target_id')();
 
+  /// Duration in seconds (for timer actions)
+  IntColumn get durationSeconds =>
+      integer().nullable().named('duration_seconds')();
+
   /// When this action was created in the OS
   DateTimeColumn get createdAt => dateTime().nullable().named('created_at')();
 }

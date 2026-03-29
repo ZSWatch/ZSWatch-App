@@ -3,7 +3,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'extracted_action.freezed.dart';
 
 /// Type of extracted action from AI processing
-enum ExtractedActionType { task, calendarEvent, reminder }
+enum ExtractedActionType { task, calendarEvent, reminder, timer, alarm }
 
 /// Domain model for an AI-extracted action from a voice memo
 @freezed
@@ -21,6 +21,7 @@ abstract class ExtractedAction with _$ExtractedAction {
     DateTime? dueDate,
     String? location,
     int? reminderMinutes,
+    int? durationSeconds,
     @Default(false) bool created,
     @Default(false) bool dismissed,
     String? platformTargetId,
@@ -36,6 +37,10 @@ abstract class ExtractedAction with _$ExtractedAction {
         return ExtractedActionType.calendarEvent;
       case 'reminder':
         return ExtractedActionType.reminder;
+      case 'timer':
+        return ExtractedActionType.timer;
+      case 'alarm':
+        return ExtractedActionType.alarm;
       default:
         return ExtractedActionType.task;
     }
@@ -50,6 +55,10 @@ abstract class ExtractedAction with _$ExtractedAction {
         return 'calendar_event';
       case ExtractedActionType.reminder:
         return 'reminder';
+      case ExtractedActionType.timer:
+        return 'timer';
+      case ExtractedActionType.alarm:
+        return 'alarm';
     }
   }
 }

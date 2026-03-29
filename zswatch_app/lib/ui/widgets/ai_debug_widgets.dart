@@ -217,6 +217,15 @@ String aiFormatChronoDetails({
   String show(String? value) =>
       (value != null && value.trim().isNotEmpty) ? value.trim() : 'null';
 
+  String formatDuration(int? seconds) {
+    if (seconds == null) return 'null';
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    if (m > 0 && s > 0) return '${m}m ${s}s (${seconds}s)';
+    if (m > 0) return '${m}m (${seconds}s)';
+    return '${seconds}s';
+  }
+
   // When multiple actions are available, show all of them.
   if (extractedActions.length > 1) {
     final buf = StringBuffer();
@@ -226,19 +235,29 @@ String aiFormatChronoDetails({
       buf.writeln('--- Action ${i + 1} ---');
       buf.writeln('Intent: ${show(a.intent)}');
       buf.writeln('Title: ${show(a.title)}');
-      buf.writeln(
-        'Original time phrase: ${show(a.datetimeExpressionOriginal)}',
-      );
-      buf.writeln('English time phrase: ${show(a.datetimeExpressionEnglish)}');
-      buf.writeln('Resolved datetime: ${show(a.resolvedDateTime)}');
-      buf.write('Resolver: ${show(a.resolverMethod)}');
+      if (a.intent == 'timer') {
+        buf.write('Duration: ${formatDuration(a.durationSeconds)}');
+      } else {
+        buf.writeln(
+          'Original time phrase: ${show(a.datetimeExpressionOriginal)}',
+        );
+        buf.writeln('English time phrase: ${show(a.datetimeExpressionEnglish)}');
+        buf.writeln('Resolved datetime: ${show(a.resolvedDateTime)}');
+        buf.write('Resolver: ${show(a.resolverMethod)}');
+      }
     }
     return buf.toString();
   }
 
   // Single action — use the direct fields (or the single extractedAction).
   final a = extractedActions.isNotEmpty ? extractedActions.first : null;
-  return 'Intent: ${show(a?.intent ?? extractedIntent)}\n'
+  final intent = a?.intent ?? extractedIntent;
+  if (intent == 'timer') {
+    return 'Intent: timer\n'
+        'Title: ${show(a?.title ?? extractedTitle)}\n'
+        'Duration: ${formatDuration(a?.durationSeconds)}';
+  }
+  return 'Intent: ${show(intent)}\n'
       'Title: ${show(a?.title ?? extractedTitle)}\n'
       'Original time phrase: ${show(a?.datetimeExpressionOriginal ?? datetimeExpressionOriginal)}\n'
       'English time phrase: ${show(a?.datetimeExpressionEnglish ?? datetimeExpressionEnglish)}\n'

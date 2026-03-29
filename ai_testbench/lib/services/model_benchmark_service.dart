@@ -16,12 +16,20 @@ class ExpectedItem {
   final DateTime? expectedDateTime;
   final int toleranceMinutes;
 
+  /// For timer intent: expected duration in seconds.
+  final int? expectedDurationSeconds;
+
+  /// Tolerance for duration matching (default ±5 seconds).
+  final int durationToleranceSeconds;
+
   const ExpectedItem({
     required this.expectedIntent,
     required this.expectTime,
     this.titleLanguageKeywords = const [],
     this.expectedDateTime,
     this.toleranceMinutes = 5,
+    this.expectedDurationSeconds,
+    this.durationToleranceSeconds = 5,
   });
 }
 
@@ -47,6 +55,8 @@ class BenchmarkCase {
     List<String> titleLanguageKeywords = const [],
     DateTime? expectedDateTime,
     int toleranceMinutes = 5,
+    int? expectedDurationSeconds,
+    int durationToleranceSeconds = 5,
   }) : expectedItems = [
           ExpectedItem(
             expectedIntent: expectedIntent,
@@ -54,6 +64,8 @@ class BenchmarkCase {
             titleLanguageKeywords: titleLanguageKeywords,
             expectedDateTime: expectedDateTime,
             toleranceMinutes: toleranceMinutes,
+            expectedDurationSeconds: expectedDurationSeconds,
+            durationToleranceSeconds: durationToleranceSeconds,
           ),
         ];
 
@@ -101,6 +113,12 @@ class BenchmarkCaseResult {
   /// Per-item validation details for multi-item cases.
   final List<String> itemFailures;
 
+  /// Whether the extracted duration matches expected (for timer intents).
+  final bool durationMatch;
+
+  /// Detail about duration match failure.
+  final String? durationDetail;
+
   const BenchmarkCaseResult({
     required this.caseName,
     required this.validJson,
@@ -110,6 +128,8 @@ class BenchmarkCaseResult {
     this.titleLanguageDetail,
     this.timeResolutionCorrect = true,
     this.timeResolutionDetail,
+    this.durationMatch = true,
+    this.durationDetail,
     required this.intent,
     this.title,
     this.datetimeOriginal,
@@ -130,6 +150,7 @@ class BenchmarkCaseResult {
       timePresenceMatch &&
       titleLanguageMatch &&
       timeResolutionCorrect &&
+      durationMatch &&
       countMatch &&
       itemFailures.isEmpty;
 }
@@ -189,6 +210,9 @@ class BenchmarkModelResult {
 class ModelBenchmarkService {
   static const Duration perCaseTimeout = Duration(seconds: 90);
   static const ChronoLlmParser _parser = ChronoLlmParser();
+
+  /// Prompt template to use for extraction.
+  String promptTemplate = ChronoPromptTemplate.defaultTemplate;
 
   /// Fixed reference time for deterministic tests.
   /// Wednesday March 11, 2026, 10:15 AM.
@@ -797,7 +821,226 @@ class ModelBenchmarkService {
         ),
       ],
     ),
+
+    // ── Timer cases ──────────────────────────────────────────────────
+
+    BenchmarkCase.single(
+      name: 'en_timer_simple',
+      transcript: 'Set a timer for 8 minutes',
+      expectedIntent: 'timer',
+      expectTime: false,
+      expectedDurationSeconds: 480,
+    ),
+    BenchmarkCase.single(
+      name: 'en_timer_labeled',
+      transcript: 'Timer for 5 minutes for pasta',
+      expectedIntent: 'timer',
+      expectTime: false,
+      titleLanguageKeywords: ['pasta'],
+      expectedDurationSeconds: 300,
+    ),
+    BenchmarkCase.single(
+      name: 'en_timer_seconds',
+      transcript: 'Set a 30 second timer',
+      expectedIntent: 'timer',
+      expectTime: false,
+      expectedDurationSeconds: 30,
+    ),
+    BenchmarkCase.single(
+      name: 'en_timer_hour',
+      transcript: 'Set a timer for one and a half hours',
+      expectedIntent: 'timer',
+      expectTime: false,
+      expectedDurationSeconds: 5400,
+    ),
+    BenchmarkCase.single(
+      name: 'sv_timer_simple',
+      transcript: 'Sätt en timer på 10 minuter',
+      expectedIntent: 'timer',
+      expectTime: false,
+      titleLanguageKeywords: [],
+      expectedDurationSeconds: 600,
+    ),
+    BenchmarkCase.single(
+      name: 'sv_timer_labeled',
+      transcript: 'Timer på 5 minuter för äggen',
+      expectedIntent: 'timer',
+      expectTime: false,
+      titleLanguageKeywords: ['äggen'],
+      expectedDurationSeconds: 300,
+    ),
+    BenchmarkCase.single(
+      name: 'de_timer_simple',
+      transcript: 'Stell einen Timer auf 15 Minuten',
+      expectedIntent: 'timer',
+      expectTime: false,
+      expectedDurationSeconds: 900,
+    ),
+    BenchmarkCase.single(
+      name: 'en_timer_vs_reminder',
+      transcript: 'Remind me in 30 minutes to check the oven',
+      expectedIntent: 'reminder',
+      expectTime: true,
+      titleLanguageKeywords: ['check', 'oven'],
+    ),
+    BenchmarkCase.single(
+      name: 'en_timer_bare_duration',
+      transcript: 'In 10 minutes',
+      expectedIntent: 'timer',
+      expectTime: false,
+      expectedDurationSeconds: 600,
+    ),
+    BenchmarkCase.single(
+      name: 'en_timer_not_reminder',
+      transcript: '30 minutes',
+      expectedIntent: 'timer',
+      expectTime: false,
+      expectedDurationSeconds: 1800,
+    ),
+    BenchmarkCase.single(
+      name: 'sv_timer_vs_reminder',
+      transcript: 'Påminn mig om 10 minuter att stänga av ugnen',
+      expectedIntent: 'reminder',
+      expectTime: true,
+      titleLanguageKeywords: ['stänga', 'ugnen'],
+    ),
+
+    // ── Alarm cases ──────────────────────────────────────────────────
+
+    BenchmarkCase.single(
+      name: 'en_alarm_morning',
+      transcript: 'Set an alarm for 7:30 AM',
+      expectedIntent: 'alarm',
+      expectTime: true,
+      expectedDateTime: DateTime(2026, 3, 11, 7, 30),
+    ),
+    BenchmarkCase.single(
+      name: 'en_alarm_labeled',
+      transcript: 'Alarm at 6 AM, wake up',
+      expectedIntent: 'alarm',
+      expectTime: true,
+      titleLanguageKeywords: ['wake'],
+      expectedDateTime: DateTime(2026, 3, 12, 6, 0),
+    ),
+    BenchmarkCase.single(
+      name: 'en_alarm_weekdays',
+      transcript: 'Set an alarm for 7 AM every weekday',
+      expectedIntent: 'alarm',
+      expectTime: true,
+      expectedDateTime: DateTime(2026, 3, 12, 7, 0),
+    ),
+    BenchmarkCase.single(
+      name: 'en_alarm_tomorrow',
+      transcript: 'Wake me up tomorrow at 5:30',
+      expectedIntent: 'alarm',
+      expectTime: true,
+      expectedDateTime: DateTime(2026, 3, 12, 5, 30),
+    ),
+    BenchmarkCase.single(
+      name: 'sv_alarm_simple',
+      transcript: 'Ställ ett alarm klockan 7',
+      expectedIntent: 'alarm',
+      expectTime: true,
+      expectedDateTime: DateTime(2026, 3, 12, 7, 0),
+    ),
+    BenchmarkCase.single(
+      name: 'sv_alarm_labeled',
+      transcript: 'Alarm klockan halv 8, dags att gå',
+      expectedIntent: 'alarm',
+      expectTime: true,
+      titleLanguageKeywords: ['dags', 'gå'],
+      expectedDateTime: DateTime(2026, 3, 11, 7, 30),
+    ),
+    BenchmarkCase.single(
+      name: 'de_alarm_simple',
+      transcript: 'Wecker auf 7 Uhr stellen',
+      expectedIntent: 'alarm',
+      expectTime: true,
+      expectedDateTime: DateTime(2026, 3, 12, 7, 0),
+    ),
+    BenchmarkCase.single(
+      name: 'en_alarm_vs_reminder',
+      transcript: 'Remind me at 3 PM to call the dentist',
+      expectedIntent: 'reminder',
+      expectTime: true,
+      titleLanguageKeywords: ['call', 'dentist'],
+      expectedDateTime: DateTime(2026, 3, 11, 15, 0),
+    ),
+    BenchmarkCase.single(
+      name: 'en_alarm_no_action',
+      transcript: '7 AM',
+      expectedIntent: 'alarm',
+      expectTime: true,
+      expectedDateTime: DateTime(2026, 3, 12, 7, 0),
+    ),
+    BenchmarkCase.single(
+      name: 'sv_alarm_vs_reminder',
+      transcript: 'Påminn mig klockan 15 att ringa tandläkaren',
+      expectedIntent: 'reminder',
+      expectTime: true,
+      titleLanguageKeywords: ['ringa', 'tandläkaren'],
+      expectedDateTime: DateTime(2026, 3, 11, 15, 0),
+    ),
+
+    // ── Multi-item cases with timers/alarms ──────────────────────────
+
+    BenchmarkCase(
+      name: 'en_multi_timer_and_alarm',
+      transcript:
+          'Set a timer for 10 minutes and an alarm for 7 AM tomorrow',
+      expectedItems: [
+        ExpectedItem(
+          expectedIntent: 'timer',
+          expectTime: false,
+          expectedDurationSeconds: 600,
+        ),
+        ExpectedItem(
+          expectedIntent: 'alarm',
+          expectTime: true,
+          expectedDateTime: DateTime(2026, 3, 12, 7, 0),
+        ),
+      ],
+    ),
+    BenchmarkCase(
+      name: 'en_multi_alarm_and_note',
+      transcript: 'Set an alarm for 6:30 and buy milk',
+      expectedItems: [
+        ExpectedItem(
+          expectedIntent: 'alarm',
+          expectTime: true,
+          expectedDateTime: DateTime(2026, 3, 12, 6, 30),
+        ),
+        ExpectedItem(
+          expectedIntent: 'note',
+          expectTime: false,
+          titleLanguageKeywords: ['milk'],
+        ),
+      ],
+    ),
+    BenchmarkCase(
+      name: 'sv_multi_timer_and_reminder',
+      transcript:
+          'Sätt en timer på 5 minuter och påminn mig klockan 3 att ringa tandläkaren',
+      expectedItems: [
+        ExpectedItem(
+          expectedIntent: 'timer',
+          expectTime: false,
+          expectedDurationSeconds: 300,
+        ),
+        ExpectedItem(
+          expectedIntent: 'reminder',
+          expectTime: true,
+          titleLanguageKeywords: ['ringa', 'tandläkaren'],
+          expectedDateTime: DateTime(2026, 3, 11, 15, 0),
+        ),
+      ],
+    ),
   ];
+
+  /// Timer/alarm test cases only (for --headless-timer mode).
+  static List<BenchmarkCase> get timerAlarmCases => benchmarkCases
+      .where((c) => c.name.contains('timer') || c.name.contains('alarm'))
+      .toList();
 
   Future<List<BenchmarkModelResult>> runForModels(
     List<String> modelPaths, {
@@ -844,7 +1087,7 @@ class ModelBenchmarkService {
 
           // Use the shared ChronoPromptTemplate from chrono_ai_flow
           final prompt = ChronoPromptTemplate.render(
-            ChronoPromptTemplate.defaultTemplate,
+            promptTemplate,
             transcript: testCase.transcript,
             now: referenceTime,
           );
@@ -869,8 +1112,10 @@ class ModelBenchmarkService {
             var allTimePresenceMatch = true;
             var allTitleLangMatch = true;
             var allTimeResMatch = true;
+            var allDurationMatch = true;
             String? allTitleLangDetail;
             String? allTimeResDetail;
+            String? allDurationDetail;
             final itemFailures = <String>[];
 
             final checkCount =
@@ -917,6 +1162,17 @@ class ModelBenchmarkService {
               }
               allTimeResDetail = (allTimeResDetail ?? '') +
                   'item[$i]: ${timeRes.detail}; ';
+
+              // Duration validation for timer intents
+              final durRes = _checkDurationForItem(
+                  ext.durationSeconds, exp);
+              if (!durRes.passed) {
+                allDurationMatch = false;
+                itemFailures.add(
+                    'item[$i] duration: ${durRes.detail}');
+              }
+              allDurationDetail = (allDurationDetail ?? '') +
+                  'item[$i]: ${durRes.detail}; ';
             }
 
             // If count mismatch, mark missing items as failures
@@ -943,6 +1199,8 @@ class ModelBenchmarkService {
                 titleLanguageDetail: allTitleLangDetail,
                 timeResolutionCorrect: allTimeResMatch,
                 timeResolutionDetail: allTimeResDetail,
+                durationMatch: allDurationMatch,
+                durationDetail: allDurationDetail,
                 intent: first?.intent ?? '',
                 title: first?.title,
                 datetimeOriginal: first?.datetimeExpressionOriginal,
@@ -1049,6 +1307,8 @@ class ModelBenchmarkService {
     if (g == e) return true;
     // Allow note <-> task fuzzy match (no time = note)
     if ({g, e}.containsAll({'note', 'task'})) return true;
+    // Allow countdown <-> timer fuzzy match
+    if ({g, e}.containsAll({'countdown', 'timer'})) return true;
     return false;
   }
 
@@ -1081,6 +1341,31 @@ class ModelBenchmarkService {
         : 'none of [${item.titleLanguageKeywords.join(", ")}] found in "$title"';
 
     return _CheckResult(passed: passed, detail: detail);
+  }
+
+  _CheckResult _checkDurationForItem(int? gotDuration, ExpectedItem item) {
+    if (item.expectedDurationSeconds == null) {
+      return const _CheckResult(passed: true, detail: 'no duration check');
+    }
+    if (gotDuration == null) {
+      return const _CheckResult(
+        passed: false,
+        detail: 'no duration_seconds in output',
+      );
+    }
+    final diff = (gotDuration - item.expectedDurationSeconds!).abs();
+    if (diff > item.durationToleranceSeconds) {
+      return _CheckResult(
+        passed: false,
+        detail:
+            'got ${gotDuration}s, expected ${item.expectedDurationSeconds}s '
+            '(diff ${diff}s, tolerance ${item.durationToleranceSeconds}s)',
+      );
+    }
+    return _CheckResult(
+      passed: true,
+      detail: '${gotDuration}s OK',
+    );
   }
 
   _CheckResult _checkTimeResolution(

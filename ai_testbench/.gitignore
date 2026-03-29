@@ -56,3 +56,4 @@ native_libs/
 
 # MLCEngine virtualenv
 .mlc_venv/
+benchmark_results/

@@ -46,6 +46,7 @@ class ExtractedActionRepository
     DateTime? dueDate,
     String? location,
     int? reminderMinutes,
+    int? durationSeconds,
   }) async {
     final id = await _db.insertExtractedAction(
       ExtractedActionsCompanion(
@@ -58,6 +59,7 @@ class ExtractedActionRepository
         dueDate: Value(dueDate),
         location: Value(location),
         reminderMinutes: Value(reminderMinutes),
+        durationSeconds: Value(durationSeconds),
       ),
     );
     debugPrint(
@@ -105,6 +107,7 @@ class ExtractedActionRepository
       dueDate: entity.dueDate,
       location: entity.location,
       reminderMinutes: entity.reminderMinutes,
+      durationSeconds: entity.durationSeconds,
       created: entity.created,
       dismissed: entity.dismissed,
       platformTargetId: entity.platformTargetId,

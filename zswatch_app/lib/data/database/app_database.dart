@@ -41,7 +41,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Database schema version
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -58,6 +58,14 @@ class AppDatabase extends _$AppDatabase {
           // v2 → v3: added CrashReports table.
           await m.createTable(crashReports);
         }
+        if (from < 4) {
+          // v3 → v4: added duration_seconds column to extracted_actions.
+          await m.addColumn(extractedActions, extractedActions.durationSeconds);
+        }
+      },
+      beforeOpen: (details) async {
+        // Reset memos stuck in intermediate processing states from a crash.
+        await resetStuckProcessingMemos();
       },
     );
   }
@@ -506,6 +514,20 @@ class AppDatabase extends _$AppDatabase {
   }) {
     return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
         .write(VoiceMemosCompanion(processingStatus: Value(status)));
+  }
+
+  /// Reset any memos stuck in intermediate processing states back to 'failed'
+  /// so they can be retried. This handles crash recovery on app startup.
+  Future<int> resetStuckProcessingMemos() {
+    return (update(voiceMemos)
+          ..where(
+            (v) =>
+                v.summary.isNull() &
+                (v.processingStatus.equals('summarizing') |
+                    v.processingStatus.equals('categorizing') |
+                    v.processingStatus.equals('extractingActions')),
+          ))
+        .write(const VoiceMemosCompanion(processingStatus: Value('failed')));
   }
 
   /// Mark task created for a voice memo

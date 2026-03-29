@@ -14,6 +14,7 @@ import '../../../providers/ai_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/voice_memo_providers.dart';
 import '../../../services/ai/ai_debug_info.dart';
+import '../../../data/models/extracted_action.dart';
 import '../../../services/ai/extracted_action_creation_service.dart';
 import '../../../services/ai/llm_service.dart';
 import '../../../services/ai/model_benchmark_service.dart';
@@ -105,6 +106,19 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             subtitle: 'Test model performance on your device',
           ),
           const _BenchmarkSection(),
+
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+
+          // ---- Timer / Alarm test section ----
+          const _SectionHeader(
+            title: 'Timer & Alarm Test',
+            subtitle:
+                'Test creating timers and alarms via the system clock app '
+                'without connecting a watch.',
+          ),
+          const _TimerAlarmTestSection(),
         ],
       ),
     );
@@ -1663,6 +1677,96 @@ class _AiBenchmarkInputEditor extends StatelessWidget {
 }
 
 /// Compact tile shown in the benchmark section after a completed run.
+class _TimerAlarmTestSection extends ConsumerStatefulWidget {
+  const _TimerAlarmTestSection();
+
+  @override
+  ConsumerState<_TimerAlarmTestSection> createState() =>
+      _TimerAlarmTestSectionState();
+}
+
+class _TimerAlarmTestSectionState
+    extends ConsumerState<_TimerAlarmTestSection> {
+  bool _busy = false;
+
+  Future<void> _testTimer() async {
+    setState(() => _busy = true);
+    try {
+      const service = ExtractedActionCreationService();
+      const draft = ActionCreationDraft(
+        actionType: ExtractedActionType.timer,
+        title: 'Test timer',
+        durationSeconds: 30,
+        skipUi: false,
+      );
+      final created = await service.createDraft(draft);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(created.successMessage)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Timer failed: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _testAlarm() async {
+    setState(() => _busy = true);
+    try {
+      const service = ExtractedActionCreationService();
+      final alarmTime = DateTime.now().add(const Duration(minutes: 5));
+      final draft = ActionCreationDraft(
+        actionType: ExtractedActionType.alarm,
+        title: 'Test alarm',
+        scheduledAt: alarmTime,
+        skipUi: false,
+      );
+      final created = await service.createDraft(draft);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(created.successMessage)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Alarm failed: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: _busy ? null : _testTimer,
+              icon: const Icon(Icons.timer, size: 18),
+              label: const Text('Timer 30s'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton.tonalIcon(
+              onPressed: _busy ? null : _testAlarm,
+              icon: const Icon(Icons.alarm_add, size: 18),
+              label: const Text('Alarm +5min'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _LastResultTile extends StatelessWidget {
   final AiDebugInfo progress;
   const _LastResultTile({required this.progress});

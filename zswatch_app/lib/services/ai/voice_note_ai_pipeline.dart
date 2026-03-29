@@ -184,18 +184,23 @@ class VoiceNoteAiPipeline {
           dueDate: _tryParseDate(action.dueDate),
           startTime: _tryParseDate(action.startTime),
           location: action.location,
+          durationSeconds: action.durationSeconds,
         );
       }
 
-      // Notify watch with round-trip confirmation toast
+      // Notify watch with round-trip confirmation toast.
+      // Skip sending notes (tasks without time) — they're app-internal only.
       final firstAction = result.actions.isNotEmpty
           ? result.actions.first
           : null;
+      final isNote = firstAction?.type == 'task' &&
+          firstAction?.startTime == null &&
+          firstAction?.dueDate == null;
       final actionDatetime = firstAction?.startTime ?? firstAction?.dueDate;
       onProcessingComplete?.call(
         filename,
         result.summary,
-        firstAction?.type,
+        isNote ? null : firstAction?.type,
         actionDatetime,
       );
 
@@ -254,6 +259,14 @@ class VoiceNoteAiPipeline {
 
   /// Process all transcribed but unprocessed memos
   Future<int> processAllUnprocessed() async {
+    // Reset any memos stuck in intermediate states from a previous crash.
+    final reset = await _memoRepository.resetStuckProcessingMemos();
+    if (reset > 0) {
+      debugPrint(
+        '[VoiceNoteAiPipeline] Reset $reset stuck processing memo(s)',
+      );
+    }
+
     final unprocessed = await _memoRepository.getUnprocessedMemos();
     if (unprocessed.isEmpty) {
       debugPrint('[VoiceNoteAiPipeline] No unprocessed memos');
@@ -288,6 +301,10 @@ class VoiceNoteAiPipeline {
         return ExtractedActionType.calendarEvent;
       case 'reminder':
         return ExtractedActionType.reminder;
+      case 'timer':
+        return ExtractedActionType.timer;
+      case 'alarm':
+        return ExtractedActionType.alarm;
       default:
         return ExtractedActionType.task;
     }
