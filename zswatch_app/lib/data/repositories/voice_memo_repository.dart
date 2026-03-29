@@ -164,6 +164,9 @@ class VoiceMemoRepository extends BaseRepository<VoiceMemo, VoiceMemoEntity> {
     );
   }
 
+  /// Reset memos stuck in intermediate processing states back to 'failed'.
+  Future<int> resetStuckProcessingMemos() => _db.resetStuckProcessingMemos();
+
   /// Get memos that are transcribed but not yet AI-processed
   Future<List<VoiceMemo>> getUnprocessedMemos() async {
     final entities = await _db.getUnprocessedVoiceMemos();

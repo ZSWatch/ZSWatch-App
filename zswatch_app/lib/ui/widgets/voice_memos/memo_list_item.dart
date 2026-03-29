@@ -230,9 +230,54 @@ class VoiceMemoMetaChip extends StatelessWidget {
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
+/// Clean up AI summary text that may contain raw JSON from a previous run.
+String cleanSummary(String summary) {
+  final trimmed = summary.trim();
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+    // Attempt to extract a readable title from JSON
+    final titleMatch = RegExp(r'"title"\s*:\s*"([^"]*)"').firstMatch(trimmed);
+    final intentMatch = RegExp(r'"intent"\s*:\s*"([^"]*)"').firstMatch(trimmed);
+    final intent = intentMatch?.group(1);
+    final title = titleMatch?.group(1);
+
+    if (intent == 'timer') {
+      final durMatch =
+          RegExp(r'"duration_seconds"\s*:\s*(\d+)').firstMatch(trimmed);
+      final d = int.tryParse(durMatch?.group(1) ?? '') ?? 0;
+      final h = d ~/ 3600;
+      final m = (d % 3600) ~/ 60;
+      final s = d % 60;
+      final parts = <String>[
+        if (h > 0) '${h}h',
+        if (m > 0) '${m}m',
+        if (s > 0 || (h == 0 && m == 0)) '${s}s',
+      ];
+      final dur = parts.join(' ');
+      return (title != null && title.isNotEmpty)
+          ? 'Timer $dur — $title'
+          : 'Timer $dur';
+    }
+    if (intent == 'alarm') {
+      final expr = RegExp(r'"datetime_expression_english"\s*:\s*"([^"]*)"')
+          .firstMatch(trimmed)
+          ?.group(1);
+      if (expr != null && expr.isNotEmpty) {
+        return (title != null && title.isNotEmpty)
+            ? 'Alarm $expr — $title'
+            : 'Alarm $expr';
+      }
+      return (title != null && title.isNotEmpty) ? 'Alarm — $title' : 'Alarm';
+    }
+    if (title != null && title.isNotEmpty) return title;
+  }
+  return trimmed;
+}
+
 String memoPreviewText(VoiceMemo memo) {
   final aiSummary = memo.summary?.trim();
-  if (aiSummary != null && aiSummary.isNotEmpty) return aiSummary;
+  if (aiSummary != null && aiSummary.isNotEmpty) {
+    return cleanSummary(aiSummary);
+  }
 
   final transcript = memo.transcription?.trim();
   if (transcript != null && transcript.isNotEmpty) {

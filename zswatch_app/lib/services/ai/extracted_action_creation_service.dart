@@ -67,6 +67,10 @@ class ActionCreationDraft {
   final DateTime? endAt;
   final String? location;
   final int? reminderMinutes;
+  final int? durationSeconds;
+  /// When true, the system clock app creates the timer/alarm silently
+  /// without opening its UI. Defaults to true for background use.
+  final bool skipUi;
   final int? platformCalendarId;
 
   const ActionCreationDraft({
@@ -77,6 +81,8 @@ class ActionCreationDraft {
     this.endAt,
     this.location,
     this.reminderMinutes,
+    this.durationSeconds,
+    this.skipUi = true,
     this.platformCalendarId,
   });
 
@@ -98,6 +104,7 @@ class ActionCreationDraft {
       reminderMinutes:
           action.reminderMinutes ??
           (action.actionType == ExtractedActionType.reminder ? 0 : null),
+      durationSeconds: action.durationSeconds,
       platformCalendarId: null,
     );
   }
@@ -110,6 +117,8 @@ class ActionCreationDraft {
     DateTime? endAt,
     String? location,
     int? reminderMinutes,
+    int? durationSeconds,
+    bool? skipUi,
     int? platformCalendarId,
   }) {
     return ActionCreationDraft(
@@ -120,6 +129,8 @@ class ActionCreationDraft {
       endAt: endAt ?? this.endAt,
       location: location ?? this.location,
       reminderMinutes: reminderMinutes ?? this.reminderMinutes,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      skipUi: skipUi ?? this.skipUi,
       platformCalendarId: platformCalendarId ?? this.platformCalendarId,
     );
   }
@@ -133,6 +144,8 @@ class ActionCreationDraft {
       'endAtMillis': endAt?.millisecondsSinceEpoch,
       'location': location,
       'reminderMinutes': reminderMinutes,
+      'durationSeconds': durationSeconds,
+      'skipUi': skipUi,
       'calendarId': platformCalendarId,
     };
   }
@@ -170,6 +183,10 @@ class CreatedPlatformAction {
         return 'Reminder created$calendarSuffix';
       case 'calendar_reminder':
         return 'Calendar reminder created$calendarSuffix';
+      case 'timer':
+        return 'Timer started';
+      case 'alarm':
+        return 'Alarm set';
       default:
         return 'Action created$calendarSuffix';
     }
@@ -303,6 +320,8 @@ class ExtractedActionCreationService {
       ExtractedActionType.calendarEvent => 'calendar_event',
       ExtractedActionType.task ||
       ExtractedActionType.reminder => 'calendar_reminder',
+      ExtractedActionType.timer ||
+      ExtractedActionType.alarm => 'alarm',
     };
 
     await _openCreatedCalendarEntryIfSupported(
@@ -363,6 +382,13 @@ class ExtractedActionCreationService {
       );
     }
 
+    // Timer/alarm use system intents on Android — no permission needed.
+    if (Platform.isAndroid &&
+        (actionType == ExtractedActionType.timer ||
+            actionType == ExtractedActionType.alarm)) {
+      return;
+    }
+
     final permission = _permissionForActionType(actionType);
     final failureMessage = _failureMessageForActionType(actionType);
 
@@ -370,16 +396,18 @@ class ExtractedActionCreationService {
   }
 
   Permission _permissionForActionType(ExtractedActionType actionType) {
-    if (Platform.isAndroid) {
-      return Permission.calendarFullAccess;
-    }
-
     switch (actionType) {
+      case ExtractedActionType.timer:
+      case ExtractedActionType.alarm:
+        // Timer/alarm use system intents — no calendar permissions needed.
+        return Permission.notification;
       case ExtractedActionType.calendarEvent:
         return Permission.calendarFullAccess;
       case ExtractedActionType.task:
       case ExtractedActionType.reminder:
-        return Permission.reminders;
+        return Platform.isAndroid
+            ? Permission.calendarFullAccess
+            : Permission.reminders;
     }
   }
 
@@ -395,6 +423,8 @@ class ExtractedActionCreationService {
         'Calendar access is required to create events.',
       ExtractedActionType.task || ExtractedActionType.reminder =>
         'Reminders access is required to create reminders.',
+      ExtractedActionType.timer || ExtractedActionType.alarm =>
+        'Notification permission is required for timers and alarms.',
     };
   }
 

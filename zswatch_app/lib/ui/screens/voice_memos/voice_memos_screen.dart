@@ -598,13 +598,23 @@ class _AISummarySection extends ConsumerWidget {
                     ),
                   ),
                 )
-              else if (hasFailed)
+              else if (hasFailed) ...[
                 Text(
-                  'AI processing failed. Please try again.',
+                  'AI processing failed.',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: AppTheme.errorColor),
-                )
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  style: _compactOutlinedButtonStyle(),
+                  onPressed: () => ref
+                      .read(aiActionsProvider.notifier)
+                      .processVoiceMemo(memo.filename),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                ),
+              ]
               else ...[
                 if (hasCategory)
                   Padding(
@@ -613,7 +623,7 @@ class _AISummarySection extends ConsumerWidget {
                   ),
                 if (hasSummary)
                   SelectableText(
-                    memo.summary!,
+                    cleanSummary(memo.summary!),
                     style: Theme.of(
                       context,
                     ).textTheme.bodyLarge?.copyWith(height: 1.45),
@@ -1472,7 +1482,7 @@ class _ActionItemState extends ConsumerState<_ActionItem> {
                 children: [
                   Expanded(
                     child: Text(
-                      action.title,
+                      _actionDisplayTitle(action),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
@@ -1507,52 +1517,62 @@ class _ActionItemState extends ConsumerState<_ActionItem> {
                   ),
                 ),
               ],
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: AppTheme.spacingSm,
-                runSpacing: AppTheme.spacingSm,
-                children: [
-                  if (!action.created && !action.dismissed)
-                    FilledButton.icon(
-                      style: _compactFilledButtonStyle(),
-                      onPressed: _isCreating ? null : _createAction,
-                      icon: _isCreating
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.add_task_outlined),
-                      label: Text(_isCreating ? 'Creating\u2026' : 'Create'),
-                    ),
-                  if (!action.created && !action.dismissed)
-                    OutlinedButton.icon(
-                      style: _compactOutlinedButtonStyle(),
-                      onPressed: _isDismissing ? null : _dismissAction,
-                      icon: _isDismissing
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.close_rounded),
-                      label: const Text('Dismiss'),
-                    ),
-                  if (action.created && action.platformTargetId != null)
-                    OutlinedButton.icon(
-                      style: _compactOutlinedButtonStyle(),
-                      onPressed: _isOpening ? null : _openCreatedAction,
-                      icon: _isOpening
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.open_in_new_rounded),
-                      label: const Text('Open'),
-                    ),
-                ],
-              ),
+              // Notes are app-internal only — no create/dismiss buttons
+              if (action.actionType != ExtractedActionType.task ||
+                  action.startTime != null ||
+                  action.dueDate != null ||
+                  action.durationSeconds != null) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: AppTheme.spacingSm,
+                  runSpacing: AppTheme.spacingSm,
+                  children: [
+                    if (!action.created && !action.dismissed)
+                      FilledButton.icon(
+                        style: _compactFilledButtonStyle(),
+                        onPressed: _isCreating ? null : _createAction,
+                        icon: _isCreating
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.add_task_outlined),
+                        label:
+                            Text(_isCreating ? 'Creating\u2026' : 'Create'),
+                      ),
+                    if (!action.created && !action.dismissed)
+                      OutlinedButton.icon(
+                        style: _compactOutlinedButtonStyle(),
+                        onPressed: _isDismissing ? null : _dismissAction,
+                        icon: _isDismissing
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.close_rounded),
+                        label: const Text('Dismiss'),
+                      ),
+                    if (action.created && action.platformTargetId != null)
+                      OutlinedButton.icon(
+                        style: _compactOutlinedButtonStyle(),
+                        onPressed: _isOpening ? null : _openCreatedAction,
+                        icon: _isOpening
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.open_in_new_rounded),
+                        label: const Text('Open'),
+                      ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -1635,6 +1655,8 @@ class _ActionItemState extends ConsumerState<_ActionItem> {
       ExtractedActionType.task => Icons.check_box_outlined,
       ExtractedActionType.reminder => Icons.alarm,
       ExtractedActionType.calendarEvent => Icons.calendar_today,
+      ExtractedActionType.timer => Icons.timer,
+      ExtractedActionType.alarm => Icons.alarm_add,
     };
   }
 
@@ -1643,10 +1665,51 @@ class _ActionItemState extends ConsumerState<_ActionItem> {
       ExtractedActionType.task => AppTheme.primaryColor,
       ExtractedActionType.reminder => AppTheme.warningColor,
       ExtractedActionType.calendarEvent => AppTheme.infoColor,
+      ExtractedActionType.timer => Colors.teal,
+      ExtractedActionType.alarm => Colors.deepOrange,
     };
   }
 
+  String _actionDisplayTitle(ExtractedAction action) {
+    if (action.actionType == ExtractedActionType.timer) {
+      final d = action.durationSeconds ?? 0;
+      final h = d ~/ 3600;
+      final m = (d % 3600) ~/ 60;
+      final s = d % 60;
+      final parts = <String>[
+        if (h > 0) '${h}h',
+        if (m > 0) '${m}m',
+        if (s > 0 || (h == 0 && m == 0)) '${s}s',
+      ];
+      final duration = parts.join(' ');
+      if (action.title.isNotEmpty) {
+        return 'Timer $duration — ${action.title}';
+      }
+      return 'Timer $duration';
+    }
+    if (action.actionType == ExtractedActionType.alarm) {
+      final time = action.startTime;
+      if (time != null) {
+        final t = time.toLocal();
+        final formatted = DateFormat.jm().format(t);
+        if (action.title.isNotEmpty) {
+          return 'Alarm at $formatted — ${action.title}';
+        }
+        return 'Alarm at $formatted';
+      }
+      if (action.title.isNotEmpty) return 'Alarm — ${action.title}';
+      return 'Alarm';
+    }
+    return action.title;
+  }
+
   String? _timingLabel(ExtractedAction action) {
+    // Timer/alarm timing info is already in the display title
+    if (action.actionType == ExtractedActionType.timer ||
+        action.actionType == ExtractedActionType.alarm) {
+      return null;
+    }
+
     final dateFormat = DateFormat.yMMMd();
     final dateTimeFormat = DateFormat.yMMMd().add_jm();
 

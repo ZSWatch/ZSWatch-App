@@ -62,6 +62,17 @@ import UIKit
     let scheduledAtMillis = (args["scheduledAtMillis"] as? NSNumber)?.doubleValue
     let endAtMillis = (args["endAtMillis"] as? NSNumber)?.doubleValue
     let reminderMinutes = (args["reminderMinutes"] as? NSNumber)?.intValue
+    let durationSeconds = (args["durationSeconds"] as? NSNumber)?.intValue
+
+    // Timer and alarm use Clock app URLs on iOS — no calendar permission needed.
+    if actionType == "timer" {
+      createTimerViaClockApp(durationSeconds: durationSeconds ?? 0, label: title, result: result)
+      return
+    }
+    if actionType == "alarm" {
+      createAlarmViaClockApp(scheduledAtMillis: scheduledAtMillis, label: title, result: result)
+      return
+    }
 
     guard !title.isEmpty else {
       result(FlutterError(code: "INVALID_ARGUMENT", message: "title is required", details: nil))
@@ -89,6 +100,46 @@ import UIKit
       )
     default:
       result(FlutterError(code: "INVALID_ARGUMENT", message: "Unsupported action type: \(actionType)", details: nil))
+    }
+  }
+
+  private func createTimerViaClockApp(durationSeconds: Int, label: String, result: @escaping FlutterResult) {
+    // iOS doesn't have a public API for setting timers programmatically.
+    // Open the Clock app's timer tab as the best available option.
+    if let url = URL(string: "clock-timer://") {
+      UIApplication.shared.open(url, options: [:]) { success in
+        result([
+          "platformId": nil,
+          "targetType": "timer",
+          "syncDisabled": false,
+        ] as [String: Any?])
+      }
+    } else {
+      result([
+        "platformId": nil,
+        "targetType": "timer",
+        "syncDisabled": false,
+      ] as [String: Any?])
+    }
+  }
+
+  private func createAlarmViaClockApp(scheduledAtMillis: Double?, label: String, result: @escaping FlutterResult) {
+    // iOS doesn't have a public API for setting alarms programmatically.
+    // Open the Clock app's alarm tab as the best available option.
+    if let url = URL(string: "clock-alarm://") {
+      UIApplication.shared.open(url, options: [:]) { success in
+        result([
+          "platformId": nil,
+          "targetType": "alarm",
+          "syncDisabled": false,
+        ] as [String: Any?])
+      }
+    } else {
+      result([
+        "platformId": nil,
+        "targetType": "alarm",
+        "syncDisabled": false,
+      ] as [String: Any?])
     }
   }
 

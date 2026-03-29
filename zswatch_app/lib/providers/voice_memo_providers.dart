@@ -247,15 +247,20 @@ Future<void> _autoCreateActionsForMemo({
     final selectedCalendarId = ref.read(selectedProductivityCalendarIdProvider);
 
     for (final action in pending) {
-      // Tasks and reminders require a scheduled time on Android — skip
-      // auto-creation if there's no date, the user can create manually.
+      // Notes (tasks without time) are app-internal only — never auto-create.
+      // Tasks/reminders require a scheduled time — skip if missing.
+      final isNote = action.actionType == ExtractedActionType.task &&
+          action.startTime == null &&
+          action.dueDate == null;
       final requiresDate =
-          action.actionType == ExtractedActionType.task ||
           action.actionType == ExtractedActionType.reminder;
-      if (requiresDate && action.startTime == null && action.dueDate == null) {
+      if (isNote ||
+          (requiresDate &&
+              action.startTime == null &&
+              action.dueDate == null)) {
         debugPrint(
           '[VoiceMemoProviders] Skipping auto-create for action ${action.id} '
-          '(${action.actionType}) — no scheduled time',
+          '(${action.actionType}) — note or no scheduled time',
         );
         continue;
       }

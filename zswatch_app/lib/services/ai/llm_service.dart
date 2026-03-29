@@ -124,12 +124,15 @@ class LlmServiceState {
 
 /// One extracted action from the LLM output.
 class ExtractedActionResult {
-  final String type; // "task", "calendar_event", "reminder"
+  final String type; // "task", "calendar_event", "reminder", "timer", "alarm"
   final String title;
   final String? notes;
   final String? dueDate;
   final String? startTime;
   final String? location;
+
+  /// Duration in seconds for timer intents.
+  final int? durationSeconds;
 
   const ExtractedActionResult({
     required this.type,
@@ -138,6 +141,7 @@ class ExtractedActionResult {
     this.dueDate,
     this.startTime,
     this.location,
+    this.durationSeconds,
   });
 }
 
@@ -964,26 +968,66 @@ class LlmService {
       // "Callback invoked after it has been deleted" crash.
       await Future<void>.delayed(const Duration(milliseconds: 500));
 
-      // --- Step 2: Build the extraction prompt ---
+      // --- Step 2: Route via lightweight pre-classifier ---
       final promptTemplate = classifyPromptOverride?.trim();
-      final prompt = (promptTemplate != null && promptTemplate.isNotEmpty)
-          ? _renderClassifyPromptTemplate(
-              promptTemplate,
-              transcript: effectiveTranscript,
-            )
-          : _buildClassifyPrompt(
-              effectiveTranscript,
-              effectiveCtx: effectiveCtx,
-            );
+      String? routeResult;
+
+      if (promptTemplate == null || promptTemplate.isEmpty) {
+        // Run the router prompt to decide timer_alarm vs voice_memo
+        final routerPrompt = ChronoPromptTemplate.render(
+          ChronoPromptTemplate.routerTemplate,
+          transcript: effectiveTranscript,
+        );
+        final routerGen = await _generate(
+          routerPrompt,
+          overrideMaxTokens: 32,
+          onPartialResponse: onProgress == null
+              ? null
+              : (partial, tokens) => onProgress('routing', partial, tokens),
+        );
+        routeResult = _parseRouterOutput(
+          _sanitizeModelOutput(routerGen.text),
+        );
+        debugPrint(
+          '[LlmService] Router: route=$routeResult '
+          '(${routerGen.metrics.wallTime.inMilliseconds}ms)',
+        );
+
+        // Brief pause between inference calls
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+
+      // --- Step 3: Build the extraction prompt based on route ---
+      final String prompt;
+      final String promptStrategy;
+
+      if (promptTemplate != null && promptTemplate.isNotEmpty) {
+        prompt = _renderClassifyPromptTemplate(
+          promptTemplate,
+          transcript: effectiveTranscript,
+        );
+        promptStrategy = promptStrategyOverride ?? 'custom-template';
+      } else if (routeResult == 'timer_alarm') {
+        prompt = ChronoPromptTemplate.render(
+          ChronoPromptTemplate.timerAlarmTemplate,
+          transcript: effectiveTranscript,
+        );
+        promptStrategy = 'router→timer_alarm';
+      } else {
+        prompt = _buildClassifyPrompt(
+          effectiveTranscript,
+          effectiveCtx: effectiveCtx,
+        );
+        promptStrategy = usesFullPrompt(effectiveCtx)
+            ? 'router→voice_memo/full'
+            : usesEmergencyCompactPrompt(effectiveCtx)
+            ? 'router→voice_memo/emergency-compact'
+            : 'router→voice_memo/compact';
+      }
+
       final structuredResult = await _generateStructuredJsonWithRetry(
         prompt,
-        promptStrategy: (promptTemplate != null && promptTemplate.isNotEmpty)
-            ? (promptStrategyOverride ?? 'custom-template')
-            : usesFullPrompt(effectiveCtx)
-            ? 'full+/no_think'
-            : usesEmergencyCompactPrompt(effectiveCtx)
-            ? 'emergency-compact/no_think (nCtx=$effectiveCtx)'
-            : 'shortened/no_think (nCtx=$effectiveCtx)',
+        promptStrategy: promptStrategy,
         phase: 'classifying',
         onProgress: onProgress,
       );
@@ -1053,10 +1097,29 @@ class LlmService {
   }
 
   String _buildClassifyPrompt(String transcript, {int? effectiveCtx}) {
-    final template = ChronoPromptTemplate.templateForContextSize(
-      effectiveCtx ?? nCtx,
-    );
+    // Use the standard 3-intent template (reminder/event/note).
+    // Timer/alarm cases are handled by the two-stage router in processTranscript.
+    const template = ChronoPromptTemplate.compactTemplate;
     return _renderClassifyPromptTemplate(template, transcript: transcript);
+  }
+
+  /// Parse the router prompt output into a route string.
+  String _parseRouterOutput(String raw) {
+    try {
+      final start = raw.indexOf('{');
+      if (start == -1) return 'voice_memo';
+      final end = raw.lastIndexOf('}');
+      if (end == -1) return 'voice_memo';
+      final decoded =
+          jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
+      final route = (decoded['route'] as String?)?.trim().toLowerCase() ?? '';
+      if (const {'timer_alarm', 'voice_memo', 'mixed'}.contains(route)) {
+        return route;
+      }
+      return 'voice_memo';
+    } catch (_) {
+      return 'voice_memo';
+    }
   }
 
   String _renderClassifyPromptTemplate(
@@ -1429,6 +1492,30 @@ JSON:
     }
   }
 
+  static String _friendlySummary(ChronoLlmExtraction first, String raw) {
+    if (first.intent == 'timer') {
+      final d = first.durationSeconds ?? 0;
+      final h = d ~/ 3600;
+      final m = (d % 3600) ~/ 60;
+      final s = d % 60;
+      final parts = <String>[
+        if (h > 0) '${h}h',
+        if (m > 0) '${m}m',
+        if (s > 0 || (h == 0 && m == 0)) '${s}s',
+      ];
+      final dur = parts.join(' ');
+      return first.title.isNotEmpty ? 'Timer $dur — ${first.title}' : 'Timer $dur';
+    }
+    if (first.intent == 'alarm') {
+      final expr = first.datetimeExpressionEnglish ?? first.datetimeExpressionOriginal;
+      if (expr != null) {
+        return first.title.isNotEmpty ? 'Alarm $expr — ${first.title}' : 'Alarm $expr';
+      }
+      return first.title.isNotEmpty ? 'Alarm — ${first.title}' : 'Alarm';
+    }
+    return first.title.isNotEmpty ? first.title : raw.trim();
+  }
+
   TranscriptResult _buildTranscriptResultFromChronoExtractions(
     List<ChronoLlmExtraction> extractions,
     String raw,
@@ -1461,6 +1548,25 @@ JSON:
         continue;
       }
 
+      if (extraction.intent == 'timer') {
+        // Timer: duration-based, no datetime resolution needed
+        actions.add(
+          ExtractedActionResult(
+            type: 'timer',
+            title: title,
+            durationSeconds: extraction.durationSeconds,
+          ),
+        );
+        chronoDetails.add(
+          ActionChronoDebug(
+            intent: extraction.intent,
+            title: title,
+            durationSeconds: extraction.durationSeconds,
+          ),
+        );
+        continue;
+      }
+
       final englishExpression = extraction.datetimeExpressionEnglish;
       final resolved = englishExpression == null
           ? null
@@ -1468,6 +1574,28 @@ JSON:
 
       firstResolvedDateTime ??= resolved?.dateTime.toIso8601String();
       firstResolverMethod ??= resolved?.method;
+
+      if (extraction.intent == 'alarm') {
+        // Alarm: clock-time based, resolve time
+        actions.add(
+          ExtractedActionResult(
+            type: 'alarm',
+            title: title,
+            startTime: resolved?.dateTime.toIso8601String(),
+          ),
+        );
+        chronoDetails.add(
+          ActionChronoDebug(
+            intent: extraction.intent,
+            title: title,
+            datetimeExpressionOriginal: extraction.datetimeExpressionOriginal,
+            datetimeExpressionEnglish: extraction.datetimeExpressionEnglish,
+            resolvedDateTime: resolved?.dateTime.toIso8601String(),
+            resolverMethod: resolved?.method,
+          ),
+        );
+        continue;
+      }
 
       actions.add(
         ExtractedActionResult(
@@ -1495,10 +1623,12 @@ JSON:
     }
 
     final first = extractions.first;
-    final summary = first.title.isNotEmpty ? first.title : raw.trim();
+    final summary = _friendlySummary(first, raw);
     final category = switch (first.intent) {
       'event' => 'meeting',
       'reminder' => 'reminder',
+      'timer' => 'timer',
+      'alarm' => 'alarm',
       _ => 'note',
     };
 

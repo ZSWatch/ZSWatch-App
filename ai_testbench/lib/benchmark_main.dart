@@ -269,6 +269,8 @@ Map<String, dynamic> _serializeModelResult(BenchmarkModelResult result) {
         'titleLanguageDetail': caseResult.titleLanguageDetail,
         'timeResolutionCorrect': caseResult.timeResolutionCorrect,
         'timeResolutionDetail': caseResult.timeResolutionDetail,
+        'durationMatch': caseResult.durationMatch,
+        'durationDetail': caseResult.durationDetail,
         'intent': caseResult.intent,
         'title': caseResult.title,
         'datetimeOriginal': caseResult.datetimeOriginal,

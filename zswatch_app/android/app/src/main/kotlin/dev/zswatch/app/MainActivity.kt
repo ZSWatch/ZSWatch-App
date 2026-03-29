@@ -549,6 +549,50 @@ class MainActivity : FlutterActivity() {
     private fun handleCreateAction(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
         Log.d(TAG, "handleCreateAction called with args=${call.arguments}")
 
+        val actionType = call.argument<String>("actionType") ?: "task"
+        val title = call.argument<String>("title")?.trim().orEmpty()
+        val notes = call.argument<String>("notes")?.trim()?.takeIf { it.isNotEmpty() }
+        val location = call.argument<String>("location")?.trim()?.takeIf { it.isNotEmpty() }
+        val scheduledAtMillis = call.argument<Number>("scheduledAtMillis")?.toLong()
+        val endAtMillis = call.argument<Number>("endAtMillis")?.toLong()
+        val reminderMinutes = call.argument<Number>("reminderMinutes")?.toInt()
+        val durationSeconds = call.argument<Number>("durationSeconds")?.toInt()
+        val skipUi = call.argument<Boolean>("skipUi") ?: true
+        val requestedCalendarId = call.argument<Number>("calendarId")?.toLong()
+
+        // Timer and alarm use system intents — no calendar permission needed.
+        if (actionType == "timer") {
+            try {
+                val response = createTimerViaIntent(
+                    durationSeconds = durationSeconds ?: 0,
+                    label = title,
+                    skipUi = skipUi
+                )
+                Log.d(TAG, "createAction (timer) succeeded with response=$response")
+                result.success(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "createAction (timer) failed", e)
+                result.error("CREATE_ACTION_FAILED", e.localizedMessage, null)
+            }
+            return
+        }
+
+        if (actionType == "alarm") {
+            try {
+                val response = createAlarmViaIntent(
+                    triggerAtMillis = scheduledAtMillis,
+                    label = title,
+                    skipUi = skipUi
+                )
+                Log.d(TAG, "createAction (alarm) succeeded with response=$response")
+                result.success(response)
+            } catch (e: Exception) {
+                Log.e(TAG, "createAction (alarm) failed", e)
+                result.error("CREATE_ACTION_FAILED", e.localizedMessage, null)
+            }
+            return
+        }
+
         if (!hasCalendarPermission()) {
             Log.w(TAG, "Calendar permission missing when attempting to create productivity action")
             result.error(
@@ -558,15 +602,6 @@ class MainActivity : FlutterActivity() {
             )
             return
         }
-
-        val actionType = call.argument<String>("actionType") ?: "task"
-        val title = call.argument<String>("title")?.trim().orEmpty()
-        val notes = call.argument<String>("notes")?.trim()?.takeIf { it.isNotEmpty() }
-        val location = call.argument<String>("location")?.trim()?.takeIf { it.isNotEmpty() }
-        val scheduledAtMillis = call.argument<Number>("scheduledAtMillis")?.toLong()
-        val endAtMillis = call.argument<Number>("endAtMillis")?.toLong()
-        val reminderMinutes = call.argument<Number>("reminderMinutes")?.toInt()
-        val requestedCalendarId = call.argument<Number>("calendarId")?.toLong()
 
         if (title.isEmpty()) {
             result.error("INVALID_ARGUMENT", "title is required", null)
@@ -636,6 +671,50 @@ class MainActivity : FlutterActivity() {
             Log.e(TAG, "createAction failed", e)
             result.error("CREATE_ACTION_FAILED", e.localizedMessage, null)
         }
+    }
+
+    private fun createTimerViaIntent(durationSeconds: Int, label: String, skipUi: Boolean = true): Map<String, Any?> {
+        val intent = android.content.Intent(android.provider.AlarmClock.ACTION_SET_TIMER).apply {
+            putExtra(android.provider.AlarmClock.EXTRA_LENGTH, durationSeconds)
+            if (label.isNotEmpty()) {
+                putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, label)
+            }
+            putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, skipUi)
+        }
+        try {
+            startActivity(intent)
+        } catch (e: android.content.ActivityNotFoundException) {
+            throw IllegalStateException("No app found that can handle timers. Please install a clock app.")
+        }
+        return mapOf(
+            "platformId" to null,
+            "targetType" to "timer",
+            "syncDisabled" to false,
+        )
+    }
+
+    private fun createAlarmViaIntent(triggerAtMillis: Long?, label: String, skipUi: Boolean = true): Map<String, Any?> {
+        val intent = android.content.Intent(android.provider.AlarmClock.ACTION_SET_ALARM).apply {
+            if (triggerAtMillis != null) {
+                val cal = java.util.Calendar.getInstance().apply { timeInMillis = triggerAtMillis }
+                putExtra(android.provider.AlarmClock.EXTRA_HOUR, cal.get(java.util.Calendar.HOUR_OF_DAY))
+                putExtra(android.provider.AlarmClock.EXTRA_MINUTES, cal.get(java.util.Calendar.MINUTE))
+            }
+            if (label.isNotEmpty()) {
+                putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, label)
+            }
+            putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, skipUi)
+        }
+        try {
+            startActivity(intent)
+        } catch (e: android.content.ActivityNotFoundException) {
+            throw IllegalStateException("No app found that can handle alarms. Please install a clock app.")
+        }
+        return mapOf(
+            "platformId" to null,
+            "targetType" to "alarm",
+            "syncDisabled" to false,
+        )
     }
 
     private fun hasCalendarPermission(): Boolean {

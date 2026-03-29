@@ -120,6 +120,9 @@ class ActionChronoDebug {
   final String? resolvedDateTime;
   final String? resolverMethod;
 
+  /// Duration in seconds for timer intents.
+  final int? durationSeconds;
+
   const ActionChronoDebug({
     this.intent,
     this.title,
@@ -127,5 +130,6 @@ class ActionChronoDebug {
     this.datetimeExpressionEnglish,
     this.resolvedDateTime,
     this.resolverMethod,
+    this.durationSeconds,
   });
 }

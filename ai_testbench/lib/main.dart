@@ -4,11 +4,18 @@ import 'package:flutter/material.dart';
 
 import 'benchmark_main.dart' as model_bench;
 import 'correction_main.dart';
+import 'router_benchmark_main.dart';
 import 'screens/testbench_screen.dart';
 import 'screens/time_extraction_screen.dart';
 import 'time_extraction_main.dart';
 
 void main(List<String> args) async {
+  // Headless mode: run router pre-classifier benchmark
+  if (args.contains('--headless-router')) {
+    await runRouterBenchmark(args);
+    exit(exitCode);
+  }
+
   // Headless mode: run time extraction tests from CLI
   if (args.contains('--headless-time')) {
     await runHeadlessTimeExtraction(args);

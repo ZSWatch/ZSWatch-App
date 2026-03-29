@@ -69,6 +69,17 @@ class ChronoLlmParser {
     final datetimeEnglish =
         (parsed['datetime_expression_english'] as String?)?.trim();
 
+    // Extract duration_seconds for timer intents.
+    final rawDuration = parsed['duration_seconds'];
+    int? durationSeconds;
+    if (rawDuration is int) {
+      durationSeconds = rawDuration;
+    } else if (rawDuration is double) {
+      durationSeconds = rawDuration.round();
+    } else if (rawDuration is String) {
+      durationSeconds = int.tryParse(rawDuration);
+    }
+
     return ChronoLlmExtraction(
       intent: intent,
       title: title,
@@ -76,6 +87,7 @@ class ChronoLlmParser {
           (datetimeOriginal?.isNotEmpty ?? false) ? datetimeOriginal : null,
       datetimeExpressionEnglish:
           (datetimeEnglish?.isNotEmpty ?? false) ? datetimeEnglish : null,
+      durationSeconds: durationSeconds,
     );
   }
 
@@ -171,6 +183,12 @@ class ChronoLlmParser {
       case 'task':
       case 'todo':
         return 'reminder';
+      case 'timer':
+      case 'countdown':
+        return 'timer';
+      case 'alarm':
+      case 'wake':
+        return 'alarm';
       default:
         return 'note';
     }

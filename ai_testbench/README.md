@@ -84,12 +84,19 @@ flutter build linux --release
 ./build/linux/x64/release/bundle/ai_testbench --headless-correction --model-dir models/ --output correction.json
 ```
 
+**Timer/alarm benchmark** (uses extended 5-intent prompt with timer/alarm cases):
+```bash
+./build/linux/x64/release/bundle/ai_testbench --headless-timer --model Qwen3.5-2B-Q4_K_M.gguf
+```
+
 ### CLI Options
 
 | Flag | Description |
 |------|-------------|
 | `--headless` | Run structured extraction benchmark (all models) |
 | `--headless-time` | Run time extraction benchmark |
+| `--headless-timer` | Run timer/alarm benchmark (5-intent prompt, timer/alarm cases only) |
+| `--prompt-timer` | Use the 5-intent prompt (with `--headless` to run all cases for regression testing) |
 | `--headless-correction` | Run correction benchmark |
 | `--model <name>` | Filter to a specific model filename |
 | `--model-dir <path>` | Path to directory containing `.gguf` files (default: `models/`) |

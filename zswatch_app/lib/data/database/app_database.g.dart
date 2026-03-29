@@ -3836,6 +3836,17 @@ class $ExtractedActionsTable extends ExtractedActions
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _durationSecondsMeta = const VerificationMeta(
+    'durationSeconds',
+  );
+  @override
+  late final GeneratedColumn<int> durationSeconds = GeneratedColumn<int>(
+    'duration_seconds',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3862,6 +3873,7 @@ class $ExtractedActionsTable extends ExtractedActions
     created,
     dismissed,
     platformTargetId,
+    durationSeconds,
     createdAt,
   ];
   @override
@@ -3963,6 +3975,15 @@ class $ExtractedActionsTable extends ExtractedActions
         ),
       );
     }
+    if (data.containsKey('duration_seconds')) {
+      context.handle(
+        _durationSecondsMeta,
+        durationSeconds.isAcceptableOrUnknown(
+          data['duration_seconds']!,
+          _durationSecondsMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4030,6 +4051,10 @@ class $ExtractedActionsTable extends ExtractedActions
         DriftSqlType.string,
         data['${effectivePrefix}platform_target_id'],
       ),
+      durationSeconds: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_seconds'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -4084,6 +4109,9 @@ class ExtractedActionEntity extends DataClass
   /// Platform-specific ID after creation (e.g. calendar event ID)
   final String? platformTargetId;
 
+  /// Duration in seconds (for timer actions)
+  final int? durationSeconds;
+
   /// When this action was created in the OS
   final DateTime? createdAt;
   const ExtractedActionEntity({
@@ -4100,6 +4128,7 @@ class ExtractedActionEntity extends DataClass
     required this.created,
     required this.dismissed,
     this.platformTargetId,
+    this.durationSeconds,
     this.createdAt,
   });
   @override
@@ -4131,6 +4160,9 @@ class ExtractedActionEntity extends DataClass
     map['dismissed'] = Variable<bool>(dismissed);
     if (!nullToAbsent || platformTargetId != null) {
       map['platform_target_id'] = Variable<String>(platformTargetId);
+    }
+    if (!nullToAbsent || durationSeconds != null) {
+      map['duration_seconds'] = Variable<int>(durationSeconds);
     }
     if (!nullToAbsent || createdAt != null) {
       map['created_at'] = Variable<DateTime>(createdAt);
@@ -4167,6 +4199,9 @@ class ExtractedActionEntity extends DataClass
       platformTargetId: platformTargetId == null && nullToAbsent
           ? const Value.absent()
           : Value(platformTargetId),
+      durationSeconds: durationSeconds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(durationSeconds),
       createdAt: createdAt == null && nullToAbsent
           ? const Value.absent()
           : Value(createdAt),
@@ -4192,6 +4227,7 @@ class ExtractedActionEntity extends DataClass
       created: serializer.fromJson<bool>(json['created']),
       dismissed: serializer.fromJson<bool>(json['dismissed']),
       platformTargetId: serializer.fromJson<String?>(json['platformTargetId']),
+      durationSeconds: serializer.fromJson<int?>(json['durationSeconds']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
     );
   }
@@ -4212,6 +4248,7 @@ class ExtractedActionEntity extends DataClass
       'created': serializer.toJson<bool>(created),
       'dismissed': serializer.toJson<bool>(dismissed),
       'platformTargetId': serializer.toJson<String?>(platformTargetId),
+      'durationSeconds': serializer.toJson<int?>(durationSeconds),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
     };
   }
@@ -4230,6 +4267,7 @@ class ExtractedActionEntity extends DataClass
     bool? created,
     bool? dismissed,
     Value<String?> platformTargetId = const Value.absent(),
+    Value<int?> durationSeconds = const Value.absent(),
     Value<DateTime?> createdAt = const Value.absent(),
   }) => ExtractedActionEntity(
     id: id ?? this.id,
@@ -4249,6 +4287,9 @@ class ExtractedActionEntity extends DataClass
     platformTargetId: platformTargetId.present
         ? platformTargetId.value
         : this.platformTargetId,
+    durationSeconds: durationSeconds.present
+        ? durationSeconds.value
+        : this.durationSeconds,
     createdAt: createdAt.present ? createdAt.value : this.createdAt,
   );
   ExtractedActionEntity copyWithCompanion(ExtractedActionsCompanion data) {
@@ -4272,6 +4313,9 @@ class ExtractedActionEntity extends DataClass
       platformTargetId: data.platformTargetId.present
           ? data.platformTargetId.value
           : this.platformTargetId,
+      durationSeconds: data.durationSeconds.present
+          ? data.durationSeconds.value
+          : this.durationSeconds,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -4292,6 +4336,7 @@ class ExtractedActionEntity extends DataClass
           ..write('created: $created, ')
           ..write('dismissed: $dismissed, ')
           ..write('platformTargetId: $platformTargetId, ')
+          ..write('durationSeconds: $durationSeconds, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -4312,6 +4357,7 @@ class ExtractedActionEntity extends DataClass
     created,
     dismissed,
     platformTargetId,
+    durationSeconds,
     createdAt,
   );
   @override
@@ -4331,6 +4377,7 @@ class ExtractedActionEntity extends DataClass
           other.created == this.created &&
           other.dismissed == this.dismissed &&
           other.platformTargetId == this.platformTargetId &&
+          other.durationSeconds == this.durationSeconds &&
           other.createdAt == this.createdAt);
 }
 
@@ -4348,6 +4395,7 @@ class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
   final Value<bool> created;
   final Value<bool> dismissed;
   final Value<String?> platformTargetId;
+  final Value<int?> durationSeconds;
   final Value<DateTime?> createdAt;
   const ExtractedActionsCompanion({
     this.id = const Value.absent(),
@@ -4363,6 +4411,7 @@ class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
     this.created = const Value.absent(),
     this.dismissed = const Value.absent(),
     this.platformTargetId = const Value.absent(),
+    this.durationSeconds = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   ExtractedActionsCompanion.insert({
@@ -4379,6 +4428,7 @@ class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
     this.created = const Value.absent(),
     this.dismissed = const Value.absent(),
     this.platformTargetId = const Value.absent(),
+    this.durationSeconds = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : memoId = Value(memoId),
        actionType = Value(actionType),
@@ -4397,6 +4447,7 @@ class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
     Expression<bool>? created,
     Expression<bool>? dismissed,
     Expression<String>? platformTargetId,
+    Expression<int>? durationSeconds,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -4413,6 +4464,7 @@ class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
       if (created != null) 'created': created,
       if (dismissed != null) 'dismissed': dismissed,
       if (platformTargetId != null) 'platform_target_id': platformTargetId,
+      if (durationSeconds != null) 'duration_seconds': durationSeconds,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -4431,6 +4483,7 @@ class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
     Value<bool>? created,
     Value<bool>? dismissed,
     Value<String?>? platformTargetId,
+    Value<int?>? durationSeconds,
     Value<DateTime?>? createdAt,
   }) {
     return ExtractedActionsCompanion(
@@ -4447,6 +4500,7 @@ class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
       created: created ?? this.created,
       dismissed: dismissed ?? this.dismissed,
       platformTargetId: platformTargetId ?? this.platformTargetId,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -4493,6 +4547,9 @@ class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
     if (platformTargetId.present) {
       map['platform_target_id'] = Variable<String>(platformTargetId.value);
     }
+    if (durationSeconds.present) {
+      map['duration_seconds'] = Variable<int>(durationSeconds.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4515,6 +4572,7 @@ class ExtractedActionsCompanion extends UpdateCompanion<ExtractedActionEntity> {
           ..write('created: $created, ')
           ..write('dismissed: $dismissed, ')
           ..write('platformTargetId: $platformTargetId, ')
+          ..write('durationSeconds: $durationSeconds, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -8013,6 +8071,7 @@ typedef $$ExtractedActionsTableCreateCompanionBuilder =
       Value<bool> created,
       Value<bool> dismissed,
       Value<String?> platformTargetId,
+      Value<int?> durationSeconds,
       Value<DateTime?> createdAt,
     });
 typedef $$ExtractedActionsTableUpdateCompanionBuilder =
@@ -8030,6 +8089,7 @@ typedef $$ExtractedActionsTableUpdateCompanionBuilder =
       Value<bool> created,
       Value<bool> dismissed,
       Value<String?> platformTargetId,
+      Value<int?> durationSeconds,
       Value<DateTime?> createdAt,
     });
 
@@ -8104,6 +8164,11 @@ class $$ExtractedActionsTableFilterComposer
 
   ColumnFilters<String> get platformTargetId => $composableBuilder(
     column: $table.platformTargetId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8187,6 +8252,11 @@ class $$ExtractedActionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -8247,6 +8317,11 @@ class $$ExtractedActionsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get durationSeconds => $composableBuilder(
+    column: $table.durationSeconds,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 }
@@ -8301,6 +8376,7 @@ class $$ExtractedActionsTableTableManager
                 Value<bool> created = const Value.absent(),
                 Value<bool> dismissed = const Value.absent(),
                 Value<String?> platformTargetId = const Value.absent(),
+                Value<int?> durationSeconds = const Value.absent(),
                 Value<DateTime?> createdAt = const Value.absent(),
               }) => ExtractedActionsCompanion(
                 id: id,
@@ -8316,6 +8392,7 @@ class $$ExtractedActionsTableTableManager
                 created: created,
                 dismissed: dismissed,
                 platformTargetId: platformTargetId,
+                durationSeconds: durationSeconds,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -8333,6 +8410,7 @@ class $$ExtractedActionsTableTableManager
                 Value<bool> created = const Value.absent(),
                 Value<bool> dismissed = const Value.absent(),
                 Value<String?> platformTargetId = const Value.absent(),
+                Value<int?> durationSeconds = const Value.absent(),
                 Value<DateTime?> createdAt = const Value.absent(),
               }) => ExtractedActionsCompanion.insert(
                 id: id,
@@ -8348,6 +8426,7 @@ class $$ExtractedActionsTableTableManager
                 created: created,
                 dismissed: dismissed,
                 platformTargetId: platformTargetId,
+                durationSeconds: durationSeconds,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0

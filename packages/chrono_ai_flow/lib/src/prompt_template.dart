@@ -213,6 +213,76 @@ $promptPlaceholderTranscript
 /no_think
 JSON:''';
 
+  /// Lightweight pre-classifier prompt. Determines if the input is a
+  /// timer/alarm or a general voice memo. Output is a single JSON object
+  /// with a "route" field. Designed to be as small as possible for speed.
+  static const String routerTemplate =
+      '''
+Classify this voice memo. The memo may be in ANY language.
+
+Output ONLY a JSON object. No other text.
+
+Rules:
+- "timer_alarm" = the memo is about setting a timer, countdown, alarm, or wake-up. No task or action to perform — just ring after a duration or at a time. Examples: "Set a timer for 5 minutes", "Alarm at 7 AM", "Wake me at 6", "Sätt en timer på 10 minuter", "Wecker auf 7 Uhr", "30 minutes", "In 10 minutes".
+- "voice_memo" = anything else: reminders with actions, events, notes, ideas, tasks. Examples: "Remind me in 30 minutes to check the oven", "Meeting tomorrow at 10", "Buy milk".
+- IMPORTANT: if the memo mentions an ACTION to perform at a time ("remind me to X", "call Y at 3 PM"), that is "voice_memo", NOT "timer_alarm".
+- If the memo contains BOTH a timer/alarm AND other items ("Set a timer for 5 min and buy milk"), output "mixed".
+
+{"route": "timer_alarm" | "voice_memo" | "mixed"}
+
+Memo: "$promptPlaceholderTranscript"
+
+/no_think
+JSON:''';
+
+  /// Dedicated timer/alarm extraction prompt. Used after the router
+  /// classifies input as "timer_alarm". Smaller and more focused than
+  /// the full 5-intent prompt — no event/reminder/note rules to confuse the model.
+  static const String timerAlarmTemplate =
+      '''
+Extract timer or alarm details from this voice memo. The memo may be in ANY language.
+
+Return a JSON array. Output MUST start with '[' and end with ']'. No text before or after.
+
+Rules:
+- "timer" = countdown for a duration. Extract duration as integer seconds in "duration_seconds". Set datetime fields to null.
+- "alarm" = ring at a specific clock time. Extract time into datetime fields. Set duration_seconds to null.
+- Keep title in the original language. If no label, set title to empty string.
+- Copy the original time phrase exactly into datetime_expression_original.
+- Translate to English in datetime_expression_english. Convert 24h to 12h format.
+- For timers: convert all durations to total seconds (e.g. "1.5 hours" = 5400).
+
+Output schema:
+[{"intent": "timer" | "alarm", "title": "label", "datetime_expression_original": "..." | null, "datetime_expression_english": "..." | null, "duration_seconds": 480 | null}]
+
+Examples:
+
+Memo: "Set a timer for 8 minutes"
+[{"intent":"timer","title":"","datetime_expression_original":null,"datetime_expression_english":null,"duration_seconds":480}]
+
+Memo: "Timer for 5 minutes for pasta"
+[{"intent":"timer","title":"pasta","datetime_expression_original":null,"datetime_expression_english":null,"duration_seconds":300}]
+
+Memo: "Set an alarm for 7:30 AM"
+[{"intent":"alarm","title":"","datetime_expression_original":"7:30 AM","datetime_expression_english":"7:30 AM","duration_seconds":null}]
+
+Memo: "Sätt en timer på 10 minuter"
+[{"intent":"timer","title":"","datetime_expression_original":null,"datetime_expression_english":null,"duration_seconds":600}]
+
+Memo: "Ställ ett alarm klockan 7"
+[{"intent":"alarm","title":"","datetime_expression_original":"klockan 7","datetime_expression_english":"at 7 AM","duration_seconds":null}]
+
+Memo: "Wecker auf 7 Uhr stellen"
+[{"intent":"alarm","title":"","datetime_expression_original":"7 Uhr","datetime_expression_english":"at 7 AM","duration_seconds":null}]
+
+Memo: "Set a timer for one and a half hours"
+[{"intent":"timer","title":"","datetime_expression_original":null,"datetime_expression_english":null,"duration_seconds":5400}]
+
+Memo: "$promptPlaceholderTranscript"
+
+/no_think
+JSON:''';
+
   /// Returns the appropriate template for the given context size.
   static String templateForContextSize(int nCtx) {
     // Always use compactTemplate (5 examples, ~1030 tokens) — the full

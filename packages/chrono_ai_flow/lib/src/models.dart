@@ -4,11 +4,15 @@ class ChronoLlmExtraction {
   final String? datetimeExpressionOriginal;
   final String? datetimeExpressionEnglish;
 
+  /// Duration in seconds for timer intents. Null for all other intents.
+  final int? durationSeconds;
+
   const ChronoLlmExtraction({
     required this.intent,
     required this.title,
     this.datetimeExpressionOriginal,
     this.datetimeExpressionEnglish,
+    this.durationSeconds,
   });
 }
 
