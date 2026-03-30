@@ -9,23 +9,43 @@ import '../../../data/models/voice_memo.dart';
 import '../../../providers/voice_memo_providers.dart';
 
 /// A dismissible card for a single voice memo in the timeline list.
+///
+/// Swipe left to delete, swipe right to archive/unarchive.
 class VoiceNoteCard extends ConsumerWidget {
   final VoiceMemo memo;
   final VoidCallback onOpen;
+  final int extractedActionCount;
 
-  const VoiceNoteCard({super.key, required this.memo, required this.onOpen});
+  const VoiceNoteCard({
+    super.key,
+    required this.memo,
+    required this.onOpen,
+    this.extractedActionCount = 0,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final previewText = memoPreviewText(memo);
     final canPlay = hasLocalAudio(memo);
-    final isProcessing = memo.isAiProcessing;
+    final titleText = memoTitleText(memo);
 
     return Dismissible(
       key: ValueKey('voice-note-${memo.id}'),
-      direction: DismissDirection.endToStart,
       background: Container(
-        margin: const EdgeInsets.only(bottom: AppTheme.spacingMd),
+        margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
+        decoration: BoxDecoration(
+          color: memo.archived ? AppTheme.primaryColor : AppTheme.warningColor,
+          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+        ),
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: AppTheme.spacingLg),
+        child: Icon(
+          memo.archived ? Icons.unarchive_outlined : Icons.archive_outlined,
+          color: Colors.white,
+        ),
+      ),
+      secondaryBackground: Container(
+        margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
         decoration: BoxDecoration(
           color: AppTheme.errorColor,
           borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
@@ -34,155 +54,241 @@ class VoiceNoteCard extends ConsumerWidget {
         padding: const EdgeInsets.only(right: AppTheme.spacingLg),
         child: const Icon(Icons.delete_outline, color: Colors.white),
       ),
-      confirmDismiss: (_) => confirmDeleteMemo(context, memo),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.endToStart) {
+          return confirmDeleteMemo(context, memo);
+        }
+        // Archive/unarchive — no confirmation needed
+        await ref
+            .read(voiceMemoActionsProvider.notifier)
+            .setArchived(memo.filename, archived: !memo.archived);
+        return false; // Don't remove the widget, the stream will update
+      },
       onDismissed: (_) {
         ref.read(voiceMemoActionsProvider.notifier).delete(memo.filename);
       },
       child: Card(
-        margin: const EdgeInsets.only(bottom: AppTheme.spacingMd),
+        margin: const EdgeInsets.only(bottom: AppTheme.spacingSm),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onOpen,
           child: Padding(
-            padding: const EdgeInsets.all(AppTheme.spacingMd),
+            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Top row: category icon + title
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (memo.aiCategory != null)
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          right: AppTheme.spacingSm,
-                        ),
-                        child: Icon(
-                          voiceNoteCategoryIcon(memo.aiCategory!),
-                          size: 20,
-                          color: voiceNoteCategoryColor(memo.aiCategory!),
-                        ),
-                      ),
+                    _CategoryIcon(category: memo.aiCategory),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        timelineTimestampLabel(memo.timestampUtc.toLocal()),
-                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppTheme.spacingSm),
-                Text(
-                  previewText,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    height: 1.35,
-                    color:
-                        memo.summary != null ||
-                            memo.transcription?.trim().isNotEmpty == true
-                        ? AppTheme.textPrimary
-                        : AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppTheme.spacingSm),
-                Wrap(
-                  spacing: AppTheme.spacingSm,
-                  runSpacing: AppTheme.spacingSm,
-                  children: [
-                    if (memo.aiCategory != null)
-                      VoiceMemoMetaChip(
-                        icon: voiceNoteCategoryIcon(memo.aiCategory!),
-                        label: voiceNoteCategoryLabel(memo.aiCategory!),
-                        color: voiceNoteCategoryColor(memo.aiCategory!),
-                      ),
-                    if (isProcessing)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusXLarge,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            titleText,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.3,
+                                ),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(
-                              width: 10,
-                              height: 10,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 1.5,
-                              ),
+                          const SizedBox(height: 3),
+                          Text(
+                            timelineTimestampLabel(
+                              memo.timestampUtc.toLocal(),
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Processing',
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(
-                                    color: AppTheme.primaryColor,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 10.5,
-                                  ),
-                            ),
-                          ],
-                        ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: AppTheme.textSecondary),
+                          ),
+                        ],
                       ),
-                    VoiceMemoMetaChip(
-                      icon: syncStatusIcon(memo.syncStatus),
-                      label: syncStatusLabel(memo),
-                      color: syncStatusColor(memo.syncStatus),
                     ),
-                    if (memo.syncedFromWatch)
-                      const VoiceMemoMetaChip(
-                        icon: Icons.smartphone_outlined,
-                        label: 'Phone',
-                        color: AppTheme.primaryColor,
-                      ),
-                    if (!memo.deletedOnWatch)
-                      const VoiceMemoMetaChip(
-                        icon: Icons.watch_outlined,
-                        label: 'On watch',
-                        color: AppTheme.warningColor,
-                      ),
                   ],
                 ),
-                const SizedBox(height: AppTheme.spacingMd),
+
+                // Preview text
+                if (previewText != titleText) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    previewText,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.5,
+                      color: const Color(0xFFB6C0CA),
+                    ),
+                  ),
+                ],
+
+                // Footer: tags + play icon
+                const SizedBox(height: 10),
                 Row(
                   children: [
-                    Text(
-                      memo.formattedDuration,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(width: AppTheme.spacingSm),
-                    Text(
-                      memo.formattedSize,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _NoteTag(label: memo.formattedDuration),
+                          if (extractedActionCount > 0)
+                            _NoteTag(
+                              label: '$extractedActionCount extracted',
+                              color: AppTheme.primaryColor,
+                              filled: true,
+                            ),
+                          if (memo.syncedFromWatch)
+                            const _NoteTag(
+                              label: 'synced',
+                              color: AppTheme.successColor,
+                              filled: true,
+                            ),
+                          if (!memo.deletedOnWatch)
+                            const _NoteTag(
+                              label: 'on watch',
+                              color: AppTheme.infoColor,
+                              filled: true,
+                            ),
+                          if (memo.archived)
+                            const _NoteTag(
+                              label: 'archived',
+                              color: AppTheme.textSecondary,
+                              filled: true,
+                            ),
+                          if (!memo.syncedFromWatch &&
+                              memo.transcription == null)
+                            const _NoteTag(
+                              label: 'phone only',
+                              color: AppTheme.textSecondary,
+                              filled: true,
+                            ),
+                          if (memo.isAiProcessing)
+                            const _NoteTag(
+                              label: 'processing',
+                              color: AppTheme.primaryColor,
+                              filled: true,
+                              showSpinner: true,
+                            ),
+                        ],
                       ),
                     ),
-                    const Spacer(),
-                    Icon(
-                      canPlay
-                          ? Icons.play_circle_fill_rounded
-                          : Icons.cloud_download_outlined,
-                      color: canPlay
-                          ? AppTheme.primaryColor
-                          : AppTheme.warningColor,
-                    ),
+                    if (canPlay)
+                      const Icon(
+                        Icons.play_circle_fill_rounded,
+                        color: AppTheme.primaryColor,
+                        size: 22,
+                      ),
                   ],
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CategoryIcon extends StatelessWidget {
+  final VoiceNoteCategory? category;
+
+  const _CategoryIcon({this.category});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = category != null
+        ? voiceNoteCategoryColor(category!)
+        : AppTheme.textSecondary;
+    final bgColor = category != null
+        ? _categoryBgColor(category!)
+        : AppTheme.textSecondary.withValues(alpha: 0.08);
+
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(
+        category != null
+            ? voiceNoteCategoryIcon(category!)
+            : Icons.mic_none_rounded,
+        size: 18,
+        color: color,
+      ),
+    );
+  }
+
+  Color _categoryBgColor(VoiceNoteCategory cat) {
+    return switch (cat) {
+      VoiceNoteCategory.idea => AppTheme.primaryColor.withValues(alpha: 0.14),
+      VoiceNoteCategory.meeting => AppTheme.infoColor.withValues(alpha: 0.14),
+      VoiceNoteCategory.task => AppTheme.successColor.withValues(alpha: 0.14),
+      VoiceNoteCategory.reminder =>
+        AppTheme.warningColor.withValues(alpha: 0.14),
+      VoiceNoteCategory.note =>
+        AppTheme.textSecondary.withValues(alpha: 0.08),
+    };
+  }
+}
+
+class _NoteTag extends StatelessWidget {
+  final String label;
+  final Color? color;
+  final bool filled;
+  final bool showSpinner;
+
+  const _NoteTag({
+    required this.label,
+    this.color,
+    this.filled = false,
+    this.showSpinner = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tagColor = color ?? AppTheme.textSecondary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: filled
+            ? tagColor.withValues(alpha: 0.12)
+            : AppTheme.textSecondary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showSpinner) ...[
+            SizedBox(
+              width: 8,
+              height: 8,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: tagColor,
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: filled ? tagColor : AppTheme.textSecondary,
+              fontWeight: FontWeight.w800,
+              fontSize: 10,
+              letterSpacing: 0.04,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -271,6 +377,29 @@ String cleanSummary(String summary) {
     if (title != null && title.isNotEmpty) return title;
   }
   return trimmed;
+}
+
+/// Extract a title from the memo — prefer AI summary, fall back to transcript.
+String memoTitleText(VoiceMemo memo) {
+  final aiSummary = memo.summary?.trim();
+  if (aiSummary != null && aiSummary.isNotEmpty) {
+    return cleanSummary(aiSummary);
+  }
+
+  final transcript = memo.transcription?.trim();
+  if (transcript != null && transcript.isNotEmpty) {
+    // Use first sentence or first 80 chars as title
+    final firstLine = transcript.split('\n').first;
+    final periodIdx = firstLine.indexOf('. ');
+    if (periodIdx > 0 && periodIdx < 80) {
+      return firstLine.substring(0, periodIdx + 1);
+    }
+    if (firstLine.length > 80) return '${firstLine.substring(0, 77)}...';
+    return firstLine;
+  }
+
+  if (memo.syncedFromWatch) return 'Audio synced — transcription pending';
+  return 'On watch only — sync to download';
 }
 
 String memoPreviewText(VoiceMemo memo) {

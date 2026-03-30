@@ -22,7 +22,16 @@ import '../../navigation/app_router.dart';
 import '../../widgets/voice_memos/memo_list_item.dart';
 import '../../widgets/voice_memos/sync_progress_bar.dart';
 
-/// Transcript-first timeline view for synced voice notes.
+// ═══════════════════════════════════════════════════════════════════════════
+// Filter enum for list view
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum _NoteFilter { all, notes, tasks, reminders, timersAlarms, archived }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LIST VIEW
+// ═══════════════════════════════════════════════════════════════════════════
+
 class VoiceMemosScreen extends ConsumerStatefulWidget {
   const VoiceMemosScreen({super.key});
 
@@ -33,6 +42,7 @@ class VoiceMemosScreen extends ConsumerStatefulWidget {
 class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
   late final TextEditingController _searchController;
   String _query = '';
+  _NoteFilter _filter = _NoteFilter.notes;
 
   @override
   void initState() {
@@ -64,6 +74,7 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
   }
 
   void _openMemo(VoiceMemo memo) {
+    FocusManager.instance.primaryFocus?.unfocus();
     context.push(AppRoutes.voiceMemoDetail(memo.id), extra: memo);
   }
 
@@ -75,7 +86,7 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
       transcriptionConfiguredProvider,
     );
     final isConnected = ref.watch(isWatchConnectedProvider);
-
+    final actionTypesMap = ref.watch(memoActionTypesMapProvider).valueOrNull ?? {};
     return Scaffold(
       appBar: AppBar(
         title: const Text('Voice Notes'),
@@ -178,18 +189,47 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
             loading: () => const SizedBox.shrink(),
             error: (_, _) => const SizedBox.shrink(),
           ),
+
+          // Filter pills
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.spacingMd,
+              AppTheme.spacingSm,
+              AppTheme.spacingMd,
+              0,
+            ),
+            child: Row(
+              children: [
+                for (final filter in _NoteFilter.values)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _FilterPill(
+                      label: _filterLabel(filter),
+                      icon: _filterIcon(filter),
+                      selected: _filter == filter,
+                      onTap: () => setState(() => _filter = filter),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Search bar
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppTheme.spacingMd,
-              AppTheme.spacingMd,
+              AppTheme.spacingSm,
               AppTheme.spacingMd,
               0,
             ),
             child: TextField(
               controller: _searchController,
+              autofocus: false,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Search voice notes...',
+                hintText:
+                    'Search titles, transcript text, or extracted actions...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _query.isEmpty
                     ? null
@@ -200,10 +240,53 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
               ),
             ),
           ),
+
+          // Count + sort info
+          memosAsync.when(
+            data: (memos) {
+              final filtered = _applyFilters(memos, _filter, _query, actionTypesMap);
+              final label = _filter == _NoteFilter.archived
+                  ? '${filtered.length} archived'
+                  : '${filtered.length} active notes';
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.spacingMd,
+                  AppTheme.spacingSm,
+                  AppTheme.spacingMd,
+                  0,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      label,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.06,
+                      ),
+                    ),
+                    Text(
+                      'Sorted by newest',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.06,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
+          ),
+
+          // Note list
           Expanded(
             child: memosAsync.when(
               data: (memos) {
-                final filteredMemos = _filterMemos(memos, _query);
+                final filteredMemos = _applyFilters(memos, _filter, _query, actionTypesMap);
 
                 return RefreshIndicator(
                   onRefresh: () =>
@@ -213,6 +296,7 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
                       : _VoiceMemoTimeline(
                           memos: filteredMemos,
                           onOpenMemo: _openMemo,
+                          showArchiveSection: _filter == _NoteFilter.all,
                         ),
                 );
               },
@@ -229,7 +313,79 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
       ),
     );
   }
+
+  String _filterLabel(_NoteFilter filter) => switch (filter) {
+    _NoteFilter.all => 'All',
+    _NoteFilter.notes => 'Notes',
+    _NoteFilter.tasks => 'Tasks',
+    _NoteFilter.reminders => 'Reminders',
+    _NoteFilter.timersAlarms => 'Alarms & Timers',
+    _NoteFilter.archived => 'Archived',
+  };
+
+  IconData _filterIcon(_NoteFilter filter) => switch (filter) {
+    _NoteFilter.all => Icons.all_inbox_outlined,
+    _NoteFilter.notes => Icons.note_outlined,
+    _NoteFilter.tasks => Icons.check_circle_outline,
+    _NoteFilter.reminders => Icons.notifications_outlined,
+    _NoteFilter.timersAlarms => Icons.alarm_outlined,
+    _NoteFilter.archived => Icons.archive_outlined,
+  };
 }
+
+class _FilterPill extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FilterPill({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppTheme.primaryColor : AppTheme.textSecondary;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppTheme.primaryColor.withValues(alpha: 0.14)
+              : AppTheme.surfaceColor,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? AppTheme.primaryColor.withValues(alpha: 0.22)
+                : AppTheme.textSecondary.withValues(alpha: 0.12),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DETAIL VIEW
+// ═══════════════════════════════════════════════════════════════════════════
 
 class VoiceMemoDetailScreen extends ConsumerStatefulWidget {
   final int memoId;
@@ -270,7 +426,69 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
     final memoAsync = ref.watch(voiceMemoByIdProvider(widget.memoId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Voice Note')),
+      appBar: AppBar(
+        title: const Text('Voice Note'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              final memo = memoAsync.valueOrNull ?? widget.initialMemo;
+              if (memo == null) return;
+              switch (value) {
+                case 'archive':
+                  ref
+                      .read(voiceMemoActionsProvider.notifier)
+                      .setArchived(memo.filename, archived: !memo.archived);
+                case 'delete':
+                  _deleteMemo(memo);
+                case 'sync':
+                  ref.read(voiceMemoActionsProvider.notifier).sync();
+              }
+            },
+            itemBuilder: (context) {
+              final memo = memoAsync.valueOrNull ?? widget.initialMemo;
+              return [
+                PopupMenuItem(
+                  value: 'archive',
+                  child: Row(
+                    children: [
+                      Icon(
+                        memo?.archived == true
+                            ? Icons.unarchive_outlined
+                            : Icons.archive_outlined,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(memo?.archived == true ? 'Unarchive' : 'Archive'),
+                    ],
+                  ),
+                ),
+                if (ref.watch(isWatchConnectedProvider))
+                  const PopupMenuItem(
+                    value: 'sync',
+                    child: Row(
+                      children: [
+                        Icon(Icons.sync),
+                        SizedBox(width: 8),
+                        Text('Sync'),
+                      ],
+                    ),
+                  ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, color: AppTheme.errorColor),
+                      SizedBox(width: 8),
+                      Text('Delete',
+                          style: TextStyle(color: AppTheme.errorColor)),
+                    ],
+                  ),
+                ),
+              ];
+            },
+          ),
+        ],
+      ),
       body: memoAsync.when(
         data: (memo) {
           final effectiveMemo = memo ?? widget.initialMemo;
@@ -284,170 +502,71 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
           }
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final showSideBySide = constraints.maxWidth >= 430;
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Category badge + metadata line
+                _DetailMetaLine(memo: effectiveMemo),
+                const SizedBox(height: 12),
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TopSummarySection(
-                      memo: effectiveMemo,
-                      sideBySide: showSideBySide,
-                    ),
-                    const SizedBox(height: 12),
-                    _AISummarySection(memo: effectiveMemo),
-                    const SizedBox(height: 12),
-                    _ExtractedActionsSection(memo: effectiveMemo),
-                    const SizedBox(height: 12),
-                    _SectionCard(
-                      title: 'Transcript',
-                      trailing: IconButton(
-                        tooltip: _isEditing
-                            ? 'Cancel editing'
-                            : 'Edit transcript',
-                        visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 32,
-                          height: 32,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _isEditing = !_isEditing;
-                            if (!_isEditing) {
-                              _transcriptController.text = currentTranscript;
-                            }
-                          });
-                        },
-                        icon: Icon(
-                          _isEditing
-                              ? Icons.close_rounded
-                              : Icons.edit_outlined,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_isEditing) ...[
-                            TextField(
-                              controller: _transcriptController,
-                              minLines: 6,
-                              maxLines: null,
-                              decoration: const InputDecoration(
-                                hintText: 'Edit transcript text...',
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                OutlinedButton(
-                                  style: _compactOutlinedButtonStyle(),
-                                  onPressed: _isSaving
-                                      ? null
-                                      : () {
-                                          setState(() {
-                                            _isEditing = false;
-                                            _transcriptController.text =
-                                                currentTranscript;
-                                          });
-                                        },
-                                  child: const Text('Cancel'),
-                                ),
-                                const SizedBox(width: AppTheme.spacingSm),
-                                FilledButton(
-                                  style: _compactFilledButtonStyle(),
-                                  onPressed: _isSaving
-                                      ? null
-                                      : () => _saveTranscript(effectiveMemo),
-                                  child: Text(_isSaving ? 'Saving...' : 'Save'),
-                                ),
-                              ],
-                            ),
-                          ] else ...[
-                            SelectableText(
-                              currentTranscript.trim().isEmpty
-                                  ? 'Transcription will appear here after sync and transcription finish.'
-                                  : currentTranscript,
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(
-                                    height: 1.45,
-                                    color: currentTranscript.trim().isEmpty
-                                        ? AppTheme.textSecondary
-                                        : AppTheme.textPrimary,
-                                  ),
-                            ),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: AppTheme.spacingSm,
-                              runSpacing: AppTheme.spacingSm,
-                              children: [
-                                OutlinedButton.icon(
-                                  style: _compactOutlinedButtonStyle(),
-                                  onPressed: currentTranscript.trim().isEmpty
-                                      ? null
-                                      : () async {
-                                          await Clipboard.setData(
-                                            ClipboardData(
-                                              text: currentTranscript,
-                                            ),
-                                          );
-                                          if (!context.mounted) {
-                                            return;
-                                          }
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Text(
-                                                'Transcript copied to clipboard',
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                  icon: const Icon(Icons.copy_all_outlined),
-                                  label: const Text('Copy text'),
-                                ),
-                                _TranscribeButton(
-                                  memo: effectiveMemo,
-                                  expand: false,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _SectionCard(
-                      title: 'Actions',
-                      child: Wrap(
-                        spacing: AppTheme.spacingSm,
-                        runSpacing: AppTheme.spacingSm,
-                        children: [
-                          OutlinedButton.icon(
-                            style: _compactOutlinedButtonStyle(),
-                            onPressed: () => _deleteMemo(effectiveMemo),
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Delete'),
-                          ),
-                          if (!hasLocalAudio(effectiveMemo))
-                            FilledButton.icon(
-                              style: _compactFilledButtonStyle(),
-                              onPressed: ref.watch(isWatchConnectedProvider)
-                                  ? () => ref
-                                        .read(voiceMemoActionsProvider.notifier)
-                                        .sync()
-                                  : null,
-                              icon: const Icon(Icons.sync),
-                              label: const Text('Sync now'),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
+                // Large title
+                Text(
+                  memoTitleText(effectiveMemo),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.5,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Transcript (editable inline)
+                _InlineTranscript(
+                  memo: effectiveMemo,
+                  controller: _transcriptController,
+                  isEditing: _isEditing,
+                  isSaving: _isSaving,
+                  onToggleEdit: () {
+                    setState(() {
+                      _isEditing = !_isEditing;
+                      if (!_isEditing) {
+                        _transcriptController.text = currentTranscript;
+                      }
+                    });
+                  },
+                  onSave: () => _saveTranscript(effectiveMemo),
+                  onCancel: () {
+                    setState(() {
+                      _isEditing = false;
+                      _transcriptController.text = currentTranscript;
+                    });
+                  },
+                ),
+
+                // Quick status chips
+                const SizedBox(height: 14),
+                _QuickStatusChips(memo: effectiveMemo),
+
+                // Audio player
+                const SizedBox(height: 18),
+                _DetailAudioPlayer(memo: effectiveMemo),
+
+                // Micro tools
+                const SizedBox(height: 14),
+                _MicroTools(memo: effectiveMemo),
+
+                // Extracted Actions (at bottom)
+                const SizedBox(height: 20),
+                _ExtractedActionsSection(memo: effectiveMemo),
+
+                // Bottom toolbar
+                const SizedBox(height: 18),
+                _BottomToolbar(
+                  memo: effectiveMemo,
+                  onDelete: () => _deleteMemo(effectiveMemo),
+                ),
+              ],
             ),
           );
         },
@@ -500,179 +619,235 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
   }
 }
 
-class _AISummarySection extends ConsumerWidget {
-  final VoiceMemo memo;
+// ─── Detail sub-widgets ──────────────────────────────────────────────────
 
-  const _AISummarySection({required this.memo});
+class _DetailMetaLine extends StatelessWidget {
+  final VoiceMemo memo;
+  const _DetailMetaLine({required this.memo});
+
+  @override
+  Widget build(BuildContext context) {
+    final local = memo.timestampUtc.toLocal();
+    final dateStr = DateFormat('MMMM d, HH:mm').format(local);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (memo.aiCategory != null)
+          _CategoryBadge(category: memo.aiCategory!),
+        Text(
+          '$dateStr · ${memo.formattedDuration} · ${memo.formattedSize}',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: AppTheme.textSecondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Combined transcript display + inline edit. Replaces both _AISummaryLede
+/// and _TranscriptSection so there's a single transcript area.
+class _InlineTranscript extends ConsumerWidget {
+  final VoiceMemo memo;
+  final TextEditingController controller;
+  final bool isEditing;
+  final bool isSaving;
+  final VoidCallback onToggleEdit;
+  final VoidCallback onSave;
+  final VoidCallback onCancel;
+
+  const _InlineTranscript({
+    required this.memo,
+    required this.controller,
+    required this.isEditing,
+    required this.isSaving,
+    required this.onToggleEdit,
+    required this.onSave,
+    required this.onCancel,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final aiEnabled = ref.watch(localAiEnabledProvider);
-    final modelDownloadedAsync = ref.watch(llmModelDownloadedProvider);
+    final isProcessing = memo.isAiProcessing;
+    final hasFailed =
+        memo.aiProcessingStatus == VoiceNoteProcessingStatus.failed;
+    final currentTranscript = memo.transcription ?? '';
+    final hasTranscript = currentTranscript.trim().isNotEmpty;
 
-    if (!aiEnabled) {
-      return const SizedBox.shrink();
+    // AI processing status line (compact)
+    if (isProcessing) {
+      return _aiProcessingRow(context, ref);
     }
 
-    return modelDownloadedAsync.when(
-      data: (modelDownloaded) {
-        if (!modelDownloaded) {
-          return const SizedBox.shrink();
-        }
+    if (hasFailed) {
+      return _aiFailedRow(context, ref);
+    }
 
-        final hasSummary = memo.summary != null && memo.summary!.isNotEmpty;
-        final hasCategory = memo.aiCategory != null;
-        final isProcessing = memo.isAiProcessing;
-        final hasFailed =
-            memo.aiProcessingStatus == VoiceNoteProcessingStatus.failed;
-
-        if (!hasSummary && !hasCategory && !isProcessing && !hasFailed) {
-          return _SectionCard(
-            title: 'AI Analysis',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Get AI-powered insights including summary, category, and extracted actions.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  style: _compactOutlinedButtonStyle(),
-                  onPressed: memo.transcription?.trim().isEmpty == true
-                      ? null
-                      : () => ref
-                            .read(aiActionsProvider.notifier)
-                            .processVoiceMemo(memo.filename),
-                  icon: const Icon(Icons.auto_awesome),
-                  label: const Text('Process with AI'),
-                ),
-                if (memo.transcription?.trim().isEmpty == true)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      'Transcribe the audio first before AI processing.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  ),
-              ],
+    // Editing mode
+    if (isEditing) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: controller,
+            minLines: 4,
+            maxLines: null,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              height: 1.65,
+              color: const Color(0xFFC5D0DA),
             ),
-          );
-        }
-
-        return _SectionCard(
-          title: 'AI Summary',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            decoration: const InputDecoration(
+              hintText: 'Edit transcript text...',
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
             children: [
-              if (isProcessing)
-                InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () => _showAiDebugDialog(context, ref),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        const SizedBox(width: AppTheme.spacingSm),
-                        Text(
-                          'Processing with AI...',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: AppTheme.textSecondary),
-                        ),
-                        const Spacer(),
-                        const Icon(
-                          Icons.bug_report_outlined,
-                          size: 16,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else if (hasFailed) ...[
-                Text(
-                  'AI processing failed.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: AppTheme.errorColor),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  style: _compactOutlinedButtonStyle(),
-                  onPressed: () => ref
-                      .read(aiActionsProvider.notifier)
-                      .processVoiceMemo(memo.filename),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                ),
-              ]
-              else ...[
-                if (hasCategory)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _CategoryBadge(category: memo.aiCategory!),
-                  ),
-                if (hasSummary)
-                  SelectableText(
-                    cleanSummary(memo.summary!),
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyLarge?.copyWith(height: 1.45),
-                  ),
-              ],
-              if (!isProcessing && (hasSummary || hasCategory))
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Wrap(
-                    spacing: AppTheme.spacingSm,
-                    children: [
-                      OutlinedButton.icon(
-                        style: _compactOutlinedButtonStyle(),
-                        onPressed: () => ref
-                            .read(aiActionsProvider.notifier)
-                            .processVoiceMemo(memo.filename),
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Re-process'),
-                      ),
-                      OutlinedButton.icon(
-                        style: _compactOutlinedButtonStyle(),
-                        onPressed: () => _showAiDebugDialog(context, ref),
-                        icon: const Icon(Icons.bug_report_outlined),
-                        label: const Text('Debug'),
-                      ),
-                    ],
-                  ),
-                ),
-              if (hasSummary && memo.aiModel != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Model: ${memo.aiModel}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
+              OutlinedButton(
+                style: _compactOutlinedButtonStyle(),
+                onPressed: isSaving ? null : onCancel,
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: AppTheme.spacingSm),
+              FilledButton(
+                style: _compactFilledButtonStyle(),
+                onPressed: isSaving ? null : onSave,
+                child: Text(isSaving ? 'Saving...' : 'Save'),
+              ),
             ],
           ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
+        ],
+      );
+    }
+
+    // Normal display
+    if (!hasTranscript) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Transcription will appear here after sync and transcription finish.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              height: 1.65,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          if (aiEnabled &&
+              memo.summary == null) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              style: _compactOutlinedButtonStyle(),
+              onPressed: null,
+              icon: const Icon(Icons.auto_awesome, size: 16),
+              label: const Text('Process with AI'),
+            ),
+          ],
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SelectableText(
+          currentTranscript,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            height: 1.65,
+            color: const Color(0xFFB6C0CA),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            GestureDetector(
+              onTap: onToggleEdit,
+              child: Text(
+                'Edit',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (aiEnabled && memo.summary == null) ...[
+              const SizedBox(width: 16),
+              GestureDetector(
+                onTap: () => ref
+                    .read(aiActionsProvider.notifier)
+                    .processVoiceMemo(memo.filename),
+                child: Text(
+                  'Process with AI',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 
-  void _showAiDebugDialog(BuildContext context, WidgetRef ref) {
+  Widget _aiProcessingRow(BuildContext context, WidgetRef ref) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _showAiDebugDialog(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: AppTheme.spacingSm),
+            Text(
+              'Processing with AI...',
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: AppTheme.textSecondary),
+            ),
+            const Spacer(),
+            const Icon(
+              Icons.bug_report_outlined,
+              size: 16,
+              color: AppTheme.textSecondary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _aiFailedRow(BuildContext context, WidgetRef ref) {
+    return Row(
+      children: [
+        Text(
+          'AI processing failed.',
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: AppTheme.errorColor),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton.icon(
+          style: _compactOutlinedButtonStyle(),
+          onPressed: () => ref
+              .read(aiActionsProvider.notifier)
+              .processVoiceMemo(memo.filename),
+          icon: const Icon(Icons.refresh, size: 16),
+          label: const Text('Retry'),
+        ),
+      ],
+    );
+  }
+
+  void _showAiDebugDialog(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -692,6 +867,830 @@ class _AISummarySection extends ConsumerWidget {
   }
 }
 
+class _QuickStatusChips extends StatelessWidget {
+  final VoiceMemo memo;
+  const _QuickStatusChips({required this.memo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        if (memo.isAiProcessed) _statusChip(context, 'AI processed'),
+        if (memo.syncedFromWatch)
+          _statusChip(context, 'Synced from watch'),
+        if (hasLocalAudio(memo))
+          _statusChip(context, 'Stored on phone'),
+        if (!memo.deletedOnWatch)
+          _statusChip(context, 'On watch'),
+        if (memo.archived)
+          _statusChip(context, 'Archived'),
+      ],
+    );
+  }
+
+  Widget _statusChip(BuildContext context, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppTheme.textSecondary.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppTheme.textSecondary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailAudioPlayer extends ConsumerWidget {
+  final VoiceMemo memo;
+  const _DetailAudioPlayer({required this.memo});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (hasLocalAudio(memo)) {
+      return _AudioPlayerBar(memo: memo);
+    }
+
+    return _SyncPromptCard(memo: memo);
+  }
+}
+
+class _AudioPlayerBar extends ConsumerStatefulWidget {
+  final VoiceMemo memo;
+  const _AudioPlayerBar({required this.memo});
+
+  @override
+  ConsumerState<_AudioPlayerBar> createState() => _AudioPlayerBarState();
+}
+
+class _AudioPlayerBarState extends ConsumerState<_AudioPlayerBar> {
+  AudioPlayer? _player;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+  bool _isPlaying = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _initPlayer();
+  }
+
+  Future<void> _initPlayer() async {
+    final path =
+        widget.memo.convertedFilePath ?? widget.memo.localFilePath;
+    if (path == null || !File(path).existsSync()) {
+      setState(() => _error = 'Audio file not found');
+      return;
+    }
+
+    try {
+      _player = AudioPlayer();
+      final duration = await _player!.setFilePath(path);
+      if (duration != null && mounted) {
+        setState(() => _duration = duration);
+      }
+
+      _player!.positionStream.listen((position) {
+        if (mounted) setState(() => _position = position);
+      });
+
+      _player!.playerStateStream.listen((state) {
+        if (!mounted) return;
+        setState(() => _isPlaying = state.playing);
+        if (state.processingState == ProcessingState.completed) {
+          _player!.seek(Duration.zero);
+          _player!.pause();
+        }
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = 'Failed to load audio: $error');
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _player?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null) {
+      return Text(_error!, style: const TextStyle(color: AppTheme.errorColor));
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.elevatedSurfaceColor.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.textSecondary.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Play button
+          GestureDetector(
+            onTap: () {
+              if (_isPlaying) {
+                _player?.pause();
+              } else {
+                _player?.play();
+              }
+            },
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                color: AppTheme.primaryColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: Colors.black,
+                size: 22,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Slider
+          Expanded(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                thumbShape: const RoundSliderThumbShape(
+                  enabledThumbRadius: 6,
+                ),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              ),
+              child: Slider(
+                padding: EdgeInsets.zero,
+                value: _duration.inMilliseconds == 0
+                    ? 0
+                    : _position.inMilliseconds
+                          .clamp(0, _duration.inMilliseconds)
+                          .toDouble(),
+                max: _duration.inMilliseconds == 0
+                    ? 1
+                    : _duration.inMilliseconds.toDouble(),
+                onChanged: (value) =>
+                    _player?.seek(Duration(milliseconds: value.toInt())),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MicroTools extends ConsumerWidget {
+  final VoiceMemo memo;
+  const _MicroTools({required this.memo});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentTranscript = memo.transcription ?? '';
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MicroToolButton(
+            label: 'Copy',
+            icon: Icons.copy_outlined,
+            onPressed: currentTranscript.trim().isEmpty
+                ? null
+                : () async {
+                    await Clipboard.setData(
+                      ClipboardData(text: currentTranscript),
+                    );
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Transcript copied to clipboard'),
+                      ),
+                    );
+                  },
+          ),
+          const SizedBox(width: AppTheme.spacingSm),
+          _TranscribeButton(memo: memo, expand: false),
+          if (ref.watch(localAiEnabledProvider)) ...[
+            const SizedBox(width: AppTheme.spacingSm),
+            _MicroToolButton(
+              label: 'Re-process',
+              icon: Icons.auto_awesome_outlined,
+              onPressed: currentTranscript.trim().isEmpty
+                  ? null
+                  : () => ref
+                        .read(aiActionsProvider.notifier)
+                        .processVoiceMemo(memo.filename),
+            ),
+          ],
+          const SizedBox(width: AppTheme.spacingSm),
+          _MicroToolButton(
+            label: 'Debug',
+            icon: Icons.bug_report_outlined,
+            onPressed: () {
+              showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: AppTheme.elevatedSurfaceColor,
+                shape: const RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                builder: (context) => DraggableScrollableSheet(
+                  initialChildSize: 0.75,
+                  minChildSize: 0.4,
+                  maxChildSize: 0.95,
+                  expand: false,
+                  builder: (context, scrollController) => _AiDebugSheet(
+                    memo: memo,
+                    scrollController: scrollController,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MicroToolButton extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final VoidCallback? onPressed;
+
+  const _MicroToolButton({required this.label, this.icon, this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    if (icon != null) {
+      return OutlinedButton.icon(
+        style: _compactOutlinedButtonStyle(),
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        label: Text(label),
+      );
+    }
+    return OutlinedButton(
+      style: _compactOutlinedButtonStyle(),
+      onPressed: onPressed,
+      child: Text(label),
+    );
+  }
+}
+
+class _BottomToolbar extends ConsumerWidget {
+  final VoiceMemo memo;
+  final VoidCallback onDelete;
+
+  const _BottomToolbar({required this.memo, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.only(top: 16),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: AppTheme.textSecondary.withValues(alpha: 0.08),
+          ),
+        ),
+      ),
+      child: Wrap(
+        spacing: AppTheme.spacingSm,
+        runSpacing: AppTheme.spacingSm,
+        children: [
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.errorColor,
+              side: BorderSide(
+                color: AppTheme.errorColor.withValues(alpha: 0.18),
+              ),
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              minimumSize: const Size(0, 34),
+              textStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            onPressed: onDelete,
+            child: const Text('Delete'),
+          ),
+          OutlinedButton(
+            style: _compactOutlinedButtonStyle(),
+            onPressed: () {
+              ref
+                  .read(voiceMemoActionsProvider.notifier)
+                  .setArchived(memo.filename, archived: !memo.archived);
+            },
+            child: Text(memo.archived ? 'Unarchive' : 'Archive'),
+          ),
+          if (ref.watch(isWatchConnectedProvider) && !hasLocalAudio(memo))
+            OutlinedButton(
+              style: _compactOutlinedButtonStyle(),
+              onPressed: () =>
+                  ref.read(voiceMemoActionsProvider.notifier).sync(),
+              child: const Text('Sync'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DividerLabel extends StatelessWidget {
+  final String label;
+
+  const _DividerLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: AppTheme.textSecondary,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: AppTheme.textSecondary.withValues(alpha: 0.08),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Extracted Actions in detail view ────────────────────────────────────
+
+class _ExtractedActionsSection extends ConsumerStatefulWidget {
+  final VoiceMemo memo;
+
+  const _ExtractedActionsSection({required this.memo});
+
+  @override
+  ConsumerState<_ExtractedActionsSection> createState() =>
+      _ExtractedActionsSectionState();
+}
+
+class _ExtractedActionsSectionState
+    extends ConsumerState<_ExtractedActionsSection> {
+  @override
+  Widget build(BuildContext context) {
+    final aiEnabled = ref.watch(localAiEnabledProvider);
+
+    if (!aiEnabled) {
+      return const SizedBox.shrink();
+    }
+
+    final actionsAsync = ref.watch(
+      extractedActionsForMemoProvider(widget.memo.id),
+    );
+
+    return actionsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (actions) {
+        if (actions.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _DividerLabel(label: 'Extracted actions · ${actions.length}'),
+            const SizedBox(height: 10),
+            for (final action in actions) ...[
+              _ActionCard(action: action),
+              const SizedBox(height: 10),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ActionCard extends ConsumerStatefulWidget {
+  final ExtractedAction action;
+
+  const _ActionCard({required this.action});
+
+  @override
+  ConsumerState<_ActionCard> createState() => _ActionCardState();
+}
+
+class _ActionCardState extends ConsumerState<_ActionCard> {
+  bool _isCreating = false;
+  bool _isDismissing = false;
+  bool _isOpening = false;
+
+  ExtractedAction get action => widget.action;
+
+  Color get _accentColor => switch (action.actionType) {
+    ExtractedActionType.calendarEvent => AppTheme.infoColor,
+    ExtractedActionType.reminder => AppTheme.warningColor,
+    ExtractedActionType.alarm => AppTheme.primaryColor,
+    ExtractedActionType.timer => Colors.teal,
+    ExtractedActionType.task => AppTheme.successColor,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceColor.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppTheme.textSecondary.withValues(alpha: 0.08),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Left color bar
+            Container(width: 4, color: _accentColor),
+            // Content
+            Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: AppTheme.textSecondary.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          _actionTypeIcon(action.actionType),
+                          size: 16,
+                          color: _accentColor,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _actionDisplayTitle(action),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            if (_timingLabel(action) case final timing?)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 3),
+                                child: Text(
+                                  timing,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      _ActionStatusBadge(action: action),
+                    ],
+                  ),
+                  if (action.notes != null &&
+                      action.notes!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      action.notes!.trim(),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                  // Action buttons
+                  if (action.actionType != ExtractedActionType.task ||
+                      action.startTime != null ||
+                      action.dueDate != null ||
+                      action.durationSeconds != null) ...[
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: AppTheme.spacingSm,
+                      runSpacing: AppTheme.spacingSm,
+                      children: [
+                        if (!action.created && !action.dismissed)
+                          FilledButton(
+                            style: _compactFilledButtonStyle(),
+                            onPressed: _isCreating ? null : _createAction,
+                            child: Text(
+                              _isCreating
+                                  ? 'Creating...'
+                                  : _createLabel(action),
+                            ),
+                          ),
+                        if (!action.created && !action.dismissed)
+                          OutlinedButton(
+                            style: _compactOutlinedWarnStyle(),
+                            onPressed: _isDismissing ? null : _dismissAction,
+                            child: const Text('Dismiss'),
+                          ),
+                        if (action.created && action.platformTargetId != null)
+                          OutlinedButton(
+                            style: _compactOutlinedButtonStyle(),
+                            onPressed: _isOpening ? null : _openCreatedAction,
+                            child: const Text('Open'),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+        ),
+      ),
+    );
+  }
+
+  String _createLabel(ExtractedAction action) {
+    if (Platform.isIOS &&
+        (action.actionType == ExtractedActionType.alarm ||
+            action.actionType == ExtractedActionType.timer)) {
+      return 'Set on iPhone';
+    }
+    return 'Create';
+  }
+
+  Future<void> _createAction() async {
+    setState(() => _isCreating = true);
+    try {
+      final selectedCalendarId = ref.read(
+        selectedProductivityCalendarIdProvider,
+      );
+      final draft = ActionCreationDraft.fromAction(action).copyWith(
+        platformCalendarId: Platform.isAndroid ? selectedCalendarId : null,
+      );
+
+      final message = await ref
+          .read(extractedActionOperationsProvider)
+          .createAction(action: action, draft: draft);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to create action: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isCreating = false);
+      }
+    }
+  }
+
+  Future<void> _dismissAction() async {
+    setState(() => _isDismissing = true);
+    try {
+      await ref
+          .read(extractedActionOperationsProvider)
+          .dismissAction(action.id);
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to dismiss action: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDismissing = false);
+      }
+    }
+  }
+
+  Future<void> _openCreatedAction() async {
+    setState(() => _isOpening = true);
+    try {
+      await ref
+          .read(extractedActionCreationServiceProvider)
+          .openCreatedAction(action);
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to open created action: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isOpening = false);
+      }
+    }
+  }
+}
+
+ButtonStyle _compactOutlinedWarnStyle() {
+  return OutlinedButton.styleFrom(
+    foregroundColor: AppTheme.primaryColor,
+    side: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.18)),
+    visualDensity: VisualDensity.compact,
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    minimumSize: const Size(0, 34),
+    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+  );
+}
+
+IconData _actionTypeIcon(ExtractedActionType type) {
+  return switch (type) {
+    ExtractedActionType.task => Icons.check_box_outlined,
+    ExtractedActionType.reminder => Icons.alarm,
+    ExtractedActionType.calendarEvent => Icons.calendar_today,
+    ExtractedActionType.timer => Icons.timer,
+    ExtractedActionType.alarm => Icons.alarm_add,
+  };
+}
+
+String _actionDisplayTitle(ExtractedAction action) {
+  if (action.actionType == ExtractedActionType.timer) {
+    final d = action.durationSeconds ?? 0;
+    final h = d ~/ 3600;
+    final m = (d % 3600) ~/ 60;
+    final s = d % 60;
+    final parts = <String>[
+      if (h > 0) '${h}h',
+      if (m > 0) '${m}m',
+      if (s > 0 || (h == 0 && m == 0)) '${s}s',
+    ];
+    final duration = parts.join(' ');
+    if (action.title.isNotEmpty) {
+      return 'Timer $duration — ${action.title}';
+    }
+    return 'Timer $duration';
+  }
+  if (action.actionType == ExtractedActionType.alarm) {
+    final time = action.startTime;
+    if (time != null) {
+      final t = time.toLocal();
+      final formatted = DateFormat.jm().format(t);
+      if (action.title.isNotEmpty) {
+        return 'Alarm at $formatted — ${action.title}';
+      }
+      return 'Alarm at $formatted';
+    }
+    if (action.title.isNotEmpty) return 'Alarm — ${action.title}';
+    return 'Alarm';
+  }
+  return action.title;
+}
+
+String? _timingLabel(ExtractedAction action) {
+  if (action.actionType == ExtractedActionType.timer ||
+      action.actionType == ExtractedActionType.alarm) {
+    return null;
+  }
+
+  final dateFormat = DateFormat.yMMMd();
+  final dateTimeFormat = DateFormat.yMMMd().add_jm();
+
+  if (action.startTime != null) {
+    final start = action.startTime!.toLocal();
+    if (action.endTime != null) {
+      final end = action.endTime!.toLocal();
+      return '${dateTimeFormat.format(start)} \u2192 ${dateTimeFormat.format(end)}';
+    }
+    return dateTimeFormat.format(start);
+  }
+
+  if (action.dueDate != null) {
+    return 'Due: ${dateFormat.format(action.dueDate!.toLocal())}';
+  }
+
+  return null;
+}
+
+class _ActionStatusBadge extends StatelessWidget {
+  final ExtractedAction action;
+
+  const _ActionStatusBadge({required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    // For simple tasks with no timing info, there's nothing to "create"
+    // so don't show a misleading "Pending" badge.
+    final isActionable = action.actionType != ExtractedActionType.task ||
+        action.startTime != null ||
+        action.dueDate != null ||
+        action.durationSeconds != null;
+
+    final (label, color) = switch ((action.created, action.dismissed)) {
+      (true, _) => ('Created', AppTheme.successColor),
+      (_, true) => ('Dismissed', AppTheme.textSecondary),
+      _ when isActionable => ('Pending', AppTheme.warningColor),
+      _ => (null, null),
+    };
+
+    if (label == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color!.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppTheme.radiusXLarge),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w800,
+          fontSize: 10,
+          letterSpacing: 0.05,
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryBadge extends StatelessWidget {
+  final VoiceNoteCategory category;
+
+  const _CategoryBadge({required this.category});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: voiceNoteCategoryColor(category).withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        voiceNoteCategoryLabel(category).toUpperCase(),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: voiceNoteCategoryColor(category),
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── AI Debug Sheet ──────────────────────────────────────────────────────
+
 class _AiDebugSheet extends ConsumerWidget {
   final VoiceMemo memo;
   final ScrollController scrollController;
@@ -701,22 +1700,18 @@ class _AiDebugSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final streamValue = ref.watch(aiProcessingDebugInfoProvider).valueOrNull;
-    // Show live stream data only when it's for THIS memo
     final liveInfo =
         (streamValue != null && streamValue.filename == memo.filename)
         ? streamValue
         : null;
-    // For completed results, look up per-file cache
     final storedInfo = ref
         .read(voiceNoteAiPipelineProvider)
         .getDebugInfoForFile(memo.filename);
-    // Prefer live (in-progress or just-completed) over stored
     final debugInfo = liveInfo ?? storedInfo;
     final theme = Theme.of(context);
 
     return Column(
       children: [
-        // Handle bar
         Padding(
           padding: const EdgeInsets.only(top: 12, bottom: 8),
           child: Container(
@@ -770,7 +1765,6 @@ class _AiDebugSheet extends ConsumerWidget {
                 const SizedBox(height: 16),
                 _debugInfoFromMemo(context),
               ] else if (!debugInfo.isComplete) ...[
-                // --- Live / in-progress view ---
                 _livePhaseHeader(context, debugInfo),
                 const SizedBox(height: 12),
                 if (debugInfo.transcriptionResult != null) ...[
@@ -782,7 +1776,6 @@ class _AiDebugSheet extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                 ],
-                // Only show the partial-response block once tokens are flowing
                 if (debugInfo.phase != 'loading')
                   _debugBlock(
                     context,
@@ -796,7 +1789,6 @@ class _AiDebugSheet extends ConsumerWidget {
                     mono: debugInfo.phase == 'classifying',
                   ),
               ] else ...[
-                // --- Completed view ---
                 _metricsRow(context, debugInfo),
                 const SizedBox(height: 16),
                 if (debugInfo.transcriptionResult != null &&
@@ -997,8 +1989,6 @@ class _AiDebugSheet extends ConsumerWidget {
   }
 
   Widget _metricsRow(BuildContext context, AiDebugInfo info) {
-    final theme = Theme.of(context);
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1010,7 +2000,7 @@ class _AiDebugSheet extends ConsumerWidget {
         children: [
           Text(
             info.modelName,
-            style: theme.textTheme.titleSmall?.copyWith(
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1162,9 +2152,6 @@ class _AiDebugSheet extends ConsumerWidget {
     );
   }
 
-  /// Build a diff view showing words removed (from original) in red and words
-  /// added (in corrected) in green. Uses a simple longest-common-subsequence
-  /// approach on whitespace-split word arrays.
   Widget _transcriptionDiffBlock(
     BuildContext context, {
     required String original,
@@ -1231,7 +2218,6 @@ class _AiDebugSheet extends ConsumerWidget {
     );
   }
 
-  /// Compute word-level diff spans using LCS (longest common subsequence).
   List<TextSpan> _computeWordDiffSpans(
     List<String> origWords,
     List<String> corrWords,
@@ -1240,19 +2226,18 @@ class _AiDebugSheet extends ConsumerWidget {
     final n = origWords.length;
     final m = corrWords.length;
 
-    // Build LCS table
     final dp = List.generate(n + 1, (_) => List.filled(m + 1, 0));
     for (var i = 1; i <= n; i++) {
       for (var j = 1; j <= m; j++) {
         if (origWords[i - 1].toLowerCase() == corrWords[j - 1].toLowerCase()) {
           dp[i][j] = dp[i - 1][j - 1] + 1;
         } else {
-          dp[i][j] = dp[i - 1][j] > dp[i][j - 1] ? dp[i - 1][j] : dp[i][j - 1];
+          dp[i][j] =
+              dp[i - 1][j] > dp[i][j - 1] ? dp[i - 1][j] : dp[i][j - 1];
         }
       }
     }
 
-    // Backtrack to produce diff operations
     final ops = <_DiffOp>[];
     var i = n;
     var j = m;
@@ -1271,10 +2256,8 @@ class _AiDebugSheet extends ConsumerWidget {
         i--;
       }
     }
-    ops.reversed; // reversed is lazy, need toList
     final orderedOps = ops.reversed.toList();
 
-    // Convert to TextSpans
     final spans = <TextSpan>[];
     for (final op in orderedOps) {
       if (spans.isNotEmpty) {
@@ -1373,427 +2356,7 @@ class _AiDebugSheet extends ConsumerWidget {
   }
 }
 
-class _ExtractedActionsSection extends ConsumerStatefulWidget {
-  final VoiceMemo memo;
-
-  const _ExtractedActionsSection({required this.memo});
-
-  @override
-  ConsumerState<_ExtractedActionsSection> createState() =>
-      _ExtractedActionsSectionState();
-}
-
-class _ExtractedActionsSectionState
-    extends ConsumerState<_ExtractedActionsSection> {
-  bool _isExpanded = true;
-
-  @override
-  Widget build(BuildContext context) {
-    final aiEnabled = ref.watch(localAiEnabledProvider);
-
-    if (!aiEnabled) {
-      return const SizedBox.shrink();
-    }
-
-    final actionsAsync = ref.watch(
-      extractedActionsForMemoProvider(widget.memo.id),
-    );
-
-    return actionsAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
-      data: (actions) {
-        if (actions.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        return _SectionCard(
-          title: 'Extracted Actions',
-          trailing: IconButton(
-            tooltip: _isExpanded ? 'Collapse' : 'Expand',
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-            onPressed: () => setState(() => _isExpanded = !_isExpanded),
-            icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
-          ),
-          child: _isExpanded
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < actions.length; i++) ...[
-                      if (i > 0) const SizedBox(height: 10),
-                      _ActionItem(action: actions[i]),
-                    ],
-                  ],
-                )
-              : Text(
-                  '${actions.length} action${actions.length == 1 ? '' : 's'}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-        );
-      },
-    );
-  }
-}
-
-class _ActionItem extends ConsumerStatefulWidget {
-  final ExtractedAction action;
-
-  const _ActionItem({required this.action});
-
-  @override
-  ConsumerState<_ActionItem> createState() => _ActionItemState();
-}
-
-class _ActionItemState extends ConsumerState<_ActionItem> {
-  bool _isCreating = false;
-  bool _isDismissing = false;
-  bool _isOpening = false;
-
-  ExtractedAction get action => widget.action;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          margin: const EdgeInsets.only(top: 2),
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: _actionTypeColor(action.actionType).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-          ),
-          child: Icon(
-            _actionTypeIcon(action.actionType),
-            size: 16,
-            color: _actionTypeColor(action.actionType),
-          ),
-        ),
-        const SizedBox(width: AppTheme.spacingSm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      _actionDisplayTitle(action),
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  const SizedBox(width: AppTheme.spacingSm),
-                  _ActionStatusBadge(action: action),
-                ],
-              ),
-              if (_timingLabel(action) case final timingLabel?) ...[
-                const SizedBox(height: 4),
-                Text(
-                  timingLabel,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-              if (action.notes != null && action.notes!.trim().isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  action.notes!.trim(),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-              if (action.location != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  action.location!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-              // Notes are app-internal only — no create/dismiss buttons
-              if (action.actionType != ExtractedActionType.task ||
-                  action.startTime != null ||
-                  action.dueDate != null ||
-                  action.durationSeconds != null) ...[
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: AppTheme.spacingSm,
-                  runSpacing: AppTheme.spacingSm,
-                  children: [
-                    if (!action.created && !action.dismissed)
-                      FilledButton.icon(
-                        style: _compactFilledButtonStyle(),
-                        onPressed: _isCreating ? null : _createAction,
-                        icon: _isCreating
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.add_task_outlined),
-                        label:
-                            Text(_isCreating ? 'Creating\u2026' : 'Create'),
-                      ),
-                    if (!action.created && !action.dismissed)
-                      OutlinedButton.icon(
-                        style: _compactOutlinedButtonStyle(),
-                        onPressed: _isDismissing ? null : _dismissAction,
-                        icon: _isDismissing
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.close_rounded),
-                        label: const Text('Dismiss'),
-                      ),
-                    if (action.created && action.platformTargetId != null)
-                      OutlinedButton.icon(
-                        style: _compactOutlinedButtonStyle(),
-                        onPressed: _isOpening ? null : _openCreatedAction,
-                        icon: _isOpening
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.open_in_new_rounded),
-                        label: const Text('Open'),
-                      ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _createAction() async {
-    setState(() => _isCreating = true);
-    try {
-      final selectedCalendarId = ref.read(
-        selectedProductivityCalendarIdProvider,
-      );
-      final draft = ActionCreationDraft.fromAction(action).copyWith(
-        platformCalendarId: Platform.isAndroid ? selectedCalendarId : null,
-      );
-
-      final message = await ref
-          .read(extractedActionOperationsProvider)
-          .createAction(action: action, draft: draft);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    } catch (error) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to create action: $error')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isCreating = false);
-      }
-    }
-  }
-
-  Future<void> _dismissAction() async {
-    setState(() => _isDismissing = true);
-    try {
-      await ref
-          .read(extractedActionOperationsProvider)
-          .dismissAction(action.id);
-    } catch (error) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to dismiss action: $error')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isDismissing = false);
-      }
-    }
-  }
-
-  Future<void> _openCreatedAction() async {
-    setState(() => _isOpening = true);
-    try {
-      await ref
-          .read(extractedActionCreationServiceProvider)
-          .openCreatedAction(action);
-    } catch (error) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to open created action: $error')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isOpening = false);
-      }
-    }
-  }
-
-  IconData _actionTypeIcon(ExtractedActionType type) {
-    return switch (type) {
-      ExtractedActionType.task => Icons.check_box_outlined,
-      ExtractedActionType.reminder => Icons.alarm,
-      ExtractedActionType.calendarEvent => Icons.calendar_today,
-      ExtractedActionType.timer => Icons.timer,
-      ExtractedActionType.alarm => Icons.alarm_add,
-    };
-  }
-
-  Color _actionTypeColor(ExtractedActionType type) {
-    return switch (type) {
-      ExtractedActionType.task => AppTheme.primaryColor,
-      ExtractedActionType.reminder => AppTheme.warningColor,
-      ExtractedActionType.calendarEvent => AppTheme.infoColor,
-      ExtractedActionType.timer => Colors.teal,
-      ExtractedActionType.alarm => Colors.deepOrange,
-    };
-  }
-
-  String _actionDisplayTitle(ExtractedAction action) {
-    if (action.actionType == ExtractedActionType.timer) {
-      final d = action.durationSeconds ?? 0;
-      final h = d ~/ 3600;
-      final m = (d % 3600) ~/ 60;
-      final s = d % 60;
-      final parts = <String>[
-        if (h > 0) '${h}h',
-        if (m > 0) '${m}m',
-        if (s > 0 || (h == 0 && m == 0)) '${s}s',
-      ];
-      final duration = parts.join(' ');
-      if (action.title.isNotEmpty) {
-        return 'Timer $duration — ${action.title}';
-      }
-      return 'Timer $duration';
-    }
-    if (action.actionType == ExtractedActionType.alarm) {
-      final time = action.startTime;
-      if (time != null) {
-        final t = time.toLocal();
-        final formatted = DateFormat.jm().format(t);
-        if (action.title.isNotEmpty) {
-          return 'Alarm at $formatted — ${action.title}';
-        }
-        return 'Alarm at $formatted';
-      }
-      if (action.title.isNotEmpty) return 'Alarm — ${action.title}';
-      return 'Alarm';
-    }
-    return action.title;
-  }
-
-  String? _timingLabel(ExtractedAction action) {
-    // Timer/alarm timing info is already in the display title
-    if (action.actionType == ExtractedActionType.timer ||
-        action.actionType == ExtractedActionType.alarm) {
-      return null;
-    }
-
-    final dateFormat = DateFormat.yMMMd();
-    final dateTimeFormat = DateFormat.yMMMd().add_jm();
-
-    if (action.startTime != null) {
-      final start = action.startTime!.toLocal();
-      if (action.endTime != null) {
-        final end = action.endTime!.toLocal();
-        return 'When: ${dateTimeFormat.format(start)} \u2192 ${dateTimeFormat.format(end)}';
-      }
-      return 'When: ${dateTimeFormat.format(start)}';
-    }
-
-    if (action.dueDate != null) {
-      return 'Due: ${dateFormat.format(action.dueDate!.toLocal())}';
-    }
-
-    return null;
-  }
-}
-
-class _ActionStatusBadge extends StatelessWidget {
-  final ExtractedAction action;
-
-  const _ActionStatusBadge({required this.action});
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch ((action.created, action.dismissed)) {
-      (true, _) => ('Created', AppTheme.successColor),
-      (_, true) => ('Dismissed', AppTheme.textSecondary),
-      _ => ('Pending', AppTheme.warningColor),
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppTheme.radiusXLarge),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoryBadge extends StatelessWidget {
-  final VoiceNoteCategory category;
-
-  const _CategoryBadge({required this.category});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: voiceNoteCategoryColor(category).withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            voiceNoteCategoryIcon(category),
-            size: 16,
-            color: voiceNoteCategoryColor(category),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            voiceNoteCategoryLabel(category),
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: voiceNoteCategoryColor(category),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// ─── List view shared widgets ────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
   final bool hasQuery;
@@ -1806,7 +2369,7 @@ class _EmptyState extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         SizedBox(
-          height: MediaQuery.of(context).size.height * 0.55,
+          height: MediaQuery.of(context).size.height * 0.45,
           child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1845,38 +2408,126 @@ class _EmptyState extends StatelessWidget {
 class _VoiceMemoTimeline extends ConsumerWidget {
   final List<VoiceMemo> memos;
   final ValueChanged<VoiceMemo> onOpenMemo;
+  final bool showArchiveSection;
 
-  const _VoiceMemoTimeline({required this.memos, required this.onOpenMemo});
+  const _VoiceMemoTimeline({
+    required this.memos,
+    required this.onOpenMemo,
+    this.showArchiveSection = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sections = _groupMemosByDay(memos);
+    // Split archived and active
+    final active = memos.where((m) => !m.archived).toList();
+    final archived = memos.where((m) => m.archived).toList();
+    final activeSections = _groupMemosByDay(active);
+    final archivedSections = _groupMemosByDay(archived);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         AppTheme.spacingMd,
-        AppTheme.spacingMd,
+        AppTheme.spacingSm,
         AppTheme.spacingMd,
         AppTheme.spacingLg,
       ),
       children: [
-        for (final section in sections) ...[
+        for (final section in activeSections) ...[
           Padding(
             padding: const EdgeInsets.only(
               top: AppTheme.spacingSm,
               bottom: AppTheme.spacingSm,
             ),
             child: Text(
-              section.label,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(color: AppTheme.textSecondary),
+              section.label.toUpperCase(),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
             ),
           ),
           for (final memo in section.memos)
-            VoiceNoteCard(memo: memo, onOpen: () => onOpenMemo(memo)),
+            _MemoCardWithActionCount(
+              memo: memo,
+              onOpen: () => onOpenMemo(memo),
+            ),
         ],
+        // Archived section (only if showing all or explicit archived filter)
+        if (showArchiveSection && archived.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(
+              top: AppTheme.spacingMd,
+              bottom: AppTheme.spacingSm,
+            ),
+            child: Text(
+              'ARCHIVED',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          for (final section in archivedSections) ...[
+            for (final memo in section.memos)
+              Opacity(
+                opacity: 0.88,
+                child: _MemoCardWithActionCount(
+                  memo: memo,
+                  onOpen: () => onOpenMemo(memo),
+                ),
+              ),
+          ],
+        ],
+        // When showing archived filter only, show them without opacity change
+        if (!showArchiveSection)
+          for (final section in _groupMemosByDay(memos.where((m) => m.archived).toList()))
+            ...[
+              Padding(
+                padding: const EdgeInsets.only(
+                  top: AppTheme.spacingSm,
+                  bottom: AppTheme.spacingSm,
+                ),
+                child: Text(
+                  section.label.toUpperCase(),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              for (final memo in section.memos)
+                _MemoCardWithActionCount(
+                  memo: memo,
+                  onOpen: () => onOpenMemo(memo),
+                ),
+            ],
       ],
+    );
+  }
+}
+
+/// Wrapper that watches the action count for a memo before rendering the card.
+class _MemoCardWithActionCount extends ConsumerWidget {
+  final VoiceMemo memo;
+  final VoidCallback onOpen;
+
+  const _MemoCardWithActionCount({
+    required this.memo,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final actionsAsync = ref.watch(extractedActionsForMemoProvider(memo.id));
+    final actionCount = actionsAsync.valueOrNull?.length ?? 0;
+
+    return VoiceNoteCard(
+      memo: memo,
+      onOpen: onOpen,
+      extractedActionCount: actionCount,
     );
   }
 }
@@ -1902,315 +2553,80 @@ class _MissingNoteState extends StatelessWidget {
   }
 }
 
-class _TopSummarySection extends StatelessWidget {
+class _SyncPromptCard extends ConsumerWidget {
   final VoiceMemo memo;
-  final bool sideBySide;
 
-  const _TopSummarySection({required this.memo, required this.sideBySide});
+  const _SyncPromptCard({required this.memo});
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compactWidth = constraints.maxWidth < 380;
-            final rightColumnWidth = compactWidth ? 128.0 : 164.0;
-            final audioWidget = hasLocalAudio(memo)
-                ? _AudioPlayerCard(memo: memo, compact: true, alignRight: true)
-                : _SyncPromptCard(memo: memo, compact: true, alignRight: true);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isConnected = ref.watch(isWatchConnectedProvider);
+    final syncStateAsync = ref.watch(voiceMemoSyncStateProvider);
 
-            if (!sideBySide && constraints.maxWidth < 320) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _VoiceNoteHeaderContent(memo: memo),
-                  const SizedBox(height: 10),
-                  audioWidget,
-                ],
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.orange.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.cloud_download_outlined, color: Colors.orange),
+              const SizedBox(width: AppTheme.spacingSm),
+              Expanded(
+                child: Text(
+                  'This note is still on the watch. Sync to enable playback.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          syncStateAsync.when(
+            data: (state) {
+              if (!state.isSyncing) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  children: [
+                    const LinearProgressIndicator(),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Syncing in progress...',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
               );
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _VoiceNoteHeaderContent(memo: memo)),
-                const SizedBox(width: 10),
-                SizedBox(width: rightColumnWidth, child: audioWidget),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _VoiceNoteHeaderContent extends StatelessWidget {
-  final VoiceMemo memo;
-
-  const _VoiceNoteHeaderContent({required this.memo});
-
-  @override
-  Widget build(BuildContext context) {
-    final local = memo.timestampUtc.toLocal();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          DateFormat('MMMM d · HH:mm').format(local),
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 6),
-        Text(
-          '${memo.formattedDuration} · ${memo.formattedSize}',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: AppTheme.spacingSm,
-          runSpacing: AppTheme.spacingSm,
-          children: [
-            VoiceMemoMetaChip(
-              icon: syncStatusIcon(memo.syncStatus),
-              label: syncStatusLabel(memo),
-              color: syncStatusColor(memo.syncStatus),
-            ),
-            if (memo.syncedFromWatch)
-              const VoiceMemoMetaChip(
-                icon: Icons.smartphone_outlined,
-                label: 'Synced',
-                color: AppTheme.primaryColor,
-              ),
-            if (!memo.deletedOnWatch)
-              const VoiceMemoMetaChip(
-                icon: Icons.watch_outlined,
-                label: 'Still on watch',
-                color: AppTheme.warningColor,
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final Widget child;
-  final Widget? trailing;
-
-  const _SectionCard({required this.title, required this.child, this.trailing});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ),
-                if (trailing != null) trailing!,
-              ],
-            ),
-            const SizedBox(height: 10),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AudioPlayerCard extends ConsumerStatefulWidget {
-  final VoiceMemo memo;
-  final bool compact;
-  final bool alignRight;
-
-  const _AudioPlayerCard({
-    required this.memo,
-    this.compact = false,
-    this.alignRight = false,
-  });
-
-  @override
-  ConsumerState<_AudioPlayerCard> createState() => _AudioPlayerCardState();
-}
-
-class _AudioPlayerCardState extends ConsumerState<_AudioPlayerCard> {
-  AudioPlayer? _player;
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  bool _isPlaying = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _initPlayer();
-  }
-
-  Future<void> _initPlayer() async {
-    final path = widget.memo.convertedFilePath ?? widget.memo.localFilePath;
-    if (path == null || !File(path).existsSync()) {
-      setState(() => _error = 'Audio file not found');
-      return;
-    }
-
-    try {
-      _player = AudioPlayer();
-      final duration = await _player!.setFilePath(path);
-      if (duration != null && mounted) {
-        setState(() => _duration = duration);
-      }
-
-      _player!.positionStream.listen((position) {
-        if (mounted) {
-          setState(() => _position = position);
-        }
-      });
-
-      _player!.playerStateStream.listen((state) {
-        if (!mounted) {
-          return;
-        }
-        setState(() => _isPlaying = state.playing);
-        if (state.processingState == ProcessingState.completed) {
-          _player!.seek(Duration.zero);
-          _player!.pause();
-        }
-      });
-    } catch (error) {
-      if (mounted) {
-        setState(() => _error = 'Failed to load audio: $error');
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _player?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_error != null) {
-      return Text(_error!, style: const TextStyle(color: AppTheme.errorColor));
-    }
-
-    return Column(
-      crossAxisAlignment: widget.alignRight
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: widget.alignRight
-              ? MainAxisAlignment.end
-              : MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              constraints: BoxConstraints.tightFor(
-                width: widget.compact ? 30 : 36,
-                height: widget.compact ? 30 : 36,
-              ),
-              onPressed: () {
-                final next = _position - const Duration(seconds: 10);
-                _player?.seek(next < Duration.zero ? Duration.zero : next);
-              },
-              icon: const Icon(Icons.replay_10_rounded),
-            ),
-            SizedBox(width: widget.compact ? 4 : 8),
-            IconButton.filled(
-              style: IconButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                minimumSize: Size(
-                  widget.compact ? 34 : 40,
-                  widget.compact ? 34 : 40,
-                ),
-                padding: EdgeInsets.zero,
-              ),
-              iconSize: widget.compact ? 24 : 28,
-              onPressed: () {
-                if (_isPlaying) {
-                  _player?.pause();
-                } else {
-                  _player?.play();
-                }
-              },
-              icon: Icon(
-                _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              ),
-            ),
-            SizedBox(width: widget.compact ? 4 : 8),
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              constraints: BoxConstraints.tightFor(
-                width: widget.compact ? 30 : 36,
-                height: widget.compact ? 30 : 36,
-              ),
-              onPressed: () {
-                final next = _position + const Duration(seconds: 10);
-                _player?.seek(next > _duration ? _duration : next);
-              },
-              icon: const Icon(Icons.forward_10_rounded),
-            ),
-          ],
-        ),
-        SizedBox(height: widget.compact ? 4 : AppTheme.spacingSm),
-        Row(
-          children: [
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
+          ),
+          FilledButton.icon(
+            style: _compactFilledButtonStyle(),
+            onPressed: isConnected
+                ? () => ref.read(voiceMemoActionsProvider.notifier).sync()
+                : null,
+            icon: const Icon(Icons.sync),
+            label: const Text('Sync now'),
+          ),
+          if (!isConnected) ...[
+            const SizedBox(height: 6),
             Text(
-              _formatDuration(_position),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            Expanded(
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: widget.compact ? 2 : null,
-                  thumbShape: RoundSliderThumbShape(
-                    enabledThumbRadius: widget.compact ? 5 : 8,
-                  ),
-                  overlayShape: RoundSliderOverlayShape(
-                    overlayRadius: widget.compact ? 10 : 16,
-                  ),
-                ),
-                child: Slider(
-                  padding: widget.compact ? EdgeInsets.zero : null,
-                  value: _duration.inMilliseconds == 0
-                      ? 0
-                      : _position.inMilliseconds
-                            .clamp(0, _duration.inMilliseconds)
-                            .toDouble(),
-                  max: _duration.inMilliseconds == 0
-                      ? 1
-                      : _duration.inMilliseconds.toDouble(),
-                  onChanged: (value) =>
-                      _player?.seek(Duration(milliseconds: value.toInt())),
-                ),
+              'Connect to your watch to sync this note.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.textSecondary,
               ),
             ),
-            Text(
-              _formatDuration(_duration),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
           ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -2234,7 +2650,7 @@ class _TranscribeButton extends ConsumerWidget {
             child: OutlinedButton.icon(
               style: _compactOutlinedButtonStyle(),
               icon: const Icon(Icons.settings, size: 18),
-              label: const Text('Set up transcription model'),
+              label: const Text('Set up transcription'),
               onPressed: () => context.push(AppRoutes.settings),
             ),
           );
@@ -2285,147 +2701,7 @@ class _TranscribeButton extends ConsumerWidget {
         );
       },
       loading: () => const SizedBox.shrink(),
-      error: (_, _) => engineStateAsync.when(
-        data: (engineState) {
-          final isTranscribing =
-              engineState.status == TranscriptionEngineStatus.transcribing;
-
-          return _ButtonBox(
-            expand: expand,
-            child: OutlinedButton.icon(
-              style: _compactOutlinedButtonStyle(),
-              icon: isTranscribing
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.transcribe),
-              label: Text(
-                isTranscribing
-                    ? 'Transcribing...'
-                    : (memo.transcription == null
-                          ? 'Transcribe'
-                          : 'Re-transcribe'),
-              ),
-              onPressed: isTranscribing
-                  ? null
-                  : () => ref
-                        .read(voiceMemoActionsProvider.notifier)
-                        .retranscribe(memo),
-            ),
-          );
-        },
-        loading: () => const SizedBox.shrink(),
-        error: (_, _) => _ButtonBox(
-          expand: expand,
-          child: OutlinedButton.icon(
-            style: _compactOutlinedButtonStyle(),
-            icon: const Icon(Icons.transcribe, size: 18),
-            label: Text(
-              memo.transcription == null ? 'Transcribe' : 'Re-transcribe',
-            ),
-            onPressed: () =>
-                ref.read(voiceMemoActionsProvider.notifier).retranscribe(memo),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SyncPromptCard extends ConsumerWidget {
-  final VoiceMemo memo;
-  final bool compact;
-  final bool alignRight;
-
-  const _SyncPromptCard({
-    required this.memo,
-    this.compact = false,
-    this.alignRight = false,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isConnected = ref.watch(isWatchConnectedProvider);
-    final syncStateAsync = ref.watch(voiceMemoSyncStateProvider);
-
-    return Column(
-      crossAxisAlignment: alignRight
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(compact ? 6 : AppTheme.spacingSm),
-          decoration: BoxDecoration(
-            color: Colors.orange.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.cloud_download_outlined, color: Colors.orange),
-              SizedBox(width: compact ? 6 : AppTheme.spacingSm),
-              Expanded(
-                child: Text(
-                  'This note is still on the watch. Sync it to enable playback and transcription.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontSize: compact ? 11 : null,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: compact ? 8 : AppTheme.spacingMd),
-        syncStateAsync.when(
-          data: (state) {
-            if (!state.isSyncing) {
-              return const SizedBox.shrink();
-            }
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: compact ? 8 : AppTheme.spacingMd,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const LinearProgressIndicator(),
-                  const SizedBox(height: AppTheme.spacingXs),
-                  Text(
-                    'Syncing in progress...',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            );
-          },
-          loading: () => const SizedBox.shrink(),
-          error: (_, _) => const SizedBox.shrink(),
-        ),
-        SizedBox(
-          width: compact && alignRight ? null : double.infinity,
-          child: FilledButton.icon(
-            style: _compactFilledButtonStyle(),
-            onPressed: isConnected
-                ? () => ref.read(voiceMemoActionsProvider.notifier).sync()
-                : null,
-            icon: const Icon(Icons.sync),
-            label: const Text('Sync now'),
-          ),
-        ),
-        if (!isConnected) ...[
-          SizedBox(height: compact ? 6 : AppTheme.spacingSm),
-          Text(
-            'Connect to your watch to sync this note.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
-              fontSize: compact ? 11 : null,
-            ),
-          ),
-        ],
-      ],
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }
@@ -2446,6 +2722,8 @@ class _ButtonBox extends StatelessWidget {
   }
 }
 
+// ─── Shared helpers ──────────────────────────────────────────────────────
+
 class _VoiceMemoTimelineSection {
   final String label;
   final List<VoiceMemo> memos;
@@ -2453,12 +2731,57 @@ class _VoiceMemoTimelineSection {
   const _VoiceMemoTimelineSection({required this.label, required this.memos});
 }
 
-List<VoiceMemo> _filterMemos(List<VoiceMemo> memos, String query) {
-  if (query.isEmpty) {
-    return memos;
+List<VoiceMemo> _applyFilters(
+  List<VoiceMemo> memos,
+  _NoteFilter filter,
+  String query,
+  Map<int, Set<String>> actionTypesMap,
+) {
+  var result = memos;
+
+  // Apply filter
+  result = switch (filter) {
+    _NoteFilter.all => result.where((m) => !m.archived).toList(),
+    _NoteFilter.notes => result.where((m) {
+        if (m.archived) return false;
+        // Exclude memos that have any reminder/timer/alarm actions
+        final types = actionTypesMap[m.id];
+        if (types != null &&
+            types.any((t) => t == 'alarm' || t == 'timer' || t == 'reminder')) {
+          return false;
+        }
+        return true;
+      }).toList(),
+    _NoteFilter.tasks => result
+        .where((m) {
+          if (m.archived) return false;
+          final types = actionTypesMap[m.id];
+          return types != null && types.any((t) => t == 'task' || t == 'calendar_event');
+        })
+        .toList(),
+    _NoteFilter.reminders => result
+        .where((m) {
+          if (m.archived) return false;
+          final types = actionTypesMap[m.id];
+          return types != null && types.contains('reminder');
+        })
+        .toList(),
+    _NoteFilter.timersAlarms => result
+        .where((m) {
+          if (m.archived) return false;
+          final types = actionTypesMap[m.id];
+          return types != null && types.any((t) => t == 'alarm' || t == 'timer');
+        })
+        .toList(),
+    _NoteFilter.archived => result.where((m) => m.archived).toList(),
+  };
+
+  // Apply search query
+  if (query.isNotEmpty) {
+    result = result.where((memo) => _matchesQuery(memo, query)).toList();
   }
 
-  return memos.where((memo) => _matchesQuery(memo, query)).toList();
+  return result;
 }
 
 List<_VoiceMemoTimelineSection> _groupMemosByDay(List<VoiceMemo> memos) {

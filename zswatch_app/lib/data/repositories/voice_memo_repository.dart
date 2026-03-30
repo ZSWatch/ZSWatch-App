@@ -173,6 +173,14 @@ class VoiceMemoRepository extends BaseRepository<VoiceMemo, VoiceMemoEntity> {
     return entities.map(_entityToModel).toList();
   }
 
+  /// Toggle the archived state of a voice memo
+  Future<void> setArchived({
+    required String filename,
+    required bool archived,
+  }) async {
+    await _db.updateVoiceMemoArchived(filename: filename, archived: archived);
+  }
+
   /// Delete a voice memo by filename (deletes local files and DB entry)
   Future<void> deleteMemo(String filename) async {
     // Get the memo first so we can clean up local files
@@ -242,6 +250,7 @@ class VoiceMemoRepository extends BaseRepository<VoiceMemo, VoiceMemoEntity> {
       taskCreated: entity.taskCreated,
       calendarEventCreated: entity.calendarEventCreated,
       actionReviewState: entity.actionReviewState,
+      archived: entity.archived,
     );
   }
 }
