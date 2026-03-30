@@ -120,6 +120,10 @@ class ExtractedActionOperations {
   Future<void> dismissAction(int actionId) {
     return _actionRepository.dismiss(actionId);
   }
+
+  Future<void> deleteAction(int actionId) {
+    return _actionRepository.deleteAction(actionId);
+  }
 }
 
 final extractedActionOperationsProvider = Provider<ExtractedActionOperations>((
@@ -228,4 +232,18 @@ final extractedActionsForMemoProvider =
     StreamProvider.family<List<ExtractedAction>, int>((ref, memoId) {
       final repo = ref.watch(extractedActionRepositoryProvider);
       return repo.watchActionsForMemo(memoId);
+    });
+
+/// Watch all alarm and timer extracted actions (for iOS Alarms & Timers page)
+final alarmTimerActionsProvider =
+    StreamProvider<List<ExtractedAction>>((ref) {
+      final repo = ref.watch(extractedActionRepositoryProvider);
+      return repo.watchAlarmTimerActions();
+    });
+
+/// Map of memoId → set of action type strings (for list filtering)
+final memoActionTypesMapProvider =
+    StreamProvider<Map<int, Set<String>>>((ref) {
+      final repo = ref.watch(extractedActionRepositoryProvider);
+      return repo.watchMemoActionTypesMap();
     });

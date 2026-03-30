@@ -2704,6 +2704,21 @@ class $VoiceMemosTable extends VoiceMemos
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _archivedMeta = const VerificationMeta(
+    'archived',
+  );
+  @override
+  late final GeneratedColumn<bool> archived = GeneratedColumn<bool>(
+    'archived',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("archived" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2726,6 +2741,7 @@ class $VoiceMemosTable extends VoiceMemos
     taskCreated,
     calendarEventCreated,
     actionReviewState,
+    archived,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2903,6 +2919,12 @@ class $VoiceMemosTable extends VoiceMemos
         ),
       );
     }
+    if (data.containsKey('archived')) {
+      context.handle(
+        _archivedMeta,
+        archived.isAcceptableOrUnknown(data['archived']!, _archivedMeta),
+      );
+    }
     return context;
   }
 
@@ -2992,6 +3014,10 @@ class $VoiceMemosTable extends VoiceMemos
         DriftSqlType.string,
         data['${effectivePrefix}action_review_state'],
       ),
+      archived: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}archived'],
+      )!,
     );
   }
 
@@ -3062,6 +3088,9 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
 
   /// Review state for extracted actions: 'pending', 'reviewed', 'dismissed'
   final String? actionReviewState;
+
+  /// Whether this memo has been archived by the user
+  final bool archived;
   const VoiceMemoEntity({
     required this.id,
     required this.filename,
@@ -3083,6 +3112,7 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
     required this.taskCreated,
     required this.calendarEventCreated,
     this.actionReviewState,
+    required this.archived,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3129,6 +3159,7 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
     if (!nullToAbsent || actionReviewState != null) {
       map['action_review_state'] = Variable<String>(actionReviewState);
     }
+    map['archived'] = Variable<bool>(archived);
     return map;
   }
 
@@ -3176,6 +3207,7 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
       actionReviewState: actionReviewState == null && nullToAbsent
           ? const Value.absent()
           : Value(actionReviewState),
+      archived: Value(archived),
     );
   }
 
@@ -3211,6 +3243,7 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
       actionReviewState: serializer.fromJson<String?>(
         json['actionReviewState'],
       ),
+      archived: serializer.fromJson<bool>(json['archived']),
     );
   }
   @override
@@ -3237,6 +3270,7 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
       'taskCreated': serializer.toJson<bool>(taskCreated),
       'calendarEventCreated': serializer.toJson<bool>(calendarEventCreated),
       'actionReviewState': serializer.toJson<String?>(actionReviewState),
+      'archived': serializer.toJson<bool>(archived),
     };
   }
 
@@ -3261,6 +3295,7 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
     bool? taskCreated,
     bool? calendarEventCreated,
     Value<String?> actionReviewState = const Value.absent(),
+    bool? archived,
   }) => VoiceMemoEntity(
     id: id ?? this.id,
     filename: filename ?? this.filename,
@@ -3296,6 +3331,7 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
     actionReviewState: actionReviewState.present
         ? actionReviewState.value
         : this.actionReviewState,
+    archived: archived ?? this.archived,
   );
   VoiceMemoEntity copyWithCompanion(VoiceMemosCompanion data) {
     return VoiceMemoEntity(
@@ -3347,6 +3383,7 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
       actionReviewState: data.actionReviewState.present
           ? data.actionReviewState.value
           : this.actionReviewState,
+      archived: data.archived.present ? data.archived.value : this.archived,
     );
   }
 
@@ -3372,13 +3409,14 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
           ..write('aiProcessedAt: $aiProcessedAt, ')
           ..write('taskCreated: $taskCreated, ')
           ..write('calendarEventCreated: $calendarEventCreated, ')
-          ..write('actionReviewState: $actionReviewState')
+          ..write('actionReviewState: $actionReviewState, ')
+          ..write('archived: $archived')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     filename,
     timestampUtc,
@@ -3399,7 +3437,8 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
     taskCreated,
     calendarEventCreated,
     actionReviewState,
-  );
+    archived,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3423,7 +3462,8 @@ class VoiceMemoEntity extends DataClass implements Insertable<VoiceMemoEntity> {
           other.aiProcessedAt == this.aiProcessedAt &&
           other.taskCreated == this.taskCreated &&
           other.calendarEventCreated == this.calendarEventCreated &&
-          other.actionReviewState == this.actionReviewState);
+          other.actionReviewState == this.actionReviewState &&
+          other.archived == this.archived);
 }
 
 class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
@@ -3447,6 +3487,7 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
   final Value<bool> taskCreated;
   final Value<bool> calendarEventCreated;
   final Value<String?> actionReviewState;
+  final Value<bool> archived;
   const VoiceMemosCompanion({
     this.id = const Value.absent(),
     this.filename = const Value.absent(),
@@ -3468,6 +3509,7 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
     this.taskCreated = const Value.absent(),
     this.calendarEventCreated = const Value.absent(),
     this.actionReviewState = const Value.absent(),
+    this.archived = const Value.absent(),
   });
   VoiceMemosCompanion.insert({
     this.id = const Value.absent(),
@@ -3490,6 +3532,7 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
     this.taskCreated = const Value.absent(),
     this.calendarEventCreated = const Value.absent(),
     this.actionReviewState = const Value.absent(),
+    this.archived = const Value.absent(),
   }) : filename = Value(filename),
        timestampUtc = Value(timestampUtc),
        durationMs = Value(durationMs),
@@ -3515,6 +3558,7 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
     Expression<bool>? taskCreated,
     Expression<bool>? calendarEventCreated,
     Expression<String>? actionReviewState,
+    Expression<bool>? archived,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3538,6 +3582,7 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
       if (calendarEventCreated != null)
         'calendar_event_created': calendarEventCreated,
       if (actionReviewState != null) 'action_review_state': actionReviewState,
+      if (archived != null) 'archived': archived,
     });
   }
 
@@ -3562,6 +3607,7 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
     Value<bool>? taskCreated,
     Value<bool>? calendarEventCreated,
     Value<String?>? actionReviewState,
+    Value<bool>? archived,
   }) {
     return VoiceMemosCompanion(
       id: id ?? this.id,
@@ -3584,6 +3630,7 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
       taskCreated: taskCreated ?? this.taskCreated,
       calendarEventCreated: calendarEventCreated ?? this.calendarEventCreated,
       actionReviewState: actionReviewState ?? this.actionReviewState,
+      archived: archived ?? this.archived,
     );
   }
 
@@ -3652,6 +3699,9 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
     if (actionReviewState.present) {
       map['action_review_state'] = Variable<String>(actionReviewState.value);
     }
+    if (archived.present) {
+      map['archived'] = Variable<bool>(archived.value);
+    }
     return map;
   }
 
@@ -3677,7 +3727,8 @@ class VoiceMemosCompanion extends UpdateCompanion<VoiceMemoEntity> {
           ..write('aiProcessedAt: $aiProcessedAt, ')
           ..write('taskCreated: $taskCreated, ')
           ..write('calendarEventCreated: $calendarEventCreated, ')
-          ..write('actionReviewState: $actionReviewState')
+          ..write('actionReviewState: $actionReviewState, ')
+          ..write('archived: $archived')
           ..write(')'))
         .toString();
   }
@@ -7571,6 +7622,7 @@ typedef $$VoiceMemosTableCreateCompanionBuilder =
       Value<bool> taskCreated,
       Value<bool> calendarEventCreated,
       Value<String?> actionReviewState,
+      Value<bool> archived,
     });
 typedef $$VoiceMemosTableUpdateCompanionBuilder =
     VoiceMemosCompanion Function({
@@ -7594,6 +7646,7 @@ typedef $$VoiceMemosTableUpdateCompanionBuilder =
       Value<bool> taskCreated,
       Value<bool> calendarEventCreated,
       Value<String?> actionReviewState,
+      Value<bool> archived,
     });
 
 class $$VoiceMemosTableFilterComposer
@@ -7702,6 +7755,11 @@ class $$VoiceMemosTableFilterComposer
 
   ColumnFilters<String> get actionReviewState => $composableBuilder(
     column: $table.actionReviewState,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get archived => $composableBuilder(
+    column: $table.archived,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -7814,6 +7872,11 @@ class $$VoiceMemosTableOrderingComposer
     column: $table.actionReviewState,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get archived => $composableBuilder(
+    column: $table.archived,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$VoiceMemosTableAnnotationComposer
@@ -7912,6 +7975,9 @@ class $$VoiceMemosTableAnnotationComposer
     column: $table.actionReviewState,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get archived =>
+      $composableBuilder(column: $table.archived, builder: (column) => column);
 }
 
 class $$VoiceMemosTableTableManager
@@ -7965,6 +8031,7 @@ class $$VoiceMemosTableTableManager
                 Value<bool> taskCreated = const Value.absent(),
                 Value<bool> calendarEventCreated = const Value.absent(),
                 Value<String?> actionReviewState = const Value.absent(),
+                Value<bool> archived = const Value.absent(),
               }) => VoiceMemosCompanion(
                 id: id,
                 filename: filename,
@@ -7986,6 +8053,7 @@ class $$VoiceMemosTableTableManager
                 taskCreated: taskCreated,
                 calendarEventCreated: calendarEventCreated,
                 actionReviewState: actionReviewState,
+                archived: archived,
               ),
           createCompanionCallback:
               ({
@@ -8009,6 +8077,7 @@ class $$VoiceMemosTableTableManager
                 Value<bool> taskCreated = const Value.absent(),
                 Value<bool> calendarEventCreated = const Value.absent(),
                 Value<String?> actionReviewState = const Value.absent(),
+                Value<bool> archived = const Value.absent(),
               }) => VoiceMemosCompanion.insert(
                 id: id,
                 filename: filename,
@@ -8030,6 +8099,7 @@ class $$VoiceMemosTableTableManager
                 taskCreated: taskCreated,
                 calendarEventCreated: calendarEventCreated,
                 actionReviewState: actionReviewState,
+                archived: archived,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

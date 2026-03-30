@@ -72,6 +72,7 @@ abstract class VoiceMemo with _$VoiceMemo {
     @Default(false) bool taskCreated,
     @Default(false) bool calendarEventCreated,
     String? actionReviewState,
+    @Default(false) bool archived,
   }) = _VoiceMemo;
 
   /// Computed sync status based on field values

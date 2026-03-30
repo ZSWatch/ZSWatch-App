@@ -84,9 +84,32 @@ class ExtractedActionRepository
     await _db.dismissExtractedAction(actionId);
   }
 
+  /// Delete a single extracted action by id
+  Future<void> deleteAction(int actionId) async {
+    await _db.deleteExtractedAction(actionId);
+  }
+
   /// Delete all actions for a memo
   Future<void> deleteActionsForMemo(int memoId) async {
     await _db.deleteActionsForMemo(memoId);
+  }
+
+  /// Watch all alarm and timer actions (reactive stream, for iOS page)
+  Stream<List<ExtractedAction>> watchAlarmTimerActions() {
+    return _db
+        .watchAlarmTimerActions()
+        .map((entities) => entities.map(_entityToModel).toList());
+  }
+
+  /// Watch a map of memoId → set of action types (for list filtering)
+  Stream<Map<int, Set<String>>> watchMemoActionTypesMap() {
+    return _db.watchAllExtractedActions().map((entities) {
+      final map = <int, Set<String>>{};
+      for (final e in entities) {
+        map.putIfAbsent(e.memoId, () => {}).add(e.actionType);
+      }
+      return map;
+    });
   }
 
   // ==================== Private Helpers ====================

@@ -80,4 +80,8 @@ class VoiceMemos extends Table {
   /// Review state for extracted actions: 'pending', 'reviewed', 'dismissed'
   TextColumn get actionReviewState =>
       text().nullable().named('action_review_state')();
+
+  /// Whether this memo has been archived by the user
+  BoolColumn get archived =>
+      boolean().withDefault(const Constant(false))();
 }

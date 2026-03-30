@@ -385,6 +385,11 @@ class VoiceMemoActionsNotifier extends StateNotifier<VoiceMemoActionState> {
     }
   }
 
+  /// Toggle archive state for a voice memo
+  Future<void> setArchived(String filename, {required bool archived}) async {
+    await _repository.setArchived(filename: filename, archived: archived);
+  }
+
   /// Delete a voice memo locally
   Future<void> delete(String filename) async {
     state = VoiceMemoActionState.loading(

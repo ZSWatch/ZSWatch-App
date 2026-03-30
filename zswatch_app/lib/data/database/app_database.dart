@@ -41,7 +41,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Database schema version
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -61,6 +61,10 @@ class AppDatabase extends _$AppDatabase {
         if (from < 4) {
           // v3 → v4: added duration_seconds column to extracted_actions.
           await m.addColumn(extractedActions, extractedActions.durationSeconds);
+        }
+        if (from < 5) {
+          // v4 → v5: added archived column to voice_memos.
+          await m.addColumn(voiceMemos, voiceMemos.archived);
         }
       },
       beforeOpen: (details) async {
@@ -542,6 +546,15 @@ class AppDatabase extends _$AppDatabase {
         .write(const VoiceMemosCompanion(calendarEventCreated: Value(true)));
   }
 
+  /// Set the archived flag for a voice memo
+  Future<void> updateVoiceMemoArchived({
+    required String filename,
+    required bool archived,
+  }) {
+    return (update(voiceMemos)..where((v) => v.filename.equals(filename)))
+        .write(VoiceMemosCompanion(archived: Value(archived)));
+  }
+
   /// Delete a voice memo by filename
   Future<int> deleteVoiceMemo(String filename) {
     return (delete(voiceMemos)..where((v) => v.filename.equals(filename))).go();
@@ -604,6 +617,32 @@ class AppDatabase extends _$AppDatabase {
     return (select(
       extractedActions,
     )..where((a) => a.created.equals(false) & a.dismissed.equals(false))).get();
+  }
+
+  /// Delete a single extracted action by id
+  Future<int> deleteExtractedAction(int actionId) {
+    return (delete(extractedActions)..where((a) => a.id.equals(actionId))).go();
+  }
+
+  /// Watch all alarm and timer extracted actions (reactive stream)
+  Stream<List<ExtractedActionEntity>> watchAlarmTimerActions() {
+    return (select(extractedActions)
+          ..where(
+            (a) =>
+                a.actionType.equals('alarm') | a.actionType.equals('timer'),
+          )
+          ..orderBy([
+            (a) => OrderingTerm.asc(a.created),
+            (a) => OrderingTerm.desc(a.id),
+          ]))
+        .watch();
+  }
+
+  /// Watch all extracted actions (for building memo→actionTypes map)
+  Stream<List<ExtractedActionEntity>> watchAllExtractedActions() {
+    return (select(extractedActions)
+          ..orderBy([(a) => OrderingTerm.desc(a.id)]))
+        .watch();
   }
 
   // ==================== Crash Report Operations ====================
