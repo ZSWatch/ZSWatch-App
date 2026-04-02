@@ -82,6 +82,5 @@ class VoiceMemos extends Table {
       text().nullable().named('action_review_state')();
 
   /// Whether this memo has been archived by the user
-  BoolColumn get archived =>
-      boolean().withDefault(const Constant(false))();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
 }

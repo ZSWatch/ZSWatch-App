@@ -249,11 +249,11 @@ Future<void> _autoCreateActionsForMemo({
     for (final action in pending) {
       // Notes (tasks without time) are app-internal only — never auto-create.
       // Tasks/reminders require a scheduled time — skip if missing.
-      final isNote = action.actionType == ExtractedActionType.task &&
+      final isNote =
+          action.actionType == ExtractedActionType.task &&
           action.startTime == null &&
           action.dueDate == null;
-      final requiresDate =
-          action.actionType == ExtractedActionType.reminder;
+      final requiresDate = action.actionType == ExtractedActionType.reminder;
       if (isNote ||
           (requiresDate &&
               action.startTime == null &&

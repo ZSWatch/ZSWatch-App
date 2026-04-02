@@ -235,15 +235,13 @@ final extractedActionsForMemoProvider =
     });
 
 /// Watch all alarm and timer extracted actions (for iOS Alarms & Timers page)
-final alarmTimerActionsProvider =
-    StreamProvider<List<ExtractedAction>>((ref) {
-      final repo = ref.watch(extractedActionRepositoryProvider);
-      return repo.watchAlarmTimerActions();
-    });
+final alarmTimerActionsProvider = StreamProvider<List<ExtractedAction>>((ref) {
+  final repo = ref.watch(extractedActionRepositoryProvider);
+  return repo.watchAlarmTimerActions();
+});
 
 /// Map of memoId → set of action type strings (for list filtering)
-final memoActionTypesMapProvider =
-    StreamProvider<Map<int, Set<String>>>((ref) {
-      final repo = ref.watch(extractedActionRepositoryProvider);
-      return repo.watchMemoActionTypesMap();
-    });
+final memoActionTypesMapProvider = StreamProvider<Map<int, Set<String>>>((ref) {
+  final repo = ref.watch(extractedActionRepositoryProvider);
+  return repo.watchMemoActionTypesMap();
+});

@@ -8,7 +8,8 @@ class CorrectionPromptTemplate {
 
   static const String promptPlaceholderTranscript = '{{transcript}}';
 
-  static const String defaultTemplate = '''
+  static const String defaultTemplate =
+      '''
 Fix speech-to-text errors. Output ONLY the corrected text.
 
 IMPORTANT: NEVER translate. The output language MUST be the same as the input language. Swedish input → Swedish output. German input → German output.
@@ -37,10 +38,7 @@ Input: "$promptPlaceholderTranscript"
 Output:''';
 
   /// Render the correction prompt with the given [transcript].
-  static String render(
-    String template, {
-    required String transcript,
-  }) {
+  static String render(String template, {required String transcript}) {
     return template.replaceAll(promptPlaceholderTranscript, transcript);
   }
 

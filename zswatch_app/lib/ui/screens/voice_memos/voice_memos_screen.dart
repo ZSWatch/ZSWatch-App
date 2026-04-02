@@ -86,7 +86,8 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
       transcriptionConfiguredProvider,
     );
     final isConnected = ref.watch(isWatchConnectedProvider);
-    final actionTypesMap = ref.watch(memoActionTypesMapProvider).valueOrNull ?? {};
+    final actionTypesMap =
+        ref.watch(memoActionTypesMapProvider).valueOrNull ?? {};
     return Scaffold(
       appBar: AppBar(
         title: const Text('Voice Notes'),
@@ -244,7 +245,12 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
           // Count + sort info
           memosAsync.when(
             data: (memos) {
-              final filtered = _applyFilters(memos, _filter, _query, actionTypesMap);
+              final filtered = _applyFilters(
+                memos,
+                _filter,
+                _query,
+                actionTypesMap,
+              );
               final label = _filter == _NoteFilter.archived
                   ? '${filtered.length} archived'
                   : '${filtered.length} active notes';
@@ -286,7 +292,12 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
           Expanded(
             child: memosAsync.when(
               data: (memos) {
-                final filteredMemos = _applyFilters(memos, _filter, _query, actionTypesMap);
+                final filteredMemos = _applyFilters(
+                  memos,
+                  _filter,
+                  _query,
+                  actionTypesMap,
+                );
 
                 return RefreshIndicator(
                   onRefresh: () =>
@@ -479,8 +490,10 @@ class _VoiceMemoDetailScreenState extends ConsumerState<VoiceMemoDetailScreen> {
                     children: [
                       Icon(Icons.delete_outline, color: AppTheme.errorColor),
                       SizedBox(width: 8),
-                      Text('Delete',
-                          style: TextStyle(color: AppTheme.errorColor)),
+                      Text(
+                        'Delete',
+                        style: TextStyle(color: AppTheme.errorColor),
+                      ),
                     ],
                   ),
                 ),
@@ -634,13 +647,12 @@ class _DetailMetaLine extends StatelessWidget {
       runSpacing: 6,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (memo.aiCategory != null)
-          _CategoryBadge(category: memo.aiCategory!),
+        if (memo.aiCategory != null) _CategoryBadge(category: memo.aiCategory!),
         Text(
           '$dateStr · ${memo.formattedDuration} · ${memo.formattedSize}',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: AppTheme.textSecondary,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
         ),
       ],
     );
@@ -737,8 +749,7 @@ class _InlineTranscript extends ConsumerWidget {
               color: AppTheme.textSecondary,
             ),
           ),
-          if (aiEnabled &&
-              memo.summary == null) ...[
+          if (aiEnabled && memo.summary == null) ...[
             const SizedBox(height: 8),
             OutlinedButton.icon(
               style: _compactOutlinedButtonStyle(),
@@ -811,8 +822,9 @@ class _InlineTranscript extends ConsumerWidget {
             const SizedBox(width: AppTheme.spacingSm),
             Text(
               'Processing with AI...',
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: AppTheme.textSecondary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
             ),
             const Spacer(),
             const Icon(
@@ -831,8 +843,9 @@ class _InlineTranscript extends ConsumerWidget {
       children: [
         Text(
           'AI processing failed.',
-          style: Theme.of(context).textTheme.bodyMedium
-              ?.copyWith(color: AppTheme.errorColor),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppTheme.errorColor),
         ),
         const SizedBox(width: 8),
         OutlinedButton.icon(
@@ -878,14 +891,10 @@ class _QuickStatusChips extends StatelessWidget {
       runSpacing: 6,
       children: [
         if (memo.isAiProcessed) _statusChip(context, 'AI processed'),
-        if (memo.syncedFromWatch)
-          _statusChip(context, 'Synced from watch'),
-        if (hasLocalAudio(memo))
-          _statusChip(context, 'Stored on phone'),
-        if (!memo.deletedOnWatch)
-          _statusChip(context, 'On watch'),
-        if (memo.archived)
-          _statusChip(context, 'Archived'),
+        if (memo.syncedFromWatch) _statusChip(context, 'Synced from watch'),
+        if (hasLocalAudio(memo)) _statusChip(context, 'Stored on phone'),
+        if (!memo.deletedOnWatch) _statusChip(context, 'On watch'),
+        if (memo.archived) _statusChip(context, 'Archived'),
       ],
     );
   }
@@ -947,8 +956,7 @@ class _AudioPlayerBarState extends ConsumerState<_AudioPlayerBar> {
   }
 
   Future<void> _initPlayer() async {
-    final path =
-        widget.memo.convertedFilePath ?? widget.memo.localFilePath;
+    final path = widget.memo.convertedFilePath ?? widget.memo.localFilePath;
     if (path == null || !File(path).existsSync()) {
       setState(() => _error = 'Audio file not found');
       return;
@@ -1032,9 +1040,7 @@ class _AudioPlayerBarState extends ConsumerState<_AudioPlayerBar> {
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 3,
-                thumbShape: const RoundSliderThumbShape(
-                  enabledThumbRadius: 6,
-                ),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
               ),
               child: Slider(
@@ -1055,9 +1061,9 @@ class _AudioPlayerBarState extends ConsumerState<_AudioPlayerBar> {
           const SizedBox(width: 8),
           Text(
             '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.textSecondary,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
           ),
         ],
       ),
@@ -1118,8 +1124,7 @@ class _MicroTools extends ConsumerWidget {
                 isScrollControlled: true,
                 backgroundColor: AppTheme.elevatedSurfaceColor,
                 shape: const RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 ),
                 builder: (context) => DraggableScrollableSheet(
                   initialChildSize: 0.75,
@@ -1194,11 +1199,12 @@ class _BottomToolbar extends ConsumerWidget {
               ),
               visualDensity: VisualDensity.compact,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               minimumSize: const Size(0, 34),
-              textStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              textStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             onPressed: onDelete,
             child: const Text('Delete'),
@@ -1354,108 +1360,106 @@ class _ActionCardState extends ConsumerState<_ActionCard> {
             Container(width: 4, color: _accentColor),
             // Content
             Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: AppTheme.textSecondary.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          _actionTypeIcon(action.actionType),
-                          size: 16,
-                          color: _accentColor,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _actionDisplayTitle(action),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w800),
-                            ),
-                            if (_timingLabel(action) case final timing?)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 3),
-                                child: Text(
-                                  timing,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color: AppTheme.textSecondary,
-                                      ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      _ActionStatusBadge(action: action),
-                    ],
-                  ),
-                  if (action.notes != null &&
-                      action.notes!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      action.notes!.trim(),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  ],
-                  // Action buttons
-                  if (action.actionType != ExtractedActionType.task ||
-                      action.startTime != null ||
-                      action.dueDate != null ||
-                      action.durationSeconds != null) ...[
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: AppTheme.spacingSm,
-                      runSpacing: AppTheme.spacingSm,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (!action.created && !action.dismissed)
-                          FilledButton(
-                            style: _compactFilledButtonStyle(),
-                            onPressed: _isCreating ? null : _createAction,
-                            child: Text(
-                              _isCreating
-                                  ? 'Creating...'
-                                  : _createLabel(action),
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: AppTheme.textSecondary.withValues(
+                              alpha: 0.06,
                             ),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                        if (!action.created && !action.dismissed)
-                          OutlinedButton(
-                            style: _compactOutlinedWarnStyle(),
-                            onPressed: _isDismissing ? null : _dismissAction,
-                            child: const Text('Dismiss'),
+                          child: Icon(
+                            _actionTypeIcon(action.actionType),
+                            size: 16,
+                            color: _accentColor,
                           ),
-                        if (action.created && action.platformTargetId != null)
-                          OutlinedButton(
-                            style: _compactOutlinedButtonStyle(),
-                            onPressed: _isOpening ? null : _openCreatedAction,
-                            child: const Text('Open'),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _actionDisplayTitle(action),
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                              if (_timingLabel(action) case final timing?)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 3),
+                                  child: Text(
+                                    timing,
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: AppTheme.textSecondary,
+                                        ),
+                                  ),
+                                ),
+                            ],
                           ),
+                        ),
+                        _ActionStatusBadge(action: action),
                       ],
                     ),
+                    if (action.notes != null &&
+                        action.notes!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        action.notes!.trim(),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                    // Action buttons
+                    if (action.actionType != ExtractedActionType.task ||
+                        action.startTime != null ||
+                        action.dueDate != null ||
+                        action.durationSeconds != null) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: AppTheme.spacingSm,
+                        runSpacing: AppTheme.spacingSm,
+                        children: [
+                          if (!action.created && !action.dismissed)
+                            FilledButton(
+                              style: _compactFilledButtonStyle(),
+                              onPressed: _isCreating ? null : _createAction,
+                              child: Text(
+                                _isCreating
+                                    ? 'Creating...'
+                                    : _createLabel(action),
+                              ),
+                            ),
+                          if (!action.created && !action.dismissed)
+                            OutlinedButton(
+                              style: _compactOutlinedWarnStyle(),
+                              onPressed: _isDismissing ? null : _dismissAction,
+                              child: const Text('Dismiss'),
+                            ),
+                          if (action.created && action.platformTargetId != null)
+                            OutlinedButton(
+                              style: _compactOutlinedButtonStyle(),
+                              onPressed: _isOpening ? null : _openCreatedAction,
+                              child: const Text('Open'),
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );
@@ -1630,7 +1634,8 @@ class _ActionStatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     // For simple tasks with no timing info, there's nothing to "create"
     // so don't show a misleading "Pending" badge.
-    final isActionable = action.actionType != ExtractedActionType.task ||
+    final isActionable =
+        action.actionType != ExtractedActionType.task ||
         action.startTime != null ||
         action.dueDate != null ||
         action.durationSeconds != null;
@@ -2000,9 +2005,9 @@ class _AiDebugSheet extends ConsumerWidget {
         children: [
           Text(
             info.modelName,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -2232,8 +2237,7 @@ class _AiDebugSheet extends ConsumerWidget {
         if (origWords[i - 1].toLowerCase() == corrWords[j - 1].toLowerCase()) {
           dp[i][j] = dp[i - 1][j - 1] + 1;
         } else {
-          dp[i][j] =
-              dp[i - 1][j] > dp[i][j - 1] ? dp[i - 1][j] : dp[i][j - 1];
+          dp[i][j] = dp[i - 1][j] > dp[i][j - 1] ? dp[i - 1][j] : dp[i][j - 1];
         }
       }
     }
@@ -2482,28 +2486,29 @@ class _VoiceMemoTimeline extends ConsumerWidget {
         ],
         // When showing archived filter only, show them without opacity change
         if (!showArchiveSection)
-          for (final section in _groupMemosByDay(memos.where((m) => m.archived).toList()))
-            ...[
-              Padding(
-                padding: const EdgeInsets.only(
-                  top: AppTheme.spacingSm,
-                  bottom: AppTheme.spacingSm,
-                ),
-                child: Text(
-                  section.label.toUpperCase(),
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
-                  ),
+          for (final section in _groupMemosByDay(
+            memos.where((m) => m.archived).toList(),
+          )) ...[
+            Padding(
+              padding: const EdgeInsets.only(
+                top: AppTheme.spacingSm,
+                bottom: AppTheme.spacingSm,
+              ),
+              child: Text(
+                section.label.toUpperCase(),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
                 ),
               ),
-              for (final memo in section.memos)
-                _MemoCardWithActionCount(
-                  memo: memo,
-                  onOpen: () => onOpenMemo(memo),
-                ),
-            ],
+            ),
+            for (final memo in section.memos)
+              _MemoCardWithActionCount(
+                memo: memo,
+                onOpen: () => onOpenMemo(memo),
+              ),
+          ],
       ],
     );
   }
@@ -2514,10 +2519,7 @@ class _MemoCardWithActionCount extends ConsumerWidget {
   final VoiceMemo memo;
   final VoidCallback onOpen;
 
-  const _MemoCardWithActionCount({
-    required this.memo,
-    required this.onOpen,
-  });
+  const _MemoCardWithActionCount({required this.memo, required this.onOpen});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2571,9 +2573,7 @@ class _SyncPromptCard extends ConsumerWidget {
       decoration: BoxDecoration(
         color: Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.15),
-        ),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2623,9 +2623,9 @@ class _SyncPromptCard extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               'Connect to your watch to sync this note.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
             ),
           ],
         ],
@@ -2746,36 +2746,31 @@ List<VoiceMemo> _applyFilters(
   result = switch (filter) {
     _NoteFilter.all => result.where((m) => !m.archived).toList(),
     _NoteFilter.notes => result.where((m) {
-        if (m.archived) return false;
-        // Exclude memos that have any reminder/timer/alarm actions
-        final types = actionTypesMap[m.id];
-        if (types != null &&
-            types.any((t) => t == 'alarm' || t == 'timer' || t == 'reminder')) {
-          return false;
-        }
-        return true;
-      }).toList(),
-    _NoteFilter.tasks => result
-        .where((m) {
-          if (m.archived) return false;
-          final types = actionTypesMap[m.id];
-          return types != null && types.any((t) => t == 'task' || t == 'calendar_event');
-        })
-        .toList(),
-    _NoteFilter.reminders => result
-        .where((m) {
-          if (m.archived) return false;
-          final types = actionTypesMap[m.id];
-          return types != null && types.contains('reminder');
-        })
-        .toList(),
-    _NoteFilter.timersAlarms => result
-        .where((m) {
-          if (m.archived) return false;
-          final types = actionTypesMap[m.id];
-          return types != null && types.any((t) => t == 'alarm' || t == 'timer');
-        })
-        .toList(),
+      if (m.archived) return false;
+      // Exclude memos that have any reminder/timer/alarm actions
+      final types = actionTypesMap[m.id];
+      if (types != null &&
+          types.any((t) => t == 'alarm' || t == 'timer' || t == 'reminder')) {
+        return false;
+      }
+      return true;
+    }).toList(),
+    _NoteFilter.tasks => result.where((m) {
+      if (m.archived) return false;
+      final types = actionTypesMap[m.id];
+      return types != null &&
+          types.any((t) => t == 'task' || t == 'calendar_event');
+    }).toList(),
+    _NoteFilter.reminders => result.where((m) {
+      if (m.archived) return false;
+      final types = actionTypesMap[m.id];
+      return types != null && types.contains('reminder');
+    }).toList(),
+    _NoteFilter.timersAlarms => result.where((m) {
+      if (m.archived) return false;
+      final types = actionTypesMap[m.id];
+      return types != null && types.any((t) => t == 'alarm' || t == 'timer');
+    }).toList(),
     _NoteFilter.archived => result.where((m) => m.archived).toList(),
   };
 

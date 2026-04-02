@@ -241,7 +241,9 @@ String aiFormatChronoDetails({
         buf.writeln(
           'Original time phrase: ${show(a.datetimeExpressionOriginal)}',
         );
-        buf.writeln('English time phrase: ${show(a.datetimeExpressionEnglish)}');
+        buf.writeln(
+          'English time phrase: ${show(a.datetimeExpressionEnglish)}',
+        );
         buf.writeln('Resolved datetime: ${show(a.resolvedDateTime)}');
         buf.write('Resolver: ${show(a.resolverMethod)}');
       }
