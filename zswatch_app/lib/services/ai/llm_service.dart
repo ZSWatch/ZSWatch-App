@@ -995,6 +995,25 @@ class LlmService {
 
         // Brief pause between inference calls
         await Future<void>.delayed(const Duration(milliseconds: 500));
+
+        // Router detected no meaningful speech — return empty result.
+        if (routeResult == 'none') {
+          debugPrint(
+            '[LlmService] Router returned "none" — no speech detected',
+          );
+          _stateSubject.add(
+            _stateSubject.value.copyWith(status: LlmServiceStatus.ready),
+          );
+          return TranscriptResult(
+            summary: '',
+            category: 'note',
+            actions: [],
+            originalTranscription: transcript,
+            correctedTranscription: correctedTranscription,
+            correctionMetrics: correctionMetrics,
+            actionChronoDetails: [],
+          );
+        }
       }
 
       // --- Step 3: Build the extraction prompt based on route ---
@@ -1113,7 +1132,7 @@ class LlmService {
       final decoded =
           jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
       final route = (decoded['route'] as String?)?.trim().toLowerCase() ?? '';
-      if (const {'timer_alarm', 'voice_memo', 'mixed'}.contains(route)) {
+      if (const {'timer_alarm', 'voice_memo', 'mixed', 'none'}.contains(route)) {
         return route;
       }
       return 'voice_memo';

@@ -63,9 +63,10 @@ class VoiceNoteAiPipeline {
     required String filename,
     required String transcript,
   }) async {
-    if (transcript.trim().isEmpty) {
+    if (transcript.trim().isEmpty ||
+        isNoSpeechTranscript(transcript)) {
       debugPrint(
-        '[VoiceNoteAiPipeline] Skipping empty transcript for $filename',
+        '[VoiceNoteAiPipeline] Skipping empty/no-speech transcript for $filename',
       );
       return false;
     }
@@ -151,6 +152,19 @@ class VoiceNoteAiPipeline {
         'summary="${result.summary}", category=${result.category}, '
         '${result.actions.length} actions',
       );
+
+      // Router or LLM returned nothing useful — treat as no speech.
+      if (result.summary.trim().isEmpty && result.actions.isEmpty) {
+        debugPrint(
+          '[VoiceNoteAiPipeline] No meaningful content for $filename, '
+          'marking as failed',
+        );
+        await _memoRepository.updateProcessingStatus(
+          filename: filename,
+          status: 'failed',
+        );
+        return false;
+      }
 
       // If the LLM corrected the transcription, update the transcript as well
       if (result.correctedTranscription != null &&
@@ -308,6 +322,36 @@ class VoiceNoteAiPipeline {
       default:
         return ExtractedActionType.task;
     }
+  }
+
+  /// Detects common Whisper no-speech / hallucination patterns so we can skip
+  /// LLM inference entirely.
+  @visibleForTesting
+  static bool isNoSpeechTranscript(String transcript) {
+    final t = transcript.trim();
+
+    final lower = t.toLowerCase();
+
+    // Whisper explicit no-speech markers
+    const noSpeechMarkers = [
+      '[blank_audio]',
+      '[no speech]',
+      '<no speech>',
+      '(no speech)',
+      '[silence]',
+      '<|nospeech|>',
+      '[music]',
+      '(music)',
+    ];
+    for (final marker in noSpeechMarkers) {
+      if (lower.contains(marker)) return true;
+    }
+
+    // Pure punctuation / music symbols / whitespace
+    final stripped = t.replaceAll(RegExp(r'[\s\p{P}\p{S}]+', unicode: true), '');
+    if (stripped.isEmpty) return true;
+
+    return false;
   }
 
   DateTime? _tryParseDate(String? value) {
