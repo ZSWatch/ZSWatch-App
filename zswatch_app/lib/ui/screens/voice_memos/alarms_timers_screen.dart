@@ -99,7 +99,8 @@ class AlarmsTimersScreen extends ConsumerWidget {
               // Pending section
               if (pending.isNotEmpty) ...[
                 const _SectionHeader(label: 'Pending from notes'),
-                for (final action in pending) _AlarmTimerCard(action: action),
+                for (final action in pending)
+                  _AlarmTimerCard(key: ValueKey(action.id), action: action),
               ],
 
               // Completed section
@@ -108,7 +109,10 @@ class AlarmsTimersScreen extends ConsumerWidget {
                 for (final action in completed)
                   Opacity(
                     opacity: 0.78,
-                    child: _AlarmTimerCard(action: action),
+                    child: _AlarmTimerCard(
+                      key: ValueKey(action.id),
+                      action: action,
+                    ),
                   ),
               ],
 
@@ -144,7 +148,7 @@ class _SectionHeader extends StatelessWidget {
 
 class _AlarmTimerCard extends ConsumerStatefulWidget {
   final ExtractedAction action;
-  const _AlarmTimerCard({required this.action});
+  const _AlarmTimerCard({super.key, required this.action});
 
   @override
   ConsumerState<_AlarmTimerCard> createState() => _AlarmTimerCardState();
