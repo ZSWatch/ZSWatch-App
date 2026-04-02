@@ -2522,12 +2522,15 @@ class _MemoCardWithActionCount extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final actionsAsync = ref.watch(extractedActionsForMemoProvider(memo.id));
-    final actionCount = actionsAsync.valueOrNull?.length ?? 0;
+    final actions = actionsAsync.valueOrNull ?? [];
+    final actionCount = actions.length;
+    final actionTypes = actions.map((a) => a.actionType).toSet();
 
     return VoiceNoteCard(
       memo: memo,
       onOpen: onOpen,
       extractedActionCount: actionCount,
+      actionTypes: actionTypes,
     );
   }
 }

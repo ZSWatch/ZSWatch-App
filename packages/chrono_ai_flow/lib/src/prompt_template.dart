@@ -19,6 +19,8 @@ The memo may be in ANY language.
 
 Return JSON only. Output MUST start with '[' and end with ']'. No text before or after.
 
+If the memo is noise, gibberish, a silence marker, or contains no meaningful words, return an empty array: []
+
 Your tasks per item:
 1. Detect intent: "reminder", "event", or "note".
 2. Extract the time/date phrase exactly as it appears in the memo.
@@ -122,6 +124,9 @@ Memo: "Bra idé om att lägga till stegräknare i klockan"
 WRONG: [{"intent":"note","title":"add step counter to watch",...}]
 RIGHT: [{"intent":"note","title":"stegräknare i klockan","datetime_expression_original":null,"datetime_expression_english":null}]
 
+Memo: "[NO SPEECH DETECTED]"
+[]
+
 Current datetime: $promptPlaceholderCurrentLocalDateTimeCompact
 Timezone: UTC$promptPlaceholderTimezoneOffset
 
@@ -143,6 +148,8 @@ A memo may contain ONE or MULTIPLE items. Return a JSON array with one object pe
 The memo may be in ANY language.
 
 Return JSON only. Output MUST start with '[' and end with ']'. No text before or after.
+
+If the memo is noise, gibberish, a silence marker, or contains no meaningful words, return an empty array: []
 
 Your tasks per item:
 1. Detect intent: "reminder", "event", or "note".
@@ -203,6 +210,9 @@ Memo: "Ring tandläkaren imorgon klockan 9, köp presenter till kalaset och möt
 Memo: "köp bröd på vägen hem"
 [{"intent":"note","title":"köp bröd","datetime_expression_original":null,"datetime_expression_english":null}]
 
+Memo: "[NO SPEECH DETECTED]"
+[]
+
 Current datetime: $promptPlaceholderCurrentLocalDateTimeCompact
 Timezone: UTC$promptPlaceholderTimezoneOffset
 
@@ -223,12 +233,33 @@ Classify this voice memo. The memo may be in ANY language.
 Output ONLY a JSON object. No other text.
 
 Rules:
-- "timer_alarm" = the memo is about setting a timer, countdown, alarm, or wake-up. No task or action to perform — just ring after a duration or at a time. Examples: "Set a timer for 5 minutes", "Alarm at 7 AM", "Wake me at 6", "Sätt en timer på 10 minuter", "Wecker auf 7 Uhr", "30 minutes", "In 10 minutes".
-- "voice_memo" = anything else: reminders with actions, events, notes, ideas, tasks. Examples: "Remind me in 30 minutes to check the oven", "Meeting tomorrow at 10", "Buy milk".
+- "none" = NOT a real voice memo. Noise, gibberish, silence markers, music symbols, filler sounds, or no meaningful words.
+- "timer_alarm" = setting a timer, countdown, alarm, or wake-up. No task or action — just ring after a duration or at a time.
+- "voice_memo" = anything with meaningful content: reminders, events, notes, ideas, tasks.
 - IMPORTANT: if the memo mentions an ACTION to perform at a time ("remind me to X", "call Y at 3 PM"), that is "voice_memo", NOT "timer_alarm".
-- If the memo contains BOTH a timer/alarm AND other items ("Set a timer for 5 min and buy milk"), output "mixed".
+- If the memo contains BOTH a timer/alarm AND other items, output "mixed".
 
-{"route": "timer_alarm" | "voice_memo" | "mixed"}
+{"route": "none" | "timer_alarm" | "voice_memo" | "mixed"}
+
+Examples:
+
+Memo: "<|nospeech|>"
+{"route":"none"}
+
+Memo: ", , ,"
+{"route":"none"}
+
+Memo: "uh eh um"
+{"route":"none"}
+
+Memo: "Set a timer for 5 minutes"
+{"route":"timer_alarm"}
+
+Memo: "Remind me to call the dentist at 3 pm"
+{"route":"voice_memo"}
+
+Memo: "Buy milk"
+{"route":"voice_memo"}
 
 Memo: "$promptPlaceholderTranscript"
 
@@ -243,6 +274,8 @@ JSON:''';
 Extract timer or alarm details from this voice memo. The memo may be in ANY language.
 
 Return a JSON array. Output MUST start with '[' and end with ']'. No text before or after.
+
+If the memo is noise, gibberish, a silence marker, or contains no meaningful words, return an empty array: []
 
 Rules:
 - "timer" = countdown for a duration. Extract duration as integer seconds in "duration_seconds". Set datetime fields to null.

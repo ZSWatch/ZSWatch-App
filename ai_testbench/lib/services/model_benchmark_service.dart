@@ -1035,6 +1035,41 @@ class ModelBenchmarkService {
         ),
       ],
     ),
+
+    // ── No-speech / garbage input cases ─────────────────────────────────
+    // These should produce an empty array []. The LLM should not
+    // hallucinate actions from noise or silence markers.
+
+    BenchmarkCase(
+      name: 'nospeech_blank_audio_marker',
+      transcript: '[BLANK_AUDIO]',
+      expectedItems: [],
+    ),
+    BenchmarkCase(
+      name: 'nospeech_silence_marker',
+      transcript: '[silence]',
+      expectedItems: [],
+    ),
+    BenchmarkCase(
+      name: 'nospeech_music_marker',
+      transcript: '(music)',
+      expectedItems: [],
+    ),
+    BenchmarkCase(
+      name: 'nospeech_just_punctuation',
+      transcript: '... . ,',
+      expectedItems: [],
+    ),
+    BenchmarkCase(
+      name: 'nospeech_gibberish_short',
+      transcript: 'hmm uhh',
+      expectedItems: [],
+    ),
+    BenchmarkCase(
+      name: 'nospeech_whisper_noise_artifact',
+      transcript: '♪ ♪ ♪',
+      expectedItems: [],
+    ),
   ];
 
   /// Timer/alarm test cases only (for --headless-timer mode).
@@ -1100,7 +1135,11 @@ class ModelBenchmarkService {
             // Parse using the shared ChronoLlmParser
             final parseResult = _parser.parse(result.output);
             final extractions = parseResult.extractions;
-            final validJson = extractions.isNotEmpty;
+            // An empty array [] is valid JSON when we expect 0 items
+            // (no-speech / garbage input).
+            final validJson = extractions.isNotEmpty ||
+                (testCase.expectedCount == 0 &&
+                    _containsEmptyJsonArray(result.output));
 
             final extractedCount = extractions.length;
             final expectedCount = testCase.expectedCount;
@@ -1300,6 +1339,12 @@ class ModelBenchmarkService {
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────
+
+  /// Check if the raw output contains an empty JSON array `[]`.
+  bool _containsEmptyJsonArray(String raw) {
+    final cleaned = raw.replaceAll(RegExp(r'\s+'), '');
+    return cleaned.contains('[]');
+  }
 
   bool _intentMatches(String got, String expected) {
     final g = got.toLowerCase().trim();

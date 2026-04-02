@@ -26,6 +26,7 @@ import '../screens/onboarding/permission_onboarding_screen.dart';
 import '../screens/settings/ai_models_settings_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/start/start_page_screen.dart';
+import '../screens/voice_memos/alarms_timers_screen.dart';
 import '../screens/voice_memos/voice_memos_screen.dart';
 
 /// Route names for the app
@@ -60,8 +61,9 @@ abstract final class AppRoutes {
   // Crash report
   static const String crashReport = '/crash-report';
 
-  // Voice routes (placeholder)
+  // Voice routes
   static const String voiceMemos = '/voice-memos';
+  static const String alarmsTimers = '/voice-memos/alarms-timers';
 
   static String voiceMemoDetail(int id) => '$voiceMemos/$id';
 }
@@ -199,6 +201,11 @@ class AppRouter {
         name: 'voice-memos',
         builder: (context, state) => const VoiceMemosScreen(),
         routes: [
+          GoRoute(
+            path: 'alarms-timers',
+            name: 'alarms-timers',
+            builder: (context, state) => const AlarmsTimersScreen(),
+          ),
           GoRoute(
             path: ':memoId',
             name: 'voice-memo-detail',
