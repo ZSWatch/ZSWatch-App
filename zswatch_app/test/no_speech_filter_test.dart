@@ -26,7 +26,8 @@ void main() {
     test('detects marker embedded in text', () {
       expect(
         VoiceNoteAiPipeline.isNoSpeechTranscript(
-            'some text [BLANK_AUDIO] more'),
+          'some text [BLANK_AUDIO] more',
+        ),
         isTrue,
       );
     });
