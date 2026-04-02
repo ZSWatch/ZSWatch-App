@@ -64,10 +64,10 @@ class ChronoLlmParser {
     final intent = _normalizeIntent(parsed['intent'] as String?);
     final title =
         ((parsed['title'] ?? parsed['summary']) as String?)?.trim() ?? '';
-    final datetimeOriginal =
-        (parsed['datetime_expression_original'] as String?)?.trim();
-    final datetimeEnglish =
-        (parsed['datetime_expression_english'] as String?)?.trim();
+    final datetimeOriginal = (parsed['datetime_expression_original'] as String?)
+        ?.trim();
+    final datetimeEnglish = (parsed['datetime_expression_english'] as String?)
+        ?.trim();
 
     // Extract duration_seconds for timer intents.
     final rawDuration = parsed['duration_seconds'];
@@ -80,13 +80,26 @@ class ChronoLlmParser {
       durationSeconds = int.tryParse(rawDuration);
     }
 
+    // Reject incomplete timer/alarm extractions — a timer needs a duration
+    // and an alarm needs at least one datetime expression.
+    if (intent == 'timer' && durationSeconds == null) {
+      return null;
+    }
+    if (intent == 'alarm' &&
+        (datetimeOriginal == null || datetimeOriginal.isEmpty) &&
+        (datetimeEnglish == null || datetimeEnglish.isEmpty)) {
+      return null;
+    }
+
     return ChronoLlmExtraction(
       intent: intent,
       title: title,
-      datetimeExpressionOriginal:
-          (datetimeOriginal?.isNotEmpty ?? false) ? datetimeOriginal : null,
-      datetimeExpressionEnglish:
-          (datetimeEnglish?.isNotEmpty ?? false) ? datetimeEnglish : null,
+      datetimeExpressionOriginal: (datetimeOriginal?.isNotEmpty ?? false)
+          ? datetimeOriginal
+          : null,
+      datetimeExpressionEnglish: (datetimeEnglish?.isNotEmpty ?? false)
+          ? datetimeEnglish
+          : null,
       durationSeconds: durationSeconds,
     );
   }

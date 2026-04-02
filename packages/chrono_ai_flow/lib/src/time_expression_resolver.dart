@@ -53,10 +53,7 @@ class TimeExpressionResolver {
               resolved.minute,
               resolved.second,
             );
-            return ResolvedTime(
-              dateTime: resolved,
-              method: 'chrono+adjusted',
-            );
+            return ResolvedTime(dateTime: resolved, method: 'chrono+adjusted');
           }
 
           if (resolved.isBefore(ref)) {
@@ -86,13 +83,17 @@ class TimeExpressionResolver {
               // Chrono gave this week's occurrence — push to next week.
               resolved = resolved.add(const Duration(days: 7));
               return ResolvedTime(
-                  dateTime: resolved, method: 'chrono+adjusted');
+                dateTime: resolved,
+                method: 'chrono+adjusted',
+              );
             }
             if (daysFromRef > 13) {
               // Chrono jumped too far — pull back one week.
               resolved = resolved.subtract(const Duration(days: 7));
               return ResolvedTime(
-                  dateTime: resolved, method: 'chrono+adjusted');
+                dateTime: resolved,
+                method: 'chrono+adjusted',
+              );
             }
           }
         }

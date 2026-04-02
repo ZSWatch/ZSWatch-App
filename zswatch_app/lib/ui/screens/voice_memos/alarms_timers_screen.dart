@@ -25,9 +25,7 @@ class AlarmsTimersScreen extends ConsumerWidget {
     final actionsAsync = ref.watch(alarmTimerActionsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Alarms & Timers'),
-      ),
+      appBar: AppBar(title: const Text('Alarms & Timers')),
       body: actionsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
@@ -70,8 +68,7 @@ class AlarmsTimersScreen extends ConsumerWidget {
                       ),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color:
-                            AppTheme.textSecondary.withValues(alpha: 0.08),
+                        color: AppTheme.textSecondary.withValues(alpha: 0.08),
                       ),
                     ),
                     child: Text.rich(
@@ -92,9 +89,9 @@ class AlarmsTimersScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        height: 1.5,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(height: 1.5),
                     ),
                   ),
                 ),
@@ -102,8 +99,7 @@ class AlarmsTimersScreen extends ConsumerWidget {
               // Pending section
               if (pending.isNotEmpty) ...[
                 const _SectionHeader(label: 'Pending from notes'),
-                for (final action in pending)
-                  _AlarmTimerCard(action: action),
+                for (final action in pending) _AlarmTimerCard(action: action),
               ],
 
               // Completed section
@@ -199,21 +195,18 @@ class _AlarmTimerCardState extends ConsumerState<_AlarmTimerCard> {
                         action.title.isNotEmpty
                             ? action.title
                             : (action.actionType == ExtractedActionType.alarm
-                                ? 'Alarm'
-                                : 'Timer'),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w800),
+                                  ? 'Alarm'
+                                  : 'Timer'),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                       if (action.notes != null &&
                           action.notes!.trim().isNotEmpty) ...[
                         const SizedBox(height: 3),
                         Text(
                           action.notes!.trim(),
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
+                          style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(
                                 color: AppTheme.textSecondary,
                                 height: 1.5,
@@ -228,9 +221,7 @@ class _AlarmTimerCardState extends ConsumerState<_AlarmTimerCard> {
                         ),
                         child: Text(
                           'Open source note',
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
+                          style: Theme.of(context).textTheme.labelSmall
                               ?.copyWith(
                                 color: AppTheme.infoColor,
                                 fontWeight: FontWeight.w800,
@@ -315,13 +306,14 @@ class _AlarmTimerCardState extends ConsumerState<_AlarmTimerCard> {
           .createAction(action: action, draft: draft);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to set: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to set: $error')));
     } finally {
       if (mounted) setState(() => _isCreating = false);
     }
@@ -330,12 +322,14 @@ class _AlarmTimerCardState extends ConsumerState<_AlarmTimerCard> {
   Future<void> _dismissAction() async {
     setState(() => _isDismissing = true);
     try {
-      await ref.read(extractedActionOperationsProvider).dismissAction(action.id);
+      await ref
+          .read(extractedActionOperationsProvider)
+          .dismissAction(action.id);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to dismiss: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to dismiss: $error')));
     } finally {
       if (mounted) setState(() => _isDismissing = false);
     }
@@ -370,9 +364,9 @@ class _AlarmTimerCardState extends ConsumerState<_AlarmTimerCard> {
       await ref.read(extractedActionOperationsProvider).deleteAction(action.id);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to delete: $error')));
     } finally {
       if (mounted) setState(() => _isDeleting = false);
     }
@@ -386,9 +380,9 @@ class _AlarmTimerCardState extends ConsumerState<_AlarmTimerCard> {
           .openCreatedAction(action);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to open: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to open: $error')));
     } finally {
       if (mounted) setState(() => _isOpening = false);
     }
@@ -404,25 +398,20 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.alarm_outlined,
-            size: 64,
-            color: Colors.grey.shade600,
-          ),
+          Icon(Icons.alarm_outlined, size: 64, color: Colors.grey.shade600),
           const SizedBox(height: AppTheme.spacingMd),
           Text(
             'No alarms or timers',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.grey.shade500,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: Colors.grey.shade500),
           ),
           const SizedBox(height: AppTheme.spacingSm),
           Text(
             'Alarms and timers extracted from your voice notes\nwill appear here.',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: Colors.grey.shade600),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
             textAlign: TextAlign.center,
           ),
         ],

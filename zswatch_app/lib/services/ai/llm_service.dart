@@ -985,9 +985,7 @@ class LlmService {
               ? null
               : (partial, tokens) => onProgress('routing', partial, tokens),
         );
-        routeResult = _parseRouterOutput(
-          _sanitizeModelOutput(routerGen.text),
-        );
+        routeResult = _parseRouterOutput(_sanitizeModelOutput(routerGen.text));
         debugPrint(
           '[LlmService] Router: route=$routeResult '
           '(${routerGen.metrics.wallTime.inMilliseconds}ms)',
@@ -1026,12 +1024,15 @@ class LlmService {
           transcript: effectiveTranscript,
         );
         promptStrategy = promptStrategyOverride ?? 'custom-template';
-      } else if (routeResult == 'timer_alarm') {
+      } else if (routeResult == 'timer_alarm' || routeResult == 'mixed') {
+        // For "mixed" inputs (e.g., "Set a timer for 5 min and buy milk"),
+        // use the timer/alarm template to avoid losing the timer/alarm intent.
+        // The non-timer items won't be extracted but the primary action is preserved.
         prompt = ChronoPromptTemplate.render(
           ChronoPromptTemplate.timerAlarmTemplate,
           transcript: effectiveTranscript,
         );
-        promptStrategy = 'router→timer_alarm';
+        promptStrategy = 'router→$routeResult';
       } else {
         prompt = _buildClassifyPrompt(
           effectiveTranscript,
@@ -1132,7 +1133,12 @@ class LlmService {
       final decoded =
           jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
       final route = (decoded['route'] as String?)?.trim().toLowerCase() ?? '';
-      if (const {'timer_alarm', 'voice_memo', 'mixed', 'none'}.contains(route)) {
+      if (const {
+        'timer_alarm',
+        'voice_memo',
+        'mixed',
+        'none',
+      }.contains(route)) {
         return route;
       }
       return 'voice_memo';
@@ -1512,8 +1518,8 @@ JSON:
   }
 
   static String _friendlySummary(ChronoLlmExtraction first, String raw) {
-    if (first.intent == 'timer') {
-      final d = first.durationSeconds ?? 0;
+    if (first.intent == 'timer' && first.durationSeconds != null) {
+      final d = first.durationSeconds!;
       final h = d ~/ 3600;
       final m = (d % 3600) ~/ 60;
       final s = d % 60;
@@ -1523,12 +1529,17 @@ JSON:
         if (s > 0 || (h == 0 && m == 0)) '${s}s',
       ];
       final dur = parts.join(' ');
-      return first.title.isNotEmpty ? 'Timer $dur — ${first.title}' : 'Timer $dur';
+      return first.title.isNotEmpty
+          ? 'Timer $dur — ${first.title}'
+          : 'Timer $dur';
     }
     if (first.intent == 'alarm') {
-      final expr = first.datetimeExpressionEnglish ?? first.datetimeExpressionOriginal;
+      final expr =
+          first.datetimeExpressionEnglish ?? first.datetimeExpressionOriginal;
       if (expr != null) {
-        return first.title.isNotEmpty ? 'Alarm $expr — ${first.title}' : 'Alarm $expr';
+        return first.title.isNotEmpty
+            ? 'Alarm $expr — ${first.title}'
+            : 'Alarm $expr';
       }
       return first.title.isNotEmpty ? 'Alarm — ${first.title}' : 'Alarm';
     }

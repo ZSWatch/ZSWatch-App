@@ -97,9 +97,7 @@ class VoiceNoteCard extends ConsumerWidget {
                             titleText,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
+                            style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(
                                   fontWeight: FontWeight.w800,
                                   height: 1.3,
@@ -107,12 +105,8 @@ class VoiceNoteCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            timelineTimestampLabel(
-                              memo.timestampUtc.toLocal(),
-                            ),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            timelineTimestampLabel(memo.timestampUtc.toLocal()),
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: AppTheme.textSecondary),
                           ),
                         ],
@@ -220,11 +214,7 @@ class _CategoryIcon extends StatelessWidget {
         color: resolved.bgColor,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Icon(
-        resolved.icon,
-        size: 18,
-        color: resolved.color,
-      ),
+      child: Icon(resolved.icon, size: 18, color: resolved.color),
     );
   }
 
@@ -258,10 +248,10 @@ class _CategoryIcon extends StatelessWidget {
       VoiceNoteCategory.idea => AppTheme.primaryColor.withValues(alpha: 0.14),
       VoiceNoteCategory.meeting => AppTheme.infoColor.withValues(alpha: 0.14),
       VoiceNoteCategory.task => AppTheme.successColor.withValues(alpha: 0.14),
-      VoiceNoteCategory.reminder =>
-        AppTheme.warningColor.withValues(alpha: 0.14),
-      VoiceNoteCategory.note =>
-        AppTheme.textSecondary.withValues(alpha: 0.08),
+      VoiceNoteCategory.reminder => AppTheme.warningColor.withValues(
+        alpha: 0.14,
+      ),
+      VoiceNoteCategory.note => AppTheme.textSecondary.withValues(alpha: 0.08),
     };
   }
 }
@@ -372,8 +362,9 @@ String cleanSummary(String summary) {
     final title = titleMatch?.group(1);
 
     if (intent == 'timer') {
-      final durMatch =
-          RegExp(r'"duration_seconds"\s*:\s*(\d+)').firstMatch(trimmed);
+      final durMatch = RegExp(
+        r'"duration_seconds"\s*:\s*(\d+)',
+      ).firstMatch(trimmed);
       final d = int.tryParse(durMatch?.group(1) ?? '') ?? 0;
       final h = d ~/ 3600;
       final m = (d % 3600) ~/ 60;
@@ -389,9 +380,9 @@ String cleanSummary(String summary) {
           : 'Timer $dur';
     }
     if (intent == 'alarm') {
-      final expr = RegExp(r'"datetime_expression_english"\s*:\s*"([^"]*)"')
-          .firstMatch(trimmed)
-          ?.group(1);
+      final expr = RegExp(
+        r'"datetime_expression_english"\s*:\s*"([^"]*)"',
+      ).firstMatch(trimmed)?.group(1);
       if (expr != null && expr.isNotEmpty) {
         return (title != null && title.isNotEmpty)
             ? 'Alarm $expr — $title'

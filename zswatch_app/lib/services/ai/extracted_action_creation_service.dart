@@ -68,6 +68,7 @@ class ActionCreationDraft {
   final String? location;
   final int? reminderMinutes;
   final int? durationSeconds;
+
   /// When true, the system clock app creates the timer/alarm silently
   /// without opening its UI. Defaults to true for background use.
   final bool skipUi;
@@ -316,12 +317,18 @@ class ExtractedActionCreationService {
       return;
     }
 
+    // Timer/alarm are created via system intents — there's no calendar entry
+    // to open afterwards, so skip them.
+    if (action.actionType == ExtractedActionType.timer ||
+        action.actionType == ExtractedActionType.alarm) {
+      return;
+    }
+
     final targetType = switch (action.actionType) {
       ExtractedActionType.calendarEvent => 'calendar_event',
       ExtractedActionType.task ||
       ExtractedActionType.reminder => 'calendar_reminder',
-      ExtractedActionType.timer ||
-      ExtractedActionType.alarm => 'alarm',
+      ExtractedActionType.timer || ExtractedActionType.alarm => 'alarm',
     };
 
     await _openCreatedCalendarEntryIfSupported(
@@ -382,10 +389,10 @@ class ExtractedActionCreationService {
       );
     }
 
-    // Timer/alarm use system intents on Android — no permission needed.
-    if (Platform.isAndroid &&
-        (actionType == ExtractedActionType.timer ||
-            actionType == ExtractedActionType.alarm)) {
+    // Timer/alarm use system intents (Android) or URL schemes (iOS) —
+    // no calendar or notification permission needed on either platform.
+    if (actionType == ExtractedActionType.timer ||
+        actionType == ExtractedActionType.alarm) {
       return;
     }
 

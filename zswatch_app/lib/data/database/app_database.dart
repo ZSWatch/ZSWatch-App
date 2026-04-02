@@ -58,12 +58,15 @@ class AppDatabase extends _$AppDatabase {
           // v2 → v3: added CrashReports table.
           await m.createTable(crashReports);
         }
-        if (from < 4) {
+        if (from >= 2 && from < 4) {
           // v3 → v4: added duration_seconds column to extracted_actions.
+          // Guard: only run when the table already existed (v2+). Fresh v1→v4
+          // upgrades create the table with this column via createTable above.
           await m.addColumn(extractedActions, extractedActions.durationSeconds);
         }
-        if (from < 5) {
+        if (from >= 2 && from < 5) {
           // v4 → v5: added archived column to voice_memos.
+          // Guard: only run when the table already existed (v2+).
           await m.addColumn(voiceMemos, voiceMemos.archived);
         }
       },
@@ -523,14 +526,13 @@ class AppDatabase extends _$AppDatabase {
   /// Reset any memos stuck in intermediate processing states back to 'failed'
   /// so they can be retried. This handles crash recovery on app startup.
   Future<int> resetStuckProcessingMemos() {
-    return (update(voiceMemos)
-          ..where(
-            (v) =>
-                v.summary.isNull() &
-                (v.processingStatus.equals('summarizing') |
-                    v.processingStatus.equals('categorizing') |
-                    v.processingStatus.equals('extractingActions')),
-          ))
+    return (update(voiceMemos)..where(
+          (v) =>
+              v.summary.isNull() &
+              (v.processingStatus.equals('summarizing') |
+                  v.processingStatus.equals('categorizing') |
+                  v.processingStatus.equals('extractingActions')),
+        ))
         .write(const VoiceMemosCompanion(processingStatus: Value('failed')));
   }
 
@@ -628,8 +630,7 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<ExtractedActionEntity>> watchAlarmTimerActions() {
     return (select(extractedActions)
           ..where(
-            (a) =>
-                a.actionType.equals('alarm') | a.actionType.equals('timer'),
+            (a) => a.actionType.equals('alarm') | a.actionType.equals('timer'),
           )
           ..orderBy([
             (a) => OrderingTerm.asc(a.created),
@@ -640,9 +641,9 @@ class AppDatabase extends _$AppDatabase {
 
   /// Watch all extracted actions (for building memo→actionTypes map)
   Stream<List<ExtractedActionEntity>> watchAllExtractedActions() {
-    return (select(extractedActions)
-          ..orderBy([(a) => OrderingTerm.desc(a.id)]))
-        .watch();
+    return (select(
+      extractedActions,
+    )..orderBy([(a) => OrderingTerm.desc(a.id)])).watch();
   }
 
   // ==================== Crash Report Operations ====================

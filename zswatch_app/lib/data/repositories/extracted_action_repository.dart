@@ -96,9 +96,9 @@ class ExtractedActionRepository
 
   /// Watch all alarm and timer actions (reactive stream, for iOS page)
   Stream<List<ExtractedAction>> watchAlarmTimerActions() {
-    return _db
-        .watchAlarmTimerActions()
-        .map((entities) => entities.map(_entityToModel).toList());
+    return _db.watchAlarmTimerActions().map(
+      (entities) => entities.map(_entityToModel).toList(),
+    );
   }
 
   /// Watch a map of memoId → set of action types (for list filtering)

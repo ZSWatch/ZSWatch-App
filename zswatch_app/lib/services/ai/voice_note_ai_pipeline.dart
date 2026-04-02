@@ -63,8 +63,7 @@ class VoiceNoteAiPipeline {
     required String filename,
     required String transcript,
   }) async {
-    if (transcript.trim().isEmpty ||
-        isNoSpeechTranscript(transcript)) {
+    if (transcript.trim().isEmpty || isNoSpeechTranscript(transcript)) {
       debugPrint(
         '[VoiceNoteAiPipeline] Skipping empty/no-speech transcript for $filename',
       );
@@ -204,17 +203,20 @@ class VoiceNoteAiPipeline {
 
       // Notify watch with round-trip confirmation toast.
       // Skip sending notes (tasks without time) — they're app-internal only.
-      final firstAction = result.actions.isNotEmpty
-          ? result.actions.first
-          : null;
-      final isNote = firstAction?.type == 'task' &&
-          firstAction?.startTime == null &&
-          firstAction?.dueDate == null;
-      final actionDatetime = firstAction?.startTime ?? firstAction?.dueDate;
+      // Find the first actionable item (not a plain note) across all actions.
+      ExtractedActionResult? actionableAction;
+      for (final a in result.actions) {
+        if (!(a.type == 'task' && a.startTime == null && a.dueDate == null)) {
+          actionableAction = a;
+          break;
+        }
+      }
+      final actionDatetime =
+          actionableAction?.startTime ?? actionableAction?.dueDate;
       onProcessingComplete?.call(
         filename,
         result.summary,
-        isNote ? null : firstAction?.type,
+        actionableAction?.type,
         actionDatetime,
       );
 
@@ -276,9 +278,7 @@ class VoiceNoteAiPipeline {
     // Reset any memos stuck in intermediate states from a previous crash.
     final reset = await _memoRepository.resetStuckProcessingMemos();
     if (reset > 0) {
-      debugPrint(
-        '[VoiceNoteAiPipeline] Reset $reset stuck processing memo(s)',
-      );
+      debugPrint('[VoiceNoteAiPipeline] Reset $reset stuck processing memo(s)');
     }
 
     final unprocessed = await _memoRepository.getUnprocessedMemos();
@@ -348,7 +348,10 @@ class VoiceNoteAiPipeline {
     }
 
     // Pure punctuation / music symbols / whitespace
-    final stripped = t.replaceAll(RegExp(r'[\s\p{P}\p{S}]+', unicode: true), '');
+    final stripped = t.replaceAll(
+      RegExp(r'[\s\p{P}\p{S}]+', unicode: true),
+      '',
+    );
     if (stripped.isEmpty) return true;
 
     return false;
