@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../data/models/extracted_action.dart';
 import '../../../data/models/voice_memo.dart';
 import '../../../providers/voice_memo_providers.dart';
 
@@ -15,12 +16,14 @@ class VoiceNoteCard extends ConsumerWidget {
   final VoiceMemo memo;
   final VoidCallback onOpen;
   final int extractedActionCount;
+  final Set<ExtractedActionType> actionTypes;
 
   const VoiceNoteCard({
     super.key,
     required this.memo,
     required this.onOpen,
     this.extractedActionCount = 0,
+    this.actionTypes = const {},
   });
 
   @override
@@ -81,7 +84,10 @@ class VoiceNoteCard extends ConsumerWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _CategoryIcon(category: memo.aiCategory),
+                    _CategoryIcon(
+                      category: memo.aiCategory,
+                      actionTypes: actionTypes,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -199,32 +205,51 @@ class VoiceNoteCard extends ConsumerWidget {
 
 class _CategoryIcon extends StatelessWidget {
   final VoiceNoteCategory? category;
+  final Set<ExtractedActionType> actionTypes;
 
-  const _CategoryIcon({this.category});
+  const _CategoryIcon({this.category, this.actionTypes = const {}});
 
   @override
   Widget build(BuildContext context) {
-    final color = category != null
-        ? voiceNoteCategoryColor(category!)
-        : AppTheme.textSecondary;
-    final bgColor = category != null
-        ? _categoryBgColor(category!)
-        : AppTheme.textSecondary.withValues(alpha: 0.08);
+    final resolved = _resolveIconAndColor();
 
     return Container(
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        color: bgColor,
+        color: resolved.bgColor,
         borderRadius: BorderRadius.circular(10),
       ),
       child: Icon(
-        category != null
-            ? voiceNoteCategoryIcon(category!)
-            : Icons.mic_none_rounded,
+        resolved.icon,
         size: 18,
-        color: color,
+        color: resolved.color,
       ),
+    );
+  }
+
+  ({IconData icon, Color color, Color bgColor}) _resolveIconAndColor() {
+    // Action types take priority for timer/alarm since VoiceNoteCategory
+    // doesn't have those values
+    if (actionTypes.contains(ExtractedActionType.alarm) ||
+        actionTypes.contains(ExtractedActionType.timer)) {
+      return (
+        icon: Icons.alarm_outlined,
+        color: AppTheme.warningColor,
+        bgColor: AppTheme.warningColor.withValues(alpha: 0.14),
+      );
+    }
+    if (category != null) {
+      return (
+        icon: voiceNoteCategoryIcon(category!),
+        color: voiceNoteCategoryColor(category!),
+        bgColor: _categoryBgColor(category!),
+      );
+    }
+    return (
+      icon: Icons.mic_none_rounded,
+      color: AppTheme.textSecondary,
+      bgColor: AppTheme.textSecondary.withValues(alpha: 0.08),
     );
   }
 
