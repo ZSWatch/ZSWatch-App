@@ -15,6 +15,7 @@ import '../screens/crash_report/crash_report_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/developer/comm_log_screen.dart';
 import '../screens/developer/developer_screen.dart';
+import '../screens/developer/file_system_screen.dart';
 import '../screens/developer/log_viewer_screen.dart';
 import '../screens/developer/sensor_debug_screen.dart';
 import '../screens/developer/shell_screen.dart';
@@ -28,6 +29,7 @@ import '../screens/settings/settings_screen.dart';
 import '../screens/start/start_page_screen.dart';
 import '../screens/voice_memos/alarms_timers_screen.dart';
 import '../screens/voice_memos/voice_memos_screen.dart';
+import '../screens/watchface/watchface_background_screen.dart';
 
 /// Route names for the app
 abstract final class AppRoutes {
@@ -54,9 +56,13 @@ abstract final class AppRoutes {
   static const String shell = '/developer/shell';
   static const String sensors = '/developer/sensors';
   static const String commLog = '/developer/comm-log';
+  static const String fileSystem = '/developer/file-system';
 
   // Settings sub-routes
   static const String aiModels = '/settings/ai-models';
+
+  // Watchface
+  static const String watchfaceBackground = '/watchface-background';
 
   // Crash report
   static const String crashReport = '/crash-report';
@@ -185,7 +191,19 @@ class AppRouter {
             name: 'comm-log',
             builder: (context, state) => const CommLogScreen(),
           ),
+          GoRoute(
+            path: 'file-system',
+            name: 'file-system',
+            builder: (context, state) => const FileSystemScreen(),
+          ),
         ],
+      ),
+
+      // Watchface background
+      GoRoute(
+        path: AppRoutes.watchfaceBackground,
+        name: 'watchface-background',
+        builder: (context, state) => const WatchfaceBackgroundScreen(),
       ),
 
       // Crash report
@@ -444,6 +462,9 @@ extension NavigationExtensions on BuildContext {
 
   /// Navigate to voice memos
   void goToVoiceMemos() => go(AppRoutes.voiceMemos);
+
+  /// Navigate to watchface background
+  void goToWatchfaceBackground() => go(AppRoutes.watchfaceBackground);
 
   /// Navigate to saved watches
   void goToSavedWatches() => go(AppRoutes.savedWatches);

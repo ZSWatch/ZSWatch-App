@@ -1217,10 +1217,13 @@ class _CIBuildsSectionState extends ConsumerState<_CIBuildsSection> {
                                   : AppTheme.primaryColor,
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              branch,
-                              style: Theme.of(context).textTheme.titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            Flexible(
+                              child: Text(
+                                branch,
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Container(
@@ -1605,9 +1608,14 @@ class _ActionButtons extends ConsumerWidget {
               OutlinedButton(onPressed: onReset, child: const Text('Reset')),
               const SizedBox(width: AppTheme.spacingMd),
               FilledButton(
-                onPressed: operationState.canStartFirmwareUpdate
-                    ? onStartFirmware
-                    : null,
+                onPressed: isFsFailed &&
+                        dfuState.status != DfuStatus.failed
+                    ? (operationState.canStartFilesystemUpload
+                        ? onStartFilesystem
+                        : null)
+                    : (operationState.canStartFirmwareUpdate
+                        ? onStartFirmware
+                        : null),
                 child: const Text('Retry'),
               ),
             ],

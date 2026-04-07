@@ -51,6 +51,9 @@ class FilesystemUploadService {
       throw StateError('Upload already in progress');
     }
 
+    // Clean up any stale manager from a previous failed attempt
+    await _cleanup();
+
     _log('Starting filesystem upload: ${image.name} -> ${image.targetPath}');
     final startTime = DateTime.now();
 
@@ -86,12 +89,14 @@ class FilesystemUploadService {
         (callback) => _handleUploadCallback(callback, startTime),
         onError: (Object error) {
           _log('Upload error: $error');
+          _stopSpeedTimer();
           _updateState(
             FilesystemUploadState.failed(
               error.toString(),
               startedAt: startTime,
             ),
           );
+          _cleanup();
         },
       );
 
@@ -104,9 +109,11 @@ class FilesystemUploadService {
 
       _log('Upload initiated');
     } on FilesystemUploadException {
+      await _cleanup();
       rethrow;
     } catch (e) {
       _log('Upload failed: $e');
+      await _cleanup();
       _updateState(
         FilesystemUploadState.failed(e.toString(), startedAt: startTime),
       );

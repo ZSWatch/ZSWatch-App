@@ -36,6 +36,7 @@ dependencies:
   shared_preferences: ^2.3.4
   flutter_secure_storage: ^9.2.3
   path_provider: ^2.1.5
+  share_plus: ^10.1.4
   path: ^1.9.1
 
   # HTTP / Networking
@@ -61,6 +62,9 @@ dependencies:
   chrono_dart: ^2.0.2
   url_launcher: ^6.3.1
   file_picker: ^8.1.6
+  image_picker: ^1.1.2
+  image: ^4.3.0
+  crop_your_image: ^1.1.0
   wakelock_plus: ^1.2.8
 
   # Audio Playback (voice memo Ogg/Opus)
@@ -107,3 +111,4 @@ flutter:
   assets:
     - assets/images/
     - assets/models/
+    - assets/backgrounds/

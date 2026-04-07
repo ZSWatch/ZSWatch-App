@@ -85,6 +85,15 @@ class _DeveloperToolsBody extends ConsumerWidget {
             ? () => context.push(AppRoutes.sensors)
             : null,
       ),
+      _BlendToolTile(
+        icon: Icons.folder_outlined,
+        title: 'File System',
+        subtitle: 'Watch files',
+        accent: Colors.purpleAccent.shade200,
+        onTap: connection.isConnected
+            ? () => context.push(AppRoutes.fileSystem)
+            : null,
+      ),
     ];
 
     return ListView(
