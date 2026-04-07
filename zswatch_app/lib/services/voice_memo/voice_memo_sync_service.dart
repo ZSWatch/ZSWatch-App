@@ -261,6 +261,7 @@ class VoiceMemoSyncService {
 
       // Enable SMP server on the watch (required for MCUmgr file transfers)
       _log('Enabling SMP server for file download');
+      final smpGen = _watchService.connectionGeneration;
       await _watchService.enableSmp();
       // Give the watch time to register the SMP transport before rediscovering.
       await Future<void>.delayed(const Duration(seconds: 2));
@@ -289,10 +290,11 @@ class VoiceMemoSyncService {
           }
         }
       } finally {
-        // Always disable SMP server when done, even on error
+        // Disable SMP only if the watch hasn't reconnected since we enabled it.
+        // A stale disableSmp() after a crash would break SMP on the new connection.
         _log('Disabling SMP server');
         try {
-          await _watchService.disableSmp();
+          await _watchService.disableSmpIfConnectionUnchanged(smpGen);
         } catch (e) {
           _log('Failed to disable SMP: $e');
         }

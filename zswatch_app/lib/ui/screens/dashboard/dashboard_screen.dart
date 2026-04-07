@@ -357,16 +357,26 @@ class _DeviceInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.spacingMd),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          title: Text(
+            'Device Information',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          tilePadding: const EdgeInsets.symmetric(
+            horizontal: AppTheme.spacingMd,
+            vertical: 0,
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(
+            AppTheme.spacingMd,
+            0,
+            AppTheme.spacingMd,
+            AppTheme.spacingMd,
+          ),
           children: [
-            Text(
-              'Device Information',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const Divider(),
+            const Divider(height: 1),
+            const SizedBox(height: AppTheme.spacingSm),
             _InfoRow(label: 'Name', value: watch?.displayName ?? 'Unknown'),
             _InfoRow(
               label: 'Bluetooth MAC',
@@ -539,6 +549,11 @@ class _FeatureShortcuts extends StatelessWidget {
               onTap: () => context.push(AppRoutes.analytics),
             ),
             _FeatureTile(
+              icon: Icons.watch,
+              label: 'Watchface',
+              onTap: () => context.push(AppRoutes.watchfaceBackground),
+            ),
+            _FeatureTile(
               icon: Icons.code,
               label: 'Developer',
               onTap: () => context.push(AppRoutes.developer),
@@ -547,11 +562,6 @@ class _FeatureShortcuts extends StatelessWidget {
               icon: Icons.mic,
               label: 'Voice',
               onTap: () => context.push(AppRoutes.voiceMemos),
-            ),
-            _FeatureTile(
-              icon: Icons.settings,
-              label: 'Settings',
-              onTap: () => context.push(AppRoutes.settings),
             ),
           ],
         ),

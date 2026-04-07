@@ -236,13 +236,13 @@ class FirmwareManager {
         ...successfulRuns,
       ];
 
-      // Remove duplicates
-      final seen = <int>{};
+      // Remove duplicates by commit SHA (same commit can trigger multiple runs)
+      final seenShas = <String>{};
       final uniqueRuns = runsWithMain
           .where((run) {
-            final id = run['id'] as int;
-            if (seen.contains(id)) return false;
-            seen.add(id);
+            final sha = run['head_sha'] as String? ?? '';
+            if (seenShas.contains(sha)) return false;
+            seenShas.add(sha);
             return true;
           })
           .take(numRuns)

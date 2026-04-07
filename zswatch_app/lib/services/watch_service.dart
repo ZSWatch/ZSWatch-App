@@ -93,6 +93,11 @@ class WatchService {
   String? _fwCommitSha;
   bool _fwIsDebug = false;
 
+  // Incremented on every new connection (including auto-reconnects).
+  // Used to detect stale async operations that call disableSmp() after a
+  // reconnect, which would disable SMP on the freshly-connected watch.
+  int _connectionGeneration = 0;
+
   /// Commit SHA from last firmware version message.
   String? get fwCommitSha => _fwCommitSha;
 
@@ -121,6 +126,13 @@ class WatchService {
 
   /// Whether the connected device has the MCUmgr/SMP service available.
   bool get hasSmpService => _ble.hasSmpService;
+
+  /// Current connection generation. Increments on every new connection.
+  ///
+  /// Capture this before calling [enableSmp], then pass it to
+  /// [disableSmpIfConnectionUnchanged] in your cleanup code to avoid
+  /// sending smp:false to a freshly-reconnected watch.
+  int get connectionGeneration => _connectionGeneration;
 
   // --- Public API: connection (delegates to BleConnectionService) ---
 
@@ -295,6 +307,20 @@ class WatchService {
   /// Disable MCUmgr/SMP on the watch.
   Future<void> disableSmp() => _sendGb({'t': 'smp', 'status': false});
 
+  /// Disable SMP only if the connection hasn't changed since [capturedGeneration].
+  ///
+  /// Use this instead of [disableSmp] in finally/cleanup blocks so that a
+  /// stale async operation does not disable SMP on a freshly-reconnected watch.
+  Future<void> disableSmpIfConnectionUnchanged(int capturedGeneration) async {
+    if (_connectionGeneration == capturedGeneration) {
+      await disableSmp();
+    } else {
+      debugPrint(
+        '[WatchService] Skipping disableSmp — connection changed since SMP was enabled',
+      );
+    }
+  }
+
   /// Request the watch to perform a cold reboot.
   Future<void> resetWatch() => _sendGb({'t': 'reset'});
 
@@ -312,6 +338,8 @@ class WatchService {
     String watchId,
     String name,
   ) async {
+    _connectionGeneration++;
+
     // Create or update watch object
     final existingWatch = currentWatch;
     final watch = existingWatch != null && existingWatch.id == watchId

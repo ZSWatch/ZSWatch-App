@@ -94,6 +94,7 @@ class CoredumpService {
       return null;
     }
 
+    final smpGen = _watchService.connectionGeneration;
     try {
       // Step 1: Enable SMP
       _state.add(
@@ -186,7 +187,7 @@ class CoredumpService {
 
       // Disable SMP after we're done
       try {
-        await _watchService.disableSmp();
+        await _watchService.disableSmpIfConnectionUnchanged(smpGen);
       } catch (_) {}
 
       return result;
@@ -200,7 +201,7 @@ class CoredumpService {
       );
       // Try to disable SMP even on failure
       try {
-        await _watchService.disableSmp();
+        await _watchService.disableSmpIfConnectionUnchanged(smpGen);
       } catch (_) {}
       return null;
     }
