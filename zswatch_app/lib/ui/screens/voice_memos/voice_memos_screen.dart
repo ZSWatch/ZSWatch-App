@@ -684,6 +684,7 @@ class _InlineTranscript extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final aiEnabled = ref.watch(localAiEnabledProvider);
     final isProcessing = memo.isAiProcessing;
+    final isQueued = memo.processingStatus == 'queued';
     final hasFailed =
         memo.aiProcessingStatus == VoiceNoteProcessingStatus.failed;
     final currentTranscript = memo.transcription ?? '';
@@ -821,7 +822,9 @@ class _InlineTranscript extends ConsumerWidget {
             ),
             const SizedBox(width: AppTheme.spacingSm),
             Text(
-              'Processing with AI...',
+              memo.processingStatus == 'queued'
+                  ? 'Queued for AI processing...'
+                  : 'Processing with AI...',
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),

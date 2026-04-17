@@ -529,7 +529,8 @@ class AppDatabase extends _$AppDatabase {
     return (update(voiceMemos)..where(
           (v) =>
               v.summary.isNull() &
-              (v.processingStatus.equals('summarizing') |
+              (v.processingStatus.equals('queued') |
+                  v.processingStatus.equals('summarizing') |
                   v.processingStatus.equals('categorizing') |
                   v.processingStatus.equals('extractingActions')),
         ))

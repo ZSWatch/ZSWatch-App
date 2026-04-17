@@ -171,11 +171,13 @@ class VoiceNoteCard extends ConsumerWidget {
                               filled: true,
                             ),
                           if (memo.isAiProcessing)
-                            const _NoteTag(
-                              label: 'processing',
+                            _NoteTag(
+                              label: memo.processingStatus == 'queued'
+                                  ? 'queued'
+                                  : 'processing',
                               color: AppTheme.primaryColor,
                               filled: true,
-                              showSpinner: true,
+                              showSpinner: memo.processingStatus != 'queued',
                             ),
                         ],
                       ),
