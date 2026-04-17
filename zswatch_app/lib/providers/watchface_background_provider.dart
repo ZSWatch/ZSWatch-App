@@ -73,6 +73,7 @@ const backgroundGroups = [
       BuiltinBackground(name: 'Starfield', assetBinPath: 'assets/backgrounds/bg_starfield.bin', assetPreviewPath: 'assets/backgrounds/bg_starfield.png'),
       BuiltinBackground(name: 'Lava Flow', assetBinPath: 'assets/backgrounds/bg_lava_flow.bin', assetPreviewPath: 'assets/backgrounds/bg_lava_flow.png'),
       BuiltinBackground(name: 'Forest Canopy', assetBinPath: 'assets/backgrounds/bg_forest_canopy.bin', assetPreviewPath: 'assets/backgrounds/bg_forest_canopy.png'),
+      BuiltinBackground(name: 'Horizon Sunset', assetBinPath: 'assets/backgrounds/bg_horizon_sunset.bin', assetPreviewPath: 'assets/backgrounds/bg_horizon_sunset.png'),
     ],
   ),
   BackgroundGroup(
