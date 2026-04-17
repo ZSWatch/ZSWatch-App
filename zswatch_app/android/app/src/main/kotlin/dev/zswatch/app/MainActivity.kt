@@ -59,6 +59,7 @@ class MainActivity : FlutterActivity() {
     private var mediaBridge: MediaSessionBridge? = null
     private var notificationEventSink: EventChannel.EventSink? = null
     private var mediaEventSink: EventChannel.EventSink? = null
+    private var liteRtLmBridge: LiteRtLmBridge? = null
     
     // Foreground service
     private var foregroundService: BleConnectionForegroundService? = null
@@ -99,6 +100,9 @@ class MainActivity : FlutterActivity() {
         setupForegroundServiceChannel(flutterEngine)
         setupLlmComputeChannel(flutterEngine)
         setupProductivityChannel(flutterEngine)
+        
+        liteRtLmBridge = LiteRtLmBridge(this)
+        liteRtLmBridge!!.setup(flutterEngine)
     }
     
     private fun setupNotificationChannel(flutterEngine: FlutterEngine) {

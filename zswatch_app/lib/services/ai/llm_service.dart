@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 
 import 'ai_debug_info.dart';
+import 'litert_lm_service.dart';
 import 'llm_compute_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -37,6 +38,10 @@ class LlmModelInfo {
   final int? benchmarkScore;
   final int? benchmarkTotal;
 
+  /// True for models that use Google LiteRT-LM runtime (.litertlm format)
+  /// instead of llama.cpp (.gguf format).
+  final bool isLiteRtLm;
+
   const LlmModelInfo({
     required this.id,
     required this.displayName,
@@ -48,6 +53,7 @@ class LlmModelInfo {
     this.contextSize,
     this.benchmarkScore,
     this.benchmarkTotal,
+    this.isLiteRtLm = false,
   });
 
   bool get isDownloadable => downloadUrl != null;
@@ -268,6 +274,16 @@ class LlmService {
   // Worst 3 removed: SmolLM3 (1/40), Llama-3.2-3B (25/40), Qwen3-1.7B (26/40).
   static const List<LlmModelInfo> catalogModels = [
     LlmModelInfo(
+      id: 'gemma4_e2b_litertlm',
+      displayName: 'Gemma 4 E2B · LiteRT-LM',
+      family: 'Gemma-4-E2B',
+      filename: 'gemma-4-E2B-it.litertlm',
+      expectedSizeBytes: 2900 * 1024 * 1024,
+      isLiteRtLm: true,
+      benchmarkScore: 46,
+      benchmarkTotal: 49,
+    ),
+    LlmModelInfo(
       id: 'qwen35_2b_q4_k_m',
       displayName: 'Qwen3.5 2B Instruct · Q4_K_M',
       family: 'Qwen3.5-2B',
@@ -350,6 +366,18 @@ class LlmService {
   int _runningRequestId = -1;
   int? _deviceMemoryMB;
 
+  /// Serializes LiteRT-LM inference calls so only one runs at a time.
+  /// Concurrent callers will queue and wait for the previous call to finish.
+  Completer<void>? _liteRtLmLock;
+
+  final LiteRtLmService _liteRtLmService = LiteRtLmService();
+
+  /// Whether the currently selected model uses LiteRT-LM.
+  bool get _isCurrentModelLiteRtLm {
+    final model = catalogModels.where((m) => m.id == _selectedModelId).firstOrNull;
+    return model?.isLiteRtLm ?? false;
+  }
+
   final _stateSubject = BehaviorSubject<LlmServiceState>.seeded(
     const LlmServiceState(),
   );
@@ -412,7 +440,10 @@ class LlmService {
 
     if (importedDir.existsSync()) {
       for (final entity in importedDir.listSync()) {
-        if (entity is! File || !entity.path.toLowerCase().endsWith('.gguf')) {
+        if (entity is! File) continue;
+        final lowerPath = entity.path.toLowerCase();
+        if (!lowerPath.endsWith('.gguf') &&
+            !lowerPath.endsWith('.litertlm')) {
           continue;
         }
 
@@ -425,6 +456,7 @@ class LlmService {
             filename: filename,
             expectedSizeBytes: entity.lengthSync(),
             userProvided: true,
+            isLiteRtLm: lowerPath.endsWith('.litertlm'),
           ),
         );
       }
@@ -435,6 +467,7 @@ class LlmService {
   }
 
   void selectModel(String modelId) {
+    debugPrint('[LlmService] selectModel($modelId) called (was: $_selectedModelId)');
     _selectedModelId = modelId;
     final builtIn = catalogModels.where((m) => m.id == modelId).firstOrNull;
     _selectedModelName =
@@ -443,6 +476,10 @@ class LlmService {
             ? modelId.replaceFirst('custom::', '')
             : catalogModels.first.displayName);
     _modelPath = null;
+    // Dispose previous LiteRT-LM engine when switching models.
+    if (_liteRtLmService.isLoaded) {
+      _liteRtLmService.dispose();
+    }
   }
 
   Future<LlmModelInfo> currentModelInfo() async {
@@ -589,8 +626,9 @@ class LlmService {
     if (!source.existsSync()) {
       throw ArgumentError('Model file not found: $sourcePath');
     }
-    if (!source.path.toLowerCase().endsWith('.gguf')) {
-      throw ArgumentError('Only .gguf models can be imported.');
+    if (!source.path.toLowerCase().endsWith('.gguf') &&
+        !source.path.toLowerCase().endsWith('.litertlm')) {
+      throw ArgumentError('Only .gguf or .litertlm models can be imported.');
     }
 
     final importedDir = await _importedModelDir();
@@ -614,6 +652,7 @@ class LlmService {
       filename: candidateName,
       expectedSizeBytes: destination.lengthSync(),
       userProvided: true,
+      isLiteRtLm: candidateName.toLowerCase().endsWith('.litertlm'),
     );
 
     selectModel(importedModel.id);
@@ -622,9 +661,21 @@ class LlmService {
 
   // ---- Inference ----
 
+  /// Override the model file path directly (for testing with external storage).
+  void overrideModelPath(String path) {
+    _modelPath = path;
+  }
+
   /// Ensure _modelPath is set (lazy init).
-  Future<void> _ensureModel() async {
-    if (_modelPath != null) return;
+  /// For LiteRT-LM models, also calls [LiteRtLmService.loadModel].
+  /// Returns the resolved [LlmModelInfo] so callers can use it without
+  /// a second async call (which would be vulnerable to provider races).
+  Future<LlmModelInfo> _ensureModel() async {
+    if (_modelPath != null) {
+      // Model path already set — resolve the info for consistency.
+      final model = await currentModelInfo();
+      return model;
+    }
     final model = await currentModelInfo();
     final path = await _modelFilePathFor(model);
     if (!File(path).existsSync()) {
@@ -634,6 +685,12 @@ class LlmService {
     }
     _selectedModelName = model.displayName;
     _modelPath = path;
+
+    // LiteRT-LM models need to initialise the native engine.
+    if (model.isLiteRtLm && !_liteRtLmService.isLoaded) {
+      await _liteRtLmService.loadModel(path, backend: 'cpu');
+    }
+    return model;
   }
 
   // ---- Memory-aware tunables ----
@@ -818,16 +875,15 @@ class LlmService {
     // a previous phase) before starting a new one.  This reduces the window
     // for the "Callback invoked after it has been deleted" crash.
     cancelInference();
-    await _ensureModel();
+    debugPrint('[LlmService] _generate: _selectedModelId=$_selectedModelId _modelPath=$_modelPath');
+    final modelInfo = await _ensureModel();
+    debugPrint('[LlmService] _generate: after ensureModel _selectedModelId=$_selectedModelId modelInfo.id=${modelInfo.id} isLiteRtLm=${modelInfo.isLiteRtLm}');
 
     // Keep CPU at full speed during inference (Android foreground service).
     await LlmComputeService.instance.start();
 
-    final completer = Completer<String>();
     final stopwatch = Stopwatch()..start();
-    int tokenCount = 0;
 
-    final modelInfo = await currentModelInfo();
     final params = await _computeInferenceParams(modelInfo);
 
     // Apply maxTokens cap from memory check. The cap is the hard ceiling;
@@ -849,34 +905,80 @@ class LlmService {
       'threads=$nThreads deviceRAM=${_deviceMemoryMB ?? "?"}MB',
     );
 
-    final request = OpenAiRequest(
-      messages: [Message(Role.user, prompt)],
-      modelPath: _modelPath!,
-      maxTokens: effectiveMaxTokens,
-      numGpuLayers: 0,
-      numThreads: nThreads,
-      temperature: temperature,
-      topP: topP,
-      frequencyPenalty: 0.0,
-      presencePenalty: presencePenalty,
-      contextSize: params.contextSize,
-      logger: _logFilter,
-      enableThinking: false,
-    );
+    String text;
+    int tokenCount;
 
-    _runningRequestId = await fllamaChat(request, (
-      String response,
-      String responseJson,
-      bool done,
-    ) {
-      tokenCount++;
-      onPartialResponse?.call(response, tokenCount);
-      if (done && !completer.isCompleted) {
-        completer.complete(response);
+    if (modelInfo.isLiteRtLm) {
+      // ---- LiteRT-LM path (Gemma 4 etc.) ----
+      // Serialize access: wait for any in-flight LiteRT-LM call to finish.
+      // The native engine crashes (SIGSEGV) if two generate calls overlap.
+      while (_liteRtLmLock != null) {
+        debugPrint('[LlmService] LiteRT-LM busy, waiting for previous call...');
+        await _liteRtLmLock!.future;
       }
-    });
+      _liteRtLmLock = Completer<void>();
+      try {
+      debugPrint(
+        '[LlmService] LiteRT-LM generate: prompt length=${prompt.length}, '
+        'first 200 chars: ${prompt.substring(0, prompt.length > 200 ? 200 : prompt.length)}',
+      );
+      final result = await _liteRtLmService.generate(
+        prompt,
+        temperature: temperature,
+        topK: 40,
+        topP: topP,
+        onToken: (partial, tokens) {
+          debugPrint(
+            '[LlmService] LiteRT-LM onToken: tokens=$tokens, '
+            'partial length=${partial.length}, first 200: ${partial.substring(0, partial.length > 200 ? 200 : partial.length)}',
+          );
+          onPartialResponse?.call(partial, tokens);
+        },
+      );
+      debugPrint(
+        '[LlmService] LiteRT-LM result: text="${result.text.substring(0, result.text.length > 500 ? 500 : result.text.length)}" '
+        'tokens=${result.tokenCount} elapsed=${result.elapsedMs}ms cancelled=${result.cancelled}',
+      );
+      text = result.text.trim();
+      tokenCount = result.tokenCount;
+      } finally {
+        _liteRtLmLock!.complete();
+        _liteRtLmLock = null;
+      }
+    } else {
+      // ---- fllama / llama.cpp path ----
+      final completer = Completer<String>();
+      tokenCount = 0;
 
-    final text = (await completer.future).trim();
+      final request = OpenAiRequest(
+        messages: [Message(Role.user, prompt)],
+        modelPath: _modelPath!,
+        maxTokens: effectiveMaxTokens,
+        numGpuLayers: 0,
+        numThreads: nThreads,
+        temperature: temperature,
+        topP: topP,
+        frequencyPenalty: 0.0,
+        presencePenalty: presencePenalty,
+        contextSize: params.contextSize,
+        logger: _logFilter,
+        enableThinking: false,
+      );
+
+      _runningRequestId = await fllamaChat(request, (
+        String response,
+        String responseJson,
+        bool done,
+      ) {
+        tokenCount++;
+        onPartialResponse?.call(response, tokenCount);
+        if (done && !completer.isCompleted) {
+          completer.complete(response);
+        }
+      });
+
+      text = (await completer.future).trim();
+    }
     stopwatch.stop();
 
     // Release the foreground service + wake lock.
@@ -922,8 +1024,7 @@ class LlmService {
       );
 
       // Pre-compute effective context size so we can select the right prompt.
-      await _ensureModel();
-      final modelInfo = await currentModelInfo();
+      final modelInfo = await _ensureModel();
       final preParams = await _computeInferenceParams(modelInfo);
       final effectiveCtx = preParams.contextSize;
 
@@ -1100,10 +1201,21 @@ class LlmService {
       fllamaCancelInference(_runningRequestId);
       _runningRequestId = -1;
     }
+    // Note: We do NOT cancel LiteRT-LM here because each generate() call
+    // creates a fresh Conversation. Cancelling between phases would just
+    // cancel an already-completed conversation, which is harmless but could
+    // confuse the engine. Only cancel on explicit user action.
+  }
+
+  /// Cancel any running LiteRT-LM inference. Call this only for explicit
+  /// user-initiated cancellation.
+  void cancelLiteRtLmInference() {
+    _liteRtLmService.cancel();
   }
 
   void dispose() {
     cancelInference();
+    _liteRtLmService.dispose();
     _stateSubject.close();
   }
 

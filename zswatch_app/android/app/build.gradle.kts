@@ -98,6 +98,10 @@ android {
     }
 }
 
+dependencies {
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")
+}
+
 flutter {
     source = "../.."
 }
