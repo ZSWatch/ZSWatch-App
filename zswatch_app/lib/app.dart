@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
+import 'providers/ai_providers.dart';
 import 'providers/analytics_providers.dart';
 import 'providers/ble_providers.dart';
 import 'providers/coredump_providers.dart';
