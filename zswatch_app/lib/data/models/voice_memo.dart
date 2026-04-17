@@ -25,6 +25,9 @@ enum VoiceNoteProcessingStatus {
   /// Not yet processed by AI
   pending,
 
+  /// Queued for AI processing (pipeline will reach it soon)
+  queued,
+
   /// AI is summarizing the transcript
   summarizing,
 
@@ -88,6 +91,8 @@ abstract class VoiceMemo with _$VoiceMemo {
   VoiceNoteProcessingStatus get aiProcessingStatus {
     if (processingStatus == null) return VoiceNoteProcessingStatus.pending;
     switch (processingStatus) {
+      case 'queued':
+        return VoiceNoteProcessingStatus.queued;
       case 'summarizing':
         return VoiceNoteProcessingStatus.summarizing;
       case 'categorizing':
@@ -131,7 +136,8 @@ abstract class VoiceMemo with _$VoiceMemo {
   /// Whether AI is currently processing this memo
   bool get isAiProcessing {
     final s = processingStatus;
-    return s == 'summarizing' ||
+    return s == 'queued' ||
+        s == 'summarizing' ||
         s == 'categorizing' ||
         s == 'extractingActions';
   }

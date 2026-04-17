@@ -288,6 +288,16 @@ class VoiceNoteAiPipeline {
     }
 
     debugPrint('[VoiceNoteAiPipeline] Processing ${unprocessed.length} memos');
+
+    // Mark all memos as queued so the UI shows them as pending AI processing
+    // before the pipeline actually reaches each one.
+    for (final memo in unprocessed) {
+      await _memoRepository.updateProcessingStatus(
+        filename: memo.filename,
+        status: 'queued',
+      );
+    }
+
     int processed = 0;
 
     for (final memo in unprocessed) {
