@@ -82,10 +82,7 @@ class _HomeShellState extends State<_HomeShell> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.science),
-            label: 'Classify',
-          ),
+          NavigationDestination(icon: Icon(Icons.science), label: 'Classify'),
           NavigationDestination(
             icon: Icon(Icons.access_time),
             label: 'Time Extract',
@@ -95,4 +92,3 @@ class _HomeShellState extends State<_HomeShell> {
     );
   }
 }
-

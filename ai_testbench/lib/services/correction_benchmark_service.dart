@@ -125,17 +125,14 @@ class CorrectionModelResult {
   final String modelPath;
   final List<CorrectionCaseResult> cases;
 
-  const CorrectionModelResult({
-    required this.modelPath,
-    required this.cases,
-  });
+  const CorrectionModelResult({required this.modelPath, required this.cases});
 
   String get modelName => modelPath.split(Platform.pathSeparator).last;
   int get passedCases => cases.where((c) => c.passed).length;
   double get avgTokensPerSecond => cases.isEmpty
       ? 0
       : cases.fold<double>(0, (sum, c) => sum + c.tokensPerSecond) /
-          cases.length;
+            cases.length;
   Duration get totalElapsed =>
       cases.fold(Duration.zero, (sum, c) => sum + c.elapsed);
 }
@@ -158,7 +155,6 @@ class CorrectionBenchmarkService {
 
   static final benchmarkCases = <CorrectionBenchmarkCase>[
     // ── English: Whisper homophone / wrong-word errors ──────────────────
-
     const CorrectionBenchmarkCase(
       name: 'en_homophone_weak_week',
       input: 'I need to finish the report by next weak',
@@ -189,14 +185,15 @@ class CorrectionBenchmarkService {
     ),
     const CorrectionBenchmarkCase(
       name: 'en_wrong_word_nonsense',
-      input: 'I have a dentist appointment and I need to cancel it because I have a cold and a terrible headache',
-      expectedOutput: 'I have a dentist appointment and I need to cancel it because I have a cold and a terrible headache.',
+      input:
+          'I have a dentist appointment and I need to cancel it because I have a cold and a terrible headache',
+      expectedOutput:
+          'I have a dentist appointment and I need to cancel it because I have a cold and a terrible headache.',
       mustContain: ['dentist', 'cancel', 'headache'],
       expectModification: false, // Clean input — should pass through
     ),
 
     // ── English: filler words + stuttering ──────────────────────────────
-
     const CorrectionBenchmarkCase(
       name: 'en_filler_um_stutter',
       input: 'I I need to um finish the report and and send it to the the boss',
@@ -206,35 +203,38 @@ class CorrectionBenchmarkService {
     ),
     const CorrectionBenchmarkCase(
       name: 'en_filler_heavy',
-      input: 'so uh you know I was like thinking we should you know maybe like schedule a meeting',
+      input:
+          'so uh you know I was like thinking we should you know maybe like schedule a meeting',
       expectedOutput: 'I was thinking we should maybe schedule a meeting.',
       mustContain: ['schedule', 'meeting'],
       mustNotContain: [' uh '],
     ),
 
     // ── English: missing/wrong punctuation ──────────────────────────────
-
     const CorrectionBenchmarkCase(
       name: 'en_missing_punctuation',
-      input: 'call the plumber tomorrow at 3 then pick up the kids at 5 and dont forget to buy groceries',
-      expectedOutput: "Call the plumber tomorrow at 3, then pick up the kids at 5, and don't forget to buy groceries.",
+      input:
+          'call the plumber tomorrow at 3 then pick up the kids at 5 and dont forget to buy groceries',
+      expectedOutput:
+          "Call the plumber tomorrow at 3, then pick up the kids at 5, and don't forget to buy groceries.",
       mustContain: ['plumber', 'kids', 'groceries'],
       mustNotContain: [],
-      expectModification: false, // punctuation-only change is acceptable either way
+      expectModification:
+          false, // punctuation-only change is acceptable either way
     ),
 
     // ── English: Whisper word-boundary / context errors ─────────────────
-
     const CorrectionBenchmarkCase(
       name: 'en_word_boundary',
-      input: 'I can not believe they moved the meeting to an other day with out telling us',
-      expectedOutput: 'I cannot believe they moved the meeting to another day without telling us.',
+      input:
+          'I can not believe they moved the meeting to an other day with out telling us',
+      expectedOutput:
+          'I cannot believe they moved the meeting to another day without telling us.',
       mustContain: ['another', 'without'],
       mustNotContain: ['an other', 'with out'],
     ),
 
     // ── Swedish: Whisper errors ─────────────────────────────────────────
-
     const CorrectionBenchmarkCase(
       name: 'sv_filler_stutter',
       input: 'jag ska eh köpa köpa mjölk och bröd på på hemvägen',
@@ -270,18 +270,20 @@ class CorrectionBenchmarkService {
     const CorrectionBenchmarkCase(
       name: 'sv_wrong_word_whisper',
       input: 'ring veterinären och boka en tid för katten som har ont i ögat',
-      expectedOutput: 'Ring veterinären och boka en tid för katten som har ont i ögat.',
+      expectedOutput:
+          'Ring veterinären och boka en tid för katten som har ont i ögat.',
       mustContain: ['veterinären', 'katten'],
       expectModification: false, // Clean-ish input
       language: 'sv',
     ),
 
     // ── German: Whisper errors ──────────────────────────────────────────
-
     const CorrectionBenchmarkCase(
       name: 'de_missing_umlaut',
-      input: 'ich muss den Arzt anrufen und einen Termin fur nachste Woche machen',
-      expectedOutput: 'Ich muss den Arzt anrufen und einen Termin für nächste Woche machen.',
+      input:
+          'ich muss den Arzt anrufen und einen Termin fur nachste Woche machen',
+      expectedOutput:
+          'Ich muss den Arzt anrufen und einen Termin für nächste Woche machen.',
       mustContain: ['für', 'nächste'],
       mustNotContain: [' fur ', 'nachste'],
       language: 'de',
@@ -296,7 +298,6 @@ class CorrectionBenchmarkService {
     ),
 
     // ── English: Whisper misheard context-dependent words ──────────────
-
     const CorrectionBenchmarkCase(
       name: 'en_misheard_their_there',
       input: 'I left my keys over their on the table',
@@ -313,31 +314,35 @@ class CorrectionBenchmarkService {
     ),
     const CorrectionBenchmarkCase(
       name: 'en_clean_long_sentence',
-      input: 'I had a great meeting with the design team today and we agreed on the new color scheme for the watch face',
-      expectedOutput: 'I had a great meeting with the design team today and we agreed on the new color scheme for the watch face.',
+      input:
+          'I had a great meeting with the design team today and we agreed on the new color scheme for the watch face',
+      expectedOutput:
+          'I had a great meeting with the design team today and we agreed on the new color scheme for the watch face.',
       mustContain: ['design team', 'color scheme', 'watch face'],
       expectModification: false,
     ),
 
     // ── English: Whisper garbled multi-word ─────────────────────────
-
     const CorrectionBenchmarkCase(
       name: 'en_garbled_sentence',
-      input: 'the whether is really nice today so lets go for a walk in the park',
-      expectedOutput: "The weather is really nice today so let's go for a walk in the park.",
+      input:
+          'the whether is really nice today so lets go for a walk in the park',
+      expectedOutput:
+          "The weather is really nice today so let's go for a walk in the park.",
       mustContain: ['weather'],
       mustNotContain: ['whether'],
     ),
     const CorrectionBenchmarkCase(
       name: 'en_multiple_errors_combined',
-      input: 'I need to by some flower for the party its on wendsday at there house',
-      expectedOutput: "I need to buy some flowers for the party, it's on Wednesday at their house.",
+      input:
+          'I need to by some flower for the party its on wendsday at there house',
+      expectedOutput:
+          "I need to buy some flowers for the party, it's on Wednesday at their house.",
       mustContain: ['buy', 'Wednesday'],
       mustNotContain: ['by some', 'wendsday'],
     ),
 
     // ── Swedish: more realistic Whisper errors ───────────────────
-
     const CorrectionBenchmarkCase(
       name: 'sv_filler_liksom',
       input: 'jag tankte liksom att vi kanske liksom borde traffas imorgon',
@@ -357,14 +362,14 @@ class CorrectionBenchmarkService {
     const CorrectionBenchmarkCase(
       name: 'sv_clean_longer',
       input: 'Vi ses på kontoret imorgon bitti för att gå igenom rapporten.',
-      expectedOutput: 'Vi ses på kontoret imorgon bitti för att gå igenom rapporten.',
+      expectedOutput:
+          'Vi ses på kontoret imorgon bitti för att gå igenom rapporten.',
       mustContain: ['kontoret', 'rapporten'],
       expectModification: false,
       language: 'sv',
     ),
 
     // ── German: more realistic Whisper errors ───────────────────
-
     const CorrectionBenchmarkCase(
       name: 'de_eszett_and_umlaut',
       input: 'ich weiss nicht ob er die strasse finden konnte',
@@ -405,7 +410,11 @@ class CorrectionBenchmarkService {
 
       final caseResults = <CorrectionCaseResult>[];
       try {
-        for (var caseIndex = 0; caseIndex < benchmarkCases.length; caseIndex++) {
+        for (
+          var caseIndex = 0;
+          caseIndex < benchmarkCases.length;
+          caseIndex++
+        ) {
           final testCase = benchmarkCases[caseIndex];
           onProgress?.call(
             CorrectionBenchmarkProgress(
@@ -421,8 +430,9 @@ class CorrectionBenchmarkService {
           );
 
           final prompt = buildCorrectionPrompt(testCase.input);
-          final maxTok =
-              CorrectionPromptTemplate.estimateMaxTokens(testCase.input);
+          final maxTok = CorrectionPromptTemplate.estimateMaxTokens(
+            testCase.input,
+          );
 
           try {
             final result = await llm
@@ -432,63 +442,69 @@ class CorrectionBenchmarkService {
             final output = _cleanOutput(result.output);
             final check = _evaluate(testCase, output);
 
-            caseResults.add(CorrectionCaseResult(
-              caseName: testCase.name,
-              input: testCase.input,
-              expectedOutput: testCase.expectedOutput,
-              actualOutput: output,
-              wasModified: check.wasModified,
-              modificationExpected: testCase.expectModification,
-              modificationMatch: check.modificationMatch,
-              allMustContainFound: check.allMustContainFound,
-              missingKeywords: check.missingKeywords,
-              allMustNotContainAbsent: check.allMustNotContainAbsent,
-              unwantedKeywordsFound: check.unwantedKeywordsFound,
-              cleanOutput: check.cleanOutput,
-              cleanOutputDetail: check.cleanOutputDetail,
-              elapsed: result.elapsed,
-              tokensPerSecond: result.tokensPerSecond,
-            ));
+            caseResults.add(
+              CorrectionCaseResult(
+                caseName: testCase.name,
+                input: testCase.input,
+                expectedOutput: testCase.expectedOutput,
+                actualOutput: output,
+                wasModified: check.wasModified,
+                modificationExpected: testCase.expectModification,
+                modificationMatch: check.modificationMatch,
+                allMustContainFound: check.allMustContainFound,
+                missingKeywords: check.missingKeywords,
+                allMustNotContainAbsent: check.allMustNotContainAbsent,
+                unwantedKeywordsFound: check.unwantedKeywordsFound,
+                cleanOutput: check.cleanOutput,
+                cleanOutputDetail: check.cleanOutputDetail,
+                elapsed: result.elapsed,
+                tokensPerSecond: result.tokensPerSecond,
+              ),
+            );
           } on TimeoutException {
             llm.cancelInference();
-            caseResults.add(CorrectionCaseResult(
-              caseName: testCase.name,
-              input: testCase.input,
-              expectedOutput: testCase.expectedOutput,
-              actualOutput: '',
-              wasModified: false,
-              modificationExpected: testCase.expectModification,
-              modificationMatch: false,
-              allMustContainFound: false,
-              missingKeywords: testCase.mustContain,
-              allMustNotContainAbsent: true,
-              unwantedKeywordsFound: const [],
-              cleanOutput: false,
-              cleanOutputDetail: 'Timed out',
-              elapsed: perCaseTimeout,
-              tokensPerSecond: 0,
-              error: 'Timed out after ${perCaseTimeout.inSeconds}s',
-            ));
+            caseResults.add(
+              CorrectionCaseResult(
+                caseName: testCase.name,
+                input: testCase.input,
+                expectedOutput: testCase.expectedOutput,
+                actualOutput: '',
+                wasModified: false,
+                modificationExpected: testCase.expectModification,
+                modificationMatch: false,
+                allMustContainFound: false,
+                missingKeywords: testCase.mustContain,
+                allMustNotContainAbsent: true,
+                unwantedKeywordsFound: const [],
+                cleanOutput: false,
+                cleanOutputDetail: 'Timed out',
+                elapsed: perCaseTimeout,
+                tokensPerSecond: 0,
+                error: 'Timed out after ${perCaseTimeout.inSeconds}s',
+              ),
+            );
           } catch (e) {
             llm.cancelInference();
-            caseResults.add(CorrectionCaseResult(
-              caseName: testCase.name,
-              input: testCase.input,
-              expectedOutput: testCase.expectedOutput,
-              actualOutput: '',
-              wasModified: false,
-              modificationExpected: testCase.expectModification,
-              modificationMatch: false,
-              allMustContainFound: false,
-              missingKeywords: testCase.mustContain,
-              allMustNotContainAbsent: true,
-              unwantedKeywordsFound: const [],
-              cleanOutput: false,
-              cleanOutputDetail: 'Error: $e',
-              elapsed: Duration.zero,
-              tokensPerSecond: 0,
-              error: e.toString(),
-            ));
+            caseResults.add(
+              CorrectionCaseResult(
+                caseName: testCase.name,
+                input: testCase.input,
+                expectedOutput: testCase.expectedOutput,
+                actualOutput: '',
+                wasModified: false,
+                modificationExpected: testCase.expectModification,
+                modificationMatch: false,
+                allMustContainFound: false,
+                missingKeywords: testCase.mustContain,
+                allMustNotContainAbsent: true,
+                unwantedKeywordsFound: const [],
+                cleanOutput: false,
+                cleanOutputDetail: 'Error: $e',
+                elapsed: Duration.zero,
+                tokensPerSecond: 0,
+                error: e.toString(),
+              ),
+            );
           }
 
           completedRuns++;
@@ -509,7 +525,9 @@ class CorrectionBenchmarkService {
         llm.dispose();
       }
 
-      results.add(CorrectionModelResult(modelPath: modelPath, cases: caseResults));
+      results.add(
+        CorrectionModelResult(modelPath: modelPath, cases: caseResults),
+      );
     }
 
     return results;
@@ -565,17 +583,18 @@ class CorrectionBenchmarkService {
     final normalizedInput = inputLower.replaceAll(RegExp(r'\s+'), ' ').trim();
     final normalizedOutput = outputLower.replaceAll(RegExp(r'\s+'), ' ').trim();
     // Strip trailing punctuation for comparison
-    final normalizedInputNoPunct =
-        normalizedInput.replaceAll(RegExp(r'[.!?,;:]+$'), '').trim();
-    final normalizedOutputNoPunct =
-        normalizedOutput.replaceAll(RegExp(r'[.!?,;:]+$'), '').trim();
+    final normalizedInputNoPunct = normalizedInput
+        .replaceAll(RegExp(r'[.!?,;:]+$'), '')
+        .trim();
+    final normalizedOutputNoPunct = normalizedOutput
+        .replaceAll(RegExp(r'[.!?,;:]+$'), '')
+        .trim();
     final wasModified = normalizedInputNoPunct != normalizedOutputNoPunct;
 
     // Modification expectation check
     // If modification is expected, it must have changed
     // If no modification expected, echoing it back is fine (but changing is also OK)
-    final modificationMatch =
-        testCase.expectModification ? wasModified : true;
+    final modificationMatch = testCase.expectModification ? wasModified : true;
 
     // Must-contain check
     final missingKeywords = <String>[];
@@ -614,7 +633,9 @@ class CorrectionBenchmarkService {
     }
 
     // Check for markdown
-    if (output.contains('```') || output.contains('**') || output.contains('##')) {
+    if (output.contains('```') ||
+        output.contains('**') ||
+        output.contains('##')) {
       return const _CleanCheck(passed: false, detail: 'contains markdown');
     }
 
@@ -639,7 +660,10 @@ class CorrectionBenchmarkService {
     // Check for excessive length (more than 3x input length likely means explanations)
     // Relaxed — just flag it
     if (output.length > 500) {
-      return const _CleanCheck(passed: false, detail: 'output suspiciously long (>500 chars)');
+      return const _CleanCheck(
+        passed: false,
+        detail: 'output suspiciously long (>500 chars)',
+      );
     }
 
     return const _CleanCheck(passed: true, detail: null);

@@ -108,7 +108,9 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     }
   }
 
-  Future<void> _syncForegroundServiceLifecycleState(AppLifecycleState state) async {
+  Future<void> _syncForegroundServiceLifecycleState(
+    AppLifecycleState state,
+  ) async {
     if (!Platform.isAndroid) return;
 
     final foregroundService = ref.read(foregroundServiceProvider);

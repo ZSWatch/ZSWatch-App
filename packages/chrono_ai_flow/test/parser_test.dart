@@ -37,11 +37,15 @@ void main() {
       expect(result.extractions[0].intent, 'reminder');
       expect(result.extractions[0].title, 'pick up dog');
       expect(
-          result.extractions[0].datetimeExpressionEnglish, 'tomorrow at 5 pm');
+        result.extractions[0].datetimeExpressionEnglish,
+        'tomorrow at 5 pm',
+      );
       expect(result.extractions[1].intent, 'reminder');
       expect(result.extractions[1].title, 'turn off lights');
       expect(
-          result.extractions[1].datetimeExpressionEnglish, 'tomorrow at 9 pm');
+        result.extractions[1].datetimeExpressionEnglish,
+        'tomorrow at 9 pm',
+      );
     });
 
     test('parses array with mixed intents', () {

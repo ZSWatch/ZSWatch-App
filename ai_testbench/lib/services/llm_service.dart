@@ -51,14 +51,21 @@ class LlmService {
   double topP = 1.0;
   double presencePenalty = 2.0;
   int numGpuLayers = 0;
+
   /// When false, disables thinking/reasoning for models like Qwen3/3.5.
   bool enableThinking = true;
 
   static void _logFilter(String log) {
-    if (log.contains('loaded') || log.contains('error') || log.contains('Error') ||
-        log.contains('token') || log.contains('speed') || log.contains('FAILED') ||
-        log.contains('Model loaded') || log.contains('Initialized') ||
-        log.contains('Backend initialized') || log.contains('Available backends')) {
+    if (log.contains('loaded') ||
+        log.contains('error') ||
+        log.contains('Error') ||
+        log.contains('token') ||
+        log.contains('speed') ||
+        log.contains('FAILED') ||
+        log.contains('Model loaded') ||
+        log.contains('Initialized') ||
+        log.contains('Backend initialized') ||
+        log.contains('Available backends')) {
       debugPrint('[llama.cpp] $log');
     }
   }
@@ -111,16 +118,17 @@ class LlmService {
     );
 
     _requestInFlight = true;
-    _runningRequestId = await fllamaChat(
-      request,
-      (String response, String responseJson, bool done) {
-        if (done && !completer.isCompleted) {
-          _requestInFlight = false;
-          _runningRequestId = -1;
-          completer.complete(response);
-        }
-      },
-    );
+    _runningRequestId = await fllamaChat(request, (
+      String response,
+      String responseJson,
+      bool done,
+    ) {
+      if (done && !completer.isCompleted) {
+        _requestInFlight = false;
+        _runningRequestId = -1;
+        completer.complete(response);
+      }
+    });
 
     final output = await completer.future;
     sw.stop();
@@ -148,7 +156,10 @@ class LlmService {
   /// Strip Qwen3-style <think>…</think> reasoning blocks from output.
   static String _stripThinkingTags(String text) {
     // Remove complete <think>...</think> blocks
-    var cleaned = text.replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '');
+    var cleaned = text.replaceAll(
+      RegExp(r'<think>.*?</think>', dotAll: true),
+      '',
+    );
     // Remove unclosed <think> (thinking consumed entire budget)
     cleaned = cleaned.replaceAll(RegExp(r'<think>.*', dotAll: true), '');
     return cleaned.trim();
@@ -188,20 +199,17 @@ class LlmService {
     );
 
     _requestInFlight = true;
-    fllamaChat(
-      request,
-      (String response, String responseJson, bool done) {
-        debugPrint('[LlmService] stream cb: done=$done, len=${response.length}');
-        if (!controller.isClosed) {
-          controller.add(response);
-          if (done) {
-            _requestInFlight = false;
-            _runningRequestId = -1;
-            controller.close();
-          }
+    fllamaChat(request, (String response, String responseJson, bool done) {
+      debugPrint('[LlmService] stream cb: done=$done, len=${response.length}');
+      if (!controller.isClosed) {
+        controller.add(response);
+        if (done) {
+          _requestInFlight = false;
+          _runningRequestId = -1;
+          controller.close();
         }
-      },
-    ).then((id) {
+      }
+    }).then((id) {
       _runningRequestId = id;
     });
 

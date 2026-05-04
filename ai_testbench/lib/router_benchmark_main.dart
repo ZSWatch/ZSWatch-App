@@ -17,15 +17,19 @@ Future<void> runRouterBenchmark(List<String> args) async {
   final modelFilter = _readArg(args, '--model');
   final modelDir = _readArg(args, '--model-dir') ?? 'models';
 
-  final modelPaths = Directory(modelDir)
-      .listSync()
-      .whereType<File>()
-      .map((f) => f.path)
-      .where((p) => p.toLowerCase().endsWith('.gguf'))
-      .where(
-          (p) => modelFilter == null || p.toLowerCase().contains(modelFilter.toLowerCase()))
-      .toList()
-    ..sort();
+  final modelPaths =
+      Directory(modelDir)
+          .listSync()
+          .whereType<File>()
+          .map((f) => f.path)
+          .where((p) => p.toLowerCase().endsWith('.gguf'))
+          .where(
+            (p) =>
+                modelFilter == null ||
+                p.toLowerCase().contains(modelFilter.toLowerCase()),
+          )
+          .toList()
+        ..sort();
 
   if (modelPaths.isEmpty) {
     stdout.writeln('[RouterBench] No .gguf models found');
@@ -40,7 +44,8 @@ Future<void> runRouterBenchmark(List<String> args) async {
     ..setModel(modelPath)
     ..nCtx = 4096
     ..nThreads = Platform.numberOfProcessors
-    ..maxTokens = 32 // Router output is tiny: {"route":"timer_alarm"}
+    ..maxTokens =
+        32 // Router output is tiny: {"route":"timer_alarm"}
     ..temperature = 0.1
     ..topP = 1.0
     ..presencePenalty = 2.0
@@ -74,27 +79,34 @@ Future<void> runRouterBenchmark(List<String> args) async {
     _RouterTestCase('Remind me in 30 minutes to check the oven', 'voice_memo'),
     _RouterTestCase('Remind me at 3 PM to call the dentist', 'voice_memo'),
     _RouterTestCase(
-        'Påminn mig om 10 minuter att stänga av ugnen', 'voice_memo'),
+      'Påminn mig om 10 minuter att stänga av ugnen',
+      'voice_memo',
+    ),
     _RouterTestCase(
-        'Påminn mig klockan 15 att ringa tandläkaren', 'voice_memo'),
+      'Påminn mig klockan 15 att ringa tandläkaren',
+      'voice_memo',
+    ),
 
     // Event/note cases → voice_memo
     _RouterTestCase('Meeting with John next Tuesday at 2 pm', 'voice_memo'),
     _RouterTestCase('Buy milk and bread', 'voice_memo'),
     _RouterTestCase('Köp mjölk och bröd på vägen hem', 'voice_memo'),
+    _RouterTestCase('Tandläkare den 15 mars klockan halv 10', 'voice_memo'),
     _RouterTestCase(
-        'Tandläkare den 15 mars klockan halv 10', 'voice_memo'),
-    _RouterTestCase(
-        'Fika med Anna imorgon klockan 10 och sen lämna in paketet',
-        'voice_memo'),
+      'Fika med Anna imorgon klockan 10 och sen lämna in paketet',
+      'voice_memo',
+    ),
 
     // Mixed cases
     _RouterTestCase(
-        'Set a timer for 10 minutes and an alarm for 7 AM tomorrow', 'timer_alarm'),
+      'Set a timer for 10 minutes and an alarm for 7 AM tomorrow',
+      'timer_alarm',
+    ),
     _RouterTestCase('Set an alarm for 6:30 and buy milk', 'mixed'),
     _RouterTestCase(
-        'Sätt en timer på 5 minuter och påminn mig klockan 3 att ringa tandläkaren',
-        'mixed'),
+      'Sätt en timer på 5 minuter och påminn mig klockan 3 att ringa tandläkaren',
+      'mixed',
+    ),
   ];
 
   stdout.writeln('[RouterBench] Running ${cases.length} router cases...\n');
@@ -110,10 +122,14 @@ Future<void> runRouterBenchmark(List<String> args) async {
       now: referenceTime,
     );
 
-    final result = await llm.generate(prompt).timeout(
+    final result = await llm
+        .generate(prompt)
+        .timeout(
           const Duration(seconds: 30),
           onTimeout: () => const InferenceResult(
-              output: '{"route":"timeout"}', elapsed: Duration(seconds: 30)),
+            output: '{"route":"timeout"}',
+            elapsed: Duration(seconds: 30),
+          ),
         );
 
     routerTimes.add(result.elapsed);
@@ -123,19 +139,23 @@ Future<void> runRouterBenchmark(List<String> args) async {
 
     final status = correct ? 'OK' : 'FAIL';
     stdout.writeln(
-        '  $status  route=$route (expected=${tc.expectedRoute})  '
-        '${result.elapsed.inMilliseconds}ms  "${tc.transcript}"');
+      '  $status  route=$route (expected=${tc.expectedRoute})  '
+      '${result.elapsed.inMilliseconds}ms  "${tc.transcript}"',
+    );
   }
 
   final avgRouterMs =
       routerTimes.fold<int>(0, (s, d) => s + d.inMilliseconds) ~/
-          routerTimes.length;
+      routerTimes.length;
   stdout.writeln(
-      '\n[RouterBench] Router accuracy: $routerCorrect/${cases.length}');
+    '\n[RouterBench] Router accuracy: $routerCorrect/${cases.length}',
+  );
   stdout.writeln('[RouterBench] Router avg latency: ${avgRouterMs}ms');
 
   // ── Stage 2: Full two-stage pipeline on timer/alarm cases ──
-  stdout.writeln('\n[RouterBench] Running full two-stage pipeline on timer/alarm cases...\n');
+  stdout.writeln(
+    '\n[RouterBench] Running full two-stage pipeline on timer/alarm cases...\n',
+  );
 
   // Reconfigure for extraction (more tokens needed)
   llm.maxTokens = 384;
@@ -157,10 +177,14 @@ Future<void> runRouterBenchmark(List<String> args) async {
       transcript: tc.transcript,
       now: referenceTime,
     );
-    final routerResult = await llm.generate(routerPrompt).timeout(
+    final routerResult = await llm
+        .generate(routerPrompt)
+        .timeout(
           const Duration(seconds: 30),
           onTimeout: () => const InferenceResult(
-              output: '{"route":"timeout"}', elapsed: Duration(seconds: 30)),
+            output: '{"route":"timeout"}',
+            elapsed: Duration(seconds: 30),
+          ),
         );
     final routerMs = routerResult.elapsed.inMilliseconds;
 
@@ -171,10 +195,14 @@ Future<void> runRouterBenchmark(List<String> args) async {
       transcript: tc.transcript,
       now: referenceTime,
     );
-    final extractResult = await llm.generate(extractPrompt).timeout(
+    final extractResult = await llm
+        .generate(extractPrompt)
+        .timeout(
           const Duration(seconds: 60),
           onTimeout: () => const InferenceResult(
-              output: '[]', elapsed: Duration(seconds: 60)),
+            output: '[]',
+            elapsed: Duration(seconds: 60),
+          ),
         );
     final extractMs = extractResult.elapsed.inMilliseconds;
 
@@ -185,29 +213,34 @@ Future<void> runRouterBenchmark(List<String> args) async {
     final first = parseResult.extractions.isNotEmpty
         ? parseResult.extractions.first
         : null;
-    final intentOk = first != null &&
-        (first.intent == 'timer' || first.intent == 'alarm');
+    final intentOk =
+        first != null && (first.intent == 'timer' || first.intent == 'alarm');
     if (intentOk) extractionCorrect++;
 
     stdout.writeln(
-        '  ${intentOk ? "OK" : "FAIL"}  intent=${first?.intent ?? "null"}  '
-        'dur=${first?.durationSeconds ?? "null"}  '
-        'router=${routerMs}ms  extract=${extractMs}ms  '
-        'total=${sw.elapsedMilliseconds}ms  "${tc.transcript}"');
+      '  ${intentOk ? "OK" : "FAIL"}  intent=${first?.intent ?? "null"}  '
+      'dur=${first?.durationSeconds ?? "null"}  '
+      'router=${routerMs}ms  extract=${extractMs}ms  '
+      'total=${sw.elapsedMilliseconds}ms  "${tc.transcript}"',
+    );
   }
 
   final avgTotalMs =
       totalTimes.fold<int>(0, (s, d) => s + d.inMilliseconds) ~/
-          totalTimes.length;
+      totalTimes.length;
   stdout.writeln(
-      '\n[RouterBench] Extraction accuracy: $extractionCorrect/${timerCases.length}');
+    '\n[RouterBench] Extraction accuracy: $extractionCorrect/${timerCases.length}',
+  );
   stdout.writeln('[RouterBench] Avg total (router+extract): ${avgTotalMs}ms');
   stdout.writeln('[RouterBench] Avg router only: ${avgRouterMs}ms');
   stdout.writeln(
-      '[RouterBench] Avg extract only: ${avgTotalMs - avgRouterMs}ms');
+    '[RouterBench] Avg extract only: ${avgTotalMs - avgRouterMs}ms',
+  );
 
   // ── Stage 3: Compare with single-pass original prompt on voice_memo cases ──
-  stdout.writeln('\n[RouterBench] Comparing single-pass original prompt latency...\n');
+  stdout.writeln(
+    '\n[RouterBench] Comparing single-pass original prompt latency...\n',
+  );
 
   final voiceMemoCases = cases
       .where((c) => c.expectedRoute == 'voice_memo')
@@ -223,23 +256,33 @@ Future<void> runRouterBenchmark(List<String> args) async {
       transcript: tc.transcript,
       now: referenceTime,
     );
-    final result = await llm.generate(prompt).timeout(
+    final result = await llm
+        .generate(prompt)
+        .timeout(
           const Duration(seconds: 90),
           onTimeout: () => const InferenceResult(
-              output: 'timeout', elapsed: Duration(seconds: 90)),
+            output: 'timeout',
+            elapsed: Duration(seconds: 90),
+          ),
         );
     singlePassTimes.add(result.elapsed);
     stdout.writeln(
-        '  single-pass: ${result.elapsed.inMilliseconds}ms  "${tc.transcript}"');
+      '  single-pass: ${result.elapsed.inMilliseconds}ms  "${tc.transcript}"',
+    );
   }
 
   final avgSingleMs =
       singlePassTimes.fold<int>(0, (s, d) => s + d.inMilliseconds) ~/
-          singlePassTimes.length;
-  stdout.writeln('\n[RouterBench] Avg single-pass (original prompt): ${avgSingleMs}ms');
-  stdout.writeln('[RouterBench] Avg two-stage (router+extract): ${avgTotalMs}ms');
+      singlePassTimes.length;
   stdout.writeln(
-      '[RouterBench] Overhead: ${avgTotalMs - avgSingleMs}ms (${((avgTotalMs - avgSingleMs) / avgSingleMs * 100).toStringAsFixed(0)}%)');
+    '\n[RouterBench] Avg single-pass (original prompt): ${avgSingleMs}ms',
+  );
+  stdout.writeln(
+    '[RouterBench] Avg two-stage (router+extract): ${avgTotalMs}ms',
+  );
+  stdout.writeln(
+    '[RouterBench] Overhead: ${avgTotalMs - avgSingleMs}ms (${((avgTotalMs - avgSingleMs) / avgSingleMs * 100).toStringAsFixed(0)}%)',
+  );
 
   llm.dispose();
   stdout.writeln('\n[RouterBench] Done.');
@@ -252,7 +295,8 @@ String _parseRoute(String raw) {
     if (start == -1) return _guessRoute(raw);
     final end = raw.lastIndexOf('}');
     if (end == -1) return _guessRoute(raw);
-    final json = jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
+    final json =
+        jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
     final route = (json['route'] as String?)?.trim().toLowerCase() ?? '';
     if (route == 'timer_alarm' || route == 'voice_memo' || route == 'mixed') {
       return route;

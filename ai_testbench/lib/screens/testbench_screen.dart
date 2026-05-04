@@ -90,10 +90,7 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
       final pickedPath = result.files.single.path!;
       setState(() {
         _modelPath = pickedPath;
-        _availableModelPaths = {
-          ..._availableModelPaths,
-          pickedPath,
-        }.toList()
+        _availableModelPaths = {..._availableModelPaths, pickedPath}.toList()
           ..sort();
       });
     }
@@ -213,9 +210,13 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
 
     final prompt = _mode == _RunMode.classify
         ? ChronoPromptTemplate.render(
-            ChronoPromptTemplate.defaultTemplate, transcript: transcript)
+            ChronoPromptTemplate.defaultTemplate,
+            transcript: transcript,
+          )
         : PromptTemplates.summarize(
-            language: _selectedLanguage, transcript: transcript);
+            language: _selectedLanguage,
+            transcript: transcript,
+          );
 
     setState(() {
       _formattedPrompt = prompt;
@@ -243,10 +244,14 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
       }
 
       sw.stop();
-      debugPrint('[Testbench] Stream done: $streamEvents events, '
-          '${_streamBuffer.length} chars, ${sw.elapsedMilliseconds}ms');
+      debugPrint(
+        '[Testbench] Stream done: $streamEvents events, '
+        '${_streamBuffer.length} chars, ${sw.elapsedMilliseconds}ms',
+      );
       if (_streamBuffer.isNotEmpty) {
-        debugPrint('[Testbench] Output preview: ${_streamBuffer.substring(0, _streamBuffer.length.clamp(0, 300))}');
+        debugPrint(
+          '[Testbench] Output preview: ${_streamBuffer.substring(0, _streamBuffer.length.clamp(0, 300))}',
+        );
       } else {
         debugPrint('[Testbench] WARNING: output is empty!');
       }
@@ -328,7 +333,11 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Chip(
-                avatar: const Icon(Icons.check_circle, size: 18, color: Colors.green),
+                avatar: const Icon(
+                  Icons.check_circle,
+                  size: 18,
+                  color: Colors.green,
+                ),
                 label: Text(
                   _modelPath?.split(Platform.pathSeparator).last ?? '',
                   style: const TextStyle(fontSize: 12),
@@ -401,10 +410,15 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
                 FilledButton.icon(
                   onPressed: _isRunning ? null : _loadModel,
                   icon: const Icon(Icons.memory, size: 18),
-                  label: Text(_llm.isModelLoaded ? 'Reload Model' : 'Set Model'),
+                  label: Text(
+                    _llm.isModelLoaded ? 'Reload Model' : 'Set Model',
+                  ),
                 ),
                 OutlinedButton.icon(
-                  onPressed: _isRunning || _isBenchmarking || _availableModelPaths.isEmpty
+                  onPressed:
+                      _isRunning ||
+                          _isBenchmarking ||
+                          _availableModelPaths.isEmpty
                       ? null
                       : () => _runBenchmarks(),
                   icon: _isBenchmarking
@@ -418,8 +432,8 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
                     _isBenchmarking && _benchmarkProgress != null
                         ? 'Benchmarking ${_benchmarkProgress!.completedRuns}/${_benchmarkProgress!.totalRuns}'
                         : _isBenchmarking
-                            ? 'Benchmarking…'
-                            : 'Benchmark All',
+                        ? 'Benchmarking…'
+                        : 'Benchmark All',
                   ),
                 ),
               ],
@@ -534,17 +548,16 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
           const SizedBox(height: 24),
 
           // ── Sample transcripts ─────────────────────────────────────────
-          Text('Sample Transcripts',
-              style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'Sample Transcripts',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: 8),
           ..._sampleTranscripts.map(
             (sample) => Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: ActionChip(
-                label: Text(
-                  sample.label,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                label: Text(sample.label, overflow: TextOverflow.ellipsis),
                 onPressed: () {
                   _transcriptController.text = sample.text;
                   setState(() => _selectedLanguage = sample.language);
@@ -632,8 +645,10 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
 
           if (_benchmarkResults.isNotEmpty) ...[
             const SizedBox(height: 16),
-            Text('Benchmark Results',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'Benchmark Results',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             ..._benchmarkResults.map(
               (result) => Card(
@@ -652,7 +667,9 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
                         spacing: 12,
                         runSpacing: 4,
                         children: [
-                          Text('Pass: ${result.passedCases}/${result.cases.length}'),
+                          Text(
+                            'Pass: ${result.passedCases}/${result.cases.length}',
+                          ),
                           Text(
                             'Avg tok/s: ${result.avgTokensPerSecond.toStringAsFixed(1)}',
                           ),
@@ -688,7 +705,9 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
                                 Text(
                                   'time: ${caseResult.timeResolutionDetail}',
                                   style: TextStyle(
-                                    color: caseResult.timeResolutionCorrect ? Colors.green : Colors.orangeAccent,
+                                    color: caseResult.timeResolutionCorrect
+                                        ? Colors.green
+                                        : Colors.orangeAccent,
                                     fontSize: 11,
                                   ),
                                 ),
@@ -732,16 +751,20 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
 
           // ── Parsed card preview ───────────────────────────────────────
           if (_parsedJson != null) ...[
-            Text('Card Preview',
-                style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'Card Preview',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             MemoCard(data: _parsedJson!),
             const SizedBox(height: 24),
           ],
 
           // ── Raw JSON output ───────────────────────────────────────────
-          Text('Raw Model Output',
-              style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            'Raw Model Output',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
           const SizedBox(height: 8),
           Container(
             width: double.infinity,
@@ -838,7 +861,9 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          LinearProgressIndicator(value: total == 0 ? null : fraction.clamp(0, 1)),
+          LinearProgressIndicator(
+            value: total == 0 ? null : fraction.clamp(0, 1),
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 12,
@@ -846,7 +871,9 @@ class _TestbenchScreenState extends State<TestbenchScreen> {
             children: [
               Text('Completed: $completed/$total'),
               if (progress != null)
-                Text('Model: ${progress.currentModelIndex + 1}/${progress.totalModels}'),
+                Text(
+                  'Model: ${progress.currentModelIndex + 1}/${progress.totalModels}',
+                ),
               if (progress != null && progress.currentCaseName.isNotEmpty)
                 Text('Case: ${progress.currentCaseName}'),
               if (eta != null) Text('ETA: ${_formatDuration(eta)}'),

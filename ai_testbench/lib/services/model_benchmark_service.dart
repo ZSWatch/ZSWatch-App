@@ -58,16 +58,16 @@ class BenchmarkCase {
     int? expectedDurationSeconds,
     int durationToleranceSeconds = 5,
   }) : expectedItems = [
-          ExpectedItem(
-            expectedIntent: expectedIntent,
-            expectTime: expectTime,
-            titleLanguageKeywords: titleLanguageKeywords,
-            expectedDateTime: expectedDateTime,
-            toleranceMinutes: toleranceMinutes,
-            expectedDurationSeconds: expectedDurationSeconds,
-            durationToleranceSeconds: durationToleranceSeconds,
-          ),
-        ];
+         ExpectedItem(
+           expectedIntent: expectedIntent,
+           expectTime: expectTime,
+           titleLanguageKeywords: titleLanguageKeywords,
+           expectedDateTime: expectedDateTime,
+           toleranceMinutes: toleranceMinutes,
+           expectedDurationSeconds: expectedDurationSeconds,
+           durationToleranceSeconds: durationToleranceSeconds,
+         ),
+       ];
 
   /// Shorthand accessors for single-item cases (used by existing code).
   String get expectedIntent => expectedItems.first.expectedIntent;
@@ -190,17 +190,14 @@ class BenchmarkModelResult {
   final String modelPath;
   final List<BenchmarkCaseResult> cases;
 
-  const BenchmarkModelResult({
-    required this.modelPath,
-    required this.cases,
-  });
+  const BenchmarkModelResult({required this.modelPath, required this.cases});
 
   String get modelName => modelPath.split(Platform.pathSeparator).last;
   int get passedCases => cases.where((c) => c.passed).length;
   double get avgTokensPerSecond => cases.isEmpty
       ? 0
       : cases.fold<double>(0, (sum, c) => sum + c.tokensPerSecond) /
-          cases.length;
+            cases.length;
   Duration get totalElapsed =>
       cases.fold(Duration.zero, (sum, c) => sum + c.elapsed);
 }
@@ -220,7 +217,6 @@ class ModelBenchmarkService {
 
   static final benchmarkCases = <BenchmarkCase>[
     // ── English single-item cases ──────────────────────────────────────
-
     BenchmarkCase.single(
       name: 'en_event_precise_time',
       transcript:
@@ -276,7 +272,6 @@ class ModelBenchmarkService {
     ),
 
     // ── Swedish single-item cases (native language title validation) ──
-
     BenchmarkCase.single(
       name: 'sv_reminder_tomorrow',
       transcript: 'Påminn mig imorgon klockan 8 att ringa tandläkaren.',
@@ -319,7 +314,6 @@ class ModelBenchmarkService {
     ),
 
     // ── German single-item cases (native language title validation) ───
-
     BenchmarkCase.single(
       name: 'de_event_appointment',
       transcript:
@@ -340,7 +334,6 @@ class ModelBenchmarkService {
     ),
 
     // ── Additional English single-item cases ─────────────────────────
-
     BenchmarkCase.single(
       name: 'en_reminder_specific_date',
       transcript: 'Submit the expense report by March 20th at 9 AM.',
@@ -366,7 +359,6 @@ class ModelBenchmarkService {
     ),
 
     // ── Additional Swedish single-item cases ─────────────────────────
-
     BenchmarkCase.single(
       name: 'sv_event_fika',
       transcript: 'Fika med Lisa på fredag klockan 15.',
@@ -439,7 +431,6 @@ class ModelBenchmarkService {
     ),
 
     // ── Voice note tests – short (1-2 sentences, casual/fragmented) ──
-
     BenchmarkCase.single(
       name: 'voice_short_en_idea',
       transcript: 'Maybe add a compass widget to the watch face.',
@@ -484,7 +475,6 @@ class ModelBenchmarkService {
     ),
 
     // ── Voice note tests – long (rambling, filler words, multi-sentence) ─
-
     BenchmarkCase.single(
       name: 'voice_long_en_rambling_reminder',
       transcript:
@@ -531,7 +521,6 @@ class ModelBenchmarkService {
     ),
 
     // ── Additional multi-item cases ──────────────────────────────────
-
     BenchmarkCase(
       name: 'sv_multi_fika_and_errand',
       transcript:
@@ -622,7 +611,6 @@ class ModelBenchmarkService {
     ),
 
     // ── Conversational Swedish / Swenglish voice notes ───────────────
-
     BenchmarkCase(
       name: 'sv_multi_dev_tasks_swenglish',
       transcript:
@@ -671,7 +659,6 @@ class ModelBenchmarkService {
     ),
 
     // ── Multi-item cases ─────────────────────────────────────────────
-
     BenchmarkCase(
       name: 'en_multi_two_reminders',
       transcript:
@@ -730,10 +717,7 @@ class ModelBenchmarkService {
       transcript:
           'Tomorrow at 8 go for a run then have lunch with Mike at noon and buy groceries.',
       expectedItems: [
-        ExpectedItem(
-          expectedIntent: 'reminder',
-          expectTime: true,
-        ),
+        ExpectedItem(expectedIntent: 'reminder', expectTime: true),
         ExpectedItem(
           expectedIntent: 'event',
           expectTime: true,
@@ -823,7 +807,6 @@ class ModelBenchmarkService {
     ),
 
     // ── Timer cases ──────────────────────────────────────────────────
-
     BenchmarkCase.single(
       name: 'en_timer_simple',
       transcript: 'Set a timer for 8 minutes',
@@ -906,7 +889,6 @@ class ModelBenchmarkService {
     ),
 
     // ── Alarm cases ──────────────────────────────────────────────────
-
     BenchmarkCase.single(
       name: 'en_alarm_morning',
       transcript: 'Set an alarm for 7:30 AM',
@@ -983,11 +965,9 @@ class ModelBenchmarkService {
     ),
 
     // ── Multi-item cases with timers/alarms ──────────────────────────
-
     BenchmarkCase(
       name: 'en_multi_timer_and_alarm',
-      transcript:
-          'Set a timer for 10 minutes and an alarm for 7 AM tomorrow',
+      transcript: 'Set a timer for 10 minutes and an alarm for 7 AM tomorrow',
       expectedItems: [
         ExpectedItem(
           expectedIntent: 'timer',
@@ -1039,7 +1019,6 @@ class ModelBenchmarkService {
     // ── No-speech / garbage input cases ─────────────────────────────────
     // These should produce an empty array []. The LLM should not
     // hallucinate actions from noise or silence markers.
-
     BenchmarkCase(
       name: 'nospeech_blank_audio_marker',
       transcript: '[BLANK_AUDIO]',
@@ -1103,9 +1082,7 @@ class ModelBenchmarkService {
 
       final caseResults = <BenchmarkCaseResult>[];
       try {
-        for (var caseIndex = 0;
-            caseIndex < casesToRun.length;
-            caseIndex++) {
+        for (var caseIndex = 0; caseIndex < casesToRun.length; caseIndex++) {
           final testCase = casesToRun[caseIndex];
           onProgress?.call(
             BenchmarkProgress(
@@ -1128,16 +1105,15 @@ class ModelBenchmarkService {
           );
 
           try {
-            final result = await llm
-                .generate(prompt)
-                .timeout(perCaseTimeout);
+            final result = await llm.generate(prompt).timeout(perCaseTimeout);
 
             // Parse using the shared ChronoLlmParser
             final parseResult = _parser.parse(result.output);
             final extractions = parseResult.extractions;
             // An empty array [] is valid JSON when we expect 0 items
             // (no-speech / garbage input).
-            final validJson = extractions.isNotEmpty ||
+            final validJson =
+                extractions.isNotEmpty ||
                 (testCase.expectedCount == 0 &&
                     _containsEmptyJsonArray(result.output));
 
@@ -1157,8 +1133,9 @@ class ModelBenchmarkService {
             String? allDurationDetail;
             final itemFailures = <String>[];
 
-            final checkCount =
-                extractedCount < expectedCount ? extractedCount : expectedCount;
+            final checkCount = extractedCount < expectedCount
+                ? extractedCount
+                : expectedCount;
             for (var i = 0; i < checkCount; i++) {
               final ext = extractions[i];
               final exp = testCase.expectedItems[i];
@@ -1167,51 +1144,49 @@ class ModelBenchmarkService {
               if (!intentOk) {
                 allIntentMatch = false;
                 itemFailures.add(
-                    'item[$i] intent: got "${ext.intent}", expected "${exp.expectedIntent}"');
+                  'item[$i] intent: got "${ext.intent}", expected "${exp.expectedIntent}"',
+                );
               }
 
-              final hasTime = ext.datetimeExpressionOriginal != null ||
+              final hasTime =
+                  ext.datetimeExpressionOriginal != null ||
                   ext.datetimeExpressionEnglish != null;
               if (hasTime != exp.expectTime) {
                 allTimePresenceMatch = false;
                 itemFailures.add(
-                    'item[$i] time presence: got $hasTime, expected ${exp.expectTime}');
+                  'item[$i] time presence: got $hasTime, expected ${exp.expectTime}',
+                );
               }
 
-              final titleLang =
-                  _checkTitleLanguageForItem(ext.title, exp);
+              final titleLang = _checkTitleLanguageForItem(ext.title, exp);
               if (!titleLang.passed) {
                 allTitleLangMatch = false;
-                itemFailures.add(
-                    'item[$i] title lang: ${titleLang.detail}');
+                itemFailures.add('item[$i] title lang: ${titleLang.detail}');
               }
-              allTitleLangDetail = (allTitleLangDetail ?? '') +
+              allTitleLangDetail =
+                  (allTitleLangDetail ?? '') +
                   'item[$i]: ${titleLang.detail}; ';
 
               final timeRes = _checkTimeResolutionForItem(
-                ext.datetimeExpressionEnglish ??
-                    ext.datetimeExpressionOriginal,
+                ext.datetimeExpressionEnglish ?? ext.datetimeExpressionOriginal,
                 exp,
                 resolver,
               );
               if (!timeRes.passed) {
                 allTimeResMatch = false;
-                itemFailures.add(
-                    'item[$i] time: ${timeRes.detail}');
+                itemFailures.add('item[$i] time: ${timeRes.detail}');
               }
-              allTimeResDetail = (allTimeResDetail ?? '') +
-                  'item[$i]: ${timeRes.detail}; ';
+              allTimeResDetail =
+                  (allTimeResDetail ?? '') + 'item[$i]: ${timeRes.detail}; ';
 
               // Duration validation for timer intents
-              final durRes = _checkDurationForItem(
-                  ext.durationSeconds, exp);
+              final durRes = _checkDurationForItem(ext.durationSeconds, exp);
               if (!durRes.passed) {
                 allDurationMatch = false;
-                itemFailures.add(
-                    'item[$i] duration: ${durRes.detail}');
+                itemFailures.add('item[$i] duration: ${durRes.detail}');
               }
-              allDurationDetail = (allDurationDetail ?? '') +
-                  'item[$i]: ${durRes.detail}; ';
+              allDurationDetail =
+                  (allDurationDetail ?? '') + 'item[$i]: ${durRes.detail}; ';
             }
 
             // If count mismatch, mark missing items as failures
@@ -1221,8 +1196,7 @@ class ModelBenchmarkService {
               allTimePresenceMatch = false;
             }
             for (var i = checkCount; i < extractedCount; i++) {
-              itemFailures
-                  .add('item[$i] unexpected extra extraction');
+              itemFailures.add('item[$i] unexpected extra extraction');
             }
 
             // Use first extraction for summary fields (backward compat)
@@ -1268,8 +1242,7 @@ class ModelBenchmarkService {
                 intent: 'timeout',
                 elapsed: perCaseTimeout,
                 tokensPerSecond: 0,
-                outputPreview:
-                    'Timed out after ${perCaseTimeout.inSeconds}s',
+                outputPreview: 'Timed out after ${perCaseTimeout.inSeconds}s',
                 error: 'Timed out after ${perCaseTimeout.inSeconds}s',
                 extractedCount: 0,
                 expectedCount: testCase.expectedCount,
@@ -1317,7 +1290,8 @@ class ModelBenchmarkService {
       }
 
       results.add(
-          BenchmarkModelResult(modelPath: modelPath, cases: caseResults));
+        BenchmarkModelResult(modelPath: modelPath, cases: caseResults),
+      );
     }
 
     onProgress?.call(
@@ -1326,12 +1300,10 @@ class ModelBenchmarkService {
         totalCasesPerModel: totalCases,
         totalRuns: totalRuns,
         completedRuns: completedRuns,
-        currentModelIndex:
-            modelPaths.isEmpty ? 0 : modelPaths.length - 1,
+        currentModelIndex: modelPaths.isEmpty ? 0 : modelPaths.length - 1,
         currentCaseIndex: totalCases == 0 ? 0 : totalCases - 1,
         currentModelPath: modelPaths.isEmpty ? '' : modelPaths.last,
-        currentCaseName:
-            benchmarkCases.isEmpty ? '' : benchmarkCases.last.name,
+        currentCaseName: benchmarkCases.isEmpty ? '' : benchmarkCases.last.name,
       ),
     );
 
@@ -1366,10 +1338,7 @@ class ModelBenchmarkService {
       return const _CheckResult(passed: true, detail: 'no keyword check');
     }
     if (title == null || title.isEmpty) {
-      return const _CheckResult(
-        passed: false,
-        detail: 'no title in output',
-      );
+      return const _CheckResult(passed: false, detail: 'no title in output');
     }
 
     final lower = title.toLowerCase();
@@ -1407,10 +1376,7 @@ class ModelBenchmarkService {
             '(diff ${diff}s, tolerance ${item.durationToleranceSeconds}s)',
       );
     }
-    return _CheckResult(
-      passed: true,
-      detail: '${gotDuration}s OK',
-    );
+    return _CheckResult(passed: true, detail: '${gotDuration}s OK');
   }
 
   _CheckResult _checkTimeResolution(
@@ -1419,7 +1385,10 @@ class ModelBenchmarkService {
     TimeExpressionResolver resolver,
   ) {
     return _checkTimeResolutionForItem(
-        timeExpr, testCase.expectedItems.first, resolver);
+      timeExpr,
+      testCase.expectedItems.first,
+      resolver,
+    );
   }
 
   _CheckResult _checkTimeResolutionForItem(
@@ -1437,10 +1406,7 @@ class ModelBenchmarkService {
       );
     }
 
-    final resolved = resolver.resolve(
-      timeExpr,
-      referenceDate: referenceTime,
-    );
+    final resolved = resolver.resolve(timeExpr, referenceDate: referenceTime);
 
     if (resolved == null) {
       return _CheckResult(

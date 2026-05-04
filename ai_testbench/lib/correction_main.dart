@@ -21,16 +21,18 @@ Future<void> runHeadlessCorrectionBenchmark(List<String> args) async {
     return null;
   }
 
-  final modelDir = readValue('--model-dir') ?? Directory('models').absolute.path;
+  final modelDir =
+      readValue('--model-dir') ?? Directory('models').absolute.path;
   final outputPath = readValue('--output');
 
-  final modelPaths = Directory(modelDir)
-      .listSync()
-      .whereType<File>()
-      .map((f) => f.path)
-      .where((p) => p.toLowerCase().endsWith('.gguf'))
-      .toList()
-    ..sort();
+  final modelPaths =
+      Directory(modelDir)
+          .listSync()
+          .whereType<File>()
+          .map((f) => f.path)
+          .where((p) => p.toLowerCase().endsWith('.gguf'))
+          .toList()
+        ..sort();
 
   if (modelPaths.isEmpty) {
     stdout.writeln('[CorrectionBench] No .gguf files found in $modelDir');
@@ -45,7 +47,9 @@ Future<void> runHeadlessCorrectionBenchmark(List<String> args) async {
   for (final p in modelPaths) {
     stdout.writeln('  - ${p.split(Platform.pathSeparator).last}');
   }
-  stdout.writeln('[CorrectionBench] Cases: ${CorrectionBenchmarkService.benchmarkCases.length}');
+  stdout.writeln(
+    '[CorrectionBench] Cases: ${CorrectionBenchmarkService.benchmarkCases.length}',
+  );
 
   final service = CorrectionBenchmarkService();
   final startedAt = DateTime.now().toUtc();
@@ -71,17 +75,19 @@ Future<void> runHeadlessCorrectionBenchmark(List<String> args) async {
 
   for (final model in results) {
     stdout.writeln('');
-    stdout.writeln('┌── ${model.modelName} ── '
-        '${model.passedCases}/${model.cases.length} passed ──┐');
+    stdout.writeln(
+      '┌── ${model.modelName} ── '
+      '${model.passedCases}/${model.cases.length} passed ──┐',
+    );
 
     for (final c in model.cases) {
       final tag = c.passed ? 'PASS' : 'FAIL';
       final reasons = <String>[];
 
       if (!c.modificationMatch) {
-        reasons.add(c.modificationExpected
-            ? 'NOT_MODIFIED'
-            : 'UNEXPECTED_MODIFICATION');
+        reasons.add(
+          c.modificationExpected ? 'NOT_MODIFIED' : 'UNEXPECTED_MODIFICATION',
+        );
       }
       if (!c.allMustContainFound) {
         reasons.add('MISSING[${c.missingKeywords.join(",")}]');
@@ -117,33 +123,41 @@ Future<void> runHeadlessCorrectionBenchmark(List<String> args) async {
       'finishedAt': finishedAt.toIso8601String(),
       'modelCount': results.length,
       'caseCount': CorrectionBenchmarkService.benchmarkCases.length,
-      'results': results.map((r) => <String, dynamic>{
-        'modelPath': r.modelPath,
-        'modelName': r.modelName,
-        'passedCases': r.passedCases,
-        'totalCases': r.cases.length,
-        'avgTokensPerSecond': r.avgTokensPerSecond,
-        'totalElapsedMs': r.totalElapsed.inMilliseconds,
-        'cases': r.cases.map((c) => <String, dynamic>{
-          'caseName': c.caseName,
-          'passed': c.passed,
-          'wasModified': c.wasModified,
-          'modificationExpected': c.modificationExpected,
-          'modificationMatch': c.modificationMatch,
-          'allMustContainFound': c.allMustContainFound,
-          'missingKeywords': c.missingKeywords,
-          'allMustNotContainAbsent': c.allMustNotContainAbsent,
-          'unwantedKeywordsFound': c.unwantedKeywordsFound,
-          'cleanOutput': c.cleanOutput,
-          'cleanOutputDetail': c.cleanOutputDetail,
-          'input': c.input,
-          'expectedOutput': c.expectedOutput,
-          'actualOutput': c.actualOutput,
-          'elapsedMs': c.elapsed.inMilliseconds,
-          'tokensPerSecond': c.tokensPerSecond,
-          'error': c.error,
-        }).toList(growable: false),
-      }).toList(growable: false),
+      'results': results
+          .map(
+            (r) => <String, dynamic>{
+              'modelPath': r.modelPath,
+              'modelName': r.modelName,
+              'passedCases': r.passedCases,
+              'totalCases': r.cases.length,
+              'avgTokensPerSecond': r.avgTokensPerSecond,
+              'totalElapsedMs': r.totalElapsed.inMilliseconds,
+              'cases': r.cases
+                  .map(
+                    (c) => <String, dynamic>{
+                      'caseName': c.caseName,
+                      'passed': c.passed,
+                      'wasModified': c.wasModified,
+                      'modificationExpected': c.modificationExpected,
+                      'modificationMatch': c.modificationMatch,
+                      'allMustContainFound': c.allMustContainFound,
+                      'missingKeywords': c.missingKeywords,
+                      'allMustNotContainAbsent': c.allMustNotContainAbsent,
+                      'unwantedKeywordsFound': c.unwantedKeywordsFound,
+                      'cleanOutput': c.cleanOutput,
+                      'cleanOutputDetail': c.cleanOutputDetail,
+                      'input': c.input,
+                      'expectedOutput': c.expectedOutput,
+                      'actualOutput': c.actualOutput,
+                      'elapsedMs': c.elapsed.inMilliseconds,
+                      'tokensPerSecond': c.tokensPerSecond,
+                      'error': c.error,
+                    },
+                  )
+                  .toList(growable: false),
+            },
+          )
+          .toList(growable: false),
     };
 
     final file = File(outputPath);
