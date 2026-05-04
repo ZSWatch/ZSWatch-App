@@ -66,10 +66,12 @@ class WatchfaceImageProcessor {
     final cropped = img.copyCrop(source, x: x, y: y, width: side, height: side);
 
     // Resize to 240×240
-    final resized = img.copyResize(cropped,
-        width: watchSize,
-        height: watchSize,
-        interpolation: img.Interpolation.linear);
+    final resized = img.copyResize(
+      cropped,
+      width: watchSize,
+      height: watchSize,
+      interpolation: img.Interpolation.linear,
+    );
 
     // Apply circular mask — pixels outside radius become black (AMOLED off)
     for (var py = 0; py < watchSize; py++) {

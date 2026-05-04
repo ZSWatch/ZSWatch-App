@@ -13,12 +13,7 @@ const int _watchSampleRate = 48000;
 const int _watchChannels = 2;
 
 /// TTS engine state
-enum TtsStatus {
-  idle,
-  synthesizing,
-  speaking,
-  error,
-}
+enum TtsStatus { idle, synthesizing, speaking, error }
 
 /// TTS service wrapping platform TTS for chat reply synthesis.
 ///
@@ -64,7 +59,14 @@ class TtsService {
       // ü(252) Ü(220) ß(223) — German-specific
       if (r == 252 || r == 220 || r == 223) deScore += 2;
       // é(233) è(232) ê(234) à(224) â(226) œ(339) ç(231) — French
-      if (r == 233 || r == 232 || r == 234 || r == 224 || r == 226 || r == 339 || r == 231) frScore++;
+      if (r == 233 ||
+          r == 232 ||
+          r == 234 ||
+          r == 224 ||
+          r == 226 ||
+          r == 339 ||
+          r == 231)
+        frScore++;
       // ñ(241) ¡(161) ¿(191) — Spanish
       if (r == 241 || r == 161 || r == 191) esScore += 2;
     }

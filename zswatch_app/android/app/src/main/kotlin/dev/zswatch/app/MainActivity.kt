@@ -68,6 +68,7 @@ class MainActivity : FlutterActivity() {
     
     private val foregroundServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            LifecycleLogger.log("MainActivity", "foreground service connected component=$name")
             val binder = service as BleConnectionForegroundService.LocalBinder
             foregroundService = binder.getService()
             foregroundServiceBound = true
@@ -79,6 +80,7 @@ class MainActivity : FlutterActivity() {
         }
         
         override fun onServiceDisconnected(name: ComponentName?) {
+            LifecycleLogger.log("MainActivity", "foreground service disconnected component=$name")
             foregroundService = null
             foregroundServiceBound = false
         }
@@ -86,14 +88,38 @@ class MainActivity : FlutterActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LifecycleLogger.initialize(applicationContext)
+        LifecycleLogger.recordHistoricalExitReasons(applicationContext)
+        LifecycleLogger.log("MainActivity", "onCreate savedInstanceState=${savedInstanceState != null}")
         
         // Create notification channels for foreground services
         BleConnectionForegroundService.createNotificationChannel(this)
         LlmComputeService.createNotificationChannel(this)
     }
+
+    override fun onStart() {
+        super.onStart()
+        LifecycleLogger.log("MainActivity", "onStart")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        LifecycleLogger.log("MainActivity", "onResume")
+    }
+
+    override fun onPause() {
+        LifecycleLogger.log("MainActivity", "onPause")
+        super.onPause()
+    }
+
+    override fun onStop() {
+        LifecycleLogger.log("MainActivity", "onStop")
+        super.onStop()
+    }
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        LifecycleLogger.log("MainActivity", "configureFlutterEngine engine=${flutterEngine.hashCode()}")
         
         setupNotificationChannel(flutterEngine)
         setupMediaChannel(flutterEngine)
@@ -178,12 +204,17 @@ class MainActivity : FlutterActivity() {
             object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
                     android.util.Log.d("ZSWNotificationBridge", "Flutter started listening to notification events")
+                    LifecycleLogger.log("NotificationBridge", "onListen args=$arguments sink=${events != null}")
                     notificationEventSink = events
                     
                     // Set up callback to forward notifications to Flutter
                     NotificationListenerServiceImpl.notificationCallback = object : NotificationListenerServiceImpl.NotificationCallback {
                         override fun onNotificationPosted(notification: Map<String, Any?>) {
                             android.util.Log.d("ZSWNotificationBridge", "Callback invoked, forwarding to Flutter event sink")
+                            LifecycleLogger.log(
+                                "NotificationBridge",
+                                "onNotificationPosted callback sinkAvailable=${notificationEventSink != null} package=${notification["packageName"]}",
+                            )
                             runOnUiThread {
                                 notificationEventSink?.success(mapOf(
                                     "event" to "posted",
@@ -193,6 +224,10 @@ class MainActivity : FlutterActivity() {
                         }
                         
                         override fun onNotificationRemoved(notification: Map<String, Any?>) {
+                            LifecycleLogger.log(
+                                "NotificationBridge",
+                                "onNotificationRemoved callback sinkAvailable=${notificationEventSink != null} package=${notification["packageName"]}",
+                            )
                             runOnUiThread {
                                 notificationEventSink?.success(mapOf(
                                     "event" to "removed",
@@ -205,6 +240,7 @@ class MainActivity : FlutterActivity() {
                 
                 override fun onCancel(arguments: Any?) {
                     android.util.Log.d("ZSWNotificationBridge", "Flutter stopped listening to notification events")
+                    LifecycleLogger.log("NotificationBridge", "onCancel args=$arguments")
                     notificationEventSink = null
                     NotificationListenerServiceImpl.notificationCallback = null
                 }
@@ -275,10 +311,15 @@ class MainActivity : FlutterActivity() {
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_EVENTS_CHANNEL).setStreamHandler(
             object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    LifecycleLogger.log("MediaBridge", "event channel onListen args=$arguments sink=${events != null}")
                     mediaEventSink = events
                     
                     mediaBridge?.setCallback(object : MediaSessionBridge.MediaCallback {
                         override fun onPlaybackStateChanged(state: Map<String, Any?>) {
+                            LifecycleLogger.log(
+                                "MediaBridge",
+                                "onPlaybackStateChanged sinkAvailable=${mediaEventSink != null} state=${state["state"]}",
+                            )
                             runOnUiThread {
                                 mediaEventSink?.success(mapOf(
                                     "event" to "playbackState",
@@ -288,6 +329,10 @@ class MainActivity : FlutterActivity() {
                         }
                         
                         override fun onMetadataChanged(metadata: Map<String, Any?>) {
+                            LifecycleLogger.log(
+                                "MediaBridge",
+                                "onMetadataChanged sinkAvailable=${mediaEventSink != null} track=${metadata["track"]}",
+                            )
                             runOnUiThread {
                                 mediaEventSink?.success(mapOf(
                                     "event" to "metadata",
@@ -299,6 +344,7 @@ class MainActivity : FlutterActivity() {
                 }
                 
                 override fun onCancel(arguments: Any?) {
+                    LifecycleLogger.log("MediaBridge", "event channel onCancel args=$arguments")
                     mediaEventSink = null
                     mediaBridge?.setCallback(null)
                 }
@@ -313,41 +359,46 @@ class MainActivity : FlutterActivity() {
                     val watchName = call.argument<String>("watchName") ?: "ZSWatch"
                     val connectionState = call.argument<String>("connectionState") 
                         ?: BleConnectionForegroundService.STATE_CONNECTED
+                    LifecycleLogger.log("ForegroundChannel", "start watchName=$watchName state=$connectionState")
                     
-                    BleConnectionForegroundService.start(this, watchName, connectionState)
+                    val started = BleConnectionForegroundService.start(this, watchName, connectionState)
                     
                     // Bind to service to receive disconnect callbacks
                     val intent = Intent(this, BleConnectionForegroundService::class.java)
                     bindService(intent, foregroundServiceConnection, Context.BIND_AUTO_CREATE)
                     
-                    result.success(true)
+                    result.success(started)
                 }
                 "stop" -> {
+                    LifecycleLogger.log("ForegroundChannel", "stop bound=$foregroundServiceBound")
                     if (foregroundServiceBound) {
                         unbindService(foregroundServiceConnection)
                         foregroundServiceBound = false
                     }
-                    BleConnectionForegroundService.stop(this)
-                    result.success(true)
+                    result.success(BleConnectionForegroundService.stop(this))
                 }
                 "updateNotification" -> {
                     val watchName = call.argument<String>("watchName") ?: "ZSWatch"
                     val connectionState = call.argument<String>("connectionState") 
                         ?: BleConnectionForegroundService.STATE_CONNECTED
+                    LifecycleLogger.log("ForegroundChannel", "updateNotification watchName=$watchName state=$connectionState")
                     
-                    BleConnectionForegroundService.updateNotification(this, watchName, connectionState)
-                    result.success(true)
+                    result.success(BleConnectionForegroundService.updateNotification(this, watchName, connectionState))
                 }
                 "isRunning" -> {
-                    result.success(BleConnectionForegroundService.isRunning())
+                    val running = BleConnectionForegroundService.isRunning()
+                    LifecycleLogger.log("ForegroundChannel", "isRunning=$running")
+                    result.success(running)
                 }
                 "isBatteryOptimizationDisabled" -> {
                     val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
                     val isIgnoring = pm.isIgnoringBatteryOptimizations(packageName)
+                    LifecycleLogger.log("ForegroundChannel", "isBatteryOptimizationDisabled=$isIgnoring")
                     result.success(isIgnoring)
                 }
                 "requestDisableBatteryOptimization" -> {
                     try {
+                        LifecycleLogger.log("ForegroundChannel", "requestDisableBatteryOptimization")
                         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                             data = Uri.parse("package:$packageName")
                         }
@@ -368,6 +419,7 @@ class MainActivity : FlutterActivity() {
                 }
                 "openBatteryOptimizationSettings" -> {
                     try {
+                        LifecycleLogger.log("ForegroundChannel", "openBatteryOptimizationSettings")
                         val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
                         if (intent.resolveActivity(packageManager) != null) {
                             startActivity(intent)
@@ -391,12 +443,53 @@ class MainActivity : FlutterActivity() {
                     // For now, we'll use event channel for this
                     result.success(true)
                 }
+                "syncBackgroundPreferences" -> {
+                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
+                    val snapshot = NativeBackgroundPreferences.sync(this, args)
+                    result.success(snapshot.toMap())
+                }
+                "getBackgroundPreferences" -> {
+                    val snapshot = NativeBackgroundPreferences.getSnapshot(this)
+                    LifecycleLogger.log("ForegroundChannel", "getBackgroundPreferences watchId=${snapshot.lastWatchId}")
+                    result.success(snapshot.toMap())
+                }
+                "recordLifecycleEvent" -> {
+                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
+                    val source = args["source"] as? String ?: "Flutter"
+                    val message = args["message"] as? String ?: ""
+                    val timestampMillis = (args["timestampMillis"] as? Number)?.toLong()
+                        ?: System.currentTimeMillis()
+                    val processId = (args["pid"] as? Number)?.toInt()
+                        ?: android.os.Process.myPid()
+
+                    if (!LifecycleLogger.shouldPersist(source, message)) {
+                        result.success(true)
+                        return@setMethodCallHandler
+                    }
+
+                    val recorded = LifecycleLogger.record(
+                        context = this,
+                        source = source,
+                        message = message,
+                        timestampMillis = timestampMillis,
+                        processId = processId,
+                        origin = "dart",
+                    )
+                    result.success(recorded)
+                }
+                "getLifecycleEvents" -> {
+                    result.success(LifecycleLogger.getEvents(this))
+                }
+                "clearLifecycleEvents" -> {
+                    result.success(LifecycleLogger.clearEvents(this))
+                }
                 else -> result.notImplemented()
             }
         }
         
         // Set up disconnect callback to notify Flutter
         pendingDisconnectCallback = {
+            LifecycleLogger.log("ForegroundChannel", "native disconnect callback invoked")
             // Use method channel to notify Flutter of disconnect request
             MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FOREGROUND_SERVICE_CHANNEL)
                 .invokeMethod("onDisconnectRequested", null)
@@ -1092,6 +1185,10 @@ class MainActivity : FlutterActivity() {
     }
     
     override fun onDestroy() {
+        LifecycleLogger.log(
+            "MainActivity",
+            "onDestroy foregroundBound=$foregroundServiceBound notificationSink=${notificationEventSink != null} mediaSink=${mediaEventSink != null}",
+        )
         if (foregroundServiceBound) {
             unbindService(foregroundServiceConnection)
             foregroundServiceBound = false

@@ -1608,14 +1608,13 @@ class _ActionButtons extends ConsumerWidget {
               OutlinedButton(onPressed: onReset, child: const Text('Reset')),
               const SizedBox(width: AppTheme.spacingMd),
               FilledButton(
-                onPressed: isFsFailed &&
-                        dfuState.status != DfuStatus.failed
+                onPressed: isFsFailed && dfuState.status != DfuStatus.failed
                     ? (operationState.canStartFilesystemUpload
-                        ? onStartFilesystem
-                        : null)
+                          ? onStartFilesystem
+                          : null)
                     : (operationState.canStartFirmwareUpdate
-                        ? onStartFirmware
-                        : null),
+                          ? onStartFirmware
+                          : null),
                 child: const Text('Retry'),
               ),
             ],

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -454,6 +455,7 @@ class _ConnectionAnalyticsTab extends ConsumerWidget {
         ref.invalidate(connectionStats24HoursProvider(watchId));
         ref.invalidate(connectionStats7DaysProvider(watchId));
         ref.invalidate(connectionTimelineProvider(watchId));
+        ref.invalidate(lifecycleLogEntriesProvider(watchId));
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -480,6 +482,11 @@ class _ConnectionAnalyticsTab extends ConsumerWidget {
 
             // Connection Timeline Chart (auto-sized window + clear button)
             _ConnectionTimelineCard(watchId: watchId),
+
+            const SizedBox(height: AppTheme.spacingMd),
+
+            // Persisted Android/Dart lifecycle diagnostics
+            _LifecycleDiagnosticsCard(watchId: watchId),
 
             const SizedBox(height: AppTheme.spacingMd),
 
@@ -830,6 +837,225 @@ class _EventListTile extends StatelessWidget {
     } else {
       return '${timestamp.day}/${timestamp.month}/${timestamp.year}';
     }
+  }
+}
+
+class _LifecycleDiagnosticsCard extends ConsumerWidget {
+  final String watchId;
+
+  const _LifecycleDiagnosticsCard({required this.watchId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final eventsAsync = ref.watch(lifecycleLogEntriesProvider(watchId));
+    final events = eventsAsync.valueOrNull ?? [];
+    final visibleEvents = events.take(20).toList();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'App Lifecycle Diagnostics',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.content_copy_outlined),
+                  iconSize: 20,
+                  tooltip: 'Copy full lifecycle diagnostics',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: eventsAsync.isLoading || events.isEmpty
+                      ? null
+                      : () => _copyDiagnostics(context, events),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  iconSize: 20,
+                  tooltip: 'Refresh lifecycle diagnostics',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () {
+                    ref.invalidate(lifecycleLogEntriesProvider(watchId));
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  iconSize: 20,
+                  tooltip: 'Clear lifecycle diagnostics',
+                  visualDensity: VisualDensity.compact,
+                  color: colorScheme.outline,
+                  onPressed: () => _confirmClear(context, ref),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spacingXs),
+            Text(
+              'Native and Dart lifecycle trail, newest first',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: colorScheme.outline),
+            ),
+            const SizedBox(height: AppTheme.spacingMd),
+            if (eventsAsync.isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (visibleEvents.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppTheme.spacingLg),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.monitor_heart_outlined,
+                        size: 48,
+                        color: colorScheme.outline,
+                      ),
+                      const SizedBox(height: AppTheme.spacingSm),
+                      Text(
+                        'No lifecycle diagnostics yet',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.outline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: visibleEvents.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  return _LifecycleEventTile(entry: visibleEvents[index]);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmClear(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear lifecycle diagnostics?'),
+        content: const Text(
+          'This clears the stored native and Dart lifecycle trail on this phone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final service = ref.read(foregroundServiceProvider);
+    await service.clearLifecycleEvents();
+    ref.invalidate(lifecycleLogEntriesProvider(watchId));
+  }
+
+  Future<void> _copyDiagnostics(
+    BuildContext context,
+    List<LifecycleLogEntry> entries,
+  ) async {
+    final buffer = StringBuffer()
+      ..writeln('ZSWatch App Lifecycle Diagnostics')
+      ..writeln('Watch ID: $watchId')
+      ..writeln('Generated At: ${DateTime.now().toIso8601String()}')
+      ..writeln('Entry Count: ${entries.length}')
+      ..writeln('Order: newest first')
+      ..writeln();
+
+    for (final entry in entries) {
+      buffer.writeln(
+        '${entry.timestamp.toIso8601String()} '
+        '[${entry.origin}] '
+        'pid=${entry.pid} '
+        'uptimeMs=${entry.uptimeMs} '
+        '${entry.source}: ${entry.message}',
+      );
+    }
+
+    await Clipboard.setData(ClipboardData(text: buffer.toString()));
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Copied ${entries.length} lifecycle entries')),
+    );
+  }
+}
+
+class _LifecycleEventTile extends StatelessWidget {
+  final LifecycleLogEntry entry;
+
+  const _LifecycleEventTile({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = entry.origin == 'native' ? Colors.blue : Colors.teal;
+    final icon = _iconFor(entry.source, entry.message);
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: color.withValues(alpha: 0.2),
+        child: Icon(icon, color: color, size: 20),
+      ),
+      title: Text(entry.source),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(entry.message),
+          const SizedBox(height: 2),
+          Text(
+            '${_formatTimestamp(entry.timestamp)} - ${entry.origin} - pid ${entry.pid}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _iconFor(String source, String message) {
+    final text = '$source $message'.toLowerCase();
+    if (text.contains('bootreceiver')) return Icons.restart_alt;
+    if (text.contains('taskremoved') || text.contains('destroy')) {
+      return Icons.warning_amber_outlined;
+    }
+    if (text.contains('foreground') || text.contains('bleconnectionservice')) {
+      return Icons.notifications_active_outlined;
+    }
+    if (text.contains('paused') || text.contains('stopped')) {
+      return Icons.pause_circle_outline;
+    }
+    if (text.contains('resumed') || text.contains('started')) {
+      return Icons.play_circle_outline;
+    }
+    return Icons.timeline;
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    return '${timestamp.month}/${timestamp.day} '
+        '${timestamp.hour.toString().padLeft(2, '0')}:'
+        '${timestamp.minute.toString().padLeft(2, '0')}:'
+        '${timestamp.second.toString().padLeft(2, '0')}';
   }
 }
 

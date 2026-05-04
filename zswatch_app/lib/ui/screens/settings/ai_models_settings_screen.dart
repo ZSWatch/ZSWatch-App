@@ -805,10 +805,7 @@ class _VoiceChatSettings extends ConsumerWidget {
     return Column(
       children: [
         ListTile(
-          leading: const Icon(
-            Icons.short_text,
-            color: AppTheme.primaryColor,
-          ),
+          leading: const Icon(Icons.short_text, color: AppTheme.primaryColor),
           title: const Text('Answer Length'),
           subtitle: Text(_answerLengthLabel(answerLength)),
           trailing: DropdownButton<String>(
@@ -824,28 +821,20 @@ class _VoiceChatSettings extends ConsumerWidget {
             ],
             onChanged: (value) {
               if (value != null) {
-                ref
-                    .read(chatAnswerLengthProvider.notifier)
-                    .setValue(value);
+                ref.read(chatAnswerLengthProvider.notifier).setValue(value);
               }
             },
           ),
         ),
         ListTile(
-          leading: const Icon(
-            Icons.history,
-            color: AppTheme.primaryColor,
-          ),
+          leading: const Icon(Icons.history, color: AppTheme.primaryColor),
           title: const Text('Conversation Memory'),
           subtitle: Text(_memoryModeLabel(memoryMode)),
           trailing: DropdownButton<String>(
             value: memoryMode,
             underline: const SizedBox.shrink(),
             items: const [
-              DropdownMenuItem(
-                value: 'single_turn',
-                child: Text('None'),
-              ),
+              DropdownMenuItem(value: 'single_turn', child: Text('None')),
               DropdownMenuItem(
                 value: 'last_exchange',
                 child: Text('Last Exchange'),
@@ -857,9 +846,7 @@ class _VoiceChatSettings extends ConsumerWidget {
             ],
             onChanged: (value) {
               if (value != null) {
-                ref
-                    .read(chatMemoryModeProvider.notifier)
-                    .setValue(value);
+                ref.read(chatMemoryModeProvider.notifier).setValue(value);
               }
             },
           ),
@@ -882,9 +869,7 @@ class _VoiceChatSettings extends ConsumerWidget {
               ],
               onChanged: (value) {
                 if (value != null) {
-                  ref
-                      .read(chatMaxHistoryProvider.notifier)
-                      .setValue(value);
+                  ref.read(chatMaxHistoryProvider.notifier).setValue(value);
                 }
               },
             ),

@@ -111,11 +111,11 @@ class WatchChatService {
     required LlmService llmService,
     required TtsService ttsService,
     required AppDatabase database,
-  })  : _watchService = watchService,
-        _transcriptionEngine = transcriptionEngine,
-        _llmService = llmService,
-        _ttsService = ttsService,
-        _database = database {
+  }) : _watchService = watchService,
+       _transcriptionEngine = transcriptionEngine,
+       _llmService = llmService,
+       _ttsService = ttsService,
+       _database = database {
     debugPrint(
       '[WatchChatService] Created, subscribing to chat messages '
       '(watchService=${_watchService.hashCode})',
@@ -232,8 +232,12 @@ class WatchChatService {
 
       final answer = result.text.trim();
       debugPrint('[WatchChatService] Answer: $answer');
-      _updateState(ChatPhase.generatingTts, sessionId,
-          transcript: transcript, answer: answer);
+      _updateState(
+        ChatPhase.generatingTts,
+        sessionId,
+        transcript: transcript,
+        answer: answer,
+      );
       await _sendStateToWatch(sessionId, 4); // ZSW_CHAT_STATE_GENERATING_TTS
 
       if (_cancelled) return;
@@ -242,7 +246,10 @@ class WatchChatService {
       // so TTS matches the spoken language rather than guessing from the answer.
       final ttsLanguage = TtsService.detectLanguage(transcript);
       debugPrint('[WatchChatService] TTS language: $ttsLanguage');
-      final ttsPath = await _ttsService.synthesizeToFile(answer, language: ttsLanguage);
+      final ttsPath = await _ttsService.synthesizeToFile(
+        answer,
+        language: ttsLanguage,
+      );
       if (ttsPath == null) {
         _sendError(sessionId, 'TTS synthesis failed');
         return;
@@ -251,8 +258,12 @@ class WatchChatService {
       if (_cancelled) return;
 
       // Upload reply to watch via MCUmgr FS
-      _updateState(ChatPhase.uploadingReply, sessionId,
-          transcript: transcript, answer: answer);
+      _updateState(
+        ChatPhase.uploadingReply,
+        sessionId,
+        transcript: transcript,
+        answer: answer,
+      );
       await _sendStateToWatch(sessionId, 5); // ZSW_CHAT_STATE_UPLOADING_REPLY
 
       final uploaded = await _uploadFileToWatch(ttsPath, _watchReplyPath);
@@ -265,11 +276,18 @@ class WatchChatService {
 
       // Signal watch that reply is ready
       await _sendReplyReadyToWatch(
-        sessionId, _watchReplyPath, 'pcm_wav', sampleRate,
+        sessionId,
+        _watchReplyPath,
+        'pcm_wav',
+        sampleRate,
       );
 
-      _updateState(ChatPhase.waitingPlayback, sessionId,
-          transcript: transcript, answer: answer);
+      _updateState(
+        ChatPhase.waitingPlayback,
+        sessionId,
+        transcript: transcript,
+        answer: answer,
+      );
 
       // Record latency
       final latencyMs = _latencyStopwatch?.elapsedMilliseconds;
@@ -280,9 +298,7 @@ class WatchChatService {
           timestampUtc: DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000,
           transcript: transcript,
           answer: Value(answer),
-          modelUsed: Value(
-            (await _llmService.currentModelInfo()).displayName,
-          ),
+          modelUsed: Value((await _llmService.currentModelInfo()).displayName),
           latencyMs: Value(latencyMs),
         ),
       );
@@ -338,8 +354,13 @@ class WatchChatService {
     });
   }
 
-  void _updateState(ChatPhase phase, int? sessionId,
-      {String? transcript, String? answer, String? error}) {
+  void _updateState(
+    ChatPhase phase,
+    int? sessionId, {
+    String? transcript,
+    String? answer,
+    String? error,
+  }) {
     _stateController.add(
       state.copyWith(
         phase: phase,
@@ -353,49 +374,60 @@ class WatchChatService {
 
   /// Send a state update to the watch via NUS
   Future<void> _sendStateToWatch(int sessionId, int stateValue) async {
-    await _watchService.sendChatCommand('state', extraData: {
-      'session_id': sessionId,
-      'state': stateValue,
-    });
+    await _watchService.sendChatCommand(
+      'state',
+      extraData: {'session_id': sessionId, 'state': stateValue},
+    );
   }
 
   /// Send the recognized transcript back to the watch
   Future<void> _sendTranscriptToWatch(int sessionId, String transcript) async {
-    await _watchService.sendChatCommand('transcript', extraData: {
-      'session_id': sessionId,
-      'text': transcript,
-    });
+    await _watchService.sendChatCommand(
+      'transcript',
+      extraData: {'session_id': sessionId, 'text': transcript},
+    );
   }
 
   /// Send error to the watch
   void _sendError(int sessionId, String message) {
     _activeQuestionKey = null;
     _updateState(ChatPhase.error, sessionId, error: message);
-    unawaited(_watchService.sendChatCommand('error', extraData: {
-      'session_id': sessionId,
-      'message': message,
-    }));
+    unawaited(
+      _watchService.sendChatCommand(
+        'error',
+        extraData: {'session_id': sessionId, 'message': message},
+      ),
+    );
 
     // Save failed entry to history
-    unawaited(_database.insertChatHistoryEntry(
-      ChatHistoryCompanion.insert(
-        timestampUtc: DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000,
-        transcript: state.transcript ?? '(unknown)',
-        success: const Value(false),
-        errorMessage: Value(message),
+    unawaited(
+      _database.insertChatHistoryEntry(
+        ChatHistoryCompanion.insert(
+          timestampUtc: DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000,
+          transcript: state.transcript ?? '(unknown)',
+          success: const Value(false),
+          errorMessage: Value(message),
+        ),
       ),
-    ));
+    );
   }
 
   /// Signal that the reply file is ready for playback
   Future<void> _sendReplyReadyToWatch(
-      int sessionId, String path, String codec, int sampleRate) async {
-    await _watchService.sendChatCommand('reply_ready', extraData: {
-      'session_id': sessionId,
-      'path': path,
-      'codec': codec,
-      'sample_rate': sampleRate,
-    });
+    int sessionId,
+    String path,
+    String codec,
+    int sampleRate,
+  ) async {
+    await _watchService.sendChatCommand(
+      'reply_ready',
+      extraData: {
+        'session_id': sessionId,
+        'path': path,
+        'codec': codec,
+        'sample_rate': sampleRate,
+      },
+    );
   }
 
   Future<String?> _prepareQuestionAudioForTranscription({
@@ -514,10 +546,7 @@ class WatchChatService {
   /// Upload a local file to the watch via MCUmgr FS.
   ///
   /// Uses the same FsManager upload pattern as FilesystemUploadService.
-  Future<bool> _uploadFileToWatch(
-    String localPath,
-    String remotePath,
-  ) async {
+  Future<bool> _uploadFileToWatch(String localPath, String remotePath) async {
     final smpGen = _watchService.connectionGeneration;
     await _watchService.enableSmp();
 
@@ -561,9 +590,7 @@ class WatchChatService {
               _uploadCompleter?.complete(true);
               _uploadCompleter = null;
             case OnUploadFailed():
-              debugPrint(
-                '[WatchChatService] Upload failed: ${callback.cause}',
-              );
+              debugPrint('[WatchChatService] Upload failed: ${callback.cause}');
               _uploadCompleter?.complete(false);
               _uploadCompleter = null;
             case OnUploadCancelled():

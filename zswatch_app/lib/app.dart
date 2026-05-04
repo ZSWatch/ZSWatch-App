@@ -1,7 +1,12 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/utils/lifecycle_logger.dart';
+import 'data/models/connection_state.dart';
 import 'providers/analytics_providers.dart';
 import 'providers/ble_providers.dart';
 import 'providers/chat_providers.dart';
@@ -13,6 +18,7 @@ import 'providers/http_providers.dart';
 import 'providers/notification_providers.dart';
 import 'providers/permission_providers.dart';
 import 'providers/voice_memo_providers.dart';
+import 'services/background/foreground_service.dart';
 import 'providers/watch_service_provider.dart';
 import 'ui/navigation/app_router.dart';
 
@@ -26,10 +32,13 @@ class ZSWatchApp extends ConsumerStatefulWidget {
   ConsumerState<ZSWatchApp> createState() => _ZSWatchAppState();
 }
 
-class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
+class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    LifecycleLogger.log('AppLifecycle', 'initState');
     try {
       ref.read(watchChatServiceProvider);
       debugPrint('[app] watchChatServiceProvider initialized in initState');
@@ -40,6 +49,20 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeBle();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    LifecycleLogger.log('AppLifecycle', state.name);
+    unawaited(_syncForegroundServiceLifecycleState(state));
+  }
+
+  @override
+  void dispose() {
+    LifecycleLogger.log('AppLifecycle', 'dispose');
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _initializeBle() async {
@@ -66,6 +89,9 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       // Initialize foreground service manager to handle background connection (FR-089 to FR-092)
       // This subscribes to connection state changes and manages the Android foreground service
       ref.read(foregroundServiceNotifierProvider);
+      // Keep Android-owned background recovery preferences synchronized for
+      // boot/package-replaced receiver scaffolding.
+      ref.read(nativeBackgroundPreferencesSyncProvider);
       // Initialize watch info persistence to sync firmware version and lastConnectedAt to database
       // This listens to watch info and connection state changes and persists them
       ref.read(watchInfoPersistenceProvider);
@@ -79,6 +105,54 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
       ref.read(crashReportPersistenceProvider);
     } catch (e) {
       debugPrint('BLE initialization error: $e');
+    }
+  }
+
+  Future<void> _syncForegroundServiceLifecycleState(AppLifecycleState state) async {
+    if (!Platform.isAndroid) return;
+
+    final foregroundService = ref.read(foregroundServiceProvider);
+    if (!foregroundService.isRunning) return;
+
+    final connection = ref.read(watchConnectionProvider);
+    final watchName = connection.watchName ?? 'ZSWatch';
+
+    if (state == AppLifecycleState.resumed) {
+      await foregroundService.updateNotification(
+        watchName: watchName,
+        state: _foregroundStateForConnection(connection.state),
+      );
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused) {
+      await foregroundService.updateNotification(
+        watchName: watchName,
+        state: ForegroundConnectionState.watcher,
+      );
+    }
+  }
+
+  ForegroundConnectionState _foregroundStateForConnection(
+    WatchConnectionState state,
+  ) {
+    switch (state) {
+      case WatchConnectionState.connected:
+      case WatchConnectionState.syncing:
+        return ForegroundConnectionState.connected;
+      case WatchConnectionState.reconnecting:
+      case WatchConnectionState.connecting:
+      case WatchConnectionState.bonding:
+      case WatchConnectionState.discoveringServices:
+      case WatchConnectionState.negotiating:
+      case WatchConnectionState.scanning:
+        return ForegroundConnectionState.reconnecting;
+      case WatchConnectionState.disconnected:
+      case WatchConnectionState.disconnecting:
+      case WatchConnectionState.error:
+        return ForegroundConnectionState.disconnected;
     }
   }
 

@@ -7,6 +7,7 @@ import 'package:rxdart/rxdart.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/ble_constants.dart';
+import '../../core/utils/lifecycle_logger.dart';
 import '../../data/models/connection.dart';
 import '../../data/models/connection_phase.dart';
 import '../../data/models/connection_state.dart';
@@ -20,6 +21,10 @@ import 'ble_scanner.dart';
 /// All connection-related providers derive their state from this service's
 /// [phaseStream] and [connectionStream].
 class BleConnectionService {
+  BleConnectionService() {
+    LifecycleLogger.log('BleConnectionService', 'created');
+  }
+
   BluetoothDevice? _device;
   List<BluetoothService>? _services;
   StreamSubscription<BluetoothConnectionState>? _connectionSubscription;
@@ -91,6 +96,10 @@ class BleConnectionService {
     ScannedWatch scannedDevice, {
     bool autoConnect = false,
   }) async {
+    LifecycleLogger.log(
+      'BleConnectionService',
+      'connect watchId=${scannedDevice.id} name=${scannedDevice.name} autoConnect=$autoConnect',
+    );
     if (!autoConnect) {
       _isCancelled = false;
     }
@@ -104,6 +113,10 @@ class BleConnectionService {
 
   /// Connect by device ID (for saved watches / auto-reconnect).
   Future<void> connectById(String deviceId, {bool autoConnect = false}) async {
+    LifecycleLogger.log(
+      'BleConnectionService',
+      'connectById deviceId=$deviceId autoConnect=$autoConnect',
+    );
     if (!autoConnect) {
       _isCancelled = false;
     }
@@ -119,6 +132,7 @@ class BleConnectionService {
   /// Cancel any pending connection attempt.
   void cancelPendingConnection() {
     debugPrint('[BleConnectionService] cancelPendingConnection()');
+    LifecycleLogger.log('BleConnectionService', 'cancelPendingConnection');
     _isCancelled = true;
     _autoReconnect = false;
     _reconnectTimer?.cancel();
@@ -138,6 +152,10 @@ class BleConnectionService {
 
   /// Disconnect from current device.
   Future<void> disconnect() async {
+    LifecycleLogger.log(
+      'BleConnectionService',
+      'disconnect currentWatchId=$_watchId phase=$currentPhase',
+    );
     _autoReconnect = false;
     _isCancelled = true;
     _reconnectTimer?.cancel();
@@ -191,6 +209,7 @@ class BleConnectionService {
 
   /// Dispose resources.
   Future<void> dispose() async {
+    LifecycleLogger.log('BleConnectionService', 'dispose');
     await disconnect();
     await _phaseController.close();
     await _connectionController.close();
@@ -209,6 +228,10 @@ class BleConnectionService {
       '[BleConnectionService] _connectToDevice: watchId=$watchId, '
       'autoConnect=$autoConnect, isReconnect=$isReconnectAttempt, '
       'phase=$currentPhase',
+    );
+    LifecycleLogger.log(
+      'BleConnectionService',
+      '_connectToDevice watchId=$watchId autoConnect=$autoConnect reconnect=$isReconnectAttempt phase=$currentPhase',
     );
 
     if (_isCancelled) return;
@@ -305,6 +328,11 @@ class BleConnectionService {
   Future<void> _runSetup(String watchId, String name) async {
     if (_isCancelled || _device == null || !_device!.isConnected) return;
 
+    LifecycleLogger.log(
+      'BleConnectionService',
+      '_runSetup start watchId=$watchId name=$name',
+    );
+
     // Prevent concurrent setup calls — both _connectToDevice (await path)
     // and _handleBleStateChange(connected) can trigger _runSetup.
     if (_setupInProgress) return;
@@ -360,12 +388,17 @@ class BleConnectionService {
       // Fully connected
       _setPhase(const ConnectionPhase.connected());
       _reconnectAttempts = 0;
+      LifecycleLogger.log(
+        'BleConnectionService',
+        '_runSetup connected watchId=$watchId mtu=${currentConnection.mtu}',
+      );
 
       // Start RSSI updates
       await readAndUpdateRssi();
       _startRssiUpdates();
     } catch (e) {
       debugPrint('[BleConnectionService] Setup error: $e');
+      LifecycleLogger.log('BleConnectionService', '_runSetup error: $e');
       if (_device != null && _device!.isConnected) {
         // Device still connected but setup failed — disconnect and let
         // the BLE state listener trigger _handleDisconnect → reconnect
@@ -396,6 +429,10 @@ class BleConnectionService {
   ) {
     debugPrint(
       '[BleConnectionService] BLE state: $state, phase: $currentPhase',
+    );
+    LifecycleLogger.log(
+      'BleConnectionService',
+      'BLE state=$state watchId=$watchId phase=$currentPhase cancelled=$_isCancelled',
     );
 
     if (_isCancelled) {
@@ -446,6 +483,10 @@ class BleConnectionService {
       'cancelled=$_isCancelled, autoReconnect=$_autoReconnect, '
       'attempts=$_reconnectAttempts',
     );
+    LifecycleLogger.log(
+      'BleConnectionService',
+      '_handleDisconnect watchId=$watchId phase=$currentPhase cancelled=$_isCancelled autoReconnect=$_autoReconnect attempts=$_reconnectAttempts',
+    );
 
     if (_isCancelled) {
       _setPhase(const ConnectionPhase.disconnected());
@@ -491,6 +532,10 @@ class BleConnectionService {
     if (_isCancelled) return;
     _reconnectTimer?.cancel();
     _reconnectAttempts++;
+    LifecycleLogger.log(
+      'BleConnectionService',
+      '_scheduleReconnect watchId=$watchId attempt=$_reconnectAttempts',
+    );
 
     _setPhase(ConnectionPhase.reconnecting(attempt: _reconnectAttempts));
 
@@ -521,6 +566,10 @@ class BleConnectionService {
   void _startBackgroundReconnect(String watchId, String name) {
     if (_isCancelled) return;
     _reconnectTimer?.cancel();
+    LifecycleLogger.log(
+      'BleConnectionService',
+      '_startBackgroundReconnect watchId=$watchId attempts=$_reconnectAttempts',
+    );
 
     _setPhase(
       ConnectionPhase.reconnecting(
@@ -548,6 +597,10 @@ class BleConnectionService {
       _reconnectAttempts++;
       debugPrint(
         '[BleConnectionService] Background reconnect attempt $_reconnectAttempts',
+      );
+      LifecycleLogger.log(
+        'BleConnectionService',
+        'background reconnect attempt=$_reconnectAttempts watchId=$watchId',
       );
 
       // Cancel old subscription — we create a new one below.

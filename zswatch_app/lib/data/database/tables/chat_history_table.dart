@@ -29,6 +29,5 @@ class ChatHistory extends Table {
       boolean().withDefault(const Constant(true)).named('success')();
 
   /// Error message if the exchange failed
-  TextColumn get errorMessage =>
-      text().nullable().named('error_message')();
+  TextColumn get errorMessage => text().nullable().named('error_message')();
 }

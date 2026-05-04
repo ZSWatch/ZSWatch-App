@@ -49,10 +49,7 @@ class _FileSystemScreenState extends ConsumerState<FileSystemScreen>
       ),
       body: TabBarView(
         controller: _tabController,
-        children: const [
-          _LogsTab(),
-          _FilesTab(),
-        ],
+        children: const [_LogsTab(), _FilesTab()],
       ),
     );
   }
@@ -120,32 +117,32 @@ class _LogsContent extends ConsumerWidget {
             )
           else
             SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final entry = fsState.logFiles[index];
-                  final isDownloading = fsState.downloadingPath == entry.path;
-                  final localPath = fsState.downloadedPaths[entry.path];
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final entry = fsState.logFiles[index];
+                final isDownloading = fsState.downloadingPath == entry.path;
+                final localPath = fsState.downloadedPaths[entry.path];
 
-                  return ListTile(
-                    leading: const Icon(Icons.description_outlined),
-                    title: Text(entry.name),
-                    subtitle: Text(entry.formattedSize),
-                    trailing: isDownloading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : localPath != null
-                        ? const Icon(Icons.check_circle_outline, color: Colors.green)
-                        : const Icon(Icons.download_outlined),
-                    onTap: isDownloading || fsState.downloadingPath != null
-                        ? null
-                        : () => _handleTap(context, ref, entry, localPath),
-                  );
-                },
-                childCount: fsState.logFiles.length,
-              ),
+                return ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: Text(entry.name),
+                  subtitle: Text(entry.formattedSize),
+                  trailing: isDownloading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : localPath != null
+                      ? const Icon(
+                          Icons.check_circle_outline,
+                          color: Colors.green,
+                        )
+                      : const Icon(Icons.download_outlined),
+                  onTap: isDownloading || fsState.downloadingPath != null
+                      ? null
+                      : () => _handleTap(context, ref, entry, localPath),
+                );
+              }, childCount: fsState.logFiles.length),
             ),
         ],
       ),
@@ -165,20 +162,26 @@ class _LogsContent extends ConsumerWidget {
 
     try {
       await ref.read(fileSystemProvider.notifier).downloadFile(entry);
-      final updatedPath = ref.read(fileSystemProvider).downloadedPaths[entry.path];
+      final updatedPath = ref
+          .read(fileSystemProvider)
+          .downloadedPaths[entry.path];
       if (updatedPath != null && context.mounted) {
         _showLogContent(context, entry, updatedPath);
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
       }
     }
   }
 
-  void _showLogContent(BuildContext context, FsFileEntry entry, String localPath) {
+  void _showLogContent(
+    BuildContext context,
+    FsFileEntry entry,
+    String localPath,
+  ) {
     showDialog<void>(
       context: context,
       builder: (ctx) => _LogContentDialog(entry: entry, localPath: localPath),
@@ -260,7 +263,8 @@ class _LogContentDialogState extends State<_LogContentDialog> {
 
   TextSpan _buildColoredText(String content, BuildContext context) {
     final lines = content.split('\n');
-    final baseStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+    final baseStyle =
+        Theme.of(context).textTheme.bodySmall?.copyWith(
           fontFamily: 'monospace',
           fontSize: 11,
         ) ??
@@ -327,7 +331,9 @@ class _DownloadOverlay extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(value: progress > 0 ? progress : null),
+                CircularProgressIndicator(
+                  value: progress > 0 ? progress : null,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   progress > 0

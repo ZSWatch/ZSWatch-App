@@ -29,8 +29,10 @@ class _WatchfaceBackgroundScreenState
     final uploadState = ref.watch(filesystemUploadStateProvider);
 
     // Show snackbar on success/error
-    ref.listen<WatchfaceBackgroundState>(watchfaceBackgroundProvider,
-        (prev, next) {
+    ref.listen<WatchfaceBackgroundState>(watchfaceBackgroundProvider, (
+      prev,
+      next,
+    ) {
       if (next.successMessage != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -58,8 +60,7 @@ class _WatchfaceBackgroundScreenState
         children: [
           // Upload progress
           if (bgState.isUploading) _UploadProgressBar(uploadState: uploadState),
-          if (bgState.isApplying)
-            const LinearProgressIndicator(),
+          if (bgState.isApplying) const LinearProgressIndicator(),
 
           Expanded(
             child: SingleChildScrollView(
@@ -78,10 +79,10 @@ class _WatchfaceBackgroundScreenState
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        mainAxisSpacing: AppTheme.spacingSm,
-                        crossAxisSpacing: AppTheme.spacingSm,
-                      ),
+                            crossAxisCount: 3,
+                            mainAxisSpacing: AppTheme.spacingSm,
+                            crossAxisSpacing: AppTheme.spacingSm,
+                          ),
                       itemCount: group.backgrounds.length,
                       itemBuilder: (context, index) {
                         final bg = group.backgrounds[index];
@@ -91,8 +92,8 @@ class _WatchfaceBackgroundScreenState
                           onTap: isBusy
                               ? null
                               : () => ref
-                                  .read(watchfaceBackgroundProvider.notifier)
-                                  .uploadBuiltin(bg),
+                                    .read(watchfaceBackgroundProvider.notifier)
+                                    .uploadBuiltin(bg),
                         );
                       },
                     ),
@@ -107,8 +108,9 @@ class _WatchfaceBackgroundScreenState
                   Card(
                     child: InkWell(
                       onTap: isBusy ? null : _pickCustomImage,
-                      borderRadius:
-                          BorderRadius.circular(AppTheme.radiusMedium),
+                      borderRadius: BorderRadius.circular(
+                        AppTheme.radiusMedium,
+                      ),
                       child: Padding(
                         padding: const EdgeInsets.all(AppTheme.spacingLg),
                         child: Column(
@@ -123,9 +125,7 @@ class _WatchfaceBackgroundScreenState
                             const SizedBox(height: AppTheme.spacingSm),
                             Text(
                               'Pick from Gallery',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
+                              style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: isBusy
                                         ? Theme.of(context).disabledColor
@@ -135,9 +135,7 @@ class _WatchfaceBackgroundScreenState
                             const SizedBox(height: AppTheme.spacingXs),
                             Text(
                               'Image will be cropped to 240x240 circle',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: Theme.of(context)
                                         .textTheme
@@ -159,8 +157,8 @@ class _WatchfaceBackgroundScreenState
                     onPressed: isBusy
                         ? null
                         : () => ref
-                            .read(watchfaceBackgroundProvider.notifier)
-                            .resetToDefault(),
+                              .read(watchfaceBackgroundProvider.notifier)
+                              .resetToDefault(),
                     icon: const Icon(Icons.restore),
                     label: const Text('Reset to Default'),
                   ),
@@ -194,8 +192,8 @@ class _WatchfaceBackgroundScreenState
 
     unawaited(
       ref
-        .read(watchfaceBackgroundProvider.notifier)
-        .uploadCroppedImage(croppedBytes),
+          .read(watchfaceBackgroundProvider.notifier)
+          .uploadCroppedImage(croppedBytes),
     );
   }
 }
@@ -235,17 +233,11 @@ class _BackgroundTile extends StatelessWidget {
               left: 0,
               right: 0,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 4,
-                  horizontal: 4,
-                ),
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
                 color: Colors.black54,
                 child: Text(
                   name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 10),
                   textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
                 ),

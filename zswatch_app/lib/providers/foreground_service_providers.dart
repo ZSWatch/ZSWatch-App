@@ -5,8 +5,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/connection.dart';
+import '../data/models/watch.dart';
 import '../data/models/connection_state.dart';
 import '../services/background/foreground_service.dart';
+import 'auto_reconnect_provider.dart';
+import 'notification_providers.dart';
 import 'settings_providers.dart';
 import 'watch_service_provider.dart';
 
@@ -25,6 +28,79 @@ final batteryOptimizationDisabledProvider = FutureProvider<bool>((ref) async {
 final foregroundServiceRunningProvider = FutureProvider<bool>((ref) async {
   final service = ref.watch(foregroundServiceProvider);
   return service.checkIsRunning();
+});
+
+/// Keeps Android-owned background recovery preferences in sync.
+///
+/// Phase 1 still leaves BLE in Dart, but native receivers need a conservative
+/// snapshot of user intent and the last known watch for boot/package-replaced
+/// recovery scaffolding. This provider is initialized from app startup.
+final nativeBackgroundPreferencesSyncProvider = Provider<void>((ref) {
+  final service = ref.watch(foregroundServiceProvider);
+
+  Timer? debounceTimer;
+  String? lastWatchId;
+  String? lastWatchName;
+  bool? backgroundConnectionEnabled;
+  bool? autoReconnectEnabled;
+  bool? notificationForwardingEnabled;
+  Set<String>? blockedNotificationApps;
+
+  void scheduleSync() {
+    debounceTimer?.cancel();
+    debounceTimer = Timer(const Duration(milliseconds: 250), () {
+      unawaited(
+        service.syncBackgroundPreferences(
+          lastWatchId: lastWatchId,
+          lastWatchName: lastWatchName,
+          backgroundConnectionEnabled: backgroundConnectionEnabled,
+          autoReconnectEnabled: autoReconnectEnabled,
+          notificationForwardingEnabled: notificationForwardingEnabled,
+          blockedNotificationApps: blockedNotificationApps,
+        ),
+      );
+    });
+  }
+
+  ref.listen<bool>(backgroundConnectionEnabledProvider, (previous, next) {
+    backgroundConnectionEnabled = next;
+    scheduleSync();
+  }, fireImmediately: true);
+
+  ref.listen<AsyncValue<bool>>(autoReconnectEnabledProvider, (previous, next) {
+    final value = next.valueOrNull;
+    if (value == null) return;
+    autoReconnectEnabled = value;
+    scheduleSync();
+  }, fireImmediately: true);
+
+  ref.listen<NotificationForwardingState>(notificationForwardingProvider, (
+    previous,
+    next,
+  ) {
+    notificationForwardingEnabled = next.isEnabled;
+    blockedNotificationApps = next.blockedApps;
+    scheduleSync();
+  }, fireImmediately: true);
+
+  ref.listen<AsyncValue<Watch?>>(lastConnectedWatchProvider, (previous, next) {
+    final watch = next.valueOrNull;
+    if (watch == null) return;
+    lastWatchId = watch.id;
+    lastWatchName = watch.displayName;
+    scheduleSync();
+  }, fireImmediately: true);
+
+  ref.listen<Connection>(watchConnectionProvider, (previous, next) {
+    if (!next.isConnected || next.watchId.isEmpty) return;
+    lastWatchId = next.watchId;
+    lastWatchName = next.watchName ?? lastWatchName ?? 'ZSWatch';
+    scheduleSync();
+  }, fireImmediately: true);
+
+  ref.onDispose(() {
+    debounceTimer?.cancel();
+  });
 });
 
 /// Notifier that manages foreground service based on connection state

@@ -60,6 +60,9 @@ class MediaSessionBridge(private val context: Context) {
                         "playbackSpeed" to it.playbackSpeed
                     )
                     Log.d(TAG, "Playback state changed: $stateStr, position: $position")
+                    if (mediaCallback == null) {
+                        LifecycleLogger.log(TAG, "drop playback state callback=null state=$stateStr")
+                    }
                     mediaCallback?.onPlaybackStateChanged(stateMap)
                 }
             }
@@ -77,6 +80,9 @@ class MediaSessionBridge(private val context: Context) {
                     lastArtist = artist
                     
                     Log.d(TAG, "Metadata changed: $track")
+                    if (mediaCallback == null) {
+                        LifecycleLogger.log(TAG, "drop metadata callback=null track=$track")
+                    }
                     mediaCallback?.onMetadataChanged(metadataMap)
                 }
             }
@@ -89,11 +95,13 @@ class MediaSessionBridge(private val context: Context) {
     }
     
     fun setCallback(callback: MediaCallback?) {
+        LifecycleLogger.log(TAG, "setCallback hasCallback=${callback != null}")
         this.mediaCallback = callback
     }
     
     fun initialize(): Boolean {
         return try {
+            LifecycleLogger.log(TAG, "initialize")
             mediaSessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
             
             // Get the component name for our NotificationListenerService
@@ -107,12 +115,15 @@ class MediaSessionBridge(private val context: Context) {
             updateActiveController(controllers)
             
             Log.d(TAG, "MediaSessionBridge initialized successfully")
+            LifecycleLogger.log(TAG, "initialize success activeController=${activeController?.packageName}")
             true
         } catch (e: SecurityException) {
             Log.e(TAG, "SecurityException: Notification access not granted", e)
+            LifecycleLogger.log(TAG, "initialize SecurityException: ${e.message}")
             false
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize MediaSessionBridge", e)
+            LifecycleLogger.log(TAG, "initialize failed: ${e.javaClass.simpleName}: ${e.message}")
             false
         }
     }
@@ -125,12 +136,15 @@ class MediaSessionBridge(private val context: Context) {
             mediaSessionManager = null
             mediaCallback = null
             Log.d(TAG, "MediaSessionBridge disposed")
+            LifecycleLogger.log(TAG, "dispose")
         } catch (e: Exception) {
             Log.e(TAG, "Error disposing MediaSessionBridge", e)
+            LifecycleLogger.log(TAG, "dispose failed: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
     
     private fun updateActiveController(controllers: List<MediaController>?) {
+        LifecycleLogger.log(TAG, "updateActiveController count=${controllers?.size ?: 0}")
         // Unregister from previous controller
         activeController?.unregisterCallback(controllerCallback)
         
@@ -173,7 +187,8 @@ class MediaSessionBridge(private val context: Context) {
             }
             
             Log.d(TAG, "Active controller set: ${controller.packageName}")
-        }
+            LifecycleLogger.log(TAG, "activeController=${controller.packageName}")
+        } ?: LifecycleLogger.log(TAG, "activeController=null")
     }
     
     private fun extractMetadata(metadata: MediaMetadata): Map<String, Any?> {

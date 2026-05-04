@@ -80,22 +80,22 @@ final watchChatStateProvider = StreamProvider<WatchChatState>((ref) {
 final chatHistoryProvider = StreamProvider<List<ChatHistoryEntry>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchAllChatHistory().map(
-        (rows) => rows
-            .map(
-              (row) => ChatHistoryEntry(
-                id: row.id,
-                timestampUtc: DateTime.fromMillisecondsSinceEpoch(
-                  row.timestampUtc * 1000,
-                  isUtc: true,
-                ),
-                transcript: row.transcript,
-                answer: row.answer,
-                modelUsed: row.modelUsed,
-                latencyMs: row.latencyMs,
-                success: row.success,
-                errorMessage: row.errorMessage,
-              ),
-            )
-            .toList(),
-      );
+    (rows) => rows
+        .map(
+          (row) => ChatHistoryEntry(
+            id: row.id,
+            timestampUtc: DateTime.fromMillisecondsSinceEpoch(
+              row.timestampUtc * 1000,
+              isUtc: true,
+            ),
+            transcript: row.transcript,
+            answer: row.answer,
+            modelUsed: row.modelUsed,
+            latencyMs: row.latencyMs,
+            success: row.success,
+            errorMessage: row.errorMessage,
+          ),
+        )
+        .toList(),
+  );
 });

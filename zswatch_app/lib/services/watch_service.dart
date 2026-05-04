@@ -6,6 +6,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../core/constants/ble_constants.dart';
+import '../core/utils/lifecycle_logger.dart';
 import '../data/models/connection.dart';
 import '../data/models/connection_phase.dart';
 import '../data/models/crash_summary.dart';
@@ -32,6 +33,7 @@ class WatchService {
   void Function(Map<String, dynamic> message)? onChatMessage;
 
   WatchService(this._ble) {
+    LifecycleLogger.log('WatchService', 'created');
     // Register our setup callback so BleConnectionService calls us
     // after BLE-level setup (bonding, service discovery, MTU) is done.
     _ble.onSetupRequired = _onSetupRequired;
@@ -141,20 +143,32 @@ class WatchService {
   // --- Public API: connection (delegates to BleConnectionService) ---
 
   /// Connect to a scanned device.
-  Future<void> connect(
-    ScannedWatch scannedDevice, {
-    bool autoConnect = false,
-  }) => _ble.connect(scannedDevice, autoConnect: autoConnect);
+  Future<void> connect(ScannedWatch scannedDevice, {bool autoConnect = false}) {
+    LifecycleLogger.log(
+      'WatchService',
+      'connect watchId=${scannedDevice.id} name=${scannedDevice.name} autoConnect=$autoConnect',
+    );
+    return _ble.connect(scannedDevice, autoConnect: autoConnect);
+  }
 
   /// Connect by device ID (for saved watches).
-  Future<void> connectById(String deviceId, {bool autoConnect = false}) =>
-      _ble.connectById(deviceId, autoConnect: autoConnect);
+  Future<void> connectById(String deviceId, {bool autoConnect = false}) {
+    LifecycleLogger.log(
+      'WatchService',
+      'connectById deviceId=$deviceId autoConnect=$autoConnect',
+    );
+    return _ble.connectById(deviceId, autoConnect: autoConnect);
+  }
 
   /// Cancel any pending connection.
-  void cancelPendingConnection() => _ble.cancelPendingConnection();
+  void cancelPendingConnection() {
+    LifecycleLogger.log('WatchService', 'cancelPendingConnection');
+    _ble.cancelPendingConnection();
+  }
 
   /// Disconnect from current device.
   Future<void> disconnect() async {
+    LifecycleLogger.log('WatchService', 'disconnect');
     _cleanupProtocol();
     await _ble.disconnect();
   }
@@ -384,6 +398,10 @@ class WatchService {
     String name,
   ) async {
     _connectionGeneration++;
+    LifecycleLogger.log(
+      'WatchService',
+      '_onSetupRequired watchId=$watchId name=$name generation=$_connectionGeneration',
+    );
 
     // Create or update watch object
     final existingWatch = currentWatch;
@@ -402,6 +420,7 @@ class WatchService {
       await _setupNus(services);
     } catch (e) {
       debugPrint('[WatchService] NUS setup failed: $e');
+      LifecycleLogger.log('WatchService', '_setupNus failed: $e');
     }
 
     // Subscribe to battery service
@@ -409,6 +428,7 @@ class WatchService {
       await _setupBatteryNotifications(services);
     } catch (e) {
       debugPrint('[WatchService] Battery setup failed: $e');
+      LifecycleLogger.log('WatchService', '_setupBattery failed: $e');
     }
 
     // Time sync + device info — await these before returning so they
@@ -419,17 +439,24 @@ class WatchService {
       await syncTime();
     } catch (e) {
       debugPrint('[WatchService] syncTime failed: $e');
+      LifecycleLogger.log('WatchService', 'syncTime failed: $e');
     }
     try {
       await requestDeviceInfo();
     } catch (e) {
       debugPrint('[WatchService] requestDeviceInfo failed: $e');
+      LifecycleLogger.log('WatchService', 'requestDeviceInfo failed: $e');
     }
+    LifecycleLogger.log(
+      'WatchService',
+      '_onSetupRequired complete watchId=$watchId',
+    );
   }
 
   // --- Phase change handler ---
 
   void _onPhaseChanged(ConnectionPhase phase) {
+    LifecycleLogger.log('WatchService', 'phase=$phase');
     if (phase is Disconnected || phase is PhaseError) {
       _cleanupProtocol();
     }
@@ -438,6 +465,10 @@ class WatchService {
   // --- Internal: NUS and message handling ---
 
   Future<void> _setupNus(List<BluetoothService> services) async {
+    LifecycleLogger.log(
+      'WatchService',
+      '_setupNus start services=${services.length}',
+    );
     await _nusSubscription?.cancel();
     _nusSubscription = null;
     try {
@@ -453,17 +484,27 @@ class WatchService {
     _inBleLog = false;
 
     final nusService = _findServiceIn(services, _guid(NusUuids.service));
-    if (nusService == null) return;
+    if (nusService == null) {
+      LifecycleLogger.log('WatchService', '_setupNus missing service');
+      return;
+    }
 
     final rxChar = _findCharacteristic(
       nusService,
       _guid(NusUuids.rxCharacteristic),
     );
-    if (rxChar == null) return;
+    if (rxChar == null) {
+      LifecycleLogger.log(
+        'WatchService',
+        '_setupNus missing RX characteristic',
+      );
+      return;
+    }
 
     _nusRxChar = rxChar;
     await rxChar.setNotifyValue(true);
     _nusSubscription = rxChar.onValueReceived.listen(_handleNusData);
+    LifecycleLogger.log('WatchService', '_setupNus subscribed');
   }
 
   void _handleNusData(List<int> data) {
@@ -831,6 +872,10 @@ class WatchService {
   // --- Cleanup ---
 
   void _cleanupProtocol() {
+    LifecycleLogger.log(
+      'WatchService',
+      '_cleanupProtocol nus=${_nusSubscription != null} battery=${_batterySubscription != null}',
+    );
     _nusSubscription?.cancel();
     _nusSubscription = null;
     _nusRxChar?.setNotifyValue(false).catchError((_) => false);
@@ -845,6 +890,7 @@ class WatchService {
 
   /// Dispose resources.
   Future<void> dispose() async {
+    LifecycleLogger.log('WatchService', 'dispose');
     _cleanupProtocol();
     await _phaseSubscription?.cancel();
     // Don't dispose _ble here — it's owned by the provider that created it

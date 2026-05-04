@@ -227,25 +227,31 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
     
     override fun onCreate() {
         super.onCreate()
+        LifecycleLogger.initialize(applicationContext)
+        LifecycleLogger.recordHistoricalExitReasons(applicationContext)
         instance = this
         initializeIdCounter(applicationContext)
         Log.d(TAG, "NotificationListenerService created")
+        LifecycleLogger.log(TAG, "onCreate")
     }
     
     override fun onDestroy() {
         super.onDestroy()
         instance = null
         Log.d(TAG, "NotificationListenerService destroyed")
+        LifecycleLogger.log(TAG, "onDestroy")
     }
     
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.d(TAG, "NotificationListenerService connected")
+        LifecycleLogger.log(TAG, "onListenerConnected activeNotifications=${activeNotifications?.size ?: 0}")
     }
     
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         Log.d(TAG, "NotificationListenerService disconnected")
+        LifecycleLogger.log(TAG, "onListenerDisconnected")
     }
     
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -430,8 +436,16 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         
         if (notificationCallback == null) {
             Log.w(TAG, "Notification callback is null - Flutter not listening!")
+            LifecycleLogger.log(
+                TAG,
+                "drop posted notification callback=null package=${sbn.packageName} key=${sbn.key}",
+            )
         } else {
             Log.d(TAG, "Forwarding notification to Flutter via callback")
+            LifecycleLogger.log(
+                TAG,
+                "forward posted notification package=${sbn.packageName} key=${sbn.key}",
+            )
             // Track that this notification was forwarded
             forwardedNotificationKeys.add(sbn.key)
             
@@ -482,6 +496,17 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
 
         Log.d(TAG, "Notification removed: ${sbn.packageName} - $uniqueId")
 
+        if (notificationCallback == null) {
+            LifecycleLogger.log(
+                TAG,
+                "drop removed notification callback=null package=${sbn.packageName} key=${sbn.key}",
+            )
+        } else {
+            LifecycleLogger.log(
+                TAG,
+                "forward removed notification package=${sbn.packageName} key=${sbn.key}",
+            )
+        }
         notificationCallback?.onNotificationRemoved(notificationData)
 
         // Clean up mappings for this notification
