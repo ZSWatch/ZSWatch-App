@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'tables/battery_readings_table.dart';
+import 'tables/chat_history_table.dart';
 import 'tables/comm_log_entries_table.dart';
 import 'tables/connection_events_table.dart';
 import 'tables/crash_reports_table.dart';
@@ -34,6 +35,7 @@ part 'app_database.g.dart';
     VoiceMemos,
     ExtractedActions,
     CrashReports,
+    ChatHistory,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -41,7 +43,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Database schema version
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -68,6 +70,10 @@ class AppDatabase extends _$AppDatabase {
           // v4 → v5: added archived column to voice_memos.
           // Guard: only run when the table already existed (v2+).
           await m.addColumn(voiceMemos, voiceMemos.archived);
+        }
+        if (from < 6) {
+          // v5 → v6: added ChatHistory table for voice chat feature.
+          await m.createTable(chatHistory);
         }
       },
       beforeOpen: (details) async {
@@ -771,6 +777,53 @@ class AppDatabase extends _$AppDatabase {
     await deleteOldHealthSamples(cutoff);
     await deleteOldBatteryReadings(cutoff);
     await deleteOldConnectionEvents(cutoff);
+  }
+
+  // ==================== Chat History Operations ====================
+
+  /// Insert a new chat history entry.
+  Future<int> insertChatHistoryEntry(ChatHistoryCompanion entry) {
+    return into(chatHistory).insert(entry);
+  }
+
+  /// Get all chat history entries, newest first.
+  Future<List<ChatHistoryEntity>> getAllChatHistory() {
+    return (select(chatHistory)
+          ..orderBy([(t) => OrderingTerm.desc(t.timestampUtc)]))
+        .get();
+  }
+
+  /// Get the N most recent chat history entries.
+  Future<List<ChatHistoryEntity>> getRecentChatHistory(int limit) {
+    return (select(chatHistory)
+          ..orderBy([(t) => OrderingTerm.desc(t.timestampUtc)])
+          ..limit(limit))
+        .get();
+  }
+
+  /// Watch all chat history entries (stream), newest first.
+  Stream<List<ChatHistoryEntity>> watchAllChatHistory() {
+    return (select(chatHistory)
+          ..orderBy([(t) => OrderingTerm.desc(t.timestampUtc)]))
+        .watch();
+  }
+
+  /// Delete a chat history entry by ID.
+  Future<int> deleteChatHistoryEntry(int id) {
+    return (delete(chatHistory)..where((t) => t.id.equals(id))).go();
+  }
+
+  /// Delete all chat history entries.
+  Future<int> deleteAllChatHistory() {
+    return delete(chatHistory).go();
+  }
+
+  /// Delete chat history older than [cutoff].
+  Future<int> deleteOldChatHistory(DateTime cutoff) {
+    final cutoffEpoch = cutoff.toUtc().millisecondsSinceEpoch ~/ 1000;
+    return (delete(chatHistory)
+          ..where((t) => t.timestampUtc.isSmallerThanValue(cutoffEpoch)))
+        .go();
   }
 }
 

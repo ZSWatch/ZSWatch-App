@@ -100,6 +100,19 @@ class AiModelsSettingsScreen extends ConsumerWidget {
           const Divider(height: 1),
           const SizedBox(height: 8),
 
+          // ---- Voice Chat section ----
+          const _SectionHeader(
+            title: 'Voice Chat',
+            subtitle:
+                'Configure the watch voice chat feature: '
+                'answer style, conversation memory, and history depth.',
+          ),
+          const _VoiceChatSettings(),
+
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
+
           // ---- Benchmark section ----
           const _SectionHeader(
             title: 'Model Benchmark',
@@ -773,6 +786,137 @@ class _AiTogglesTile extends ConsumerWidget {
         ),
       ],
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Voice Chat settings
+// ---------------------------------------------------------------------------
+
+class _VoiceChatSettings extends ConsumerWidget {
+  const _VoiceChatSettings();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final answerLength = ref.watch(chatAnswerLengthProvider);
+    final memoryMode = ref.watch(chatMemoryModeProvider);
+    final maxHistory = ref.watch(chatMaxHistoryProvider);
+
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(
+            Icons.short_text,
+            color: AppTheme.primaryColor,
+          ),
+          title: const Text('Answer Length'),
+          subtitle: Text(_answerLengthLabel(answerLength)),
+          trailing: DropdownButton<String>(
+            value: answerLength,
+            underline: const SizedBox.shrink(),
+            items: const [
+              DropdownMenuItem(
+                value: 'ultra_short',
+                child: Text('Ultra Short'),
+              ),
+              DropdownMenuItem(value: 'short', child: Text('Short')),
+              DropdownMenuItem(value: 'normal', child: Text('Normal')),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                ref
+                    .read(chatAnswerLengthProvider.notifier)
+                    .setValue(value);
+              }
+            },
+          ),
+        ),
+        ListTile(
+          leading: const Icon(
+            Icons.history,
+            color: AppTheme.primaryColor,
+          ),
+          title: const Text('Conversation Memory'),
+          subtitle: Text(_memoryModeLabel(memoryMode)),
+          trailing: DropdownButton<String>(
+            value: memoryMode,
+            underline: const SizedBox.shrink(),
+            items: const [
+              DropdownMenuItem(
+                value: 'single_turn',
+                child: Text('None'),
+              ),
+              DropdownMenuItem(
+                value: 'last_exchange',
+                child: Text('Last Exchange'),
+              ),
+              DropdownMenuItem(
+                value: 'short_history',
+                child: Text('Short History'),
+              ),
+            ],
+            onChanged: (value) {
+              if (value != null) {
+                ref
+                    .read(chatMemoryModeProvider.notifier)
+                    .setValue(value);
+              }
+            },
+          ),
+        ),
+        if (memoryMode == 'short_history')
+          ListTile(
+            leading: const Icon(
+              Icons.format_list_numbered,
+              color: AppTheme.primaryColor,
+            ),
+            title: const Text('Max History Entries'),
+            subtitle: Text('$maxHistory exchanges used for context'),
+            trailing: DropdownButton<int>(
+              value: maxHistory,
+              underline: const SizedBox.shrink(),
+              items: const [
+                DropdownMenuItem(value: 3, child: Text('3')),
+                DropdownMenuItem(value: 5, child: Text('5')),
+                DropdownMenuItem(value: 10, child: Text('10')),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  ref
+                      .read(chatMaxHistoryProvider.notifier)
+                      .setValue(value);
+                }
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _answerLengthLabel(String value) {
+    switch (value) {
+      case 'ultra_short':
+        return '1 sentence max — fastest response';
+      case 'short':
+        return '2–3 sentences — balanced';
+      case 'normal':
+        return 'Full response — most detailed';
+      default:
+        return value;
+    }
+  }
+
+  String _memoryModeLabel(String value) {
+    switch (value) {
+      case 'single_turn':
+        return 'Each question is independent';
+      case 'last_exchange':
+        return 'Remembers last Q&A pair';
+      case 'short_history':
+        return 'Uses recent conversation history';
+      default:
+        return value;
+    }
   }
 }
 

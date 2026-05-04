@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -191,9 +192,11 @@ class _WatchfaceBackgroundScreenState
     );
     if (croppedBytes == null) return;
 
-    ref
+    unawaited(
+      ref
         .read(watchfaceBackgroundProvider.notifier)
-        .uploadCroppedImage(croppedBytes);
+        .uploadCroppedImage(croppedBytes),
+    );
   }
 }
 
@@ -221,7 +224,7 @@ class _BackgroundTile extends StatelessWidget {
               child: Image.asset(
                 previewAsset,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => ColoredBox(
+                errorBuilder: (context, error, stackTrace) => ColoredBox(
                   color: Colors.grey.shade800,
                   child: const Icon(Icons.image, color: Colors.grey),
                 ),
