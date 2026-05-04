@@ -37,7 +37,9 @@ Future<void> main(List<String> args) async {
       if (filteredModelPaths.isEmpty) {
         stdout.writeln('[BenchmarkRunner] No matching .gguf files found');
         if (config.modelFilter != null) {
-          stdout.writeln('[BenchmarkRunner] Model filter: ${config.modelFilter}');
+          stdout.writeln(
+            '[BenchmarkRunner] Model filter: ${config.modelFilter}',
+          );
         }
         exitCode = 1;
         return;
@@ -48,7 +50,9 @@ Future<void> main(List<String> args) async {
         caseLimit: config.caseLimit,
       );
       if (selectedCases.isEmpty) {
-        stdout.writeln('[BenchmarkRunner] No benchmark cases matched the request');
+        stdout.writeln(
+          '[BenchmarkRunner] No benchmark cases matched the request',
+        );
         if (config.caseFilter != null) {
           stdout.writeln('[BenchmarkRunner] Case filter: ${config.caseFilter}');
         }
@@ -77,11 +81,7 @@ Future<void> main(List<String> args) async {
     }
   }
 
-  runApp(
-    BenchmarkApp(
-      modelDirectory: modelDir,
-    ),
-  );
+  runApp(BenchmarkApp(modelDirectory: modelDir));
 }
 
 class _RunnerConfig {
@@ -113,13 +113,17 @@ _RunnerConfig _parseConfig(List<String> args) {
     return null;
   }
 
-  final modelDir = readValue('--model-dir') ?? Directory('models').absolute.path;
+  final modelDir =
+      readValue('--model-dir') ?? Directory('models').absolute.path;
   final outputPath = readValue('--output');
   final modelFilter = readValue('--model');
   final caseFilter = readValue('--case');
   final caseLimitValue = readValue('--case-limit');
-  final caseLimit = caseLimitValue == null ? null : int.tryParse(caseLimitValue);
-  final headless = hasFlag('--headless') || Platform.environment['AI_BENCH_HEADLESS'] == '1';
+  final caseLimit = caseLimitValue == null
+      ? null
+      : int.tryParse(caseLimitValue);
+  final headless =
+      hasFlag('--headless') || Platform.environment['AI_BENCH_HEADLESS'] == '1';
 
   return _RunnerConfig(
     headless: headless,
@@ -219,16 +223,20 @@ Future<void> _runHeadlessBenchmark({
     'finishedAt': finishedAt.toIso8601String(),
     'modelCount': results.length,
     'caseCount': selectedCases.length,
-    if (modelFilter != null && modelFilter.isNotEmpty) 'modelFilter': modelFilter,
+    if (modelFilter != null && modelFilter.isNotEmpty)
+      'modelFilter': modelFilter,
     if (caseFilter != null && caseFilter.isNotEmpty) 'caseFilter': caseFilter,
     'results': results.map(_serializeModelResult).toList(growable: false),
   };
 
-  final resolvedOutputPath = outputPath ??
+  final resolvedOutputPath =
+      outputPath ??
       '${Directory.current.path}${Platform.pathSeparator}benchmark_results_${DateTime.now().millisecondsSinceEpoch}.json';
   final outputFile = File(resolvedOutputPath);
   outputFile.parent.createSync(recursive: true);
-  outputFile.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(report));
+  outputFile.writeAsStringSync(
+    const JsonEncoder.withIndent('  ').convert(report),
+  );
 
   stdout.writeln('[BenchmarkRunner] Headless benchmark complete');
   stdout.writeln('[BenchmarkRunner] Results written to ${outputFile.path}');
@@ -258,42 +266,41 @@ Map<String, dynamic> _serializeModelResult(BenchmarkModelResult result) {
     'totalCases': result.cases.length,
     'avgTokensPerSecond': result.avgTokensPerSecond,
     'totalElapsedMs': result.totalElapsed.inMilliseconds,
-    'cases': result.cases.map((caseResult) {
-      return <String, dynamic>{
-        'caseName': caseResult.caseName,
-        'passed': caseResult.passed,
-        'validJson': caseResult.validJson,
-        'intentMatch': caseResult.intentMatch,
-        'timePresenceMatch': caseResult.timePresenceMatch,
-        'titleLanguageMatch': caseResult.titleLanguageMatch,
-        'titleLanguageDetail': caseResult.titleLanguageDetail,
-        'timeResolutionCorrect': caseResult.timeResolutionCorrect,
-        'timeResolutionDetail': caseResult.timeResolutionDetail,
-        'durationMatch': caseResult.durationMatch,
-        'durationDetail': caseResult.durationDetail,
-        'intent': caseResult.intent,
-        'title': caseResult.title,
-        'datetimeOriginal': caseResult.datetimeOriginal,
-        'datetimeEnglish': caseResult.datetimeEnglish,
-        'elapsedMs': caseResult.elapsed.inMilliseconds,
-        'tokensPerSecond': caseResult.tokensPerSecond,
-        'outputPreview': caseResult.outputPreview,
-        'error': caseResult.error,
-        'extractedCount': caseResult.extractedCount,
-        'expectedCount': caseResult.expectedCount,
-        'countMatch': caseResult.countMatch,
-        if (caseResult.itemFailures.isNotEmpty)
-          'itemFailures': caseResult.itemFailures,
-      };
-    }).toList(growable: false),
+    'cases': result.cases
+        .map((caseResult) {
+          return <String, dynamic>{
+            'caseName': caseResult.caseName,
+            'passed': caseResult.passed,
+            'validJson': caseResult.validJson,
+            'intentMatch': caseResult.intentMatch,
+            'timePresenceMatch': caseResult.timePresenceMatch,
+            'titleLanguageMatch': caseResult.titleLanguageMatch,
+            'titleLanguageDetail': caseResult.titleLanguageDetail,
+            'timeResolutionCorrect': caseResult.timeResolutionCorrect,
+            'timeResolutionDetail': caseResult.timeResolutionDetail,
+            'durationMatch': caseResult.durationMatch,
+            'durationDetail': caseResult.durationDetail,
+            'intent': caseResult.intent,
+            'title': caseResult.title,
+            'datetimeOriginal': caseResult.datetimeOriginal,
+            'datetimeEnglish': caseResult.datetimeEnglish,
+            'elapsedMs': caseResult.elapsed.inMilliseconds,
+            'tokensPerSecond': caseResult.tokensPerSecond,
+            'outputPreview': caseResult.outputPreview,
+            'error': caseResult.error,
+            'extractedCount': caseResult.extractedCount,
+            'expectedCount': caseResult.expectedCount,
+            'countMatch': caseResult.countMatch,
+            if (caseResult.itemFailures.isNotEmpty)
+              'itemFailures': caseResult.itemFailures,
+          };
+        })
+        .toList(growable: false),
   };
 }
 
 class BenchmarkApp extends StatelessWidget {
-  const BenchmarkApp({
-    super.key,
-    required this.modelDirectory,
-  });
+  const BenchmarkApp({super.key, required this.modelDirectory});
 
   final String modelDirectory;
 

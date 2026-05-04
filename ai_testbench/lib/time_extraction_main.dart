@@ -63,18 +63,18 @@ Future<void> runHeadlessTimeExtraction(List<String> args) async {
     return;
   }
 
-  var modelPaths = modelsDirectory
-      .listSync()
-      .whereType<File>()
-      .map((f) => f.path)
-      .where((p) => p.toLowerCase().endsWith('.gguf'))
-      .toList()
-    ..sort();
+  var modelPaths =
+      modelsDirectory
+          .listSync()
+          .whereType<File>()
+          .map((f) => f.path)
+          .where((p) => p.toLowerCase().endsWith('.gguf'))
+          .toList()
+        ..sort();
 
   if (modelFilter != null) {
     modelPaths = modelPaths
-        .where((p) =>
-            p.toLowerCase().contains(modelFilter!.toLowerCase()))
+        .where((p) => p.toLowerCase().contains(modelFilter!.toLowerCase()))
         .toList();
   }
 
@@ -96,11 +96,19 @@ Future<void> runHeadlessTimeExtraction(List<String> args) async {
   for (final p in modelPaths) {
     stdout.writeln('  - ${p.split(Platform.pathSeparator).last}');
   }
-  stdout.writeln('Test cases: ${TimeExtractionBenchmarkService.testCases.length}');
-  stdout.writeln('Reference time: ${TimeExtractionBenchmarkService.referenceTime}');
+  stdout.writeln(
+    'Test cases: ${TimeExtractionBenchmarkService.testCases.length}',
+  );
+  stdout.writeln(
+    'Reference time: ${TimeExtractionBenchmarkService.referenceTime}',
+  );
   stdout.writeln('Prompt variant: ${promptVariant.name}');
-  stdout.writeln('Language hint: ${includeLanguageHint ? 'enabled' : 'disabled'}');
-  stdout.writeln('Retry invalid output: ${retryInvalidOutput ? 'enabled' : 'disabled'}');
+  stdout.writeln(
+    'Language hint: ${includeLanguageHint ? 'enabled' : 'disabled'}',
+  );
+  stdout.writeln(
+    'Retry invalid output: ${retryInvalidOutput ? 'enabled' : 'disabled'}',
+  );
   stdout.writeln('');
 
   final service = TimeExtractionBenchmarkService();

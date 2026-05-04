@@ -251,7 +251,9 @@ void main(List<String> args) async {
 
   for (var i = 0; i < testCases.length; i++) {
     final tc = testCases[i];
-    print('─── Test ${i + 1}/${testCases.length}: ${tc.name} ───────────────────────');
+    print(
+      '─── Test ${i + 1}/${testCases.length}: ${tc.name} ───────────────────────',
+    );
     print('  Input: "${tc.transcript}"');
 
     // Build prompt
@@ -283,13 +285,15 @@ void main(List<String> args) async {
       }
     } catch (e) {
       stderr.writeln('  ERROR during generation: $e');
-      results.add(TestResult(
-        testCase: tc,
-        llmDuration: genSw.elapsed,
-        tokenCount: tokenCount,
-        status: TestStatus.fail,
-        failures: ['LLM generation error: $e'],
-      ));
+      results.add(
+        TestResult(
+          testCase: tc,
+          llmDuration: genSw.elapsed,
+          tokenCount: tokenCount,
+          status: TestStatus.fail,
+          failures: ['LLM generation error: $e'],
+        ),
+      );
       print('');
       continue;
     }
@@ -300,10 +304,14 @@ void main(List<String> args) async {
     // Strip end-of-turn tokens
     raw = raw.replaceAll('<|im_end|>', '').trim();
     // Strip thinking blocks (Qwen3 models may use these)
-    raw = raw.replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '').trim();
+    raw = raw
+        .replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '')
+        .trim();
 
     final secs = genSw.elapsed.inMilliseconds / 1000;
-    print('  LLM time: ${secs.toStringAsFixed(2)}s (~${(tokenCount / secs).toStringAsFixed(1)} tok/s)');
+    print(
+      '  LLM time: ${secs.toStringAsFixed(2)}s (~${(tokenCount / secs).toStringAsFixed(1)} tok/s)',
+    );
 
     if (verbose) {
       print('  Raw output:');
@@ -341,13 +349,15 @@ void main(List<String> args) async {
       if (!verbose) {
         print('  Raw output: $raw');
       }
-      results.add(TestResult(
-        testCase: tc,
-        llmDuration: genSw.elapsed,
-        tokenCount: tokenCount,
-        status: TestStatus.fail,
-        failures: ['JSON parse failed: $e'],
-      ));
+      results.add(
+        TestResult(
+          testCase: tc,
+          llmDuration: genSw.elapsed,
+          tokenCount: tokenCount,
+          status: TestStatus.fail,
+          failures: ['JSON parse failed: $e'],
+        ),
+      );
       print('');
       continue;
     }
@@ -355,15 +365,15 @@ void main(List<String> args) async {
     // Resolve time expression with chrono
     ResolvedTime? resolvedTime;
     // Try English translation first, fall back to original expression
-    final timeExpr = llmResult.datetimeExpressionEnglish ??
+    final timeExpr =
+        llmResult.datetimeExpressionEnglish ??
         llmResult.datetimeExpressionOriginal;
     if (timeExpr != null) {
-      resolvedTime = resolver.resolve(
-        timeExpr,
-        referenceDate: referenceTime,
-      );
+      resolvedTime = resolver.resolve(timeExpr, referenceDate: referenceTime);
       if (resolvedTime != null) {
-        print('  Chrono parse: ${resolvedTime.dateTime} (via ${resolvedTime.method})');
+        print(
+          '  Chrono parse: ${resolvedTime.dateTime} (via ${resolvedTime.method})',
+        );
       } else {
         print('  Chrono parse: FAILED — could not resolve "$timeExpr"');
       }
@@ -378,7 +388,8 @@ void main(List<String> args) async {
     final intentMatch = _intentMatches(llmResult.intent, tc.expectedIntent);
     if (!intentMatch) {
       failures.add(
-          'Intent mismatch: got "${llmResult.intent}", expected "${tc.expectedIntent}"');
+        'Intent mismatch: got "${llmResult.intent}", expected "${tc.expectedIntent}"',
+      );
     }
 
     // Check 2: Time expression present/absent
@@ -389,7 +400,8 @@ void main(List<String> args) async {
     if (tc.expectedTimeEnglish == null &&
         llmResult.datetimeExpressionEnglish != null) {
       failures.add(
-          'Expected no time expression but got "${llmResult.datetimeExpressionEnglish}"');
+        'Expected no time expression but got "${llmResult.datetimeExpressionEnglish}"',
+      );
     }
 
     // Check 3: Chrono parse succeeded when expected
@@ -398,24 +410,28 @@ void main(List<String> args) async {
     }
     if (tc.expectedDateTime == null && resolvedTime != null) {
       failures.add(
-          'Expected no resolved time but got ${resolvedTime.dateTime}');
+        'Expected no resolved time but got ${resolvedTime.dateTime}',
+      );
     }
 
     // Check 4: DateTime accuracy
     if (tc.expectedDateTime != null && resolvedTime != null) {
-      final diff =
-          resolvedTime.dateTime.difference(tc.expectedDateTime!).inMinutes.abs();
+      final diff = resolvedTime.dateTime
+          .difference(tc.expectedDateTime!)
+          .inMinutes
+          .abs();
       if (diff > tc.toleranceMinutes) {
         failures.add(
-            'DateTime mismatch: got ${resolvedTime.dateTime}, expected ${tc.expectedDateTime} (diff: ${diff}min, tolerance: ${tc.toleranceMinutes}min)');
+          'DateTime mismatch: got ${resolvedTime.dateTime}, expected ${tc.expectedDateTime} (diff: ${diff}min, tolerance: ${tc.toleranceMinutes}min)',
+        );
       }
     }
 
     final status = failures.isEmpty
         ? TestStatus.pass
         : (failures.length == 1 && !failures.first.contains('Intent'))
-            ? TestStatus.partial
-            : TestStatus.fail;
+        ? TestStatus.partial
+        : TestStatus.fail;
 
     if (failures.isEmpty) {
       print('  ✅ PASS');
@@ -429,15 +445,17 @@ void main(List<String> args) async {
       print('  Expected:   ${tc.expectedDateTime}');
     }
 
-    results.add(TestResult(
-      testCase: tc,
-      llmResult: llmResult,
-      resolvedTime: resolvedTime,
-      llmDuration: genSw.elapsed,
-      tokenCount: tokenCount,
-      status: status,
-      failures: failures,
-    ));
+    results.add(
+      TestResult(
+        testCase: tc,
+        llmResult: llmResult,
+        resolvedTime: resolvedTime,
+        llmDuration: genSw.elapsed,
+        tokenCount: tokenCount,
+        status: status,
+        failures: failures,
+      ),
+    );
 
     print('');
   }
@@ -449,12 +467,18 @@ void main(List<String> args) async {
   final partial = results.where((r) => r.status == TestStatus.partial).length;
   final failed = results.where((r) => r.status == TestStatus.fail).length;
   final totalLlmTime = results.fold<Duration>(
-      Duration.zero, (sum, r) => sum + r.llmDuration);
+    Duration.zero,
+    (sum, r) => sum + r.llmDuration,
+  );
 
   print('╔══════════════════════════════════════════════════════════╗');
-  print('║  Results: $passed passed, $partial partial, $failed failed '
-      'out of ${testCases.length} tests');
-  print('║  Total LLM time: ${(totalLlmTime.inMilliseconds / 1000).toStringAsFixed(1)}s');
+  print(
+    '║  Results: $passed passed, $partial partial, $failed failed '
+    'out of ${testCases.length} tests',
+  );
+  print(
+    '║  Total LLM time: ${(totalLlmTime.inMilliseconds / 1000).toStringAsFixed(1)}s',
+  );
   print('║  Model: $modelFile');
   print('╚══════════════════════════════════════════════════════════╝');
 
@@ -463,7 +487,8 @@ void main(List<String> args) async {
     print('');
     print('Failed/partial tests:');
     for (final r in results.where(
-        (r) => r.status == TestStatus.fail || r.status == TestStatus.partial)) {
+      (r) => r.status == TestStatus.fail || r.status == TestStatus.partial,
+    )) {
       print('  ${r.testCase.name}:');
       for (final f in r.failures) {
         print('    - $f');

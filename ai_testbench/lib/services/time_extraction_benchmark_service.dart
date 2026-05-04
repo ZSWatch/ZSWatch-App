@@ -84,8 +84,7 @@ class TimeExtractionProgress {
     required this.modelName,
   });
 
-  double get fraction =>
-      totalCases == 0 ? 0 : completedCases / totalCases;
+  double get fraction => totalCases == 0 ? 0 : completedCases / totalCases;
 }
 
 // ── Aggregate result for a model ────────────────────────────────────────
@@ -100,16 +99,14 @@ class TimeExtractionModelResult {
   });
 
   String get modelName => modelPath.split(Platform.pathSeparator).last;
-  int get passedCount =>
-      cases.where((c) => c.status == TestStatus.pass).length;
+  int get passedCount => cases.where((c) => c.status == TestStatus.pass).length;
   int get partialCount =>
       cases.where((c) => c.status == TestStatus.partial).length;
-  int get failedCount =>
-      cases.where((c) => c.status == TestStatus.fail).length;
+  int get failedCount => cases.where((c) => c.status == TestStatus.fail).length;
   double get avgTokensPerSecond => cases.isEmpty
       ? 0
       : cases.fold<double>(0, (sum, c) => sum + c.tokensPerSecond) /
-          cases.length;
+            cases.length;
   Duration get totalElapsed =>
       cases.fold(Duration.zero, (sum, c) => sum + c.llmDuration);
 }
@@ -275,16 +272,16 @@ class TimeExtractionBenchmarkService {
         for (var i = 0; i < testCases.length; i++) {
           final tc = testCases[i];
 
-          onProgress?.call(TimeExtractionProgress(
-            totalCases: testCases.length,
-            completedCases: i,
-            currentCaseName: tc.name,
-            modelName: modelName,
-          ));
-
-          debugPrint(
-            '\n─── Test ${i + 1}/${testCases.length}: ${tc.name} ───',
+          onProgress?.call(
+            TimeExtractionProgress(
+              totalCases: testCases.length,
+              completedCases: i,
+              currentCaseName: tc.name,
+              modelName: modelName,
+            ),
           );
+
+          debugPrint('\n─── Test ${i + 1}/${testCases.length}: ${tc.name} ───');
           debugPrint('  Input: "${tc.transcript}"');
 
           try {
@@ -301,9 +298,7 @@ class TimeExtractionBenchmarkService {
 
             while (true) {
               attempts++;
-              result = await llm
-                  .generate(prompt)
-                  .timeout(perCaseTimeout);
+              result = await llm.generate(prompt).timeout(perCaseTimeout);
               totalElapsed += result.elapsed;
               lastTokensPerSecond = result.tokensPerSecond;
               llmResult = _parseLlmOutput(result.output);
@@ -314,39 +309,47 @@ class TimeExtractionBenchmarkService {
                 break;
               }
 
-              debugPrint('  ↻ Retrying invalid output (attempt ${attempts + 1}/2)');
+              debugPrint(
+                '  ↻ Retrying invalid output (attempt ${attempts + 1}/2)',
+              );
             }
 
-            debugPrint('  LLM time: ${totalElapsed.inMilliseconds}ms '
-                '(${lastTokensPerSecond.toStringAsFixed(1)} tok/s)');
+            debugPrint(
+              '  LLM time: ${totalElapsed.inMilliseconds}ms '
+              '(${lastTokensPerSecond.toStringAsFixed(1)} tok/s)',
+            );
             debugPrint('  attempts: $attempts');
             debugPrint('  intent: ${llmResult.intent}');
             debugPrint('  title: ${llmResult.title}');
-            debugPrint('  time (orig): ${llmResult.datetimeExpressionOriginal}');
+            debugPrint(
+              '  time (orig): ${llmResult.datetimeExpressionOriginal}',
+            );
             debugPrint('  time (EN): ${llmResult.datetimeExpressionEnglish}');
 
             // Resolve time expression
             ResolvedTime? resolvedTime;
-            final timeExpr = llmResult.datetimeExpressionEnglish ??
+            final timeExpr =
+                llmResult.datetimeExpressionEnglish ??
                 llmResult.datetimeExpressionOriginal;
             if (timeExpr != null) {
               resolvedTime = resolver.resolve(
                 timeExpr,
                 referenceDate: referenceTime,
               );
-              debugPrint(resolvedTime != null
-                  ? '  Chrono: ${resolvedTime.dateTime} (via ${resolvedTime.method})'
-                  : '  Chrono: FAILED for "$timeExpr"');
+              debugPrint(
+                resolvedTime != null
+                    ? '  Chrono: ${resolvedTime.dateTime} (via ${resolvedTime.method})'
+                    : '  Chrono: FAILED for "$timeExpr"',
+              );
             }
 
             // Evaluate
             final failures = _evaluate(tc, llmResult, resolvedTime);
             final status = failures.isEmpty
                 ? TestStatus.pass
-                : (failures.length == 1 &&
-                        !failures.first.contains('Intent'))
-                    ? TestStatus.partial
-                    : TestStatus.fail;
+                : (failures.length == 1 && !failures.first.contains('Intent'))
+                ? TestStatus.partial
+                : TestStatus.fail;
 
             for (final f in failures) {
               debugPrint('  ❌ $f');
@@ -355,52 +358,59 @@ class TimeExtractionBenchmarkService {
               debugPrint('  ✅ PASS');
             }
 
-            caseResults.add(TimeExtractionTestResult(
-              testCase: tc,
-              llmResult: llmResult,
-              resolvedTime: resolvedTime,
-              llmDuration: totalElapsed,
-              tokensPerSecond: lastTokensPerSecond,
-              status: status,
-              failures: failures,
-            ));
+            caseResults.add(
+              TimeExtractionTestResult(
+                testCase: tc,
+                llmResult: llmResult,
+                resolvedTime: resolvedTime,
+                llmDuration: totalElapsed,
+                tokensPerSecond: lastTokensPerSecond,
+                status: status,
+                failures: failures,
+              ),
+            );
           } on TimeoutException {
             llm.cancelInference();
             debugPrint('  ⏱ TIMEOUT');
-            caseResults.add(TimeExtractionTestResult(
-              testCase: tc,
-              llmDuration: perCaseTimeout,
-              tokensPerSecond: 0,
-              status: TestStatus.fail,
-              failures: ['Timed out after ${perCaseTimeout.inSeconds}s'],
-            ));
+            caseResults.add(
+              TimeExtractionTestResult(
+                testCase: tc,
+                llmDuration: perCaseTimeout,
+                tokensPerSecond: 0,
+                status: TestStatus.fail,
+                failures: ['Timed out after ${perCaseTimeout.inSeconds}s'],
+              ),
+            );
           } catch (e) {
             llm.cancelInference();
             debugPrint('  ❌ ERROR: $e');
-            caseResults.add(TimeExtractionTestResult(
-              testCase: tc,
-              llmDuration: Duration.zero,
-              tokensPerSecond: 0,
-              status: TestStatus.fail,
-              failures: ['Error: $e'],
-            ));
+            caseResults.add(
+              TimeExtractionTestResult(
+                testCase: tc,
+                llmDuration: Duration.zero,
+                tokensPerSecond: 0,
+                status: TestStatus.fail,
+                failures: ['Error: $e'],
+              ),
+            );
           }
 
-          onProgress?.call(TimeExtractionProgress(
-            totalCases: testCases.length,
-            completedCases: i + 1,
-            currentCaseName: tc.name,
-            modelName: modelName,
-          ));
+          onProgress?.call(
+            TimeExtractionProgress(
+              totalCases: testCases.length,
+              completedCases: i + 1,
+              currentCaseName: tc.name,
+              modelName: modelName,
+            ),
+          );
         }
       } finally {
         llm.dispose();
       }
 
-      results.add(TimeExtractionModelResult(
-        modelPath: modelPath,
-        cases: caseResults,
-      ));
+      results.add(
+        TimeExtractionModelResult(modelPath: modelPath, cases: caseResults),
+      );
     }
 
     return results;
@@ -424,11 +434,13 @@ class TimeExtractionBenchmarkService {
     LlmExtractionResult llmResult,
   ) {
     final hasIntent = llmResult.intent != null && llmResult.intent!.isNotEmpty;
-    final hasAnyTime = (llmResult.datetimeExpressionEnglish != null &&
+    final hasAnyTime =
+        (llmResult.datetimeExpressionEnglish != null &&
             llmResult.datetimeExpressionEnglish!.isNotEmpty) ||
         (llmResult.datetimeExpressionOriginal != null &&
             llmResult.datetimeExpressionOriginal!.isNotEmpty);
-    final hasJsonFields = hasIntent ||
+    final hasJsonFields =
+        hasIntent ||
         llmResult.title != null ||
         llmResult.datetimeExpressionEnglish != null ||
         llmResult.datetimeExpressionOriginal != null;
@@ -517,13 +529,19 @@ class TimeExtractionBenchmarkService {
     for (final model in results) {
       buf.writeln('╔══════════════════════════════════════════════════════╗');
       buf.writeln('║ Model: ${model.modelName}');
-      buf.writeln('║ Results: ${model.passedCount} passed, '
-          '${model.partialCount} partial, ${model.failedCount} failed '
-          'of ${model.cases.length}');
-      buf.writeln('║ Total time: '
-          '${(model.totalElapsed.inMilliseconds / 1000).toStringAsFixed(1)}s');
-      buf.writeln('║ Avg: '
-          '${model.avgTokensPerSecond.toStringAsFixed(1)} tok/s');
+      buf.writeln(
+        '║ Results: ${model.passedCount} passed, '
+        '${model.partialCount} partial, ${model.failedCount} failed '
+        'of ${model.cases.length}',
+      );
+      buf.writeln(
+        '║ Total time: '
+        '${(model.totalElapsed.inMilliseconds / 1000).toStringAsFixed(1)}s',
+      );
+      buf.writeln(
+        '║ Avg: '
+        '${model.avgTokensPerSecond.toStringAsFixed(1)} tok/s',
+      );
       buf.writeln('╚══════════════════════════════════════════════════════╝');
       buf.writeln();
 
@@ -539,20 +557,24 @@ class TimeExtractionBenchmarkService {
           buf.writeln('   Intent: ${r.llmResult!.intent}');
           buf.writeln('   Title: ${r.llmResult!.title}');
           buf.writeln(
-              '   Time (orig): ${r.llmResult!.datetimeExpressionOriginal}');
+            '   Time (orig): ${r.llmResult!.datetimeExpressionOriginal}',
+          );
           buf.writeln(
-              '   Time (EN): ${r.llmResult!.datetimeExpressionEnglish}');
+            '   Time (EN): ${r.llmResult!.datetimeExpressionEnglish}',
+          );
         }
         if (r.resolvedTime != null) {
           buf.writeln(
-              '   Resolved: ${r.resolvedTime!.dateTime} (${r.resolvedTime!.method})');
+            '   Resolved: ${r.resolvedTime!.dateTime} (${r.resolvedTime!.method})',
+          );
         }
         if (r.testCase.expectedDateTime != null) {
           buf.writeln('   Expected: ${r.testCase.expectedDateTime}');
         }
         buf.writeln(
-            '   LLM: ${r.llmDuration.inMilliseconds}ms, '
-            '${r.tokensPerSecond.toStringAsFixed(1)} tok/s');
+          '   LLM: ${r.llmDuration.inMilliseconds}ms, '
+          '${r.tokensPerSecond.toStringAsFixed(1)} tok/s',
+        );
         for (final f in r.failures) {
           buf.writeln('   ↳ $f');
         }

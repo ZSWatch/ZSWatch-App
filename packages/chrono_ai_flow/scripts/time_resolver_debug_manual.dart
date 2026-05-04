@@ -13,7 +13,9 @@ void main() {
   );
   if (chronoResult.isNotEmpty) {
     final d = chronoResult.first.date();
-    print('chrono raw: $d weekday=${d.weekday} daysFromRef=${d.difference(ref).inDays}');
+    print(
+      'chrono raw: $d weekday=${d.weekday} daysFromRef=${d.difference(ref).inDays}',
+    );
   }
 
   final cases = [

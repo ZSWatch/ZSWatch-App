@@ -46,13 +46,14 @@ class _TimeExtractionScreenState extends State<TimeExtractionScreen> {
       _log('No models/ directory found');
       return;
     }
-    final models = modelDir
-        .listSync()
-        .whereType<File>()
-        .map((f) => f.path)
-        .where((p) => p.toLowerCase().endsWith('.gguf'))
-        .toList()
-      ..sort();
+    final models =
+        modelDir
+            .listSync()
+            .whereType<File>()
+            .map((f) => f.path)
+            .where((p) => p.toLowerCase().endsWith('.gguf'))
+            .toList()
+          ..sort();
 
     setState(() {
       _availableModels = models;
@@ -135,8 +136,10 @@ class _TimeExtractionScreenState extends State<TimeExtractionScreen> {
       _availableModels,
       onProgress: (p) {
         setState(() => _progress = p);
-        _log('[${p.modelName}] [${p.completedCases}/${p.totalCases}] '
-            '${p.currentCaseName}');
+        _log(
+          '[${p.modelName}] [${p.completedCases}/${p.totalCases}] '
+          '${p.currentCaseName}',
+        );
       },
     );
 
@@ -155,9 +158,7 @@ class _TimeExtractionScreenState extends State<TimeExtractionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Time Extraction Testbench'),
-      ),
+      appBar: AppBar(title: const Text('Time Extraction Testbench')),
       body: Column(
         children: [
           // ── Controls bar ──
@@ -165,14 +166,11 @@ class _TimeExtractionScreenState extends State<TimeExtractionScreen> {
           // ── Progress indicator ──
           if (_isRunning && _progress != null)
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  LinearProgressIndicator(
-                    value: _progress!.fraction,
-                  ),
+                  LinearProgressIndicator(value: _progress!.fraction),
                   const SizedBox(height: 4),
                   Text(
                     '${_progress!.modelName} — '
@@ -256,20 +254,40 @@ class _TimeExtractionScreenState extends State<TimeExtractionScreen> {
           DataColumn(label: Text('tok/s'), numeric: true),
         ],
         rows: _results.map((model) {
-          return DataRow(cells: [
-            DataCell(Text(model.modelName,
-                style: const TextStyle(fontWeight: FontWeight.bold))),
-            DataCell(Text('${model.passedCount}',
-                style: const TextStyle(color: Colors.green))),
-            DataCell(Text('${model.partialCount}',
-                style: const TextStyle(color: Colors.orange))),
-            DataCell(Text('${model.failedCount}',
-                style: const TextStyle(color: Colors.red))),
-            DataCell(Text(
-                '${(model.totalElapsed.inMilliseconds / 1000).toStringAsFixed(1)}s')),
-            DataCell(
-                Text(model.avgTokensPerSecond.toStringAsFixed(1))),
-          ]);
+          return DataRow(
+            cells: [
+              DataCell(
+                Text(
+                  model.modelName,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              DataCell(
+                Text(
+                  '${model.passedCount}',
+                  style: const TextStyle(color: Colors.green),
+                ),
+              ),
+              DataCell(
+                Text(
+                  '${model.partialCount}',
+                  style: const TextStyle(color: Colors.orange),
+                ),
+              ),
+              DataCell(
+                Text(
+                  '${model.failedCount}',
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+              DataCell(
+                Text(
+                  '${(model.totalElapsed.inMilliseconds / 1000).toStringAsFixed(1)}s',
+                ),
+              ),
+              DataCell(Text(model.avgTokensPerSecond.toStringAsFixed(1))),
+            ],
+          );
         }).toList(),
       ),
     );

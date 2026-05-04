@@ -44,7 +44,9 @@ class MemoCard extends StatelessWidget {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
@@ -62,10 +64,9 @@ class MemoCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         title,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -123,14 +124,9 @@ class MemoCard extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '$label: ',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
           ),
-          Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 14)),
-          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );
