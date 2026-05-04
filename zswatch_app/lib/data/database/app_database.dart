@@ -788,9 +788,9 @@ class AppDatabase extends _$AppDatabase {
 
   /// Get all chat history entries, newest first.
   Future<List<ChatHistoryEntity>> getAllChatHistory() {
-    return (select(chatHistory)
-          ..orderBy([(t) => OrderingTerm.desc(t.timestampUtc)]))
-        .get();
+    return (select(
+      chatHistory,
+    )..orderBy([(t) => OrderingTerm.desc(t.timestampUtc)])).get();
   }
 
   /// Get the N most recent chat history entries.
@@ -803,9 +803,9 @@ class AppDatabase extends _$AppDatabase {
 
   /// Watch all chat history entries (stream), newest first.
   Stream<List<ChatHistoryEntity>> watchAllChatHistory() {
-    return (select(chatHistory)
-          ..orderBy([(t) => OrderingTerm.desc(t.timestampUtc)]))
-        .watch();
+    return (select(
+      chatHistory,
+    )..orderBy([(t) => OrderingTerm.desc(t.timestampUtc)])).watch();
   }
 
   /// Delete a chat history entry by ID.
@@ -821,9 +821,9 @@ class AppDatabase extends _$AppDatabase {
   /// Delete chat history older than [cutoff].
   Future<int> deleteOldChatHistory(DateTime cutoff) {
     final cutoffEpoch = cutoff.toUtc().millisecondsSinceEpoch ~/ 1000;
-    return (delete(chatHistory)
-          ..where((t) => t.timestampUtc.isSmallerThanValue(cutoffEpoch)))
-        .go();
+    return (delete(
+      chatHistory,
+    )..where((t) => t.timestampUtc.isSmallerThanValue(cutoffEpoch))).go();
   }
 }
 

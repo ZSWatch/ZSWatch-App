@@ -27,7 +27,9 @@ class LiteRtLmService {
     String backend = 'gpu',
     int maxTokens = 4096,
   }) async {
-    debugPrint('[LiteRtLmService] Loading model: $modelPath (backend=$backend)');
+    debugPrint(
+      '[LiteRtLmService] Loading model: $modelPath (backend=$backend)',
+    );
     await _methodChannel.invokeMethod('loadModel', {
       'modelPath': modelPath,
       'backend': backend,
@@ -52,8 +54,11 @@ class LiteRtLmService {
       throw StateError('Model not loaded. Call loadModel() first.');
     }
 
-    // Set up event stream for partial tokens
-    final completer = Completer<void>();
+    // Set up event stream for partial tokens.
+    // Capture any stream error so it can be rethrown after invokeMethod returns,
+    // covering the case where the native side signals failure via EventChannel.
+    Object? streamError;
+    StackTrace? streamTrace;
     await _eventSubscription?.cancel();
     _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
       (dynamic event) {
@@ -64,29 +69,36 @@ class LiteRtLmService {
               event['text'] as String? ?? '',
               event['tokenCount'] as int? ?? 0,
             );
-          } else if (type == 'done') {
-            if (!completer.isCompleted) completer.complete();
           }
+          // 'done' events are handled by invokeMethod completing — no completer needed.
         }
       },
-      onError: (Object error, StackTrace stackTrace) {
-        if (!completer.isCompleted) {
-          completer.completeError(error, stackTrace);
-        }
+      onError: (Object error, StackTrace stack) {
+        streamError = error;
+        streamTrace = stack;
       },
     );
 
     try {
       debugPrint('[LiteRtLmService] Calling generate MethodChannel...');
-        final result =
-          await _methodChannel.invokeMethod<Map<Object?, Object?>>('generate', {
-        'prompt': prompt,
-        'temperature': temperature,
-        'topK': topK,
-        'topP': topP,
-      });
+      final result = await _methodChannel.invokeMethod<Map<Object?, Object?>>(
+        'generate',
+        {
+          'prompt': prompt,
+          'temperature': temperature,
+          'topK': topK,
+          'topP': topP,
+        },
+      );
 
       debugPrint('[LiteRtLmService] MethodChannel returned: $result');
+
+      // Propagate any error the native side signalled via the EventChannel
+      // (covers the case where invokeMethod doesn't throw but the stream did).
+      final err = streamError;
+      if (err != null) {
+        Error.throwWithStackTrace(err, streamTrace ?? StackTrace.current);
+      }
 
       if (result == null) {
         throw PlatformException(

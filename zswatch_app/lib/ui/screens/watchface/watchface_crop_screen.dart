@@ -3,22 +3,24 @@ import 'dart:typed_data';
 
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Screen for interactively cropping an image before uploading
 /// as a watchface background.
 ///
 /// Returns the cropped image bytes (Uint8List) via Navigator.pop,
 /// or null if the user cancels.
-class WatchfaceCropScreen extends StatefulWidget {
+class WatchfaceCropScreen extends ConsumerStatefulWidget {
   final String imagePath;
 
   const WatchfaceCropScreen({super.key, required this.imagePath});
 
   @override
-  State<WatchfaceCropScreen> createState() => _WatchfaceCropScreenState();
+  ConsumerState<WatchfaceCropScreen> createState() =>
+      _WatchfaceCropScreenState();
 }
 
-class _WatchfaceCropScreenState extends State<WatchfaceCropScreen> {
+class _WatchfaceCropScreenState extends ConsumerState<WatchfaceCropScreen> {
   final _cropController = CropController();
   Uint8List? _imageBytes;
   bool _isCropping = false;
@@ -36,10 +38,10 @@ class _WatchfaceCropScreenState extends State<WatchfaceCropScreen> {
   Future<void> _loadImage() async {
     try {
       final bytes = await File(widget.imagePath).readAsBytes();
-      // Try using the raw bytes first (works for JPEG/PNG).
-      // If crop_your_image can't parse them, the re-encode path below handles it.
+      if (!mounted) return;
       setState(() => _imageBytes = bytes);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'Could not load image file');
       debugPrint('[WatchfaceCropScreen] Image load error: $e');
     }
@@ -69,10 +71,12 @@ class _WatchfaceCropScreenState extends State<WatchfaceCropScreen> {
         ],
       ),
       body: _error != null
-          ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+          ? Center(
+              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+            )
           : _imageBytes == null
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               children: [
                 Expanded(
                   child: Crop(
@@ -83,7 +87,17 @@ class _WatchfaceCropScreenState extends State<WatchfaceCropScreen> {
                     baseColor: Colors.black,
                     maskColor: Colors.black.withValues(alpha: 0.7),
                     onCropped: (croppedBytes) {
+                      if (!mounted) return;
+                      setState(() => _isCropping = false);
                       Navigator.of(context).pop(croppedBytes);
+                    },
+                    onStatusChanged: (status) {
+                      // If the controller returns to ready while _isCropping is
+                      // set (e.g. internal crop failure), reset the button state.
+                      if (status == CropStatus.ready && _isCropping) {
+                        if (!mounted) return;
+                        setState(() => _isCropping = false);
+                      }
                     },
                   ),
                 ),
@@ -92,12 +106,10 @@ class _WatchfaceCropScreenState extends State<WatchfaceCropScreen> {
                   child: Text(
                     'Pinch to zoom, drag to position',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.color
-                              ?.withValues(alpha: 0.6),
-                        ),
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+                    ),
                   ),
                 ),
               ],

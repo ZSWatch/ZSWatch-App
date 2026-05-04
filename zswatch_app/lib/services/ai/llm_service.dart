@@ -436,8 +436,7 @@ class LlmService {
       for (final entity in importedDir.listSync()) {
         if (entity is! File) continue;
         final lowerPath = entity.path.toLowerCase();
-        if (!lowerPath.endsWith('.gguf') &&
-            !lowerPath.endsWith('.litertlm')) {
+        if (!lowerPath.endsWith('.gguf') && !lowerPath.endsWith('.litertlm')) {
           continue;
         }
 
@@ -461,7 +460,9 @@ class LlmService {
   }
 
   void selectModel(String modelId) {
-    debugPrint('[LlmService] selectModel($modelId) called (was: $_selectedModelId)');
+    debugPrint(
+      '[LlmService] selectModel($modelId) called (was: $_selectedModelId)',
+    );
     _selectedModelId = modelId;
     final builtIn = catalogModels.where((m) => m.id == modelId).firstOrNull;
     _selectedModelName =
@@ -869,9 +870,13 @@ class LlmService {
     // a previous phase) before starting a new one.  This reduces the window
     // for the "Callback invoked after it has been deleted" crash.
     cancelInference();
-    debugPrint('[LlmService] _generate: _selectedModelId=$_selectedModelId _modelPath=$_modelPath');
+    debugPrint(
+      '[LlmService] _generate: _selectedModelId=$_selectedModelId _modelPath=$_modelPath',
+    );
     final modelInfo = await _ensureModel();
-    debugPrint('[LlmService] _generate: after ensureModel _selectedModelId=$_selectedModelId modelInfo.id=${modelInfo.id} isLiteRtLm=${modelInfo.isLiteRtLm}');
+    debugPrint(
+      '[LlmService] _generate: after ensureModel _selectedModelId=$_selectedModelId modelInfo.id=${modelInfo.id} isLiteRtLm=${modelInfo.isLiteRtLm}',
+    );
 
     // Keep CPU at full speed during inference (Android foreground service).
     await LlmComputeService.instance.start();
@@ -912,29 +917,29 @@ class LlmService {
       }
       _liteRtLmLock = Completer<void>();
       try {
-      debugPrint(
-        '[LlmService] LiteRT-LM generate: prompt length=${prompt.length}, '
-        'first 200 chars: ${prompt.substring(0, prompt.length > 200 ? 200 : prompt.length)}',
-      );
-      final result = await _liteRtLmService.generate(
-        prompt,
-        temperature: temperature,
-        topK: 40,
-        topP: topP,
-        onToken: (partial, tokens) {
-          debugPrint(
-            '[LlmService] LiteRT-LM onToken: tokens=$tokens, '
-            'partial length=${partial.length}, first 200: ${partial.substring(0, partial.length > 200 ? 200 : partial.length)}',
-          );
-          onPartialResponse?.call(partial, tokens);
-        },
-      );
-      debugPrint(
-        '[LlmService] LiteRT-LM result: text="${result.text.substring(0, result.text.length > 500 ? 500 : result.text.length)}" '
-        'tokens=${result.tokenCount} elapsed=${result.elapsedMs}ms cancelled=${result.cancelled}',
-      );
-      text = result.text.trim();
-      tokenCount = result.tokenCount;
+        debugPrint(
+          '[LlmService] LiteRT-LM generate: prompt length=${prompt.length}, '
+          'first 200 chars: ${prompt.substring(0, prompt.length > 200 ? 200 : prompt.length)}',
+        );
+        final result = await _liteRtLmService.generate(
+          prompt,
+          temperature: temperature,
+          topK: 40,
+          topP: topP,
+          onToken: (partial, tokens) {
+            debugPrint(
+              '[LlmService] LiteRT-LM onToken: tokens=$tokens, '
+              'partial length=${partial.length}, first 200: ${partial.substring(0, partial.length > 200 ? 200 : partial.length)}',
+            );
+            onPartialResponse?.call(partial, tokens);
+          },
+        );
+        debugPrint(
+          '[LlmService] LiteRT-LM result: text="${result.text.substring(0, result.text.length > 500 ? 500 : result.text.length)}" '
+          'tokens=${result.tokenCount} elapsed=${result.elapsedMs}ms cancelled=${result.cancelled}',
+        );
+        text = result.text.trim();
+        tokenCount = result.tokenCount;
       } finally {
         _liteRtLmLock!.complete();
         _liteRtLmLock = null;
@@ -1019,7 +1024,8 @@ class LlmService {
       }
     }
 
-    final prompt = '''You are a helpful voice assistant on a smartwatch. Answer the user's question directly and concisely in $lengthHint. Use simple language that sounds natural when spoken aloud. Avoid markdown, lists, or formatting. If uncertain, say so briefly.
+    final prompt =
+        '''You are a helpful voice assistant on a smartwatch. Answer the user's question directly and concisely in $lengthHint. Use simple language that sounds natural when spoken aloud. Avoid markdown, lists, or formatting. If uncertain, say so briefly.
 
 ${historyBlock.isNotEmpty ? 'Previous conversation:\n$historyBlock\n' : ''}User: $question
 Assistant:''';
@@ -1030,9 +1036,7 @@ Assistant:''';
 
     try {
       final result = await _generate(prompt, overrideMaxTokens: 256);
-      _stateSubject.add(
-        const LlmServiceState(status: LlmServiceStatus.ready),
-      );
+      _stateSubject.add(const LlmServiceState(status: LlmServiceStatus.ready));
       return result;
     } catch (e) {
       _stateSubject.add(

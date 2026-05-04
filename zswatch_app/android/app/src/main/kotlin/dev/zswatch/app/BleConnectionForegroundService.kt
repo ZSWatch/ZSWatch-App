@@ -43,6 +43,7 @@ class BleConnectionForegroundService : Service() {
 
         // Connection states
         const val STATE_CONNECTED = "connected"
+        const val STATE_WATCHER = "watcher"
         const val STATE_RECONNECTING = "reconnecting"
         const val STATE_DISCONNECTED = "disconnected"
         const val STATE_APP_KILLED = "app_killed"
@@ -57,40 +58,61 @@ class BleConnectionForegroundService : Service() {
         /**
          * Start the foreground service
          */
-        fun start(context: Context, watchName: String, connectionState: String = STATE_CONNECTED) {
+        fun start(context: Context, watchName: String, connectionState: String = STATE_CONNECTED): Boolean {
             val intent = Intent(context, BleConnectionForegroundService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_WATCH_NAME, watchName)
                 putExtra(EXTRA_CONNECTION_STATE, connectionState)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            return try {
+                LifecycleLogger.log("BleConnectionService", "start requested watchName=$watchName state=$connectionState")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                true
+            } catch (e: Exception) {
+                LifecycleLogger.log("BleConnectionService", "start failed: ${e.javaClass.simpleName}: ${e.message}")
+                false
             }
         }
 
         /**
          * Stop the foreground service
          */
-        fun stop(context: Context) {
+        fun stop(context: Context): Boolean {
             val intent = Intent(context, BleConnectionForegroundService::class.java).apply {
                 action = ACTION_STOP
             }
-            context.startService(intent)
+            return try {
+                LifecycleLogger.log("BleConnectionService", "stop requested")
+                context.startService(intent)
+                true
+            } catch (e: Exception) {
+                LifecycleLogger.log("BleConnectionService", "stop failed: ${e.javaClass.simpleName}: ${e.message}")
+                false
+            }
         }
 
         /**
          * Update the notification text
          */
-        fun updateNotification(context: Context, watchName: String, connectionState: String) {
-            if (!isRunning()) return
+        fun updateNotification(context: Context, watchName: String, connectionState: String): Boolean {
+            if (!isRunning()) return false
             val intent = Intent(context, BleConnectionForegroundService::class.java).apply {
                 action = ACTION_UPDATE
                 putExtra(EXTRA_WATCH_NAME, watchName)
                 putExtra(EXTRA_CONNECTION_STATE, connectionState)
             }
-            context.startService(intent)
+            return try {
+                LifecycleLogger.log("BleConnectionService", "update requested watchName=$watchName state=$connectionState")
+                context.startService(intent)
+                true
+            } catch (e: Exception) {
+                LifecycleLogger.log("BleConnectionService", "update failed: ${e.javaClass.simpleName}: ${e.message}")
+                false
+            }
         }
 
         /**
@@ -111,6 +133,7 @@ class BleConnectionForegroundService : Service() {
                 val notificationManager = context.getSystemService(NotificationManager::class.java)
                 notificationManager?.createNotificationChannel(channel)
                 Log.d(TAG, "Notification channel created")
+                LifecycleLogger.log(TAG, "notification channel created")
             }
         }
     }
@@ -126,15 +149,31 @@ class BleConnectionForegroundService : Service() {
         fun getService(): BleConnectionForegroundService = this@BleConnectionForegroundService
     }
 
-    override fun onBind(intent: Intent?): IBinder = binder
+    override fun onBind(intent: Intent?): IBinder {
+        LifecycleLogger.log(TAG, "onBind action=${intent?.action}")
+        return binder
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        LifecycleLogger.log(TAG, "onUnbind action=${intent?.action}")
+        onDisconnectRequested = null
+        return super.onUnbind(intent)
+    }
 
     override fun onCreate() {
         super.onCreate()
+        LifecycleLogger.initialize(applicationContext)
+        LifecycleLogger.recordHistoricalExitReasons(applicationContext)
         instance = this
         Log.d(TAG, "Service created")
+        LifecycleLogger.log(TAG, "onCreate")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        LifecycleLogger.log(
+            TAG,
+            "onStartCommand action=${intent?.action} flags=$flags startId=$startId state=$currentState watch=$currentWatchName",
+        )
         when (intent?.action) {
             ACTION_START -> {
                 currentWatchName = intent.getStringExtra(EXTRA_WATCH_NAME) ?: "ZSWatch"
@@ -151,8 +190,8 @@ class BleConnectionForegroundService : Service() {
             }
             ACTION_DISCONNECT -> {
                 Log.d(TAG, "Disconnect action triggered")
+                LifecycleLogger.log(TAG, "disconnect/exit action triggered callbackAvailable=${onDisconnectRequested != null}")
                 // Try to notify Flutter, but also handle locally if Flutter is not available
-                val callbackInvoked = onDisconnectRequested != null
                 onDisconnectRequested?.invoke()
                 
                 // Always stop the service when disconnect is pressed
@@ -166,17 +205,23 @@ class BleConnectionForegroundService : Service() {
 
     private fun startForegroundWithNotification() {
         Log.d(TAG, "Starting foreground service for $currentWatchName")
+        LifecycleLogger.log(TAG, "startForegroundWithNotification state=$currentState watch=$currentWatchName")
         
         val notification = buildNotification()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+        } catch (e: Exception) {
+            LifecycleLogger.log(TAG, "startForeground failed: ${e.javaClass.simpleName}: ${e.message}")
+            stopSelf()
         }
     }
 
@@ -209,14 +254,19 @@ class BleConnectionForegroundService : Service() {
                 "ZSWatch companion is running",
                 android.R.drawable.stat_sys_data_bluetooth
             )
+            STATE_WATCHER -> Triple(
+                "Watching $currentWatchName in background",
+                "Keeping the companion ready while the app is hidden",
+                android.R.drawable.stat_notify_sync_noanim
+            )
             STATE_RECONNECTING -> Triple(
                 "Reconnecting to $currentWatchName...",
                 "Waiting for watch to be in range",
                 android.R.drawable.stat_notify_sync
             )
             STATE_APP_KILLED -> Triple(
-                "App killed — restart needed",
-                "Connection lost, tap to reopen",
+                "Reopen ZSWatch to restore BLE",
+                "Flutter stopped; tap to reconnect the watch",
                 android.R.drawable.stat_notify_error
             )
             else -> Triple(
@@ -226,35 +276,42 @@ class BleConnectionForegroundService : Service() {
             )
         }
 
+        val actionLabel = if (currentState == STATE_APP_KILLED) "Exit" else "Disconnect"
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setSmallIcon(icon)
             .setOngoing(true)
             .setContentIntent(openAppPendingIntent)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "Disconnect",
+                actionLabel,
                 disconnectPendingIntent
             )
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setOnlyAlertOnce(true)
             .build()
     }
 
     private fun updateNotificationContent() {
+        LifecycleLogger.log(TAG, "updateNotificationContent state=$currentState watch=$currentWatchName")
         val notificationManager = getSystemService(NotificationManager::class.java)
         notificationManager?.notify(NOTIFICATION_ID, buildNotification())
     }
 
     private fun stopForegroundService() {
         Log.d(TAG, "Stopping foreground service")
+        LifecycleLogger.log(TAG, "stopForegroundService state=$currentState watch=$currentWatchName")
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         Log.d(TAG, "App task removed (swiped away), updating notification warning")
+        LifecycleLogger.log(TAG, "onTaskRemoved rootAction=${rootIntent?.action} rootData=${rootIntent?.dataString}")
         // Flutter engine is dead at this point — BLE connection is lost.
         // Keep notification visible as a warning so the user knows.
         currentState = STATE_APP_KILLED
@@ -265,6 +322,7 @@ class BleConnectionForegroundService : Service() {
     override fun onDestroy() {
         instance = null
         Log.d(TAG, "Service destroyed")
+        LifecycleLogger.log(TAG, "onDestroy state=$currentState watch=$currentWatchName")
         super.onDestroy()
     }
 }

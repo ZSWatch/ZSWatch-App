@@ -63,7 +63,7 @@ class FileSystemNotifier extends StateNotifier<FileSystemState> {
   final WatchService _watchService;
 
   FileSystemNotifier(this._service, this._watchService)
-      : super(const FileSystemState());
+    : super(const FileSystemState());
 
   Future<void> refreshLogs() async {
     final device = _watchService.device;
@@ -114,10 +114,7 @@ class FileSystemNotifier extends StateNotifier<FileSystemState> {
       return;
     }
 
-    state = state.copyWith(
-      downloadingPath: entry.path,
-      downloadProgress: 0.0,
-    );
+    state = state.copyWith(downloadingPath: entry.path, downloadProgress: 0.0);
 
     final smpGen = _watchService.connectionGeneration;
     try {
@@ -150,10 +147,7 @@ class FileSystemNotifier extends StateNotifier<FileSystemState> {
       );
     } catch (e) {
       _log('downloadFile failed: $e');
-      state = state.copyWith(
-        downloadingPath: null,
-        downloadProgress: 0.0,
-      );
+      state = state.copyWith(downloadingPath: null, downloadProgress: 0.0);
       rethrow;
     } finally {
       _log('Disabling SMP server');

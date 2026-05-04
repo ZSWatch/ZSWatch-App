@@ -26,7 +26,9 @@ class FileSystemService {
         final path = '$dir$name';
         try {
           final sizeBytes = await fsManager.status(path);
-          entries.add(FsFileEntry(path: path, name: name, sizeBytes: sizeBytes));
+          entries.add(
+            FsFileEntry(path: path, name: name, sizeBytes: sizeBytes),
+          );
           _log('Found file: $path ($sizeBytes bytes)');
         } catch (_) {
           // File not found — skip
@@ -54,6 +56,9 @@ class FileSystemService {
 
     try {
       completer = Completer<Uint8List>();
+      // Capture the future before any callback can null the completer to
+      // avoid a null-dereference if the callback fires before the await below.
+      final future = completer.future;
 
       subscription = fsManager.downloadCallbacks.listen(
         (callback) {
@@ -87,7 +92,7 @@ class FileSystemService {
 
       await fsManager.download(path);
 
-      final data = await completer!.future.timeout(
+      final data = await future.timeout(
         const Duration(minutes: 5),
         onTimeout: () {
           throw Exception('Download timed out');

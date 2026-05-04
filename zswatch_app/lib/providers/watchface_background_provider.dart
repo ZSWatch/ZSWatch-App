@@ -34,10 +34,7 @@ class BackgroundGroup {
   final String name;
   final List<BuiltinBackground> backgrounds;
 
-  const BackgroundGroup({
-    required this.name,
-    required this.backgrounds,
-  });
+  const BackgroundGroup({required this.name, required this.backgrounds});
 }
 
 /// All built-in backgrounds organized by group
@@ -45,71 +42,204 @@ const backgroundGroups = [
   BackgroundGroup(
     name: 'Round-Display Combos',
     backgrounds: [
-      BuiltinBackground(name: 'Fume Guilloche', assetBinPath: 'assets/backgrounds/bg_fume_guilloche.bin', assetPreviewPath: 'assets/backgrounds/bg_fume_guilloche.png'),
-      BuiltinBackground(name: 'Topo Metal Arc', assetBinPath: 'assets/backgrounds/bg_topo_metal_arc.bin', assetPreviewPath: 'assets/backgrounds/bg_topo_metal_arc.png'),
-      BuiltinBackground(name: 'CRT Neon Grid', assetBinPath: 'assets/backgrounds/bg_crt_neon_grid.bin', assetPreviewPath: 'assets/backgrounds/bg_crt_neon_grid.png'),
-      BuiltinBackground(name: 'Flow Ink Parchment', assetBinPath: 'assets/backgrounds/bg_flow_ink_parchment.bin', assetPreviewPath: 'assets/backgrounds/bg_flow_ink_parchment.png'),
-      BuiltinBackground(name: 'Reaction Coral', assetBinPath: 'assets/backgrounds/bg_reaction_coral.bin', assetPreviewPath: 'assets/backgrounds/bg_reaction_coral.png'),
+      BuiltinBackground(
+        name: 'Fume Guilloche',
+        assetBinPath: 'assets/backgrounds/bg_fume_guilloche.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_fume_guilloche.png',
+      ),
+      BuiltinBackground(
+        name: 'Topo Metal Arc',
+        assetBinPath: 'assets/backgrounds/bg_topo_metal_arc.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_topo_metal_arc.png',
+      ),
+      BuiltinBackground(
+        name: 'CRT Neon Grid',
+        assetBinPath: 'assets/backgrounds/bg_crt_neon_grid.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_crt_neon_grid.png',
+      ),
+      BuiltinBackground(
+        name: 'Flow Ink Parchment',
+        assetBinPath: 'assets/backgrounds/bg_flow_ink_parchment.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_flow_ink_parchment.png',
+      ),
+      BuiltinBackground(
+        name: 'Reaction Coral',
+        assetBinPath: 'assets/backgrounds/bg_reaction_coral.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_reaction_coral.png',
+      ),
     ],
   ),
   BackgroundGroup(
     name: 'Gradient & Atmosphere',
     backgrounds: [
-      BuiltinBackground(name: 'Deep Space', assetBinPath: 'assets/backgrounds/bg_deep_space.bin', assetPreviewPath: 'assets/backgrounds/bg_deep_space.png'),
-      BuiltinBackground(name: 'Ocean', assetBinPath: 'assets/backgrounds/bg_ocean.bin', assetPreviewPath: 'assets/backgrounds/bg_ocean.png'),
-      BuiltinBackground(name: 'Ember', assetBinPath: 'assets/backgrounds/bg_ember.bin', assetPreviewPath: 'assets/backgrounds/bg_ember.png'),
-      BuiltinBackground(name: 'Aurora', assetBinPath: 'assets/backgrounds/bg_aurora.bin', assetPreviewPath: 'assets/backgrounds/bg_aurora.png'),
-      BuiltinBackground(name: 'Vortex', assetBinPath: 'assets/backgrounds/bg_vortex.bin', assetPreviewPath: 'assets/backgrounds/bg_vortex.png'),
-      BuiltinBackground(name: 'Midnight Frost', assetBinPath: 'assets/backgrounds/bg_midnight_frost.bin', assetPreviewPath: 'assets/backgrounds/bg_midnight_frost.png'),
-      BuiltinBackground(name: 'Solar Flare', assetBinPath: 'assets/backgrounds/bg_solar_flare.bin', assetPreviewPath: 'assets/backgrounds/bg_solar_flare.png'),
-      BuiltinBackground(name: 'Starfield', assetBinPath: 'assets/backgrounds/bg_starfield.bin', assetPreviewPath: 'assets/backgrounds/bg_starfield.png'),
-      BuiltinBackground(name: 'Lava Flow', assetBinPath: 'assets/backgrounds/bg_lava_flow.bin', assetPreviewPath: 'assets/backgrounds/bg_lava_flow.png'),
-      BuiltinBackground(name: 'Forest Canopy', assetBinPath: 'assets/backgrounds/bg_forest_canopy.bin', assetPreviewPath: 'assets/backgrounds/bg_forest_canopy.png'),
-      BuiltinBackground(name: 'Horizon Sunset', assetBinPath: 'assets/backgrounds/bg_horizon_sunset.bin', assetPreviewPath: 'assets/backgrounds/bg_horizon_sunset.png'),
+      BuiltinBackground(
+        name: 'Deep Space',
+        assetBinPath: 'assets/backgrounds/bg_deep_space.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_deep_space.png',
+      ),
+      BuiltinBackground(
+        name: 'Ocean',
+        assetBinPath: 'assets/backgrounds/bg_ocean.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_ocean.png',
+      ),
+      BuiltinBackground(
+        name: 'Ember',
+        assetBinPath: 'assets/backgrounds/bg_ember.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_ember.png',
+      ),
+      BuiltinBackground(
+        name: 'Aurora',
+        assetBinPath: 'assets/backgrounds/bg_aurora.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_aurora.png',
+      ),
+      BuiltinBackground(
+        name: 'Vortex',
+        assetBinPath: 'assets/backgrounds/bg_vortex.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_vortex.png',
+      ),
+      BuiltinBackground(
+        name: 'Midnight Frost',
+        assetBinPath: 'assets/backgrounds/bg_midnight_frost.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_midnight_frost.png',
+      ),
+      BuiltinBackground(
+        name: 'Solar Flare',
+        assetBinPath: 'assets/backgrounds/bg_solar_flare.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_solar_flare.png',
+      ),
+      BuiltinBackground(
+        name: 'Starfield',
+        assetBinPath: 'assets/backgrounds/bg_starfield.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_starfield.png',
+      ),
+      BuiltinBackground(
+        name: 'Lava Flow',
+        assetBinPath: 'assets/backgrounds/bg_lava_flow.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_lava_flow.png',
+      ),
+      BuiltinBackground(
+        name: 'Forest Canopy',
+        assetBinPath: 'assets/backgrounds/bg_forest_canopy.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_forest_canopy.png',
+      ),
+      BuiltinBackground(
+        name: 'Horizon Sunset',
+        assetBinPath: 'assets/backgrounds/bg_horizon_sunset.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_horizon_sunset.png',
+      ),
     ],
   ),
   BackgroundGroup(
     name: 'Structured Patterns',
     backgrounds: [
-      BuiltinBackground(name: 'Matrix Rain', assetBinPath: 'assets/backgrounds/bg_matrix_rain.bin', assetPreviewPath: 'assets/backgrounds/bg_matrix_rain.png'),
-      BuiltinBackground(name: 'Copper Mesh', assetBinPath: 'assets/backgrounds/bg_copper_mesh.bin', assetPreviewPath: 'assets/backgrounds/bg_copper_mesh.png'),
-      BuiltinBackground(name: 'Topographic', assetBinPath: 'assets/backgrounds/bg_topographic.bin', assetPreviewPath: 'assets/backgrounds/bg_topographic.png'),
-      BuiltinBackground(name: 'Brushed Titanium', assetBinPath: 'assets/backgrounds/bg_brushed_titanium.bin', assetPreviewPath: 'assets/backgrounds/bg_brushed_titanium.png'),
-      BuiltinBackground(name: 'Pixel Neon', assetBinPath: 'assets/backgrounds/bg_pixel_neon.bin', assetPreviewPath: 'assets/backgrounds/bg_pixel_neon.png'),
-      BuiltinBackground(name: 'Retro Sunburst', assetBinPath: 'assets/backgrounds/bg_retro_sunburst.bin', assetPreviewPath: 'assets/backgrounds/bg_retro_sunburst.png'),
-      BuiltinBackground(name: 'SDF Rings', assetBinPath: 'assets/backgrounds/bg_sdf_rings.bin', assetPreviewPath: 'assets/backgrounds/bg_sdf_rings.png'),
+      BuiltinBackground(
+        name: 'Matrix Rain',
+        assetBinPath: 'assets/backgrounds/bg_matrix_rain.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_matrix_rain.png',
+      ),
+      BuiltinBackground(
+        name: 'Copper Mesh',
+        assetBinPath: 'assets/backgrounds/bg_copper_mesh.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_copper_mesh.png',
+      ),
+      BuiltinBackground(
+        name: 'Topographic',
+        assetBinPath: 'assets/backgrounds/bg_topographic.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_topographic.png',
+      ),
+      BuiltinBackground(
+        name: 'Brushed Titanium',
+        assetBinPath: 'assets/backgrounds/bg_brushed_titanium.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_brushed_titanium.png',
+      ),
+      BuiltinBackground(
+        name: 'Pixel Neon',
+        assetBinPath: 'assets/backgrounds/bg_pixel_neon.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_pixel_neon.png',
+      ),
+      BuiltinBackground(
+        name: 'Retro Sunburst',
+        assetBinPath: 'assets/backgrounds/bg_retro_sunburst.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_retro_sunburst.png',
+      ),
+      BuiltinBackground(
+        name: 'SDF Rings',
+        assetBinPath: 'assets/backgrounds/bg_sdf_rings.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_sdf_rings.png',
+      ),
     ],
   ),
   BackgroundGroup(
     name: 'Material & Editorial',
     backgrounds: [
-      BuiltinBackground(name: 'Ink Wash', assetBinPath: 'assets/backgrounds/bg_ink_wash.bin', assetPreviewPath: 'assets/backgrounds/bg_ink_wash.png'),
-      BuiltinBackground(name: 'Paper Cut', assetBinPath: 'assets/backgrounds/bg_paper_cut.bin', assetPreviewPath: 'assets/backgrounds/bg_paper_cut.png'),
-      BuiltinBackground(name: 'Halftone Poster', assetBinPath: 'assets/backgrounds/bg_halftone_poster.bin', assetPreviewPath: 'assets/backgrounds/bg_halftone_poster.png'),
-      BuiltinBackground(name: 'Warp Marble', assetBinPath: 'assets/backgrounds/bg_warp_marble.bin', assetPreviewPath: 'assets/backgrounds/bg_warp_marble.png'),
-      BuiltinBackground(name: 'Guilloche Dial', assetBinPath: 'assets/backgrounds/bg_guilloche_dial.bin', assetPreviewPath: 'assets/backgrounds/bg_guilloche_dial.png'),
+      BuiltinBackground(
+        name: 'Ink Wash',
+        assetBinPath: 'assets/backgrounds/bg_ink_wash.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_ink_wash.png',
+      ),
+      BuiltinBackground(
+        name: 'Paper Cut',
+        assetBinPath: 'assets/backgrounds/bg_paper_cut.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_paper_cut.png',
+      ),
+      BuiltinBackground(
+        name: 'Halftone Poster',
+        assetBinPath: 'assets/backgrounds/bg_halftone_poster.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_halftone_poster.png',
+      ),
+      BuiltinBackground(
+        name: 'Warp Marble',
+        assetBinPath: 'assets/backgrounds/bg_warp_marble.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_warp_marble.png',
+      ),
+      BuiltinBackground(
+        name: 'Guilloche Dial',
+        assetBinPath: 'assets/backgrounds/bg_guilloche_dial.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_guilloche_dial.png',
+      ),
     ],
   ),
   BackgroundGroup(
     name: 'Cellular & Faceted',
     backgrounds: [
-      BuiltinBackground(name: 'Mosaic Gem', assetBinPath: 'assets/backgrounds/bg_mosaic_gem.bin', assetPreviewPath: 'assets/backgrounds/bg_mosaic_gem.png'),
-      BuiltinBackground(name: 'Voronoi Glass', assetBinPath: 'assets/backgrounds/bg_voronoi_glass.bin', assetPreviewPath: 'assets/backgrounds/bg_voronoi_glass.png'),
-      BuiltinBackground(name: 'Low Poly Shards', assetBinPath: 'assets/backgrounds/bg_low_poly_shards.bin', assetPreviewPath: 'assets/backgrounds/bg_low_poly_shards.png'),
+      BuiltinBackground(
+        name: 'Mosaic Gem',
+        assetBinPath: 'assets/backgrounds/bg_mosaic_gem.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_mosaic_gem.png',
+      ),
+      BuiltinBackground(
+        name: 'Voronoi Glass',
+        assetBinPath: 'assets/backgrounds/bg_voronoi_glass.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_voronoi_glass.png',
+      ),
+      BuiltinBackground(
+        name: 'Low Poly Shards',
+        assetBinPath: 'assets/backgrounds/bg_low_poly_shards.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_low_poly_shards.png',
+      ),
     ],
   ),
   BackgroundGroup(
     name: 'Experimental',
     backgrounds: [
-      BuiltinBackground(name: 'Flow Field Silk', assetBinPath: 'assets/backgrounds/bg_flow_field_silk.bin', assetPreviewPath: 'assets/backgrounds/bg_flow_field_silk.png'),
-      BuiltinBackground(name: 'Moire Interference', assetBinPath: 'assets/backgrounds/bg_moire_interference.bin', assetPreviewPath: 'assets/backgrounds/bg_moire_interference.png'),
+      BuiltinBackground(
+        name: 'Flow Field Silk',
+        assetBinPath: 'assets/backgrounds/bg_flow_field_silk.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_flow_field_silk.png',
+      ),
+      BuiltinBackground(
+        name: 'Moire Interference',
+        assetBinPath: 'assets/backgrounds/bg_moire_interference.bin',
+        assetPreviewPath: 'assets/backgrounds/bg_moire_interference.png',
+      ),
     ],
   ),
 ];
 
 /// Flat list of all built-in backgrounds (for backward compat)
-final builtinBackgrounds =
-    backgroundGroups.expand((g) => g.backgrounds).toList();
+final builtinBackgrounds = backgroundGroups
+    .expand((g) => g.backgrounds)
+    .toList();
 
 /// State for the watchface background feature
 class WatchfaceBackgroundState {
@@ -148,10 +278,8 @@ class WatchfaceBackgroundNotifier
   StreamSubscription<FilesystemUploadState>? _uploadSub;
   int _smpConnectionGeneration = -1;
 
-  WatchfaceBackgroundNotifier(
-    this._uploadService,
-    this._ref,
-  ) : super(const WatchfaceBackgroundState());
+  WatchfaceBackgroundNotifier(this._uploadService, this._ref)
+    : super(const WatchfaceBackgroundState());
 
   /// Upload a built-in background to the watch
   Future<void> uploadBuiltin(BuiltinBackground bg) async {
@@ -226,9 +354,7 @@ class WatchfaceBackgroundNotifier
   Future<void> _startUpload(String filePath, String name) async {
     final connection = _ref.read(watchConnectionProvider);
     if (!connection.isConnected || connection.watchId.isEmpty) {
-      state = const WatchfaceBackgroundState(
-        error: 'Watch not connected',
-      );
+      state = const WatchfaceBackgroundState(error: 'Watch not connected');
       return;
     }
 
@@ -243,12 +369,14 @@ class WatchfaceBackgroundNotifier
       await Future<void>.delayed(const Duration(seconds: 2));
       final smpReady = await watchService.rediscoverServices();
       if (!smpReady) {
+        _disableSmp();
         state = const WatchfaceBackgroundState(
           error: 'SMP service did not become available',
         );
         return;
       }
     } catch (e) {
+      _disableSmp();
       state = WatchfaceBackgroundState(error: 'Failed to enable SMP: $e');
       return;
     }
@@ -269,25 +397,32 @@ class WatchfaceBackgroundNotifier
     _uploadSub = _uploadService.stateStream
         .where((s) => s.status != FilesystemUploadStatus.idle)
         .listen((uploadState) {
-      if (uploadState.status == FilesystemUploadStatus.completed) {
-        unawaited(_applyBackground());
-      } else if (uploadState.status == FilesystemUploadStatus.failed) {
-        state = WatchfaceBackgroundState(
-          error: 'Upload failed: ${uploadState.errorMessage}',
-        );
-        _disableSmp();
-        unawaited(_uploadSub?.cancel() ?? Future<void>.value());
-      } else if (uploadState.status == FilesystemUploadStatus.cancelled) {
-        state = const WatchfaceBackgroundState();
-        _disableSmp();
-        unawaited(_uploadSub?.cancel() ?? Future<void>.value());
-      }
-    });
+          if (uploadState.status == FilesystemUploadStatus.completed) {
+            unawaited(_applyBackground());
+          } else if (uploadState.status == FilesystemUploadStatus.failed) {
+            state = WatchfaceBackgroundState(
+              error: 'Upload failed: ${uploadState.errorMessage}',
+            );
+            _disableSmp();
+            unawaited(_uploadSub?.cancel() ?? Future<void>.value());
+          } else if (uploadState.status == FilesystemUploadStatus.cancelled) {
+            state = const WatchfaceBackgroundState();
+            _disableSmp();
+            unawaited(_uploadSub?.cancel() ?? Future<void>.value());
+          }
+        });
 
-    await _uploadService.startUpload(
-      deviceId: connection.watchId,
-      image: image,
-    );
+    try {
+      await _uploadService.startUpload(
+        deviceId: connection.watchId,
+        image: image,
+      );
+    } catch (e) {
+      await _uploadSub?.cancel();
+      _uploadSub = null;
+      _disableSmp();
+      state = WatchfaceBackgroundState(error: 'Upload failed to start: $e');
+    }
   }
 
   void _disableSmp() {
@@ -346,8 +481,11 @@ class WatchfaceBackgroundNotifier
 }
 
 /// Provider for the watchface background notifier
-final watchfaceBackgroundProvider = StateNotifierProvider<
-    WatchfaceBackgroundNotifier, WatchfaceBackgroundState>((ref) {
-  final uploadService = ref.watch(filesystemUploadServiceProvider);
-  return WatchfaceBackgroundNotifier(uploadService, ref);
-});
+final watchfaceBackgroundProvider =
+    StateNotifierProvider<
+      WatchfaceBackgroundNotifier,
+      WatchfaceBackgroundState
+    >((ref) {
+      final uploadService = ref.watch(filesystemUploadServiceProvider);
+      return WatchfaceBackgroundNotifier(uploadService, ref);
+    });

@@ -67,6 +67,10 @@ class VoiceNoteAiPipeline {
       debugPrint(
         '[VoiceNoteAiPipeline] Skipping empty/no-speech transcript for $filename',
       );
+      await _memoRepository.updateProcessingStatus(
+        filename: filename,
+        status: 'failed',
+      );
       return false;
     }
 
@@ -302,6 +306,10 @@ class VoiceNoteAiPipeline {
 
     for (final memo in unprocessed) {
       if (memo.transcription == null || memo.transcription!.trim().isEmpty) {
+        await _memoRepository.updateProcessingStatus(
+          filename: memo.filename,
+          status: 'failed',
+        );
         continue;
       }
 

@@ -1,6 +1,7 @@
 import EventKit
 import Flutter
 import UIKit
+import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -104,42 +105,86 @@ import UIKit
   }
 
   private func createTimerViaClockApp(durationSeconds: Int, label: String, result: @escaping FlutterResult) {
-    // iOS doesn't have a public API for setting timers programmatically.
-    // Open the Clock app's timer tab as the best available option.
-    if let url = URL(string: "clock-timer://") {
-      UIApplication.shared.open(url, options: [:]) { success in
-        result([
-          "platformId": nil,
-          "targetType": "timer",
-          "syncDisabled": false,
-        ] as [String: Any?])
+    guard durationSeconds > 0 else {
+      result(FlutterError(code: "INVALID_ARGUMENT", message: "durationSeconds must be > 0", details: nil))
+      return
+    }
+    let center = UNUserNotificationCenter.current()
+    center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+      guard granted else {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "PERMISSION_DENIED", message: "Notification permission not granted", details: nil))
+        }
+        return
       }
-    } else {
-      result([
-        "platformId": nil,
-        "targetType": "timer",
-        "syncDisabled": false,
-      ] as [String: Any?])
+      let content = UNMutableNotificationContent()
+      content.title = label.isEmpty ? "Timer" : label
+      content.body = "Your timer has finished!"
+      content.sound = .default
+      let trigger = UNTimeIntervalNotificationTrigger(
+        timeInterval: TimeInterval(durationSeconds),
+        repeats: false
+      )
+      let identifier = "timer-\(UUID().uuidString)"
+      let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+      center.add(request) { error in
+        DispatchQueue.main.async {
+          if let error = error {
+            result(FlutterError(code: "SCHEDULE_FAILED", message: error.localizedDescription, details: nil))
+          } else {
+            result([
+              "platformId": identifier,
+              "targetType": "timer",
+              "syncDisabled": false,
+            ] as [String: Any?])
+          }
+        }
+      }
     }
   }
 
   private func createAlarmViaClockApp(scheduledAtMillis: Double?, label: String, result: @escaping FlutterResult) {
-    // iOS doesn't have a public API for setting alarms programmatically.
-    // Open the Clock app's alarm tab as the best available option.
-    if let url = URL(string: "clock-alarm://") {
-      UIApplication.shared.open(url, options: [:]) { success in
-        result([
-          "platformId": nil,
-          "targetType": "alarm",
-          "syncDisabled": false,
-        ] as [String: Any?])
+    guard let scheduledAtMillis = scheduledAtMillis else {
+      result(FlutterError(code: "INVALID_ARGUMENT", message: "scheduledAtMillis is required", details: nil))
+      return
+    }
+    let fireDate = Date(timeIntervalSince1970: scheduledAtMillis / 1000.0)
+    guard fireDate > Date() else {
+      result(FlutterError(code: "INVALID_ARGUMENT", message: "Alarm time must be in the future", details: nil))
+      return
+    }
+    let center = UNUserNotificationCenter.current()
+    center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+      guard granted else {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "PERMISSION_DENIED", message: "Notification permission not granted", details: nil))
+        }
+        return
       }
-    } else {
-      result([
-        "platformId": nil,
-        "targetType": "alarm",
-        "syncDisabled": false,
-      ] as [String: Any?])
+      let content = UNMutableNotificationContent()
+      content.title = label.isEmpty ? "Alarm" : label
+      content.body = "Your alarm is ringing!"
+      content.sound = .default
+      let components = Calendar.current.dateComponents(
+        [.year, .month, .day, .hour, .minute, .second],
+        from: fireDate
+      )
+      let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+      let identifier = "alarm-\(UUID().uuidString)"
+      let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+      center.add(request) { error in
+        DispatchQueue.main.async {
+          if let error = error {
+            result(FlutterError(code: "SCHEDULE_FAILED", message: error.localizedDescription, details: nil))
+          } else {
+            result([
+              "platformId": identifier,
+              "targetType": "alarm",
+              "syncDisabled": false,
+            ] as [String: Any?])
+          }
+        }
+      }
     }
   }
 

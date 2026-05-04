@@ -178,9 +178,7 @@ class FirmwareManager {
       // don't crowd out actual firmware builds from different branches.
       final responses = await Future.wait([
         http.get(
-          Uri.parse(
-            '$_apiBase/repos/$_owner/$_repo/actions/runs?per_page=50',
-          ),
+          Uri.parse('$_apiBase/repos/$_owner/$_repo/actions/runs?per_page=50'),
           headers: {'Accept': 'application/vnd.github.v3+json'},
         ),
         http.get(

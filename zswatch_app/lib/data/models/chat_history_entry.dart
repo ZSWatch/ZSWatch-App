@@ -60,13 +60,13 @@ class ChatHistoryEntry {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        timestampUtc,
-        transcript,
-        answer,
-        modelUsed,
-        latencyMs,
-        success,
-        errorMessage,
-      );
+    id,
+    timestampUtc,
+    transcript,
+    answer,
+    modelUsed,
+    latencyMs,
+    success,
+    errorMessage,
+  );
 }

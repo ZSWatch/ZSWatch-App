@@ -4,10 +4,15 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/utils/lifecycle_logger.dart';
+
 /// Connection state for foreground service notification
 enum ForegroundConnectionState {
   /// Connected to watch
   connected,
+
+  /// App is backgrounded and the foreground service is passively watching.
+  watcher,
 
   /// Reconnecting to watch
   reconnecting,
@@ -32,6 +37,7 @@ class ForegroundService {
   static ForegroundService get instance => _instance ??= ForegroundService._();
 
   ForegroundService._() {
+    LifecycleLogger.log('ForegroundService', 'created');
     _channel.setMethodCallHandler(_handleMethodCall);
   }
 
@@ -48,6 +54,7 @@ class ForegroundService {
 
   /// Handle method calls from native side
   Future<dynamic> _handleMethodCall(MethodCall call) async {
+    LifecycleLogger.log('ForegroundService', 'methodCall ${call.method}');
     switch (call.method) {
       case 'onDisconnectRequested':
         debugPrint(
@@ -74,12 +81,18 @@ class ForegroundService {
     }
 
     try {
-      await _channel.invokeMethod('start', {
-        'watchName': watchName,
-        'connectionState': _stateToString(state),
-      });
-      _isRunning = true;
-      debugPrint('[ForegroundService] Started for $watchName');
+      LifecycleLogger.log(
+        'ForegroundService',
+        'start watchName=$watchName state=$state',
+      );
+      final started =
+          await _channel.invokeMethod<bool>('start', {
+            'watchName': watchName,
+            'connectionState': _stateToString(state),
+          }) ??
+          false;
+      _isRunning = started;
+      debugPrint('[ForegroundService] Start result=$started for $watchName');
     } on PlatformException catch (e) {
       debugPrint('[ForegroundService] Failed to start: ${e.message}');
     }
@@ -93,9 +106,12 @@ class ForegroundService {
     }
 
     try {
-      await _channel.invokeMethod('stop');
-      _isRunning = false;
-      debugPrint('[ForegroundService] Stopped');
+      LifecycleLogger.log('ForegroundService', 'stop');
+      final stopped = await _channel.invokeMethod<bool>('stop') ?? false;
+      if (stopped) {
+        _isRunning = false;
+      }
+      debugPrint('[ForegroundService] Stop result=$stopped');
     } on PlatformException catch (e) {
       debugPrint('[ForegroundService] Failed to stop: ${e.message}');
     }
@@ -109,6 +125,10 @@ class ForegroundService {
     if (!Platform.isAndroid || !_isRunning) return;
 
     try {
+      LifecycleLogger.log(
+        'ForegroundService',
+        'updateNotification watchName=$watchName state=$state',
+      );
       await _channel.invokeMethod('updateNotification', {
         'watchName': watchName,
         'connectionState': _stateToString(state),
@@ -129,9 +149,104 @@ class ForegroundService {
     try {
       final running = await _channel.invokeMethod<bool>('isRunning') ?? false;
       _isRunning = running;
+      LifecycleLogger.log('ForegroundService', 'checkIsRunning=$running');
       return running;
     } on PlatformException catch (e) {
       debugPrint('[ForegroundService] Failed to check status: ${e.message}');
+      return false;
+    }
+  }
+
+  /// Sync native-readable background connection preferences.
+  ///
+  /// These are stored in an Android-owned SharedPreferences file so boot and
+  /// package-replaced receivers can make conservative recovery decisions
+  /// without depending on Flutter's SharedPreferences implementation details.
+  Future<void> syncBackgroundPreferences({
+    String? lastWatchId,
+    String? lastWatchName,
+    bool? backgroundConnectionEnabled,
+    bool? autoReconnectEnabled,
+    bool? notificationForwardingEnabled,
+    Set<String>? blockedNotificationApps,
+  }) async {
+    if (!Platform.isAndroid) return;
+
+    final payload = <String, Object?>{};
+    if (lastWatchId != null) payload['last_watch_id'] = lastWatchId;
+    if (lastWatchName != null) payload['last_watch_name'] = lastWatchName;
+    if (backgroundConnectionEnabled != null) {
+      payload['background_connection_enabled'] = backgroundConnectionEnabled;
+    }
+    if (autoReconnectEnabled != null) {
+      payload['auto_reconnect_enabled'] = autoReconnectEnabled;
+    }
+    if (notificationForwardingEnabled != null) {
+      payload['notification_forwarding_enabled'] =
+          notificationForwardingEnabled;
+    }
+    if (blockedNotificationApps != null) {
+      payload['blocked_notification_apps'] = blockedNotificationApps.toList();
+    }
+
+    if (payload.isEmpty) return;
+
+    try {
+      await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'syncBackgroundPreferences',
+        payload,
+      );
+      LifecycleLogger.log(
+        'ForegroundService',
+        'syncBackgroundPreferences $payload',
+      );
+      debugPrint('[ForegroundService] Synced background prefs: $payload');
+    } on PlatformException catch (e) {
+      debugPrint(
+        '[ForegroundService] Failed to sync background prefs: ${e.message}',
+      );
+    }
+  }
+
+  /// Retrieve the persisted native/Dart lifecycle diagnostic ring buffer.
+  Future<List<LifecycleLogEntry>> getLifecycleEvents() async {
+    if (!Platform.isAndroid) return [];
+
+    try {
+      final rawEvents =
+          await _channel.invokeMethod<List<dynamic>>('getLifecycleEvents') ??
+          const <dynamic>[];
+      final entries = <LifecycleLogEntry>[];
+      for (final rawEvent in rawEvents) {
+        if (rawEvent is Map<Object?, Object?>) {
+          final entry = LifecycleLogEntry.fromMap(rawEvent);
+          if (LifecycleLogger.shouldPersistDiagnostic(
+            entry.source,
+            entry.message,
+          )) {
+            entries.add(entry);
+          }
+        }
+      }
+      return entries.reversed.toList();
+    } on PlatformException catch (e) {
+      debugPrint(
+        '[ForegroundService] Failed to read lifecycle events: ${e.message}',
+      );
+      return [];
+    }
+  }
+
+  /// Clear persisted lifecycle diagnostics.
+  Future<bool> clearLifecycleEvents() async {
+    if (!Platform.isAndroid) return true;
+
+    try {
+      return await _channel.invokeMethod<bool>('clearLifecycleEvents') ?? false;
+    } on PlatformException catch (e) {
+      debugPrint(
+        '[ForegroundService] Failed to clear lifecycle events: ${e.message}',
+      );
       return false;
     }
   }
@@ -146,10 +261,14 @@ class ForegroundService {
     }
 
     try {
-      return await _channel.invokeMethod<bool>(
-            'isBatteryOptimizationDisabled',
-          ) ??
+      final disabled =
+          await _channel.invokeMethod<bool>('isBatteryOptimizationDisabled') ??
           false;
+      LifecycleLogger.log(
+        'ForegroundService',
+        'isBatteryOptimizationDisabled=$disabled',
+      );
+      return disabled;
     } on PlatformException catch (e) {
       debugPrint(
         '[ForegroundService] Failed to check battery optimization: ${e.message}',
@@ -171,6 +290,10 @@ class ForegroundService {
     }
 
     try {
+      LifecycleLogger.log(
+        'ForegroundService',
+        'requestDisableBatteryOptimization',
+      );
       return await _channel.invokeMethod<bool>(
             'requestDisableBatteryOptimization',
           ) ??
@@ -193,6 +316,10 @@ class ForegroundService {
     }
 
     try {
+      LifecycleLogger.log(
+        'ForegroundService',
+        'openBatteryOptimizationSettings',
+      );
       return await _channel.invokeMethod<bool>(
             'openBatteryOptimizationSettings',
           ) ??
@@ -209,6 +336,8 @@ class ForegroundService {
     switch (state) {
       case ForegroundConnectionState.connected:
         return 'connected';
+      case ForegroundConnectionState.watcher:
+        return 'watcher';
       case ForegroundConnectionState.reconnecting:
         return 'reconnecting';
       case ForegroundConnectionState.disconnected:
@@ -218,6 +347,7 @@ class ForegroundService {
 
   /// Dispose resources
   void dispose() {
+    LifecycleLogger.log('ForegroundService', 'dispose');
     _disconnectRequestedController.close();
   }
 }

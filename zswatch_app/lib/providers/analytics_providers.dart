@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/database/app_database.dart';
 import '../data/repositories/battery_repository.dart';
 import '../data/repositories/connection_analytics_repository.dart';
+import '../core/utils/lifecycle_logger.dart';
 import '../services/analytics/battery_storage_service.dart';
 import '../services/analytics/connection_analytics_service.dart';
+import 'foreground_service_providers.dart';
 import 'watch_providers.dart';
 import 'watch_service_provider.dart';
 
@@ -21,6 +23,8 @@ export '../services/analytics/battery_storage_service.dart'
     show batteryStorageServiceProvider;
 export '../services/analytics/connection_analytics_service.dart'
     show connectionAnalyticsServiceProvider;
+export '../core/utils/lifecycle_logger.dart' show LifecycleLogEntry;
+export 'foreground_service_providers.dart' show foregroundServiceProvider;
 
 // ============================================================================
 // Enums and Constants
@@ -221,6 +225,13 @@ final connectionEventsStreamProvider = StreamProvider.autoDispose
     .family<List<ConnectionEventEntity>, String>((ref, watchId) {
       final db = ref.watch(databaseProvider);
       return db.watchConnectionEvents(watchId: watchId, limit: 50);
+    });
+
+/// Provider for persisted native/Dart lifecycle diagnostics.
+final lifecycleLogEntriesProvider = FutureProvider.autoDispose
+    .family<List<LifecycleLogEntry>, String>((ref, _) async {
+      final service = ref.watch(foregroundServiceProvider);
+      return service.getLifecycleEvents();
     });
 
 /// Provider for the oldest connection event timestamp for a watch.
