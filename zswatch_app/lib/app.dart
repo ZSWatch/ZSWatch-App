@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
-import 'providers/ai_providers.dart';
 import 'providers/analytics_providers.dart';
 import 'providers/ble_providers.dart';
+import 'providers/chat_providers.dart';
 import 'providers/coredump_providers.dart';
 import 'providers/developer_providers.dart';
 import 'providers/foreground_service_providers.dart';
@@ -30,6 +30,12 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
   @override
   void initState() {
     super.initState();
+    try {
+      ref.read(watchChatServiceProvider);
+      debugPrint('[app] watchChatServiceProvider initialized in initState');
+    } catch (e, st) {
+      debugPrint('[app] early watchChatServiceProvider init failed: $e\n$st');
+    }
     // Initialize BLE service after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeBle();
@@ -78,6 +84,10 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Keep the chat service alive for the full app lifetime so incoming
+    // question_ready messages are always consumed even if no chat UI is open.
+    ref.watch(watchChatServiceProvider);
+
     return MaterialApp.router(
       title: 'ZSWatch',
       debugShowCheckedModeBanner: false,

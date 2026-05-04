@@ -372,12 +372,6 @@ class LlmService {
 
   final LiteRtLmService _liteRtLmService = LiteRtLmService();
 
-  /// Whether the currently selected model uses LiteRT-LM.
-  bool get _isCurrentModelLiteRtLm {
-    final model = catalogModels.where((m) => m.id == _selectedModelId).firstOrNull;
-    return model?.isLiteRtLm ?? false;
-  }
-
   final _stateSubject = BehaviorSubject<LlmServiceState>.seeded(
     const LlmServiceState(),
   );
@@ -999,6 +993,53 @@ class LlmService {
     );
 
     return (text: text, metrics: metrics);
+  }
+
+  /// Generate a short conversational reply for the voice chat feature.
+  ///
+  /// Unlike [processTranscript], this does not extract structured data.
+  /// It produces a short, spoken-friendly answer text.
+  Future<({String text, LlmInferenceMetrics metrics})> generateChatReply(
+    String question, {
+    List<({String question, String answer})>? history,
+    String answerLength = 'short',
+  }) async {
+    final lengthHint = switch (answerLength) {
+      'ultra_short' => '1 sentence',
+      'short' => '2-3 sentences',
+      'normal' => '3-5 sentences',
+      _ => '2-3 sentences',
+    };
+
+    final historyBlock = StringBuffer();
+    if (history != null && history.isNotEmpty) {
+      for (final turn in history) {
+        historyBlock.writeln('User: ${turn.question}');
+        historyBlock.writeln('Assistant: ${turn.answer}');
+      }
+    }
+
+    final prompt = '''You are a helpful voice assistant on a smartwatch. Answer the user's question directly and concisely in $lengthHint. Use simple language that sounds natural when spoken aloud. Avoid markdown, lists, or formatting. If uncertain, say so briefly.
+
+${historyBlock.isNotEmpty ? 'Previous conversation:\n$historyBlock\n' : ''}User: $question
+Assistant:''';
+
+    _stateSubject.add(
+      const LlmServiceState(status: LlmServiceStatus.processing),
+    );
+
+    try {
+      final result = await _generate(prompt, overrideMaxTokens: 256);
+      _stateSubject.add(
+        const LlmServiceState(status: LlmServiceStatus.ready),
+      );
+      return result;
+    } catch (e) {
+      _stateSubject.add(
+        LlmServiceState(status: LlmServiceStatus.error, error: e.toString()),
+      );
+      rethrow;
+    }
   }
 
   /// Process a voice memo transcript: optionally correct transcription errors,

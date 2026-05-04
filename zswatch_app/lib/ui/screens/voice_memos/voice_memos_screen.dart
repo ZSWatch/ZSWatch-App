@@ -684,7 +684,6 @@ class _InlineTranscript extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final aiEnabled = ref.watch(localAiEnabledProvider);
     final isProcessing = memo.isAiProcessing;
-    final isQueued = memo.processingStatus == 'queued';
     final hasFailed =
         memo.aiProcessingStatus == VoiceNoteProcessingStatus.failed;
     final currentTranscript = memo.transcription ?? '';

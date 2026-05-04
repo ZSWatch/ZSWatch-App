@@ -10,9 +10,7 @@ import 'package:path/path.dart' as p;
 import '../core/utils/watchface_image_processor.dart';
 import '../data/models/filesystem_image.dart';
 import '../services/dfu/filesystem_upload_service.dart';
-import '../services/shell/shell_service.dart';
 import 'filesystem_providers.dart';
-import 'shell_providers.dart';
 import 'watch_service_provider.dart';
 
 /// Target path for the background upload (temp name to avoid race condition)
@@ -41,12 +39,6 @@ class BackgroundGroup {
     required this.backgrounds,
   });
 }
-
-BuiltinBackground _bg(String slug, String displayName) => BuiltinBackground(
-      name: displayName,
-      assetBinPath: 'assets/backgrounds/bg_$slug.bin',
-      assetPreviewPath: 'assets/backgrounds/bg_$slug.png',
-    );
 
 /// All built-in backgrounds organized by group
 const backgroundGroups = [
@@ -152,14 +144,12 @@ class WatchfaceBackgroundState {
 class WatchfaceBackgroundNotifier
     extends StateNotifier<WatchfaceBackgroundState> {
   final FilesystemUploadService _uploadService;
-  final ShellService _shellService;
   final Ref _ref;
   StreamSubscription<FilesystemUploadState>? _uploadSub;
   int _smpConnectionGeneration = -1;
 
   WatchfaceBackgroundNotifier(
     this._uploadService,
-    this._shellService,
     this._ref,
   ) : super(const WatchfaceBackgroundState());
 
@@ -216,10 +206,11 @@ class WatchfaceBackgroundNotifier
     try {
       state = const WatchfaceBackgroundState(isApplying: true);
 
-      final result = await _shellService.execute('bg reset');
-      if (result.returnCode != 0) {
+      final watchService = _ref.read(watchServiceProvider);
+      final result = await watchService.resetWatchfaceBackground();
+      if (result['ok'] != true) {
         state = WatchfaceBackgroundState(
-          error: 'Reset failed: ${result.output}',
+          error: 'Reset failed: ${_resultError(result)}',
         );
         return;
       }
@@ -273,23 +264,23 @@ class WatchfaceBackgroundNotifier
     // doesn't immediately replay a stale 'completed'/'failed' status.
     _uploadService.reset();
 
-    // Listen for completion to trigger the shell command
-    _uploadSub?.cancel();
+    // Listen for completion to trigger the GadgetBridge apply command.
+    await _uploadSub?.cancel();
     _uploadSub = _uploadService.stateStream
         .where((s) => s.status != FilesystemUploadStatus.idle)
         .listen((uploadState) {
       if (uploadState.status == FilesystemUploadStatus.completed) {
-        _applyBackground();
+        unawaited(_applyBackground());
       } else if (uploadState.status == FilesystemUploadStatus.failed) {
         state = WatchfaceBackgroundState(
           error: 'Upload failed: ${uploadState.errorMessage}',
         );
         _disableSmp();
-        _uploadSub?.cancel();
+        unawaited(_uploadSub?.cancel() ?? Future<void>.value());
       } else if (uploadState.status == FilesystemUploadStatus.cancelled) {
         state = const WatchfaceBackgroundState();
         _disableSmp();
-        _uploadSub?.cancel();
+        unawaited(_uploadSub?.cancel() ?? Future<void>.value());
       }
     });
 
@@ -311,16 +302,15 @@ class WatchfaceBackgroundNotifier
   }
 
   Future<void> _applyBackground() async {
-    _uploadSub?.cancel();
+    await _uploadSub?.cancel();
     state = const WatchfaceBackgroundState(isApplying: true);
 
     try {
-      // Send shell command to swap bg_new.bin -> bg.bin and refresh watchface
-      // NOTE: Shell uses SMP transport, so SMP must stay enabled until done.
-      final result = await _shellService.execute('bg apply');
-      if (result.returnCode != 0) {
+      final watchService = _ref.read(watchServiceProvider);
+      final result = await watchService.applyWatchfaceBackground();
+      if (result['ok'] != true) {
         state = WatchfaceBackgroundState(
-          error: 'Apply failed: ${result.output}',
+          error: 'Apply failed: ${_resultError(result)}',
         );
         return;
       }
@@ -335,13 +325,22 @@ class WatchfaceBackgroundNotifier
     }
   }
 
+  String _resultError(Map<String, dynamic> result) {
+    final error = result['error'] as String?;
+    final rc = result['rc'];
+    if (error == null || error.isEmpty) {
+      return rc == null ? 'unknown error' : 'error $rc';
+    }
+    return rc == null ? error : '$error ($rc)';
+  }
+
   void clearMessages() {
     state = const WatchfaceBackgroundState();
   }
 
   @override
   void dispose() {
-    _uploadSub?.cancel();
+    unawaited(_uploadSub?.cancel() ?? Future<void>.value());
     super.dispose();
   }
 }
@@ -350,6 +349,5 @@ class WatchfaceBackgroundNotifier
 final watchfaceBackgroundProvider = StateNotifierProvider<
     WatchfaceBackgroundNotifier, WatchfaceBackgroundState>((ref) {
   final uploadService = ref.watch(filesystemUploadServiceProvider);
-  final shellService = ref.watch(shellServiceProvider);
-  return WatchfaceBackgroundNotifier(uploadService, shellService, ref);
+  return WatchfaceBackgroundNotifier(uploadService, ref);
 });

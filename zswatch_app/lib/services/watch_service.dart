@@ -27,6 +27,10 @@ Guid _guid(String uuid) => Guid(uuid);
 class WatchService {
   final BleConnectionService _ble;
 
+  /// Dedicated callback for chat messages. This avoids relying solely on the
+  /// generic incoming message broadcast path for the chat pipeline.
+  void Function(Map<String, dynamic> message)? onChatMessage;
+
   WatchService(this._ble) {
     // Register our setup callback so BleConnectionService calls us
     // after BLE-level setup (bonding, service discovery, MTU) is done.
@@ -297,6 +301,47 @@ class WatchService {
     Map<String, dynamic>? extraData,
   }) async {
     final data = <String, dynamic>{'t': 'voice_memo', 'action': action};
+    if (extraData != null) data.addAll(extraData);
+    await _sendGb(data);
+  }
+
+  /// Send a watchface background command and wait for the result.
+  Future<Map<String, dynamic>> sendWatchfaceBackgroundCommand(
+    String action, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (!_ble.isDeviceConnected) {
+      throw StateError('Watch not connected');
+    }
+
+    final resultAction = '${action}_result';
+    final responseFuture = incomingMessages
+        .where(
+          (message) =>
+              message['t'] == 'watchface_bg' &&
+              message['action'] == resultAction,
+        )
+        .first
+        .timeout(timeout);
+
+    await _sendGb({'t': 'watchface_bg', 'action': action});
+    return responseFuture;
+  }
+
+  /// Apply the staged watchface background on the watch.
+  Future<Map<String, dynamic>> applyWatchfaceBackground() =>
+      sendWatchfaceBackgroundCommand('apply');
+
+  /// Reset the watchface background to the firmware default.
+  Future<Map<String, dynamic>> resetWatchfaceBackground() =>
+      sendWatchfaceBackgroundCommand('reset');
+
+  /// Send a chat command to the watch.
+  Future<void> sendChatCommand(
+    String action, {
+    Map<String, dynamic>? extraData,
+  }) async {
+    final data = <String, dynamic>{'t': 'chat', 'action': action};
     if (extraData != null) data.addAll(extraData);
     await _sendGb(data);
   }
@@ -641,6 +686,17 @@ class WatchService {
 
       case 'voice_memo':
         debugPrint('[WatchService] Voice memo message: ${message['action']}');
+        break;
+
+      case 'watchface_bg':
+        debugPrint(
+          '[WatchService] Watchface background message: ${message['action']}',
+        );
+        break;
+
+      case 'chat':
+        debugPrint('[WatchService] Chat message: ${message['action']}');
+        onChatMessage?.call(message);
         break;
     }
   }

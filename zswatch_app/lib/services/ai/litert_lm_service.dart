@@ -54,10 +54,10 @@ class LiteRtLmService {
 
     // Set up event stream for partial tokens
     final completer = Completer<void>();
-    _eventSubscription?.cancel();
+    await _eventSubscription?.cancel();
     _eventSubscription = _eventChannel.receiveBroadcastStream().listen(
       (dynamic event) {
-        if (event is Map) {
+        if (event is Map<Object?, Object?>) {
           final type = event['type'] as String?;
           if (type == 'token') {
             onToken?.call(
@@ -69,14 +69,17 @@ class LiteRtLmService {
           }
         }
       },
-      onError: (dynamic error) {
-        if (!completer.isCompleted) completer.completeError(error);
+      onError: (Object error, StackTrace stackTrace) {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
       },
     );
 
     try {
       debugPrint('[LiteRtLmService] Calling generate MethodChannel...');
-      final result = await _methodChannel.invokeMethod<Map>('generate', {
+        final result =
+          await _methodChannel.invokeMethod<Map<Object?, Object?>>('generate', {
         'prompt': prompt,
         'temperature': temperature,
         'topK': topK,
@@ -99,7 +102,7 @@ class LiteRtLmService {
         cancelled: result['cancelled'] as bool? ?? false,
       );
     } finally {
-      _eventSubscription?.cancel();
+      await _eventSubscription?.cancel();
       _eventSubscription = null;
     }
   }
@@ -111,7 +114,7 @@ class LiteRtLmService {
 
   /// Release all native resources.
   Future<void> dispose() async {
-    _eventSubscription?.cancel();
+    await _eventSubscription?.cancel();
     _eventSubscription = null;
     await _methodChannel.invokeMethod('dispose');
     _loaded = false;

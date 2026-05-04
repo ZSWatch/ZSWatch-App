@@ -19,6 +19,8 @@ class FilesystemUploadService {
   Timer? _speedTimer;
   int _lastBytesTransferred = 0;
   DateTime? _lastSpeedUpdate;
+  String? _expectedUploadPath;
+  int? _expectedUploadSize;
   final List<int> _speedSamples = [];
   static const int _speedWindowSize = 5;
 
@@ -67,6 +69,8 @@ class FilesystemUploadService {
       // Read file data
       final Uint8List data = await file.readAsBytes();
       _log('Read ${data.length} bytes from ${image.name}');
+      _expectedUploadPath = image.targetPath;
+      _expectedUploadSize = data.length;
 
       _updateState(
         FilesystemUploadState.uploading(
@@ -136,11 +140,7 @@ class FilesystemUploadService {
         );
         break;
       case OnUploadCompleted():
-        _stopSpeedTimer();
-        _log('Upload completed successfully!');
-        _updateState(FilesystemUploadState.completed(startedAt: startTime));
-        // Cleanup FsManager to release BLE transport for subsequent operations
-        _cleanup();
+        unawaited(_completeUpload(startTime));
         break;
       case OnUploadFailed():
         _stopSpeedTimer();
@@ -151,13 +151,13 @@ class FilesystemUploadService {
             startedAt: startTime,
           ),
         );
-        _cleanup();
+        unawaited(_cleanup());
         break;
       case OnUploadCancelled():
         _stopSpeedTimer();
         _log('Upload cancelled');
         _updateState(FilesystemUploadState.cancelled(startedAt: startTime));
-        _cleanup();
+        unawaited(_cleanup());
         break;
     }
   }
@@ -245,6 +245,44 @@ class FilesystemUploadService {
     _stateController.add(state);
   }
 
+  Future<void> _completeUpload(DateTime startTime) async {
+    _stopSpeedTimer();
+    _log('Upload transfer completed, verifying remote file...');
+
+    try {
+      final fsManager = _fsManager;
+      final expectedPath = _expectedUploadPath;
+      final expectedSize = _expectedUploadSize;
+
+      if (fsManager == null || expectedPath == null || expectedSize == null) {
+        throw FilesystemUploadException('Upload verification state missing');
+      }
+
+      final remoteSize = await fsManager.status(expectedPath);
+      if (remoteSize != expectedSize) {
+        throw FilesystemUploadException(
+          'Uploaded file size mismatch for $expectedPath: '
+          'expected $expectedSize bytes, got $remoteSize bytes',
+        );
+      }
+
+      _log('Verified $expectedPath ($remoteSize bytes)');
+      await _cleanup();
+      _updateState(FilesystemUploadState.completed(startedAt: startTime));
+    } catch (e) {
+      _log('Upload verification failed: $e');
+      _updateState(
+        FilesystemUploadState.failed(e.toString(), startedAt: startTime),
+      );
+
+      try {
+        await _cleanup();
+      } catch (cleanupError) {
+        _log('Cleanup after upload verification failed: $cleanupError');
+      }
+    }
+  }
+
   void _log(String message) {
     final timestamp = DateTime.now().toIso8601String().substring(11, 23);
     _logController.add('[FS] [$timestamp] $message');
@@ -256,6 +294,8 @@ class FilesystemUploadService {
     _uploadSubscription = null;
     await _fsManager?.kill();
     _fsManager = null;
+    _expectedUploadPath = null;
+    _expectedUploadSize = null;
   }
 
   /// Reset to idle state

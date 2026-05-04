@@ -27,6 +27,9 @@ abstract final class SettingsKeys {
   static const String aiCorrectionEnabled = 'ai_correction_enabled';
   static const String coredumpServerUrl = 'coredump_server_url';
   static const String coredumpUseLatestElf = 'coredump_use_latest_elf';
+  static const String chatAnswerLength = 'chat_answer_length';
+  static const String chatMemoryMode = 'chat_memory_mode';
+  static const String chatMaxHistory = 'chat_max_history';
 }
 
 /// Provider for SharedPreferences instance
@@ -516,5 +519,66 @@ class CoredumpServerUrlNotifier extends StateNotifier<String> {
   void reset() {
     state = defaultUrl;
     _prefs?.remove(SettingsKeys.coredumpServerUrl);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Voice Chat settings
+// ---------------------------------------------------------------------------
+
+/// Chat answer length preference: 'ultra_short', 'short', 'normal'
+final chatAnswerLengthProvider =
+    StateNotifierProvider<ChatAnswerLengthNotifier, String>((ref) {
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return ChatAnswerLengthNotifier(prefs.valueOrNull);
+    });
+
+class ChatAnswerLengthNotifier extends StateNotifier<String> {
+  final SharedPreferences? _prefs;
+
+  ChatAnswerLengthNotifier(this._prefs)
+    : super(_prefs?.getString(SettingsKeys.chatAnswerLength) ?? 'short');
+
+  void setValue(String value) {
+    state = value;
+    _prefs?.setString(SettingsKeys.chatAnswerLength, value);
+  }
+}
+
+/// Chat memory mode: 'single_turn', 'last_exchange', 'short_history'
+final chatMemoryModeProvider =
+    StateNotifierProvider<ChatMemoryModeNotifier, String>((ref) {
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return ChatMemoryModeNotifier(prefs.valueOrNull);
+    });
+
+class ChatMemoryModeNotifier extends StateNotifier<String> {
+  final SharedPreferences? _prefs;
+
+  ChatMemoryModeNotifier(this._prefs)
+    : super(_prefs?.getString(SettingsKeys.chatMemoryMode) ?? 'single_turn');
+
+  void setValue(String value) {
+    state = value;
+    _prefs?.setString(SettingsKeys.chatMemoryMode, value);
+  }
+}
+
+/// Max history entries used for chat context
+final chatMaxHistoryProvider =
+    StateNotifierProvider<ChatMaxHistoryNotifier, int>((ref) {
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return ChatMaxHistoryNotifier(prefs.valueOrNull);
+    });
+
+class ChatMaxHistoryNotifier extends StateNotifier<int> {
+  final SharedPreferences? _prefs;
+
+  ChatMaxHistoryNotifier(this._prefs)
+    : super(_prefs?.getInt(SettingsKeys.chatMaxHistory) ?? 5);
+
+  void setValue(int value) {
+    state = value;
+    _prefs?.setInt(SettingsKeys.chatMaxHistory, value);
   }
 }
