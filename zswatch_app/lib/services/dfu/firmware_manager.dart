@@ -28,7 +28,7 @@ class FirmwareManager {
   static const String _apiBase = 'https://api.github.com';
 
   /// Artifact name filters to match ZSWatch firmware artifacts
-  static const List<String> _artifactFilters = ['watchdk@1', '@5'];
+  static const List<String> _artifactFilters = ['watchdk@1', 'zswatch@1', '@5'];
 
   /// Whether to use the rotated firmware variant (dfu_application_rotated.zip)
   bool useRotatedFirmware = false;
@@ -170,15 +170,16 @@ class FirmwareManager {
   ///
   /// Similar to the website implementation, this fetches recent successful builds
   /// and prioritizes the main branch.
-  Future<List<WorkflowRun>> fetchWorkflowRuns({int numRuns = 5}) async {
+  Future<List<WorkflowRun>> fetchWorkflowRuns({int numRuns = 10}) async {
     _log('Fetching workflow runs from GitHub Actions...');
 
     try {
-      // Fetch recent runs plus explicitly grab the latest successful run on main
+      // Fetch a large window so that non-firmware runs (security scans, etc.)
+      // don't crowd out actual firmware builds from different branches.
       final responses = await Future.wait([
         http.get(
           Uri.parse(
-            '$_apiBase/repos/$_owner/$_repo/actions/runs?per_page=${numRuns * 2}',
+            '$_apiBase/repos/$_owner/$_repo/actions/runs?per_page=50',
           ),
           headers: {'Accept': 'application/vnd.github.v3+json'},
         ),
@@ -236,13 +237,15 @@ class FirmwareManager {
         ...successfulRuns,
       ];
 
-      // Remove duplicates by commit SHA (same commit can trigger multiple runs)
-      final seenShas = <String>{};
+      // Keep only the latest run per branch (runs are already sorted newest-first).
+      // Deduplicating by branch ensures feature branches aren't crowded out by
+      // multiple main-branch runs filling up the numRuns limit.
+      final seenBranches = <String>{};
       final uniqueRuns = runsWithMain
           .where((run) {
-            final sha = run['head_sha'] as String? ?? '';
-            if (seenShas.contains(sha)) return false;
-            seenShas.add(sha);
+            final branch = run['head_branch'] as String? ?? '';
+            if (seenBranches.contains(branch)) return false;
+            seenBranches.add(branch);
             return true;
           })
           .take(numRuns)
