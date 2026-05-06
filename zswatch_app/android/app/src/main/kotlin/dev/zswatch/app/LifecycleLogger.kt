@@ -25,6 +25,23 @@ object LifecycleLogger {
         appContext = context.applicationContext
     }
 
+    fun recordStartupCause(source: String, detail: String) {
+        log("StartupCause", "source=$source $detail")
+    }
+
+    fun trimMemoryLevelLabel(level: Int): String {
+        return when (level) {
+            80 -> "complete"
+            60 -> "moderate"
+            40 -> "background"
+            20 -> "ui_hidden"
+            15 -> "running_critical"
+            10 -> "running_low"
+            5 -> "running_moderate"
+            else -> "unknown_$level"
+        }
+    }
+
     fun log(source: String, message: String) {
         val uptimeMs = SystemClock.uptimeMillis()
         val pid = Process.myPid()
@@ -82,17 +99,22 @@ object LifecycleLogger {
         val lowerMessage = message.lowercase()
 
         if (lowerSource == "processexitreason") return true
+        if (lowerSource == "startupcause") return true
         if (lowerSource == "applifecycle" || lowerSource == "mainactivity") return true
         if (lowerSource == "bootreceiver") return true
         if (lowerSource.contains("notificationservice")) {
             return lowerMessage.contains("oncreate") ||
                 lowerMessage.contains("ondestroy") ||
+                lowerMessage.contains("onlowmemory") ||
+                lowerMessage.contains("ontrimmemory") ||
                 lowerMessage.contains("listenerconnected") ||
                 lowerMessage.contains("listenerdisconnected")
         }
         if (lowerSource == "bleconnectionservice") {
             return lowerMessage.contains("oncreate") ||
                 lowerMessage.contains("ondestroy") ||
+                lowerMessage.contains("onlowmemory") ||
+                lowerMessage.contains("ontrimmemory") ||
                 lowerMessage.contains("ontaskremoved") ||
                 lowerMessage.contains("start requested") ||
                 lowerMessage.contains("stop requested") ||
@@ -108,6 +130,8 @@ object LifecycleLogger {
         }
         return lowerMessage.contains("oncreate") ||
             lowerMessage.contains("ondestroy") ||
+            lowerMessage.contains("onlowmemory") ||
+            lowerMessage.contains("ontrimmemory") ||
             lowerMessage.contains("ontaskremoved") ||
             lowerMessage.contains("boot_completed") ||
             lowerMessage.contains("my_package_replaced") ||
@@ -203,11 +227,42 @@ object LifecycleLogger {
     private fun ApplicationExitInfo.toDiagnosticMessage(): String {
         val parts = mutableListOf(
             "reason=${reasonLabel(reason)}",
+            "reasonCode=$reason",
             "importance=$importance",
             "status=$status",
+            "pssKb=$pss",
+            "rssKb=$rss",
         )
+        if (timestamp > 0L) {
+            parts.add("timestamp=${timestamp}")
+        }
         description?.takeIf { it.isNotBlank() }?.let { parts.add("description=$it") }
+        runtimeSummary?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
         return parts.joinToString(" ")
+    }
+
+    private val ApplicationExitInfo.runtimeSummary: String?
+        get() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+
+            val summary = mutableListOf<String>()
+            importanceLabel(importance)?.let { summary.add("importanceLabel=$it") }
+            return summary.takeIf { it.isNotEmpty() }?.joinToString(",")
+        }
+
+    private fun importanceLabel(importance: Int): String? {
+        return when (importance) {
+            100 -> "foreground"
+            125 -> "foreground_service"
+            130 -> "visible"
+            200 -> "service"
+            230 -> "top_sleeping"
+            300 -> "cached"
+            325 -> "cant_save_state"
+            350 -> "cached_empty"
+            400 -> "gone"
+            else -> null
+        }
     }
 
     private fun reasonLabel(reason: Int): String {

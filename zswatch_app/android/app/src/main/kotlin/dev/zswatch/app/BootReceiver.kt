@@ -10,6 +10,10 @@ class BootReceiver : BroadcastReceiver() {
         LifecycleLogger.initialize(context)
         LifecycleLogger.recordHistoricalExitReasons(context)
         val action = intent?.action
+        LifecycleLogger.recordStartupCause(
+            source = "boot_receiver",
+            detail = "action=$action",
+        )
         if (action != Intent.ACTION_BOOT_COMPLETED && action != Intent.ACTION_MY_PACKAGE_REPLACED) {
             LifecycleLogger.log("BootReceiver", "ignored action=$action")
             return
