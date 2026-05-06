@@ -90,6 +90,10 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
         LifecycleLogger.initialize(applicationContext)
         LifecycleLogger.recordHistoricalExitReasons(applicationContext)
+        LifecycleLogger.recordStartupCause(
+            source = "activity",
+            detail = "savedInstanceState=${savedInstanceState != null} intentAction=${intent?.action}",
+        )
         LifecycleLogger.log("MainActivity", "onCreate savedInstanceState=${savedInstanceState != null}")
         
         // Create notification channels for foreground services
@@ -115,6 +119,19 @@ class MainActivity : FlutterActivity() {
     override fun onStop() {
         LifecycleLogger.log("MainActivity", "onStop")
         super.onStop()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        LifecycleLogger.log(
+            "MainActivity",
+            "onTrimMemory level=$level label=${LifecycleLogger.trimMemoryLevelLabel(level)}",
+        )
+        super.onTrimMemory(level)
+    }
+
+    override fun onLowMemory() {
+        LifecycleLogger.log("MainActivity", "onLowMemory")
+        super.onLowMemory()
     }
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

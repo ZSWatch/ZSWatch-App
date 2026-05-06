@@ -215,9 +215,11 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
   /// MCUmgr GATT service appears.
   Future<void> _ensureSmpEnabled() async {
     final watchService = _ref.read(watchServiceProvider);
-    if (watchService.hasSmpService) return;
 
-    debugPrint('[DfuNotifier] SMP not available, sending smp_enable…');
+    // Do not trust the cached discovery state here. SMP may have been
+    // disabled on the watch after the last service discovery, leaving
+    // hasSmpService stuck at true until we explicitly re-discover.
+    debugPrint('[DfuNotifier] Ensuring SMP is enabled...');
     await watchService.enableSmp();
     await Future<void>.delayed(const Duration(seconds: 2));
     final ready = await watchService.rediscoverServices();

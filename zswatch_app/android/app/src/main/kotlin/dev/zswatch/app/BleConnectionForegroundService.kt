@@ -164,6 +164,10 @@ class BleConnectionForegroundService : Service() {
         super.onCreate()
         LifecycleLogger.initialize(applicationContext)
         LifecycleLogger.recordHistoricalExitReasons(applicationContext)
+        LifecycleLogger.recordStartupCause(
+            source = "foreground_service",
+            detail = "service=${javaClass.simpleName}",
+        )
         instance = this
         Log.d(TAG, "Service created")
         LifecycleLogger.log(TAG, "onCreate")
@@ -317,6 +321,19 @@ class BleConnectionForegroundService : Service() {
         currentState = STATE_APP_KILLED
         updateNotificationContent()
         super.onTaskRemoved(rootIntent)
+    }
+
+    override fun onTrimMemory(level: Int) {
+        LifecycleLogger.log(
+            TAG,
+            "onTrimMemory level=$level label=${LifecycleLogger.trimMemoryLevelLabel(level)} state=$currentState watch=$currentWatchName",
+        )
+        super.onTrimMemory(level)
+    }
+
+    override fun onLowMemory() {
+        LifecycleLogger.log(TAG, "onLowMemory state=$currentState watch=$currentWatchName")
+        super.onLowMemory()
     }
 
     override fun onDestroy() {

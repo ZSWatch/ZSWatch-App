@@ -229,6 +229,10 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         super.onCreate()
         LifecycleLogger.initialize(applicationContext)
         LifecycleLogger.recordHistoricalExitReasons(applicationContext)
+        LifecycleLogger.recordStartupCause(
+            source = "notification_listener",
+            detail = "component=${javaClass.simpleName}",
+        )
         instance = this
         initializeIdCounter(applicationContext)
         Log.d(TAG, "NotificationListenerService created")
@@ -252,6 +256,19 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         super.onListenerDisconnected()
         Log.d(TAG, "NotificationListenerService disconnected")
         LifecycleLogger.log(TAG, "onListenerDisconnected")
+    }
+
+    override fun onTrimMemory(level: Int) {
+        LifecycleLogger.log(
+            TAG,
+            "onTrimMemory level=$level label=${LifecycleLogger.trimMemoryLevelLabel(level)}",
+        )
+        super.onTrimMemory(level)
+    }
+
+    override fun onLowMemory() {
+        LifecycleLogger.log(TAG, "onLowMemory")
+        super.onLowMemory()
     }
     
     override fun onNotificationPosted(sbn: StatusBarNotification?) {

@@ -65,8 +65,9 @@ class TtsService {
           r == 224 ||
           r == 226 ||
           r == 339 ||
-          r == 231)
+          r == 231) {
         frScore++;
+      }
       // ñ(241) ¡(161) ¿(191) — Spanish
       if (r == 241 || r == 161 || r == 191) esScore += 2;
     }
