@@ -136,8 +136,9 @@ Packet hashes and SMP headers were captured without packet bodies. During these
 attempts Android also reported Service Changed callbacks and unregistered GATT
 clients as the watch dynamically registered/unregistered SMP. This is a concrete
 coexistence lead, not yet proof that it caused the altered bytes. The current
-protocol uses two Android GATT owners (NUS and Nordic MCUmgr); a single-owner
-transfer experiment and repeated byte comparisons are still needed.
+prototype uses separate NUS and Nordic MCUmgr GATT objects. The companion service
+must coordinate their lifecycles; a single logical owner does not require
+replacing Nordic's transport or sharing one BluetoothGatt object.
 
 The experimental APK, source copies, native test log, probe output, UART/logcat
 and hash-only comparison records are kept locally under
@@ -146,13 +147,39 @@ and hash-only comparison records are kept locally under
 `.companion-hil-runs/20261002-native-timeout-trial/`. Host test results are 34
 passing native JVM tests. Transfer acceptance remains unmet.
 
+## Withdrawn custom-transport experiment
+
+A later diagnostic experiment replaced Nordic's GATT/SMP transport with a
+shared-GATT adapter. That departed from the implementation plan and has been
+removed. Nordic's `McuMgrBleTransport` and `FsManager` are restored. The added
+firmware checksum configuration was also removed; it was never flashed.
+
+The experiment introduced a separate timeout bug: requests kept sequence zero,
+and a timer from a completed request could fail a later request. Its results
+cannot establish that the Nordic library caused the original failures.
+Byte-for-byte USB comparison found `20261002_195726` and `20261002_200103` exact,
+but `20261002_195732` differed in the chunk starting at offset 9700 even though
+the container passed validation and the prototype marked it downloaded.
+A new `20261002_212304` recording differed at offset 12125 and was rejected by
+the container check. Thus a diagnostic `ALL_RECEIPTS_DOWNLOADED` result does not
+prove end-to-end integrity. All nine original recordings remain on the watch.
+The locally captured experiment evidence is retained under
+`.companion-hil-runs/20261002-single-gatt-*`; continuation-fragment byte samples
+have been redacted from the diagnostic capture.
+
+The restored Nordic build passes all 34 native JVM tests and has replaced the
+experimental APK on the Nokia; the installed APK SHA-256 matches the built file.
+The corrupted `20261002_195732` receipt is preserved in quarantine and its journal
+entry is marked failed, so it cannot be reused as a successful cached download.
+This verifies the rollback, not transfer integrity or background recovery.
+
 ## Next physical work
 
-1. Compare a single-owner GATT transport against Nordic MCUmgr, then repeat the
-   failed files. Preserve hash-only traces and check whether returned packet
-   hashes match contiguous source ranges; do not publish until whole-file hashes
-   and containers pass. The 10-second chunk timeout fixes some waiting but not
-   the observed body corruption.
+1. Use Nordic's existing transport in both the native-service prototype and the
+   ordinary Flutter-wrapper baseline on this phone. Compare lifecycle coordination
+   and repeat the failed files with byte-for-byte USB verification. Preserve
+   hash-only traces. The 10-second chunk timeout fixes some waiting but not the
+   observed body corruption. Do not implement custom SMP sequencing or reassembly.
 2. Once transfers work, repeat the failed batch and isolated screen-off cases,
    then record after task removal. Require byte comparisons after completion;
    include multiple pending files and interrupted SMP. Keep the original failed
@@ -164,6 +191,9 @@ passing native JVM tests. Transfer acceptance remains unmet.
 4. Run the ordinary Flutter-app baseline, notification forwarding, Stop,
    permissions/radio changes and network jobs. Repeat unplugged idle/Doze and
    longer recordings before the planned soak tests. iOS still requires a Mac/iPhone.
+
+Transfer diagnosis remains a separate work item. It must not turn into a custom
+protocol implementation or prevent work on native service ownership and recovery.
 
 Neither a foreground-service migration nor rewriting the UI in native code is
 approved by these results. The prototype remains behind its debug flag.

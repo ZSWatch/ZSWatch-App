@@ -220,6 +220,13 @@ Watch-delete är ett separat tillstånd från AI-resultat och watch-leverans. Av
 
 Överföringen ska använda den native MCUmgr-kod som redan finns bakom wrappern. Android och iOS ska samordna SMP, vanlig trafik och DFU; flera bibliotek kan ha olika transportobjekt utan att de blir oberoende ägare av användarens anslutningsstate.
 
+Använd Nordics befintliga transport och protokollhantering: Androids
+`mcumgr-ble` och iOS `iOSMcuManagerLibrary`. Implementera inte egen SMP-sekvensering,
+fragmentering eller svarskorrelation. En tjänst som samordnar livscykeln får äga
+flera biblioteksstyrda transportobjekt; en enda logisk companion-ägare betyder
+inte att NUS och MCUmgr måste dela samma `BluetoothGatt`-objekt. Förändringar ska
+gälla start, avbrott, recovery och persistens runt bibliotekens API:er.
+
 ### Backendval
 
 Definiera separata `TranscriptionBackend` och `VoiceAnalysisBackend`, plus möjlighet till en backend som analyserar ljud direkt. Stöd minst:
@@ -808,9 +815,22 @@ mottagna. Båda hade ändå fel SHA-256 och avvisades; tredje filen time-outade.
 Hashar före SDK-montering visar två felaktiga chunkar i timeoutprovet. Därmed är
 timeouten en bidragande faktor men inte datakorruptionens förklaring. Androids
 loggar visar också Service Changed vid firmwaretjänstens dynamiska SMP-registrering.
-Nästa steg är en enda GATT-ägare för NUS och MCUmgr, därefter upprepade bytevisa
-batch- och skärmlåsta prov. 34 native JVM-tester passerar; hårdvaruacceptans
-saknas fortfarande.
+Nästa steg är att samordna livscykeln för NUS och Nordics befintliga MCUmgr-transport,
+och jämföra mot appens befintliga Flutter-wrapper på samma telefon. Egen
+SMP-transport ingår inte i planen. Bytevisa batch- och skärmlåsta prov behövs
+fortfarande, liksom normal serviceåterstart. 34 native JVM-tester passerar;
+hårdvaruacceptans saknas fortfarande.
+
+Ett senare experiment ersatte Nordics GATT/SMP-transport med egen sekvensering
+och fragmentmontering. Detta var ett avsteg från planen och är återtaget.
+Experimentet introducerade ett separat timeoutfel genom återanvändning av
+sekvens noll. Det löste inte datakorruptionen: två av tre kontrollerade filer
+matchade klockan, men en strukturellt giltig fil hade en felaktig chunk och hade
+ändå märkts mottagen. En ny inspelning fick också en felaktig chunk och avvisades
+av containerkontrollen. Dessa instrumenterade resultat bevisar varken korrekt
+filöverföring eller bakgrunds-recovery. Inspelningarna finns kvar på klockan;
+fortsatt felsökning ska använda biblioteken och behandlas separat från
+companion-tjänstens OS-livscykel.
 
 ### Införande och återgång
 
