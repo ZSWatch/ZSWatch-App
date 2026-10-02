@@ -679,18 +679,26 @@ Varje etapp ska kunna granskas som en avgränsad ändring med testartefakter. UI
 Genomförandestatus 2026-10-02: etapp 0 är påbörjad med körbar read-only preflight,
 provenance-patchar, UART/logcat-collector och fixtures som bevarar sessionen.
 20 tester utan hårdvara verifierar dessa skydd och collectors med fake ADB/PTY.
-Den faktiska inventeringen på Linux hittar UART
-`usb-FTDI_FT232R_USB_UART_BG00RS5E-if00-port0` och J-Link `51022722`, men ingen
-telefon eller exponerad USB-SMP-port. USB-anslutningen till datorn finns alltså;
-den separata CDC/SMP-kanalen är ännu inte verifierad. Aktuell firmwarekälla
-stänger av USB efter 20 sekunder från boot om CDC DTR inte är aktiv; Update-appens
-USB-toggle kan aktivera den igen. Det är en möjlig förklaring, inte ett bevis för
-vilken firmware som körs. En femsekunders passiv UART-capture gav två bytes och
-verifierar därför inte bootversion eller en fungerande shell.
-Preflight är fortfarande BLOCKED och acceptans är NOT_RUN. Ingen
-flash/reset/pairing eller native-migrering har gjorts i denna första leverans.
-Verifierad styrkanal, foreground-baslinje och reproducerat bakgrundsgap återstår;
-etapp 0:s grind är inte uppfylld.
+Efter användarens explicita reset-instruktion är även USB-SMP-styrkanalen verifierad
+på den verkliga klockan. J-Link `51022722` resetades riktat med `nrfutil device reset
+--serial-number 51022722 --family nrf53`. USB-porten
+`usb-ZEPHYR_ZSWatch_6F42BAA5F4D862F3-if00` dök upp efter 5,12 sekunder och SMP
+anslöts efter 5,45 sekunder från reset-begäran. `app state`, `voice_memo status`
+och `power status` gav lyckade svar. Ett ytterligare statuskommando efter 25
+sekunder fungerade, och porten fanns kvar efter att klienten stängts. Därefter
+passerade den befintliga pytest-statusproben på fysisk klocka utan ytterligare
+reset, flash eller BLE-anslutning. Setupsekvensen finns i körguiden ovan.
+
+Den lokala konfigurationen använder labbnamnet `connected-watch` med verifierade
+UART-/SMP-portar; det är inte ett påstående om fysisk board-revision. Exakt
+installerad firmware och revision återstår att verifiera. Testartefakter ligger
+i `.companion-hil-runs/20261002-usb-reset-probe/`; uppdaterad preflight finns i
+`.companion-hil-runs/20261002-preflight-smp-active/`. UART-adaptern är fortsatt
+`usb-FTDI_FT232R_USB_UART_BG00RS5E-if00-port0`.
+
+Preflight är nu BLOCKED enbart på saknad telefon, och companion-acceptans är
+NOT_RUN. Ingen flash/pairing eller native-migrering har gjorts. Foreground-baslinje
+och reproducerat bakgrundsgap återstår; etapp 0:s grind är inte uppfylld.
 
 HTTP-timeout/callback-fixen genomförs som en liten sidoändring under prototyparbetet och ska vara verifierad före HTTP-acceptans. Den blockerar inte att bygga och utvärdera companion-kärnan. Mer omfattande remote-infrastruktur tas in först om de tidiga voice-proven motiverar den.
 

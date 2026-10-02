@@ -34,8 +34,65 @@ not alone establish the watch's USB CDC/SMP endpoint. In the current firmware
 source, `zsw_usb_manager.c` releases USB after a 20-second boot guard when CDC
 DTR is not asserted. The Update app's USB toggle enables it again. Therefore
 an absent CDC port can mean inactive firmware USB rather than a missing cable.
-Verify the running firmware and a control path before trying to enable it;
-inventory does not reset the watch to reopen this boot window.
+Inventory does not reset the watch to reopen this boot window. An explicitly
+requested reset during lab setup can reopen it; keep this separate from a
+session-preserving test or a lifecycle/reconnection scenario.
+
+The connected rig was verified on 2026-10-02: J-Link `51022722`, UART
+`usb-FTDI_FT232R_USB_UART_BG00RS5E-if00-port0`, and USB SMP
+`usb-ZEPHYR_ZSWatch_6F42BAA5F4D862F3-if00`. A targeted nRF53 reset followed by
+opening SMP within 5.45 seconds allowed status commands; another status command
+after 25 seconds succeeded, and the USB port remained after the client closed.
+Re-inventory these identities if the rig changes. The watch's physical revision
+and exact installed firmware artifact still need verification.
+
+When this verified SMP port is absent, the following explicit setup sequence
+resets the selected probe's target and opens it as soon as it enumerates. Prepare
+the Python environment before reset. Pyserial's default asserted DTR keeps CDC
+active during the boot guard; sending a valid SMP request also verifies the path.
+
+```bash
+export ZSW_JLINK_SERIAL=51022722
+export ZSW_SMP_PORT=/dev/serial/by-id/usb-ZEPHYR_ZSWatch_6F42BAA5F4D862F3-if00
+/tmp/zswatch-companion-hil-venv/bin/python - <<'PY'
+import asyncio, os, subprocess, time
+from pathlib import Path
+from smpclient import SMPClient
+from smpclient.generics import success
+from smpclient.requests.shell_management import Execute
+from smpclient.transport.serial import SMPSerialTransport
+
+async def bootstrap():
+    port = Path(os.environ['ZSW_SMP_PORT'])
+    if port.exists():
+        raise RuntimeError('SMP already available; use the status probe without reset')
+    process = subprocess.Popen(['nrfutil', 'device', 'reset', '--serial-number',
+                                os.environ['ZSW_JLINK_SERIAL'], '--family', 'nrf53'])
+    try:
+        deadline = time.monotonic() + 15
+        while not port.exists():
+            if process.poll() not in (None, 0) or time.monotonic() >= deadline:
+                raise RuntimeError('Reset failed or SMP did not enumerate in time')
+            await asyncio.sleep(0.05)
+        async with SMPClient(SMPSerialTransport(exclusive=True), str(port), timeout_s=3) as client:
+            for delay in (0, 25):
+                await asyncio.sleep(delay)
+                response = await client.request(Execute(argv=['app', 'state']), timeout_s=5)
+                assert success(response) and response.ret == 0, response
+                print(response.o)
+        assert process.wait(timeout=5) == 0
+        assert port.exists(), 'CDC disappeared after closing the client'
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=5)
+
+asyncio.run(bootstrap())
+PY
+```
+
+Start the UART collector before this explicit action when boot evidence is needed.
+Do not automatically repeat reset on errors: save the first failure and logs.
 
 ```bash
 python3 scripts/companion_hil/hil.py preflight \
@@ -133,7 +190,8 @@ python3 -m pytest app/pytest_unit/test_session_safety.py -q
 
 ## Remaining stage 0 work
 
-Verify watch identity/firmware and a USB SMP or other independent control path.
+USB SMP status/control is now verified on the connected rig. Verify exact watch
+revision/installed firmware and preserve that provenance.
 Attach a physical phone, establish the normal bond/permissions, implement
 foreground notification/time/voice fixtures and reproduce a background failure.
 Add scenario assertions and deployment adapters separately. Mac/iPhone control,
