@@ -33,6 +33,18 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
         return true
     }
 
+    /** A delayed OS presence event cannot undo Stop or switch the selected watch. */
+    fun restoreForPresence(address: String, expectedGeneration: Long): Boolean {
+        val state = store.control()
+        if (state["desired_running"] != true || state["address"] != address ||
+            generation != expectedGeneration) return false
+        if (active) {
+            if (state["phase"] in listOf("error", "disconnected")) reconnect()
+            return true
+        }
+        return restore()
+    }
+
     fun owns(token: Long): Boolean = active && token == generation
 
     fun reconnect() {

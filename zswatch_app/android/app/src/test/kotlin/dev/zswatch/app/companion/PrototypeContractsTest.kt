@@ -81,6 +81,45 @@ class PrototypeContractsTest {
         assertTrue(runtime.phase(runtime.generation, "ready"))
     }
 
+    @Test fun presenceRestoresDestroyedOwnerWithoutAnotherUiStart() {
+        val first = PrototypeRuntime(store(), Link()); first.start(address)
+        val savedGeneration = first.generation; first.destroy()
+        val link = Link(); val restored = PrototypeRuntime(store(), link)
+        assertTrue(restored.restoreForPresence(address, savedGeneration))
+        assertEquals(address, link.sessions.single().first)
+        assertTrue(restored.generation > savedGeneration)
+        // Duplicate presence for the active generation must not acquire a new transport.
+        assertTrue(restored.restoreForPresence(address, restored.generation))
+        assertEquals(1, link.sessions.size)
+    }
+
+    @Test fun queuedPresenceCannotUndoStopOrSwitchWatch() {
+        val link = Link(); val runtime = PrototypeRuntime(store(), link)
+        runtime.start(address); val old = runtime.generation
+        runtime.stop()
+        assertFalse(runtime.restoreForPresence(address, old))
+        assertFalse(PrototypeRuntime(store(), Link()).restoreForPresence(address, runtime.generation))
+        val other = "11:22:33:44:55:66"
+        runtime.start(other)
+        assertFalse(runtime.restoreForPresence(address, runtime.generation))
+        assertFalse(runtime.restoreForPresence(other, old))
+        assertEquals(listOf(address, other), link.sessions.map { it.first })
+        assertEquals(other, runtime.store.control()["address"])
+    }
+
+    @Test fun matchingPresenceRetriesFailedLinkButDoesNotReplaceReadyLink() {
+        val link = Link(); val runtime = PrototypeRuntime(store(), link)
+        runtime.start(address); runtime.phase(runtime.generation, "error", "radio off")
+        val failedGeneration = runtime.generation
+        assertTrue(runtime.restoreForPresence(address, failedGeneration))
+        assertEquals(2, link.sessions.size)
+        assertEquals("connecting", runtime.store.control()["phase"])
+        runtime.phase(runtime.generation, "ready")
+        assertTrue(runtime.restoreForPresence(address, runtime.generation))
+        assertEquals(2, link.sessions.size)
+        assertFalse(runtime.restoreForPresence(address, failedGeneration))
+    }
+
     @Test fun failedConnectRetainsUserIntentAndReportsInactiveProtocol() {
         val link = Link(); link.onConnect = { throw IllegalStateException("radio off") }
         val runtime = PrototypeRuntime(store(), link); runtime.start(address)

@@ -88,6 +88,78 @@ void main() {
     expect(calls, isEmpty);
   });
 
+  test(
+    'presence setup is explicit and distinguishes association from support',
+    () async {
+      messenger.setMockMethodCallHandler(methods, (call) async {
+        calls.add(call);
+        return {
+          'version': 1,
+          'supported': true,
+          'associated': call.method == 'associatePresence',
+          'address': 'AA:BB:CC:DD:EE:FF',
+        };
+      });
+      expect(
+        (await client.presence(' aa:bb:cc:dd:ee:ff '))['associated'],
+        false,
+      );
+      expect(
+        (await client.presence(
+          'AA:BB:CC:DD:EE:FF',
+          associate: true,
+        ))['associated'],
+        true,
+      );
+      expect(calls.map((call) => call.method), [
+        'presenceStatus',
+        'associatePresence',
+      ]);
+      expect(calls.last.arguments, {
+        'version': 1,
+        'address': 'AA:BB:CC:DD:EE:FF',
+      });
+    },
+  );
+
+  test('presence status for a different watch cannot be accepted', () async {
+    messenger.setMockMethodCallHandler(
+      methods,
+      (_) async => {
+        'version': 1,
+        'supported': true,
+        'associated': true,
+        'address': '11:22:33:44:55:66',
+      },
+    );
+    await expectLater(
+      client.presence('AA:BB:CC:DD:EE:FF'),
+      throwsFormatException,
+    );
+    await expectLater(
+      client.presence('watch UUID', associate: true),
+      throwsFormatException,
+    );
+  });
+
+  test(
+    'association cancellation propagates without starting the runtime',
+    () async {
+      messenger.setMockMethodCallHandler(methods, (call) async {
+        calls.add(call);
+        throw PlatformException(
+          code: 'ASSOCIATION_FAILED',
+          message: 'Cancelled',
+        );
+      });
+      await expectLater(
+        client.presence('AA:BB:CC:DD:EE:FF', associate: true),
+        throwsA(isA<PlatformException>()),
+      );
+      expect(calls.single.method, 'associatePresence');
+    },
+  );
+
   test('unaccepted start and native permission errors propagate', () async {
     messenger.setMockMethodCallHandler(
       methods,

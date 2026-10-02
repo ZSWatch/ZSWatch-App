@@ -17,6 +17,7 @@ class CompanionPrototypeService : Service() {
     companion object {
         const val START = "dev.zswatch.app.companion.START"
         const val STOP = "dev.zswatch.app.companion.STOP"
+        const val RESTORE_PRESENCE = "dev.zswatch.app.companion.RESTORE_PRESENCE"
         const val CHANNEL = "companion_prototype"
         const val NOTIFICATION = 1003
         @Volatile var instance: CompanionPrototypeService? = null
@@ -51,10 +52,13 @@ class CompanionPrototypeService : Service() {
         if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE) { stopSelf(); return START_NOT_STICKY }
         LifecycleLogger.log("CompanionPrototype", "service_start action=${intent?.action} flags=$flags id=$startId")
         if (intent?.action == STOP) {
-            PrototypeHub.worker.post { safely { runtime?.stop() }; PrototypeHub.main.post { stopSelf() } }
+            PrototypeHub.worker.post {
+                safely { runtime?.stop(); stopPresenceObservation() }
+                PrototypeHub.main.post { stopSelf() }
+            }
             return START_NOT_STICKY
         }
-        if (intent != null && intent.action != START) { stopSelf(); return START_NOT_STICKY }
+        if (intent != null && intent.action !in listOf(START, RESTORE_PRESENCE)) { stopSelf(); return START_NOT_STICKY }
         try {
             val manager = getSystemService(NotificationManager::class.java)
             if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(
@@ -80,6 +84,13 @@ class CompanionPrototypeService : Service() {
         PrototypeHub.worker.post {
             safely {
                 val owner = runtime ?: error("Prototype owner unavailable")
+                if (intent?.action == RESTORE_PRESENCE) {
+                    val restored = address != null && PrototypePresence.associated(applicationContext, address) &&
+                        owner.restoreForPresence(address, intent.getLongExtra("generation", -1))
+                    LifecycleLogger.log("CompanionPresence", "restore_accepted=$restored")
+                    if (!restored && !owner.active) PrototypeHub.main.post { stopSelf() }
+                    return@safely
+                }
                 // Two accepted starts may reach the service before the first
                 // controller exists. Reject a switch without destroying its link.
                 if (address != null && owner.active && owner.store.control()["address"] != address) {
@@ -93,9 +104,22 @@ class CompanionPrototypeService : Service() {
                     check(owner.store.control()["address"] == address) { "Stop before changing watch" }
                     owner.reconnect()
                 } else owner.start(address)
+                try { PrototypePresence.observe(applicationContext, owner.store.control()["address"] as String) }
+                catch (error: Exception) {
+                    LifecycleLogger.log("CompanionPresence", "observe_failed ${error.javaClass.simpleName}")
+                }
             }
         }
         return START_STICKY
+    }
+
+    fun stopPresenceObservation() {
+        try {
+            val address = runtime?.store?.control()?.get("address") as? String ?: return
+            PrototypePresence.stopObserving(applicationContext, address)
+        } catch (error: Exception) {
+            LifecycleLogger.log("CompanionPresence", "stop_observation_failed ${error.javaClass.simpleName}")
+        }
     }
 
     private fun safely(action: () -> Unit) {

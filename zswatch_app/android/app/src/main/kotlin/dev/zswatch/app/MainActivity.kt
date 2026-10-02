@@ -135,6 +135,11 @@ class MainActivity : FlutterActivity() {
         super.onLowMemory()
     }
     
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (companionPrototypeBridge?.onActivityResult(requestCode, resultCode) == true) return
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         LifecycleLogger.log("MainActivity", "configureFlutterEngine engine=${flutterEngine.hashCode()}")

@@ -19,6 +19,7 @@ class _CompanionPrototypeAppState extends State<CompanionPrototypeApp> {
   StreamSubscription<CompanionPrototypeSnapshot>? subscription;
   CompanionPrototypeSnapshot? state;
   String? error;
+  Map<String, Object?>? presence;
   bool busy = false;
 
   @override
@@ -106,6 +107,10 @@ class _CompanionPrototypeAppState extends State<CompanionPrototypeApp> {
             'Protocol ready: ${state?.protocolReady ?? false} • generation ${state?.generation ?? 0}',
           ),
           Text('Saved recordings: ${state?.recordings.length ?? 0}'),
+          if (presence != null)
+            Text(
+              'Presence supported: ${presence!['supported']} • associated: ${presence!['associated']}',
+            ),
           if (error != null)
             Text(error!, style: const TextStyle(color: Colors.redAccent)),
           const SizedBox(height: 12),
@@ -116,6 +121,20 @@ class _CompanionPrototypeAppState extends State<CompanionPrototypeApp> {
               FilledButton(
                 onPressed: busy ? null : () => unawaited(run(connect)),
                 child: const Text('Connect / recover'),
+              ),
+              OutlinedButton(
+                onPressed: busy || state?.runtimeActive != true
+                    ? null
+                    : () => unawaited(
+                        run(() async {
+                          final next = await client.presence(
+                            address.text,
+                            associate: true,
+                          );
+                          if (mounted) setState(() => presence = next);
+                        }),
+                      ),
+                child: const Text('Enable presence recovery'),
               ),
               OutlinedButton(
                 onPressed: busy

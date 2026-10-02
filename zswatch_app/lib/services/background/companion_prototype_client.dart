@@ -66,6 +66,28 @@ class CompanionPrototypeClient {
     }
   }
 
+  Future<Map<String, Object?>> presence(
+    String address, {
+    bool associate = false,
+  }) async {
+    final normalized = address.trim().toUpperCase();
+    if (!RegExp(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$').hasMatch(normalized)) {
+      throw const FormatException('Expected an Android BLE MAC address');
+    }
+    final value = await methods.invokeMethod<Object?>(
+      associate ? 'associatePresence' : 'presenceStatus',
+      {'version': 1, 'address': normalized},
+    );
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['supported'] is! bool ||
+        value['associated'] is! bool ||
+        value['address'] != normalized) {
+      throw const FormatException('Unsupported companion presence status');
+    }
+    return Map<String, Object?>.from(value);
+  }
+
   Future<CompanionPrototypeSnapshot> command(String name, {int? cursor}) async {
     if (!['stop', 'syncTime', 'retryRecordings', 'ackEvents'].contains(name) ||
         (name == 'ackEvents' && (cursor == null || cursor < 0))) {

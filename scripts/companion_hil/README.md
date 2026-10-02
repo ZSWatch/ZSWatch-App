@@ -213,6 +213,73 @@ the original SHA-256. Cleanup succeeded and the recording count remained zero.
 Artifacts are in `.companion-hil-runs/20261002-usb-file-reconnect/`.
 This does not prove BLE resumption on Android/iOS or native plugin behavior.
 
+## Existing Flutter/Nordic transfer baseline
+
+`zswatch_app/tool/companion_flutter_transfer_probe.dart` calls the existing
+`WatchService`, `BleConnectionService` and `FileSystemService`, including the
+normal SMP enable, two-second wait and service rediscovery. File transfers go
+through the unchanged `mcumgr_flutter` wrapper and Nordic's native transport.
+It starts no voice-sync/AI provider and deletes no watch recording.
+
+Build from `zswatch_app`, choosing the actual bonded address and one to four
+existing filenames (without `.zsw_opus`):
+
+```bash
+flutter build apk --debug --no-pub \
+  --target tool/companion_flutter_transfer_probe.dart \
+  --dart-define=HIL_WATCH_ADDRESS=VERIFIED_MAC \
+  --dart-define=HIL_RECORDINGS=EXISTING_FILENAME_1,EXISTING_FILENAME_2
+```
+
+Preserve the built APK under a run-specific path before another build. Install
+that saved file with targeted `adb -s "$ZSW_PHONE_SERIAL" install -r`; do not
+uninstall the app or clear its data. Launch, unlock the phone, and press **Run
+foreground transfer diagnostic**. Wait for protocol-ready state, not merely the
+return from `connectById`. The diagnostic writes unverified local receipts and
+`result.json` under the phone's private `app_flutter/companion-flutter-probe/`
+with a unique run directory. A 60-second caller timeout cancels through the
+existing wrapper and ends the batch rather than overlapping another transfer.
+
+Hash/read each selected source through USB SMP before the BLE run, with no USB
+filesystem traffic during the BLE transfers. Afterwards, compare each received
+file's bytes, length and SHA-256 with an independent USB read. Read real audio
+into host memory only; save metadata/hashes as evidence. `received_unverified`
+is not an integrity pass. Preserve failed trials and all watch originals.
+This diagnostic is a foreground SDK baseline, not a background/kill-recovery test.
+
+## Android companion-presence prototype
+
+Build the existing native prototype with
+`--dart-define=COMPANION_RUNTIME_PROTOTYPE=true`, launch it, then use **Connect /
+recover** and **Enable presence recovery**. The second action opens Android's
+system companion-association picker for that exact watch address. An existing
+Bluetooth bond is not a companion association. Cancellation reports an error;
+unsupported devices keep the explicit foreground connection path.
+
+The prototype supports Android 12/API 31 and later with the companion-device
+setup feature. Its permission/service declarations exist in the debug manifest
+only. The Android-12-compatible address-based observation callbacks are retained
+on newer Android versions; Android 16-specific API migration remains separate.
+`PrototypePresenceService` receives OS callbacks without launching Flutter,
+checks the saved connect intent and current association, then asks the existing
+native runtime to restore. Address/generation checks prevent a delayed event
+from undoing Stop or changing watches. Ready links remain owned by the existing
+runtime; a matching presence event can retry a failed link. Stop persists the
+intent first and unregisters observation without removing the association/bond.
+
+Physical acceptance must establish actual association, OS presence callbacks,
+protocol-ready restoration and time writes with UI absent. Repeat after an
+injected crash without launching the Activity or using instrumentation; label
+that result separately from OS memory reclamation. Then test Stop, cancellation,
+watch absence, radio changes and association removal. Address identity after
+watch reboot and wakeup reliability on this Nokia are not yet verified, so
+presence is not established as the sole recovery path. Do not silently change
+battery restrictions to obtain a pass.
+
+API references: [Android background BLE guidance](https://developer.android.com/develop/connectivity/bluetooth/ble/background),
+[companion association](https://developer.android.com/develop/connectivity/bluetooth/companion-device-pairing),
+[presence observation](https://developer.android.com/reference/android/companion/CompanionDeviceManager#startObservingDevicePresence(java.lang.String)).
+
 ## App voice-receipt checks without a phone
 
 From `zswatch_app`:

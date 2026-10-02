@@ -173,6 +173,55 @@ The corrupted `20261002_195732` receipt is preserved in quarantine and its journ
 entry is marked failed, so it cannot be reused as a successful cached download.
 This verifies the rollback, not transfer integrity or background recovery.
 
+## Existing Flutter baseline and presence foundation
+
+The foreground diagnostic now invokes the existing Flutter `WatchService`,
+`BleConnectionService` and `FileSystemService` without auto-sync, AI or watch
+cleanup. The first harness attempt was invalid: it checked Connected immediately
+after `connectById` returned, before asynchronous setup finished. That wait is
+corrected and the diagnostic now requires its visible Run button.
+
+The corrected Nokia run reached the app's Connected state, but service discovery
+returned zero services. `WatchService` logged missing NUS and still reported
+Connected; SMP-enable could not take effect, and the diagnostic stopped before
+calling Nordic's file downloader. A subsequent native prototype connection also
+reported `NUS service unavailable`. This is not a Nordic file-transfer result.
+Four source files were hashed independently over USB before the run, with no USB
+filesystem traffic during BLE. All nine watch originals remain. Metadata and
+failed-run captures are under `.companion-hil-runs/20261002-flutter-nordic-baseline/`.
+
+A debug-only CDM association/presence path is now implemented and the Nokia
+reports the companion-device-setup feature. The system picker selects the exact
+watch address. OS presence callbacks request restoration of the existing native
+runtime without starting Flutter. Persisted intent/address/generation checks
+protect Stop and watch changes; a matching event can retry an errored link.
+The service/permissions are excluded from the merged release manifest.
+
+37 native JVM tests and 12 Flutter bridge/widget tests pass, static analysis
+passes, and the prototype/diagnostic APKs compile. Android’s system picker approved the
+watch association, observation registration succeeded, and real appeared/
+disappeared callbacks reached `PrototypePresenceService`. A callback issued
+`RESTORE_PRESENCE`, which the runtime accepted; the NUS failure persisted.
+
+With the association active and Settings foreground, an injected `am crash`
+changed PID 17260 to 17863 and generation 81 to 82 without a UI launch. Android
+delivered a null-intent sticky start, and the service registered observation
+again. Unlike the earlier trials, a new native generation ran. The starting
+link was already disconnected, and the restored generation still did not reach
+Ready. This is evidence of process/service restart with association active,
+not full connection/recording recovery or proof of which CDM privilege caused
+the difference. It is not low-memory termination or a force-stop test.
+
+Real presence callbacks also resumed after the crash. A subsequent explicit Stop
+persisted `desired_running=false` and phase Stopped; generation stayed 89, the
+native foreground service was absent, and the system association remained.
+The phone is left with the prototype stopped rather than repeatedly retrying the
+failed link. All nine watch recordings remain, and no firmware was flashed.
+Evidence is under `.companion-hil-runs/20261002-presence-foundation/`.
+
+The empty service discovery remains an open blocker for transport acceptance. Setup
+and acceptance instructions are in `scripts/companion_hil/README.md`.
+
 ## Next physical work
 
 1. Use Nordic's existing transport in both the native-service prototype and the

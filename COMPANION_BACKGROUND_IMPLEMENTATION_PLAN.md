@@ -832,6 +832,37 @@ filöverföring eller bakgrunds-recovery. Inspelningarna finns kvar på klockan;
 fortsatt felsökning ska använda biblioteken och behandlas separat från
 companion-tjänstens OS-livscykel.
 
+### Companion-presence-prototyp efter transportåtergång
+
+Android-prototypen har nu en explicit CDM-association via systemets picker och en
+`CompanionDeviceService` för presence (API 31+, där setup-feature finns).
+Declarationer och permissions ligger endast i debug-manifestet. OS-callbacken
+startar ingen Flutter-engine; den ber befintlig native-runtime att återställa
+sparad connect-intent. Adress/generation spärrar gamla callbacks efter Stop eller
+byte av klocka. En redan Ready anslutning behålls; en felande länk kan återförsökas
+på en matchande presence-händelse. Stop avregistrerar observation men behåller
+bond/association. MCUmgr fortsätter använda Nordic.
+
+37 native JVM-tester och 12 Flutter bridge/widget-tester passerar. APK-bygge och
+statisk analys passerar; release-manifestet innehåller inte presence-prototypen.
+På Nokia är faktisk association och OS presence-callbacks nu observerade. Med
+associationen aktiv gav en injicerad Java-processkrasch en ny PID och native
+generation via sticky-start utan UI-launch. Utgångslänken var redan felande och
+återstarten nådde inte protocol-ready: detta är endast process/service-wakeup,
+inte full BLE-/recording-recovery. Presence-callbacks återkom även efter kraschen.
+Explicit Stop bevarades, native foreground-service stoppades och associationen
+behölls. Radio/absence och adressidentitet efter watch-reset återstår som
+acceptans. Körningen dokumenteras
+i [`scripts/companion_hil/README.md`](scripts/companion_hil/README.md).
+
+En separat foreground-diagnostik anropar appens befintliga Flutter
+`WatchService`/`FileSystemService` och MCUmgr-wrapper utan auto-sync/AI/delete.
+På Nokia återkom en tom GATT-service-lista och appen rapporterade ändå Connected
+utan NUS-setup. SMP-enable kunde därför inte verka och ingen Nordic-download
+kördes. Det är ett anslutnings-/readiness-fel före filöverföringen, inte bevis om
+SDK:ns filintegritet. Den misslyckade baselinen sparas separat från
+presence-/recovery-resultat. Nio watch-inspelningar är bevarade.
+
 ### Införande och återgång
 
 - Inför en explicit runtime-selection per appstart under migreringen. Legacy och ny kärna får inte ansluta samtidigt till samma watch.

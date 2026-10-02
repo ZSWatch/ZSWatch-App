@@ -1,7 +1,7 @@
 package dev.zswatch.app.companion
 
 import android.Manifest
-import android.content.Context
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -13,8 +13,9 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 /** UI is an observer/controller, never a lifetime owner or a BLE transport. */
-class CompanionPrototypeBridge(context: Context, messenger: BinaryMessenger) {
-    private val context = context.applicationContext
+class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
+    private val context = activity.applicationContext
+    private val association = PrototypeAssociation(activity)
     private val methods = MethodChannel(messenger, "dev.zswatch.app/companion_v1")
     private val events = EventChannel(messenger, "dev.zswatch.app/companion_events_v1")
     private var sink: EventChannel.EventSink? = null
@@ -28,6 +29,24 @@ class CompanionPrototypeBridge(context: Context, messenger: BinaryMessenger) {
                 result.error("VERSION", "Unsupported companion bridge version", null)
             } else when (call.method) {
                 "snapshot" -> snapshot(result::success) { message -> result.error("SNAPSHOT_FAILED", message, null) }
+                "presenceStatus", "associatePresence" -> {
+                    try {
+                        val address = call.argument<String>("address")?.uppercase() ?: error("Address required")
+                        require(Regex("[0-9A-F]{2}(:[0-9A-F]{2}){5}").matches(address))
+                        if (call.method == "presenceStatus") result.success(PrototypePresence.status(context, address))
+                        else PrototypeHub.worker.post {
+                            try {
+                                val state = PrototypeHub.journal(context).control()
+                                check(state["desired_running"] == true && state["address"] == address) {
+                                    "Connect the selected watch before enabling presence recovery"
+                                }
+                                PrototypeHub.main.post { association.associate(address, result) }
+                            } catch (error: Exception) {
+                                PrototypeHub.main.post { result.error("ASSOCIATION_FAILED", error.message, null) }
+                            }
+                        }
+                    } catch (error: Exception) { result.error("ASSOCIATION_FAILED", error.message, null) }
+                }
                 "start" -> {
                     try {
                         val address = call.argument<String>("address")?.uppercase() ?: error("Address required")
@@ -56,9 +75,13 @@ class CompanionPrototypeBridge(context: Context, messenger: BinaryMessenger) {
                             val service = CompanionPrototypeService.instance
                             when (call.method) {
                                 "stop" -> {
-                                    if (service?.runtime != null) service.runtime!!.stop()
+                                    if (service?.runtime != null) {
+                                        service.runtime!!.stop()
+                                        service.stopPresenceObservation()
+                                    }
                                     else store.update("runtime_stopped", mapOf("desired_running" to false,
                                         "phase" to "stopped", "generation" to (store.control()["generation"] as Number).toLong() + 1))
+                                    if (service == null) runCatching { PrototypePresence.stopObserving(context, store.control()["address"] as String) }
                                     PrototypeHub.main.post { service?.stopSelf() }
                                 }
                                 "syncTime" -> (service?.transport ?: error("Service not running")).syncTime()
@@ -106,5 +129,7 @@ class CompanionPrototypeBridge(context: Context, messenger: BinaryMessenger) {
         LifecycleLogger.log("CompanionPrototype", "ui_detached transportOwner=service")
     }
 
-    fun dispose() { detach(); methods.setMethodCallHandler(null); events.setStreamHandler(null) }
+    fun onActivityResult(requestCode: Int, resultCode: Int) = association.onActivityResult(requestCode, resultCode)
+
+    fun dispose() { association.dispose(); detach(); methods.setMethodCallHandler(null); events.setStreamHandler(null) }
 }
