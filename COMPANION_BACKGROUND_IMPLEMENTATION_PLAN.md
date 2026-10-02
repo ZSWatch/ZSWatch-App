@@ -757,13 +757,23 @@ skippas i prototypen. Beständig intent, generationsfencing, event-replay och
 fil/journal-recovery använder en separat store; Drift/schema 6 migreras inte.
 Watch-recordings raderas aldrig. Normal debug-app samt profile/release väljer
 ordinarie startup. Båda debug-varianterna bygger och Dart-analyzer är ren.
-22 JVM-kontraktstester (inklusive tre dödade JVM-processer vid staging/publicering/
+28 JVM-kontraktstester (inklusive tre dödade JVM-processer vid staging/publicering/
 journal-commit) och 72 valda Flutter-tester (9 nya bridge/UI + 63 tidigare voice)
 passerar. Detta verifierar host-kontrakt, inte Android-service-livscykel eller BLE.
 Notifikationsforwarding, HTTP, AI-adaptrar, CDM/presence, boot/radio-triggers och
 UI/DB-integration ingår ännu inte. Arkitekturgrinden är fortsatt öppen: verklig
 Android-baseline/native-spike, jämförelse med engine-spike och iOS-bakgrundsprov
 återstår innan produktionskärnan väljs. Fysisk companion-acceptans är `NOT_RUN`.
+
+Review-fixarna hämtar listmetadata efter `voice_memo/new`, eftersom eventets
+stopptid skiljer sig från filheaderns starttid. Tid och tidszon skickas som separata
+hela ATT-paket efter MTU-förhandling; otillräcklig payload ger ett beständigt
+tidsskrivningsfel utan att stoppa recording-sync. Firmware ignorerar fortfarande
+noll-offset och trunkerar fraktionella tidszoner i sin tidshanterare; det är ett
+separat kvarstående firmwarefel. Pytest skiljer nu okänd board (fel) från saknad
+valfri PPK2-kapabilitet (skip/deselection); 12 fixture-säkerhetstester passerar,
+inklusive Linux-only CI-collection. Aktuella APK:er och evidens finns under
+`.companion-hil-runs/20261002-prototype-review-fixes/`.
 
 ### Införande och återgång
 

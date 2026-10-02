@@ -292,7 +292,7 @@ Flutter detach/reattach only changes observers. The normal startup is skipped
 in the experiment; no model starts, no Drift migration occurs, and no watch
 recording is deleted.
 
-22 JVM tests include three forcibly killed JVM workers at native staging,
+28 JVM tests include three forcibly killed JVM workers at native staging,
 publication and journal-commit boundaries. 72 selected Flutter tests include
 9 new bridge/UI tests and the existing 63 receipt/parser checks. Both prototype
 and normal debug APKs compile. The JVM workers exercise actual journal/files,
@@ -300,6 +300,10 @@ with fake transport, rather than an Android service. Real GATT, SMP coexistence,
 screen-off execution, OS restarts and manufacturer power behavior remain `NOT_RUN`.
 Existing capture tooling records evidence; it does not automatically assert the
 new phone scenarios. Keep baseline, process reclamation and force-stop separate.
+Review regressions additionally cover canonical recording timestamps and intact
+clock packets. Current APKs/evidence: `.companion-hil-runs/20261002-prototype-review-fixes/`
+at the application repository root. Firmware application of zero/fractional
+timezone offsets remains a separate known limitation in the prototype runbook.
 
 ## Remaining stage 0 work
 

@@ -25,8 +25,13 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var operation = 0L
     private var retryDelay = 5000L
     private val framer = NusJsonFramer()
-    private data class Write(val bytes: ByteArray, val done: () -> Unit, var offset: Int = 0)
-    private val writes = ArrayDeque<Write>()
+    private val writes = ArrayDeque<NusWrite>()
+    private var payloadSize = 20
+    private var awaitingMtu = false
+    private val recordingInbox = PrototypeRecordingInbox(store) {
+        // Subscription completion always requests a list, including for early hints.
+        if (store.control()["phase"] == "ready") requestRecordings()
+    }
     private var writing = false
     private var noResponse = false
     private var fileTransport: McuMgrBleTransport? = null
@@ -48,12 +53,21 @@ class NativePrototypeTransport(private val context: Context, private val handler
             }
             override fun onConnectionStateChange(client: BluetoothGatt, status: Int, state: Int) = accept(client) {
                 if (status == BluetoothGatt.GATT_SUCCESS && state == BluetoothProfile.STATE_CONNECTED) {
-                    runtime.phase(session, "discovering")
-                    check(client.discoverServices()) { "GATT discovery rejected" }
-                    deadline(session, 15000, "Service discovery timed out")
+                    awaitingMtu = true
+                    if (client.requestMtu(64)) {
+                        val expected = ++operation
+                        handler.postDelayed({
+                            if (runtime.owns(session) && gatt === client && operation == expected && awaitingMtu)
+                                safely { discover(client, session) }
+                        }, 5000)
+                    } else discover(client, session)
                 } else if (state == BluetoothProfile.STATE_DISCONNECTED || status != BluetoothGatt.GATT_SUCCESS) {
                     lost(session, "GATT disconnect status=$status")
                 }
+            }
+            override fun onMtuChanged(client: BluetoothGatt, mtu: Int, status: Int) = accept(client) {
+                if (status == BluetoothGatt.GATT_SUCCESS && mtu >= 23) payloadSize = mtu - 3
+                if (awaitingMtu) discover(client, session)
             }
             override fun onServicesDiscovered(client: BluetoothGatt, status: Int) = accept(client) {
                 check(status == BluetoothGatt.GATT_SUCCESS) { "GATT discovery failed: $status" }
@@ -98,6 +112,13 @@ class NativePrototypeTransport(private val context: Context, private val handler
         deadline(session, 30000, "Connection timed out")
     }
 
+    private fun discover(client: BluetoothGatt, session: Long) {
+        awaitingMtu = false
+        runtime.phase(session, "discovering")
+        check(client.discoverServices()) { "GATT discovery rejected" }
+        deadline(session, 15000, "Service discovery timed out")
+    }
+
     private fun deadline(session: Long, delay: Long, reason: String) {
         val expected = ++operation
         handler.postDelayed({
@@ -119,9 +140,20 @@ class NativePrototypeTransport(private val context: Context, private val handler
         check(store.control()["phase"] == "ready") { "NUS not ready" }
         val now = System.currentTimeMillis()
         val offset = TimeZone.getDefault().getOffset(now) / 3600000.0
-        command("setTime(${now / 1000});E.setTimeZone($offset);") {
-            store.update("time_write_completed", mapOf("last_time_write_utc_ms" to now))
+        val packets = try { PrototypeClockCommands.packets(now / 1000, offset, payloadSize) }
+        catch (error: IllegalArgumentException) {
+            // Keep recordings usable if this link cannot carry a complete clock command.
+            store.update("time_write_failed", mapOf("last_time_error" to error.message))
+            return
         }
+        check(runtime.owns(token) && writes.size + packets.size <= 16) { "NUS write queue unavailable" }
+        packets.forEachIndexed { index, bytes ->
+            writes.add(NusWrite(bytes, {
+                if (index == packets.lastIndex) store.update("time_write_completed",
+                    mapOf("last_time_write_utc_ms" to now, "last_time_error" to null))
+            }, bytes.size))
+        }
+        pump()
     }
 
     fun requestRecordings() { command("GB({\"t\":\"voice_memo\",\"action\":\"list\"})") }
@@ -129,7 +161,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private fun command(text: String, done: () -> Unit = {}) {
         check(runtime.owns(token) && store.control()["phase"] == "ready") { "NUS not ready" }
         check(writes.size < 16) { "NUS write queue full" }
-        writes.add(Write(text.toByteArray(Charsets.UTF_8), done))
+        writes.add(NusWrite(text.toByteArray(Charsets.UTF_8), done))
         pump()
     }
 
@@ -138,8 +170,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         val client = gatt ?: return
         val characteristic = tx ?: return
         val item = writes.first
-        val end = minOf(item.offset + 20, item.bytes.size) // Works with the minimum MTU.
-        characteristic.value = item.bytes.copyOfRange(item.offset, end)
+        characteristic.value = item.packet()
         noResponse = characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE == 0
         characteristic.writeType = if (noResponse) BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
                                    else BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
@@ -159,8 +190,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         operation++
         writing = false
         val item = writes.peek() ?: return
-        item.offset = minOf(item.offset + 20, item.bytes.size)
-        if (item.offset == item.bytes.size) { writes.remove(); item.done() }
+        if (item.advance()) { writes.remove(); item.done() }
         pump()
     }
 
@@ -170,31 +200,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
             // A notification may precede the CCCD completion callback. Readiness
             // sends time anyway; do not disconnect a valid subscribing link.
             if (message.optString("t") == "time" && store.control()["phase"] == "ready") syncTime()
-            if (message.optString("t") != "voice_memo") continue
-            when (message.optString("action")) {
-                "new" -> queueRecording(message)
-                "list_result" -> {
-                    val list = message.optJSONArray("recordings") ?: continue
-                    for (index in 0 until list.length()) queueRecording(list.getJSONObject(index))
-                }
-            }
+            recordingInbox.receive(message)
         }
         downloadNext()
-    }
-
-    private fun queueRecording(json: JSONObject) {
-        val name = json.getString("filename")
-        require(Regex("[A-Za-z0-9_-]{1,32}").matches(name)) { "Unsafe recording filename" }
-        val size = json.getLong("size_bytes")
-        require(size in 34..(16L * 1024 * 1024)) { "Prototype recording size unsupported" }
-        val timestamp = json.getLong("timestamp")
-        val duration = json.getLong("duration_ms")
-        require(timestamp in 0..0xffffffffL && duration > 0)
-        val address = store.control()["address"] as String
-        val key = "$address:$name:$timestamp:$size:$duration"
-        if (store.record(key) != null) return
-        store.putRecord(key, mapOf("address" to address, "filename" to name, "timestamp" to timestamp,
-            "size_bytes" to size, "duration_ms" to duration, "state" to "pending"))
     }
 
     private fun records(): Map<String, Map<String, Any?>> {
@@ -288,6 +296,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     override fun close() {
         operation++; fileOperation++
         writing = false; writes.clear(); downloading = false
+        awaitingMtu = false; payloadSize = 20
         runCatching { transfer?.cancel() }; transfer = null
         runCatching { fileTransport?.release() }; fileTransport = null
         val previous = gatt; gatt = null; tx = null

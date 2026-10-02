@@ -4,6 +4,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.json.JSONObject
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -175,6 +176,95 @@ class PrototypeContractsTest {
     private fun metadata() = mapOf<String, Any?>("timestamp" to 1700000000L, "duration_ms" to 1600L,
         "size_bytes" to 5472L, "state" to "downloading")
     private fun files() = ReceiptFiles(File(temporary.root, "recordings"))
+
+    @Test fun newRecordingUsesListHeaderTimestampAndPublishesOnlyOneReceipt() {
+        val journal = store(); journal.update("selected", mapOf("address" to address))
+        var requests = 0
+        val inbox = PrototypeRecordingInbox(journal) { requests++ }
+        // zsw_recording_manager.c emits stop time; the list reads start time from the header.
+        val event = JSONObject("""{"t":"voice_memo","action":"new","filename":"REC_001",
+            "timestamp":1700000002,"size_bytes":5472,"duration_ms":1600}""")
+        inbox.receive(event)
+        assertEquals(1, requests)
+        assertTrue((journal.control()["recordings"] as Map<*, *>).isEmpty())
+        val response = JSONObject("""{"t":"voice_memo","action":"list_result","recordings":[
+            {"filename":"REC_001","timestamp":1700000000,"size_bytes":5472,"duration_ms":1600}]}""")
+        inbox.receive(response)
+        val key = (journal.control()["recordings"] as Map<*, *>).keys.single() as String
+        val receipt = files().publish(key, journal.record(key)!!, fixture())
+        journal.putRecord(key, receipt)
+        inbox.receive(event); inbox.receive(response)
+        val reopened = store()
+        assertEquals(2, requests)
+        assertEquals(1, (reopened.control()["recordings"] as Map<*, *>).size)
+        assertEquals("downloaded", reopened.record(key)!!["state"])
+        assertEquals(1700000000L, (reopened.record(key)!!["timestamp"] as Number).toLong())
+        assertArrayEquals(fixture(), File(receipt["local_path"] as String).readBytes())
+    }
+
+    @Test fun newRecordingHintDoesNotRequireOrTrustItsMetadata() {
+        val journal = store()
+        var requests = 0
+        val inbox = PrototypeRecordingInbox(journal) { requests++ }
+        inbox.receive(JSONObject("""{"t":"voice_memo","action":"new"}"""))
+        inbox.receive(JSONObject("""{"t":"unrelated","action":"new"}"""))
+        assertEquals(1, requests)
+        assertTrue((journal.control()["recordings"] as Map<*, *>).isEmpty())
+    }
+
+    /** Wire-level subset of ble_gadgetbridge_input/parse_time/parse_time_zone.
+     * Each call represents one ATT write; clock commands have no reassembly.
+     * This tests delivery to the parser, not main.c's application of the timezone.
+     */
+    private fun firmwareClockEvent(packet: ByteArray): Pair<String, Double>? {
+        val text = packet.toString(Charsets.UTF_8)
+        for ((prefix, event) in listOf("setTime(" to "seconds", ";E.setTimeZone(" to "timezone")) {
+            val start = text.indexOf(prefix)
+            if (start < 0) continue
+            val end = text.indexOf(')', start + prefix.length)
+            if (end < 0) return null
+            return event to text.substring(start + prefix.length, end).toDouble()
+        }
+        return null
+    }
+
+    private fun clockEvents(offset: Double, payload: Int): List<Pair<String, Double>?> =
+        PrototypeClockCommands.packets(1700000000L, offset, payload).map { bytes ->
+            val write = NusWrite(bytes, packetSize = bytes.size)
+            val packet = write.packet()
+            assertTrue(packet.size <= payload)
+            assertTrue(write.advance()) // Each command must finish in exactly one ATT write.
+            firmwareClockEvent(packet)
+        }
+
+    @Test fun minimumMtuDeliversBothClockCommandsIncludingTimezonePrefix() {
+        for (offset in listOf(0.0, 2.0, -12.0, 5.5, 5.75, -9.5)) {
+            assertEquals(listOf("seconds" to 1700000000.0, "timezone" to offset), clockEvents(offset, 20))
+        }
+    }
+
+    @Test fun negotiatedMtuDeliversLongFractionalTimezoneIntact() {
+        for (offset in listOf(12.75, 13.75)) {
+            assertEquals(listOf("seconds" to 1700000000.0, "timezone" to offset), clockEvents(offset, 61))
+        }
+    }
+
+    @Test fun unsupportedClockPayloadRejectsBeforeReturningAnyCommands() {
+        rejected { PrototypeClockCommands.packets(1700000000L, 13.75, 20) }
+        rejected { PrototypeClockCommands.packets(1700000000L, 2.0, 18) }
+    }
+
+    @Test fun ordinaryNusWritesStillReassembleAcrossMinimumMtuPackets() {
+        val bytes = "GB({\"t\":\"voice_memo\",\"action\":\"list\"})".toByteArray()
+        val write = NusWrite(bytes)
+        val packets = mutableListOf<Byte>()
+        do {
+            val packet = write.packet()
+            assertTrue(packet.size in 1..20)
+            packets.addAll(packet.toList())
+        } while (!write.advance())
+        assertArrayEquals(bytes, packets.toByteArray())
+    }
 
     @Test fun closedContainerMatchesUsbFixtureAndRejectsBrokenBoundaries() {
         val files = files(); val bytes = fixture(); val meta = metadata()

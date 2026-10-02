@@ -8,12 +8,14 @@ completed companion migration or a decision to discard the engine-based option.
 
 ## Implemented scope
 
-- Known-address BLE connection, NUS discovery/subscription, serialized writes
-  using the minimum MTU, fragmented UTF-8 JSON reception, operation deadlines
+- Known-address BLE connection, MTU negotiation, NUS discovery/subscription,
+  serialized writes, fragmented UTF-8 JSON reception, operation deadlines
   and reconnect attempts with 5–60 second delays. No discovery or bonding UI.
 - Time/timezone write on readiness and watch time request; explicit UI command.
   `last_time_write_utc_ms` means transport write completion, not watch receipt ACK.
-- Watch recording list/new messages persisted before download; sequential BLE
+- Watch recording list entries persisted before download; new events trigger a
+  fresh list because their stop timestamp differs from the file header's start
+  timestamp. Receipt identity/validation use the canonical list metadata. Sequential BLE
   MCUmgr downloads using Nordic's existing 2.7.2 SDK; closed v1 container and
   metadata verification; flushed staging, rename publication and SHA-256 receipt.
 - Separate atomic JSON journal, generation fencing, saved running intent,
@@ -59,6 +61,25 @@ Validation checks version/magic, exact byte size, timestamp, frame boundaries,
 closed frame count and duration; it does not decode or verify Opus audio content.
 Identical metadata with replaced content is still ambiguous. A valid existing
 receipt is preserved rather than overwritten.
+
+Clock commands are separate, complete ATT writes: `setTime(seconds)` and
+`;E.setTimeZone(offset)`. The leading semicolon matters to the firmware parser;
+these commands cannot use the JSON fragmentation path. The connection requests
+MTU 64 and uses the actual successful callback's MTU minus three for payload
+capacity; rejection, failure or a five-second callback timeout falls back to the
+20-byte minimum. Later MTU callbacks update capacity without restarting discovery.
+Android may negotiate a different size than requested; see
+[BluetoothGatt.requestMtu](https://developer.android.com/reference/android/bluetooth/BluetoothGatt#requestMtu(int)).
+JSON commands retain 20-byte chunks. Clock commands are validated together before
+queuing. If a timezone command cannot fit (for example UTC+13:45 at minimum MTU),
+`last_time_error`/`time_write_failed` records that failure while recording sync
+remains available. A later successful time write clears the error.
+
+These changes fix delivery to the existing firmware parser. The firmware's
+`main.c` time-event handler separately ignores a zero timezone offset and truncates
+fractional offsets when setting its timezone; those pre-existing application
+limitations still need firmware work and physical validation. Transport completion
+does not establish that the watch applied a correct local time.
 
 On a ready connection, saved `downloading` entries or missing receipts return to
 `pending`; complete staged/published files are adopted before a new transfer.
@@ -110,16 +131,20 @@ simultaneously. Native Gradle and Dart select the experiment from the same
 define, and native profile/release flags are explicitly false.
 Both debug APK manifests were inspected: minimum Android SDK 24, target SDK 35.
 
-2026-10-02 host checks: 22 JVM tests and 72 selected Flutter tests pass, including
+2026-10-02 host checks after review fixes: 28 JVM tests and 72 selected Flutter tests pass, including
 9 new bridge/UI tests and the existing 63 receipt/parser tests. JVM tests exercise
 the actual journal and file implementations with fake connection callbacks,
 reopened stores and three forcibly killed JVM workers at complete staging,
 publication and journal-commit boundaries, not Android services. Existing Flutter recovery tests include
 three SIGKILL workers against Drift; those kills do not exercise this native service.
 Dart analysis is clean; experimental and ordinary debug APKs compile.
+The six additional JVM regressions cover stop/start timestamp disagreement,
+duplicate hints/list replay, firmware clock-packet prefixes and boundaries,
+minimum/negotiated payloads and ordinary JSON fragmentation. They model the
+firmware wire contract; they do not execute the Android Bluetooth stack.
 
 Local build evidence and APKs are retained in
-`.companion-hil-runs/20261002-native-runtime-prototype/`. `verification.json`
+`.companion-hil-runs/20261002-prototype-review-fixes/`. `verification.json`
 records hashes and source provenance. Mobile/BLE acceptance remains `NOT_RUN`.
 
 ## Physical-phone runbook
@@ -136,10 +161,16 @@ stable MAC is required; switching bonded/random addresses is not implemented.
    enter the known watch MAC and press Connect/recover. Grant Bluetooth Connect
    and notification permission. Record acceptance, service start, CCCD completion,
    `protocol_ready=true`, and observed watch time/timezone.
+   Capture MTU negotiation and complete clock packets; test a nonzero whole-hour
+   offset, zero offset and a fractional offset separately. Record firmware
+   application failures separately from transport completion. Exercise a rejected
+   MTU request and a missing/late MTU callback with an instrumented GATT test double.
 2. Make a short real watch recording. Confirm `pending → downloading → downloaded`,
    raw file size/hash and that the source recording remains on the watch. Test
    more than one recording. Synthetic USB fixtures verify framing only; use a
    real audio recording to assess contents, with later decoding separately.
+   Require the new-event hint to cause a list request, and one receipt using the
+   list/header timestamp even when the event reports a later stop timestamp.
 3. Press Home, lock the screen, then remove the app task. Make another recording
    while Flutter has no observer. Reopen and require the same service ownership,
    persisted receipt and increasing cursors; check the watch and both log streams.
