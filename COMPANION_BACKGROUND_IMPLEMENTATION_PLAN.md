@@ -680,8 +680,14 @@ Genomförandestatus 2026-10-02: etapp 0 är påbörjad med körbar read-only pre
 provenance-patchar, UART/logcat-collector och fixtures som bevarar sessionen.
 20 tester utan hårdvara verifierar dessa skydd och collectors med fake ADB/PTY.
 Den faktiska inventeringen på Linux hittar UART
-`usb-FTDI_FT232R_USB_UART_BG00RS5E-if00-port0`, men ingen telefon eller exponerad
-USB-SMP-port. Preflight är därför BLOCKED och acceptans är NOT_RUN. Ingen
+`usb-FTDI_FT232R_USB_UART_BG00RS5E-if00-port0` och J-Link `51022722`, men ingen
+telefon eller exponerad USB-SMP-port. USB-anslutningen till datorn finns alltså;
+den separata CDC/SMP-kanalen är ännu inte verifierad. Aktuell firmwarekälla
+stänger av USB efter 20 sekunder från boot om CDC DTR inte är aktiv; Update-appens
+USB-toggle kan aktivera den igen. Det är en möjlig förklaring, inte ett bevis för
+vilken firmware som körs. En femsekunders passiv UART-capture gav två bytes och
+verifierar därför inte bootversion eller en fungerande shell.
+Preflight är fortfarande BLOCKED och acceptans är NOT_RUN. Ingen
 flash/reset/pairing eller native-migrering har gjorts i denna första leverans.
 Verifierad styrkanal, foreground-baslinje och reproducerat bakgrundsgap återstår;
 etapp 0:s grind är inte uppfylld.

@@ -29,6 +29,14 @@ python3 scripts/companion_hil/hil.py preflight --output /tmp/zswatch-preflight-0
 
 With equipment, explicitly select the phone and **two separate** watch ports:
 
+A USB cable, FTDI UART adapter or J-Link appearing in the host inventory does
+not alone establish the watch's USB CDC/SMP endpoint. In the current firmware
+source, `zsw_usb_manager.c` releases USB after a 20-second boot guard when CDC
+DTR is not asserted. The Update app's USB toggle enables it again. Therefore
+an absent CDC port can mean inactive firmware USB rather than a missing cable.
+Verify the running firmware and a control path before trying to enable it;
+inventory does not reset the watch to reopen this boot window.
+
 ```bash
 python3 scripts/companion_hil/hil.py preflight \
   --android-serial "$ZSW_PHONE_SERIAL" \
