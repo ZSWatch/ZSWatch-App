@@ -142,7 +142,7 @@ simultaneously. Native Gradle and Dart select the experiment from the same
 define, and native profile/release flags are explicitly false.
 Both debug APK manifests were inspected: minimum Android SDK 24, target SDK 35.
 
-2026-10-02 host checks after review fixes: 28 JVM tests and 72 selected Flutter tests pass, including
+2026-10-02 host checks after review fixes: 34 JVM tests and 72 selected Flutter tests pass, including
 9 new bridge/UI tests and the existing 63 receipt/parser tests. JVM tests exercise
 the actual journal and file implementations with fake connection callbacks,
 reopened stores and three forcibly killed JVM workers at complete staging,
@@ -159,6 +159,26 @@ Local build evidence and APKs are retained in
 records hashes and source provenance. These were host-only checks. The subsequent
 [Nokia physical smoke test](ANDROID_COMPANION_NOKIA_SMOKE.md) has partial results
 and exposed unresolved recovery/transfer failures; mobile acceptance is not met.
+
+The debug build also contains an explicit instrumentation probe for an attached
+phone. After building the experimental APK and pairing the watch, it can be run
+with:
+
+```bash
+adb -s "$ZSW_PHONE_SERIAL" shell am instrument -w \
+  -e address "$ZSW_WATCH_MAC" -e seconds 120 \
+  -e trace_packets true \
+  com.zswatch.app/dev.zswatch.app.companion.CompanionTransferProbe
+```
+
+This retries listed recordings and reports protocol state and receipt outcome.
+It requires the experimental Gradle/Dart define. Android instrumentation can
+change scheduling and kill/restart the target process, so this command is only
+for BLE-transfer diagnosis. It is not a locked-phone lifecycle or autonomous
+recovery acceptance test. The probe never deletes watch files or exports audio.
+Chunk offsets and bounds are checked before the SDK assembles its receipt; the
+pinned SDK's 2.5-second file timeout is extended to 10 seconds in this experiment.
+See the physical report for the still-failing hash comparisons.
 
 ## Physical-phone runbook
 

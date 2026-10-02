@@ -7,7 +7,6 @@ import android.os.Handler
 import dev.zswatch.app.LifecycleLogger
 import io.runtime.mcumgr.ble.McuMgrBleTransport
 import io.runtime.mcumgr.exception.McuMgrException
-import io.runtime.mcumgr.managers.FsManager
 import io.runtime.mcumgr.transfer.DownloadCallback
 import io.runtime.mcumgr.transfer.TransferController
 import org.json.JSONObject
@@ -258,18 +257,39 @@ class NativePrototypeTransport(private val context: Context, private val handler
             handler.postDelayed({
                 if (runtime.owns(session) && downloading && fileOperation == transferId) safely {
                     val adapter = context.getSystemService(BluetoothManager::class.java).adapter
-                    val transport = fileTransport ?: McuMgrBleTransport(context, adapter.getRemoteDevice(address), handler).also {
+                    val transport = fileTransport ?: object : McuMgrBleTransport(context, adapter.getRemoteDevice(address), handler) {
+                        private var packet = 0L
+                        override fun getMinLogPriority() = if (traceMcuPackets) android.util.Log.INFO else android.util.Log.WARN
+                        override fun log(priority: Int, message: String) {
+                            if (!traceMcuPackets) return
+                            if ((message.startsWith("Sending (") || message.startsWith("Received Header (")) && message.contains(" CBOR ")) {
+                                android.util.Log.d("ZSWPrototypePacket", "session=$session ${message.substringBefore(" CBOR ")}")
+                                return
+                            }
+                            // The SDK supplies a hex dump here. Never forward that dump to logcat.
+                            // This opt-in diagnostic observes notifications before reassembly.
+                            if (!message.startsWith("Notification received from ") || !message.contains(", value: (0x)")) return
+                            val hex = message.substringAfter(", value: (0x)").trim().split('-')
+                            val bytes = runCatching { hex.map { it.trim().toInt(16).toByte() }.toByteArray() }.getOrNull() ?: return
+                            android.util.Log.d("ZSWPrototypePacket", "session=$session packet=${++packet} bytes=${bytes.size} sha256=${ReceiptFiles.sha(bytes)}")
+                        }
+                    }.also {
                         fileTransport = it
                         it.requestConnPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
                     }
-                    transfer = FsManager(transport).fileDownload("/user/recordings/${metadata["filename"]}.zsw_opus",
+                    val manager = CheckedFsManager(transport, (metadata["size_bytes"] as Number).toInt()) { requested, returned, data ->
+                        // Hashes/offsets allow independent USB comparison without logging audio.
+                        android.util.Log.d("ZSWPrototypeTransfer", "session=$session transfer=$transferId file=${metadata["filename"]} requested=$requested returned=$returned bytes=${data.size} sha256=${ReceiptFiles.sha(data)}")
+                    }
+                    transfer = manager.fileDownload("/user/recordings/${metadata["filename"]}.zsw_opus",
                         object : DownloadCallback {
                             private fun deliver(action: () -> Unit) { handler.post {
                                 if (runtime.owns(session) && downloading && fileOperation == transferId) safely(action)
                             } }
                             override fun onDownloadProgressChanged(current: Int, total: Int, timestamp: Long) {}
                             override fun onDownloadFailed(error: McuMgrException) = deliver {
-                                finishFile(key, metadata, error.javaClass.simpleName)
+                                val reason = if (error is FileChunkMismatchException) "${error.javaClass.simpleName}: ${error.message}" else error.javaClass.simpleName
+                                finishFile(key, metadata, reason)
                             }
                             override fun onDownloadCanceled() = deliver { finishFile(key, metadata, "cancelled") }
                             override fun onDownloadCompleted(bytes: ByteArray) = deliver {
@@ -345,6 +365,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     companion object {
+        @Volatile var traceMcuPackets = false
         private val NUS = UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
         private val TX = UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
         private val RX = UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e")

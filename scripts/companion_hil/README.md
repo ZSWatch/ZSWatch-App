@@ -292,7 +292,7 @@ Flutter detach/reattach only changes observers. The normal startup is skipped
 in the experiment; no model starts, no Drift migration occurs, and no watch
 recording is deleted.
 
-28 JVM tests include three forcibly killed JVM workers at native staging,
+34 JVM tests include three forcibly killed JVM workers at native staging,
 publication and journal-commit boundaries. 72 selected Flutter tests include
 9 new bridge/UI tests and the existing 63 receipt/parser checks. Both prototype
 and normal debug APKs compile. The JVM workers exercise actual journal/files,
@@ -306,6 +306,15 @@ Review regressions additionally cover canonical recording timestamps and intact
 clock packets. Current APKs/evidence: `.companion-hil-runs/20261002-prototype-review-fixes/`
 at the application repository root. Firmware application of zero/fractional
 timezone offsets remains a separate known limitation in the prototype runbook.
+
+For the attached Android phone's debug-only transfer diagnostic, see the
+[native companion runbook](../../ANDROID_COMPANION_RUNTIME_PROTOTYPE.md). The
+instrumentation probe can retry existing files while locked, but its scheduling
+effect means it cannot prove ordinary background lifecycle recovery. The latest
+timeout trial lengthened Nordic's per-chunk wait from 2.5 to 10 seconds; complete
+file reception improved, while invalid file hashes still blocked receipt
+publication. Packet/source hash evidence is documented in the
+[Nokia smoke report](../../ANDROID_COMPANION_NOKIA_SMOKE.md).
 
 ## Remaining stage 0 work
 

@@ -106,13 +106,53 @@ evidence root. The prototype service remains foreground and connected after the
 trials. The two prior crash-recovery failures remain unresolved and were not
 reclassified or repeated in this session. No native code changed during this repeat.
 
+## Chunk validation and timeout experiment
+
+The app now checks the SDK's returned file offset, bounds, first-chunk length,
+and complete container before publishing any receipt. Five JVM tests exercise
+the actual SDK download assembler with injected responses; one confirms that
+the unguarded SDK would silently zero-fill an offset gap. This prevents a bad
+payload from being marked as received, but does not repair bytes lost earlier
+in BLE delivery.
+
+A debug-only instrumentation probe can start the native service while the
+Nokia is locked, retry already-listed recordings, and return bounded state.
+Because Android instrumentation changes process scheduling and can terminate
+the target process, these trials diagnose transfers only; they do not establish
+normal background recovery or kill recovery.
+
+The pinned Nordic `FsManager` uses a 2.5 second timeout for every file chunk.
+An experimental build raised that single-request timeout to 10 seconds. Two
+previously failing recordings completed byte reception, but both failed the
+container/hash check. In-memory comparison against USB reads found different
+data in one of seven chunks for `20261002_195726` and the first chunk for
+`20261002_195732`; the other 12 checked chunks matched. The third pending file
+still timed out. Offsets were contiguous. Thus the short timeout contributes to
+some failures but cannot account for the body corruption, which is already
+present before the SDK copies the returned data into its receipt buffer. No
+invalid receipt was accepted and no watch recording was deleted or exported.
+
+Packet hashes and SMP headers were captured without packet bodies. During these
+attempts Android also reported Service Changed callbacks and unregistered GATT
+clients as the watch dynamically registered/unregistered SMP. This is a concrete
+coexistence lead, not yet proof that it caused the altered bytes. The current
+protocol uses two Android GATT owners (NUS and Nordic MCUmgr); a single-owner
+transfer experiment and repeated byte comparisons are still needed.
+
+The experimental APK, source copies, native test log, probe output, UART/logcat
+and hash-only comparison records are kept locally under
+`.companion-hil-runs/20261002-native-chunk-trace/`,
+`.companion-hil-runs/20261002-native-packet-trace/` and
+`.companion-hil-runs/20261002-native-timeout-trial/`. Host test results are 34
+passing native JVM tests. Transfer acceptance remains unmet.
+
 ## Next physical work
 
-1. Add transport-level evidence for requested/returned file offsets and lengths
-   without logging audio, and check continuity before the SDK buffer is published.
-   Diagnose the body mismatch and timeouts on this rig; isolate SDK assembly,
-   firmware SMP delivery and the two GATT clients. Compare a single-owner transport
-   experiment before extending the migration.
+1. Compare a single-owner GATT transport against Nordic MCUmgr, then repeat the
+   failed files. Preserve hash-only traces and check whether returned packet
+   hashes match contiguous source ranges; do not publish until whole-file hashes
+   and containers pass. The 10-second chunk timeout fixes some waiting but not
+   the observed body corruption.
 2. Once transfers work, repeat the failed batch and isolated screen-off cases,
    then record after task removal. Require byte comparisons after completion;
    include multiple pending files and interrupted SMP. Keep the original failed

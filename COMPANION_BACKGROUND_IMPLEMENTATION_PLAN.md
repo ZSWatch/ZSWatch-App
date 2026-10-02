@@ -798,6 +798,20 @@ inte och är återtagen. Prioritera isolerad transfer-/batchverifiering och utre
 av OS-startregler/CDM-association innan längre soakprov. USB-laddat skärmsovläge
 bevisar inte Doze. Se [hela provrapporten](ANDROID_COMPANION_NOKIA_SMOKE.md).
 
+Uppföljning 2026-10-02: en debug-only Android-instrumenteringsprob kan ansluta
+med skärmen låst, men instrumentation ändrar OS-körningen och provar därför
+endast BLE-transport, inte normal återstart. Chunk-offset/bounds kontrolleras
+nu före SDK-montering, och tester bekräftar att Nordic-assemblern annars kan
+acceptera ett offset-gap med nollfyllda byte. SDK:ns 2,5-sekunders chunk-timeout
+visade sig för kort på den här länken; 10 sekunder lät två filer bli fullständigt
+mottagna. Båda hade ändå fel SHA-256 och avvisades; tredje filen time-outade.
+Hashar före SDK-montering visar två felaktiga chunkar i timeoutprovet. Därmed är
+timeouten en bidragande faktor men inte datakorruptionens förklaring. Androids
+loggar visar också Service Changed vid firmwaretjänstens dynamiska SMP-registrering.
+Nästa steg är en enda GATT-ägare för NUS och MCUmgr, därefter upprepade bytevisa
+batch- och skärmlåsta prov. 34 native JVM-tester passerar; hårdvaruacceptans
+saknas fortfarande.
+
 ### Införande och återgång
 
 - Inför en explicit runtime-selection per appstart under migreringen. Legacy och ny kärna får inte ansluta samtidigt till samma watch.
