@@ -56,7 +56,8 @@ screen-off scenario, so repeat that case without competing filesystem reads.
 A successful transfer previously released its SDK transport and queued SMP
 disable immediately before starting another pending file. The new batch change
 retains one SDK connection/SMP lease across pending files. Physical validation of
-that change is pending phone unlock; it must not erase the earlier failures.
+that change was attempted after phone unlock and failed, as described below.
+Successful reuse across multiple completed files remains unverified.
 The updated prototype is installed. Both debug variants compile and the existing
 28 JVM contract tests pass; these tests do not execute the Android transport.
 
@@ -71,14 +72,51 @@ Starting the service from the debug app UID while locked/backgrounded was also
 rejected with `ForegroundServiceStartNotAllowedException`. That diagnostic
 attempt was an explicit test start, not automatic recovery or a UI launch.
 
+## Isolated repeat after phone unlock
+
+The installed batch APK was unchanged (`43a09e0db53f4d9bdafb51e8055dc6c8d97c815bf1beffc75473ab549e651106`,
+source commit `0d09a61a0010524340f7caea89b1893c5c37ef63`). The host made two more
+short recordings with the service stopped, then used Connect and one Fetch
+recordings action to queue those two and the prior failed receipt. The batch did
+not complete within 120 seconds: two receipts timed out and one was rejected by
+container validation. There were repeated GATT reconnects. No successful
+multi-file batch was observed, so retaining the SDK lease is not a proven fix
+for the transfer failures.
+
+A subsequent new recording was made with the display asleep. Its event/list
+entry arrived and download started, but the resulting container was rejected.
+The 120-second trial ended with `mWakefulness=Dozing`, USB power and a Ready
+connection; there was no intervening UI launch or manual wake. UART/phone logs
+were captured throughout. No USB filesystem reads competed with either BLE trial.
+This reproduces failure independently of the earlier overlapping USB reads.
+
+After both trials ended, all four failed source recordings were read over USB.
+Their exact sizes, canonical timestamps, closed frame counts, frame boundaries
+and durations were valid. The two rejected BLE payloads had the same size and
+32-byte header as their sources, but different SHA-256 values. This narrows the
+problem to the BLE transfer/assembly path; the current evidence does not locate
+the fault within firmware SMP delivery, the SDK or GATT ownership. No invalid
+payload was accepted as a receipt. Audio was compared in memory without exporting
+new audio copies. All eight source recordings remain on the watch; four have
+previously verified phone receipts.
+
+Evidence is in `unlocked-batch-validation.json`, `unlocked-screen-off.json`,
+`isolated-failed-watch-files.json` and `capture-batch-validation/` under the local
+evidence root. The prototype service remains foreground and connected after the
+trials. The two prior crash-recovery failures remain unresolved and were not
+reclassified or repeated in this session. No native code changed during this repeat.
+
 ## Next physical work
 
-1. Finish batch-transfer validation, then repeat isolated screen-off and task
-   removal recordings with uninterrupted UART/phone capture and byte comparison
-   after transfer completion. Include multiple pending files and interrupted SMP.
-2. Add transport-level evidence for requested/returned file offsets and lengths
-   without logging audio. Resolve the observed invalid receipt/timeout and
-   distinguish firmware filesystem behavior, SDK behavior and shared GATT teardown.
+1. Add transport-level evidence for requested/returned file offsets and lengths
+   without logging audio, and check continuity before the SDK buffer is published.
+   Diagnose the body mismatch and timeouts on this rig; isolate SDK assembly,
+   firmware SMP delivery and the two GATT clients. Compare a single-owner transport
+   experiment before extending the migration.
+2. Once transfers work, repeat the failed batch and isolated screen-off cases,
+   then record after task removal. Require byte comparisons after completion;
+   include multiple pending files and interrupted SMP. Keep the original failed
+   trials as baseline evidence.
 3. Investigate the idle-service stop against the running Android build. Evaluate
    the planned CompanionDeviceManager association/presence recovery path; repeat
    with a genuine process-reclamation scenario when a reliable kill mechanism is

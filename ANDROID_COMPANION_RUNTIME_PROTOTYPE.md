@@ -76,7 +76,8 @@ on the Nokia test rig. GATT Service Changed fences the session and reconnects
 with fresh handles; this also interrupts an active SMP transfer. The SDK requests
 high connection priority for file transfer and retains its connection/SMP lease
 across pending files rather than toggling the service between files.
-Batch transfer validation is pending. These changes still need broader
+The first physical batch trial timed out/rejected receipts; successful reuse
+across multiple completed files remains unverified. These changes still need broader
 coexistence and failure testing.
 Android may negotiate a different size than requested; see
 [BluetoothGatt.requestMtu](https://developer.android.com/reference/android/bluetooth/BluetoothGatt#requestMtu(int)).

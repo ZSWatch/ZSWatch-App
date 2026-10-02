@@ -784,7 +784,13 @@ med Activity i bakgrunden, serviceägarskap efter task removal och fyra mottagna
 råfiler med samma bytes/SHA-256 som på klockan. MTU 64 efter watch-initierad 247
 orsakade förlorade recording-events och är åtgärdat. Ett senare screen-off-prov
 misslyckades under SMP/återanslutning. Service Changed hanteras nu med ny session;
-SDK/SMP behålls över en kö av filer, men batchändringen väntar på fysisk verifiering.
+SDK/SMP behålls över en kö av filer, men ett fysiskt batchprov efter unlock
+misslyckades med timeouts och containerfel; ingen lyckad batch är verifierad.
+Ett isolerat screen-off-prov utan samtidiga USB-filreads gav också containerfel.
+USB-läsning efter avslutade prov verifierade alla fyra misslyckade källfiler.
+Två av de returnerade BLE-payloadsen hade rätt storlek/header men annat SHA-256
+och ogiltig body. Prioritera chunk-offset/längd-kontroller och isolering av
+SDK-assembly, firmware-SMP och de två GATT-ägarna. Alla åtta watch-kopior finns kvar.
 Två injicerade Java-processkrascher gav schemalagd sticky-restart följd av
 `am_stop_idle_service` före startcallback: automatisk BLE-recovery är alltså
 fortfarande ett reproducerat gap. En tidigarelagd foreground-promotion hjälpte
