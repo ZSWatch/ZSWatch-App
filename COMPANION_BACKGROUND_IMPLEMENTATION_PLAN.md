@@ -863,6 +863,37 @@ kördes. Det är ett anslutnings-/readiness-fel före filöverföringen, inte be
 SDK:ns filintegritet. Den misslyckade baselinen sparas separat från
 presence-/recovery-resultat. Nio watch-inspelningar är bevarade.
 
+Uppföljning: appens befintliga SMP-enable/vänta/rediscover-flöde används redan av
+diagnostiken. Efter omstart av Nokias Bluetooth-adapter gav samma oförändrade
+Flutter-baseline 15 services och fungerande NUS-subscription. Bond behölls. Ingen
+ny cachelösning eller SMP-implementation infördes. Detta visar återhämtning från
+den tomma listan, men fastställer inte dess orsak eller en generell lösning.
+
+Fyra downloads via befintliga `FileSystemService`/Nordic 2.7.2 slutfördes med rätt
+storlek men samtliga hade fel SHA-256 jämfört med oberoende USB-läsningar.
+USB-originalen matchade tidigare referenser. Korruptionsfelet finns alltså även
+i ordinarie biblioteksväg och är fortfarande en blockerare för transfer-acceptans;
+orsaken är inte isolerad till SDK, telefon eller firmware. Separata diagnostiska
+receipts används inte av voice-sync/AI och inga original raderas. Rätt fillängd
+räcker inte som acceptansbevis.
+
+Flutter NUS-setup avbryter nu vid saknad service/notify/write eller felande
+subscription och låter befintlig connection-owner hantera felet. Den rapporterar
+inte längre Connected efter misslyckad NUS-setup. Batteriservice är valfri. Sex
+setup-regressionstester och elva voice-sync-tester passerar; analys och APK-bygge
+passerar.
+Verifierad installerad APK nådde NUS och gick från 14 till 15 services efter
+befintlig SMP-enable/rediscovery. Den slutförde fyra downloads; två matchade
+USB-referenserna exakt och två var korrupta. Felet är intermittent och readiness-
+ändringen löser inte filintegriteten. Dessa baselines ger inget bakgrunds-PASS.
+
+En separat USB-läsning med BLE SMP aktiverat, utan samtidig BLE-transfer, tappade
+USB och följdes av observerad watch-reboot. Orsaken kunde inte fångas vid fault;
+lagrad coredump-summary har opålitlig filename/line. USB återställdes med tillåten
+reset, BLE SMP är avstängt och nio recordings finns kvar. Ingen firmware flashades.
+Se `ANDROID_COMPANION_NOKIA_SMOKE.md` och
+`.companion-hil-runs/20261002-existing-discovery-retry/` för avgränsade resultat.
+
 ### Införande och återgång
 
 - Inför en explicit runtime-selection per appstart under migreringen. Legacy och ny kärna får inte ansluta samtidigt till samma watch.

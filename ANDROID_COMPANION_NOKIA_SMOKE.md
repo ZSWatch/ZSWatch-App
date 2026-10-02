@@ -219,8 +219,52 @@ The phone is left with the prototype stopped rather than repeatedly retrying the
 failed link. All nine watch recordings remain, and no firmware was flashed.
 Evidence is under `.companion-hil-runs/20261002-presence-foundation/`.
 
-The empty service discovery remains an open blocker for transport acceptance. Setup
-and acceptance instructions are in `scripts/companion_hil/README.md`.
+The initial empty discovery was recovered in the follow-up below. Transport
+integrity remains an open blocker. Setup and acceptance instructions are in
+`scripts/companion_hil/README.md`.
+
+## Existing discovery flow and SDK baseline after adapter restart
+
+The existing Flutter SMP preparation already sends enable, waits two seconds,
+then rediscovers instead of trusting `hasSmpService`; the diagnostic uses that
+same path. Initial connection also closes any stale GATT handle. No replacement
+cache recovery or SMP protocol was added.
+
+Restarting the Nokia Bluetooth adapter retained the watch bond and changed the
+unchanged diagnostic's discovery result from zero to 15 services. NUS subscription
+and the existing enable/rediscovery flow succeeded. The Android enable log confirms
+an adapter restart, although Google Play services also re-enabled Bluetooth during
+the operation. This is an observed recovery, not proof of the exact root cause or
+a requirement to restart Bluetooth on every connection.
+
+The ordinary Flutter `FileSystemService` / Nordic 2.7.2 baseline then completed
+four recordings in roughly 2.9–3.8 seconds each. All had the correct length but
+all four SHA-256 hashes differed from independent USB reads of the watch originals.
+The USB originals still matched the earlier references. In-memory comparison found
+186–326 changed bytes per file, confined to a few regions. The diagnostic invokes
+no AI, voice-sync commit, or watch deletion; its unverified receipts remain separate
+from the normal voice-memo pipeline. Correct length alone is insufficient for
+transfer acceptance. This reproduces corruption through the existing library path
+and does not establish whether the fault is in firmware, Android, or the SDK.
+
+Flutter protocol setup now propagates missing NUS service, missing notify/write
+characteristic, and subscription failures to `BleConnectionService` instead of
+allowing Connected. The owner's existing setup failure/reconnect path remains in
+use. Battery remains optional. Six setup regression tests plus eleven existing
+voice-sync tests pass, focused analysis is clean, and the diagnostic APK compiles.
+The installed readiness APK's hash was verified. Its second physical run discovered
+14 services initially, then 15 after the existing SMP enable/rediscovery flow,
+and completed all four downloads. Two matched the USB references exactly and two
+did not. This confirms intermittent corruption; the readiness change does not
+claim to fix it. Background transfer acceptance remains unrun in these baselines.
+
+A separate USB isolation attempt enabled BLE SMP without a concurrent BLE transfer.
+USB disconnected during a subsequent read, and UART showed the watch had rebooted.
+There was no active UART capture at the fault itself, so its cause is unconfirmed.
+The stored coredump summary has an invalid-looking filename/line and is not a
+usable source location. An authorized reset restored USB SMP; BLE SMP is disabled
+and all nine recordings remain. No firmware was flashed or coredump erased.
+Evidence: `.companion-hil-runs/20261002-existing-discovery-retry/`.
 
 ## Next physical work
 

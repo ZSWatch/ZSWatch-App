@@ -421,6 +421,9 @@ class WatchService {
     } catch (e) {
       debugPrint('[WatchService] NUS setup failed: $e');
       LifecycleLogger.log('WatchService', '_setupNus failed: $e');
+      // NUS is required for the companion protocol. Let the connection owner
+      // handle setup failure instead of reporting an unusable link as connected.
+      rethrow;
     }
 
     // Subscribe to battery service
@@ -486,7 +489,7 @@ class WatchService {
     final nusService = _findServiceIn(services, _guid(NusUuids.service));
     if (nusService == null) {
       LifecycleLogger.log('WatchService', '_setupNus missing service');
-      return;
+      throw StateError('NUS service unavailable');
     }
 
     final rxChar = _findCharacteristic(
@@ -498,11 +501,18 @@ class WatchService {
         'WatchService',
         '_setupNus missing RX characteristic',
       );
-      return;
+      throw StateError('NUS notify characteristic unavailable');
+    }
+
+    if (_findCharacteristic(nusService, _guid(NusUuids.txCharacteristic)) ==
+        null) {
+      throw StateError('NUS write characteristic unavailable');
     }
 
     _nusRxChar = rxChar;
-    await rxChar.setNotifyValue(true);
+    if (!await rxChar.setNotifyValue(true)) {
+      throw StateError('NUS notification subscription rejected');
+    }
     _nusSubscription = rxChar.onValueReceived.listen(_handleNusData);
     LifecycleLogger.log('WatchService', '_setupNus subscribed');
   }
