@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "scenario": "lost_accept_then_offline_result_then_lost_watch_ack",
+  "job_key": "9093102c5916f157187b657cceb1ed460e64d262e36a680c4ecd547f1c2c3fe6",
+  "result_id": "eb06156058c6673f5adc9a058bace66d90727d1f5566e8890c29064b43d2ee1e",
+  "steps": [
+    {"op": "fault", "fault": "drop_after_accept", "state": "ready", "pending": 0},
+    {"op": "advance", "now": 100, "trigger": "watch_event", "state": "ready", "pending": 0},
+    {"op": "reopen", "state": "ready", "pending": 0},
+    {"op": "advance", "now": 109, "trigger": "foreground_start", "state": "ready", "pending": 0},
+    {"op": "advance", "now": 110, "trigger": "watch_event", "state": "waiting_remote", "pending": 0},
+    {"op": "complete_server", "state": "waiting_remote", "pending": 0},
+    {"op": "reopen_server", "state": "waiting_remote", "pending": 0},
+    {"op": "reopen", "state": "waiting_remote", "pending": 0},
+    {"op": "advance", "now": 119, "trigger": "watch_event", "state": "waiting_remote", "pending": 0},
+    {"op": "advance", "now": 120, "trigger": "watch_event", "state": "result_ready", "pending": 1},
+    {"op": "deliver_drop_ack", "state": "result_ready", "pending": 1},
+    {"op": "reopen", "state": "result_ready", "pending": 1},
+    {"op": "deliver_ack", "state": "delivered", "pending": 0}
+  ],
+  "expected_remote_jobs": 1,
+  "expected_watch_receipts": 1
+}

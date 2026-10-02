@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "watch_id": "fixture-watch",
+  "recording_id": "fixture-recording-001",
+  "input_sha256": "effa60b67bee0f4d8da64cc35755a07a1e7535b2ed0ced083ce34bdd7d22ff18",
+  "backend": "remote",
+  "provider": "loopback-fixture",
+  "model": "deterministic-v1",
+  "pipeline_revision": "voice-v1",
+  "generation": 1,
+  "upload_authorized": true
+}

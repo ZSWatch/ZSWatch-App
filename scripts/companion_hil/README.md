@@ -244,6 +244,35 @@ Android debug APK compilation also passed with the receipt changes and native
 logging that persists BLE service starts with null action (including sticky
 restart evidence). Validate that restart path on a physical phone.
 
+## Remote-job fixtures and recovery contracts without a phone
+
+See [the v1 recovery contract](../../REMOTE_JOB_RECOVERY_CONTRACT.md) for the
+shared JSON envelopes/trace, local/remote policy, lease fencing, transaction
+boundaries, outbox replay and the distinction between delivery ACK and actions.
+The Python reference runtime uses separate SQLite files and is not wired into
+the Flutter app or firmware. The fixture server accepts metadata only and
+returns synthetic text; no audio upload, model or external provider is used.
+
+From the repo root, Python standard library only:
+
+```bash
+python3 -m unittest discover -s scripts/companion_hil/tests -p test_remote_jobs.py -v
+PYTHONPATH=scripts/companion_hil python3 -m remote_jobs.run_fixture \
+  --output /tmp/zswatch-remote-recovery-001
+PYTHONPATH=scripts/companion_hil python3 -m remote_jobs.server \
+  --state-dir /tmp/zswatch-remote-server-001 --port 8765
+```
+
+Use new output directories. A standalone server can explicitly resume a marked
+state directory with `--resume-existing`. It binds only to loopback; test controls
+can complete/fail/cancel a job or inject one lost acceptance response, 429 or 401.
+Replay saves SQLite stores, timeline, fixture/database hashes and `result.json`.
+24 new tests include two real subprocess kills around a SQLite commit, competing
+claims, stale callbacks, backend policy, cancellation, generation replacement,
+server result retention, bounded retry, explicit triggers and fake-watch ACK loss.
+The trace yields one remote job and one receipt. `CONTRACT_VERIFIED` is a host
+conformance result; mobile/background acceptance remains `NOT_RUN`.
+
 ## Remaining stage 0 work
 
 USB SMP status/control is now verified on the connected rig. Verify exact watch

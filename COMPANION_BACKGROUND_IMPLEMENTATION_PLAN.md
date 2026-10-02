@@ -718,6 +718,24 @@ file/DB-reconcile, outbox, delete-ACK eller fysiska telefoners bakgrundsacceptan
 
 HTTP-timeout/callback-fixen genomförs som en liten sidoändring under prototyparbetet och ska vara verifierad före HTTP-acceptans. Den blockerar inte att bygga och utvärdera companion-kärnan. Mer omfattande remote-infrastruktur tas in först om de tidiga voice-proven motiverar den.
 
+Telefonfria remote/recovery-kontrakt är nu körbara: se
+[REMOTE_JOB_RECOVERY_CONTRACT.md](REMOTE_JOB_RECOVERY_CONTRACT.md).
+En loopback-server med beständig idempotency/status/result och explicita
+fault-kontroller, separat SQLite-referensmodell samt delade JSON-fixtures provar
+leases/fencing, generationer, cancellation, retry/credentials och atomär
+resultat/outbox-commit. 24 nya tester passerar, inklusive SIGKILL före och efter
+commit. En 13-stegs HTTP-replay ger ett serverjobb och en fake-watch-receipt
+trots tappat accept-svar och ACK. Inget ljud skickas och inga riktiga modeller
+eller leverantörer används. Runtime/adaptrar och appens DB är inte migrerade.
+
+Mottagnings-ACK behöver särskiljas från dagens `onConfirmed`/undo-timer:
+`sendResultToWatch()` väntar inte på beständig watch-mottagning, och disconnected
+watch kan fortfarande utlösa auto-create direkt. Referenskontraktets fake-watch
+ACK/deduplicering finns inte i firmware. Versionerat resultat-ID/ACK och separata
+action-ID:n måste verifieras innan replay tillåts orsaka externa actions.
+Normal iOS-suspension/trigger och Android-livscykel återstår på fysisk telefon;
+etapp 0:s grind och companion-acceptans är fortfarande inte uppfyllda.
+
 ### Införande och återgång
 
 - Inför en explicit runtime-selection per appstart under migreringen. Legacy och ny kärna får inte ansluta samtidigt till samma watch.

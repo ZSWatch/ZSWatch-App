@@ -8,6 +8,32 @@ permissions:
   contents: read
 
 jobs:
+  companion-contracts:
+    name: Companion recovery contracts (no phone)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test HTTP, SQLite and process-death contracts
+        run: python3 -m unittest discover -s scripts/companion_hil/tests -p test_remote_jobs.py -v
+
+      - name: Replay shared recovery fixture
+        env:
+          PYTHONPATH: scripts/companion_hil
+        run: python3 -m remote_jobs.run_fixture --output "$RUNNER_TEMP/companion-recovery"
+
+      - name: Upload synthetic recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-recovery-${{ github.sha }}
+          path: ${{ runner.temp }}/companion-recovery
+          if-no-files-found: ignore
+
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
