@@ -736,6 +736,18 @@ action-ID:n måste verifieras innan replay tillåts orsaka externa actions.
 Normal iOS-suspension/trigger och Android-livscykel återstår på fysisk telefon;
 etapp 0:s grind och companion-acceptans är fortfarande inte uppfyllda.
 
+Första recovery-implementationen finns nu också i själva Flutter-appen: se
+[VOICE_MEMO_RECEIPT_RECOVERY.md](VOICE_MEMO_RECEIPT_RECOVERY.md).
+En startup-pass återförenar kompletta råfiler/manifesterade stages med befintliga
+DB-poster, bygger saknad Ogg och tar bort saknade filreferenser. DB-uppdateringen
+sker i Drift-transaktion med snapshot-kontroll; okända recordings importeras
+inte och staging städas konservativt. Sync inväntar recovery och försöker bara
+hämta recordings som finns i den aktuella watch-listan. Den valda voice-sviten
+omfattar nu 63 verifierade tester, inklusive tre dödade Flutter-processer med
+riktig Drift/SQLite vid mottagningsgränserna. Analyzer är ren och debug-APK bygger.
+Ingen DB-migrering, modellstart, native-runtime eller firmwareändring ingår.
+Filnamnsidentitet, delete-ACK, AI/outbox och fysisk bakgrundsacceptans återstår.
+
 ### Införande och återgång
 
 - Inför en explicit runtime-selection per appstart under migreringen. Legacy och ny kärna får inte ansluta samtidigt till samma watch.

@@ -47,8 +47,17 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     }
     // Initialize BLE service after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_initializeVoiceRecovery());
       _initializeBle();
     });
+  }
+
+  Future<void> _initializeVoiceRecovery() async {
+    try {
+      await ref.read(voiceMemoRecoveryProvider.future);
+    } catch (error) {
+      debugPrint('[VoiceMemoRecovery] Startup recovery failed: $error');
+    }
   }
 
   @override

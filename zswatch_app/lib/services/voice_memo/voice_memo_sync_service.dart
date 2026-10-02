@@ -110,6 +110,7 @@ class VoiceMemoSyncService {
   final VoiceMemoRepository _repository;
   final FsManager Function(String remoteId) _createFsManager;
   final Future<Directory> Function() _getDocumentsDirectory;
+  final Future<void> Function()? _beforeSync;
 
   /// Called after sync completes with the number of newly downloaded memos.
   /// Used to trigger auto-transcription from the provider layer.
@@ -127,15 +128,19 @@ class VoiceMemoSyncService {
   Completer<Uint8List?>? _downloadCompleter;
   bool _hasAutoSynced = false;
   Timer? _resetStateTimer;
+  Timer? _autoSyncTimer;
+  bool _disposed = false;
 
   VoiceMemoSyncService({
     required WatchService watchService,
     required VoiceMemoRepository repository,
     FsManager Function(String remoteId)? fsManagerFactory,
     Future<Directory> Function()? documentsDirectory,
+    Future<void> Function()? beforeSync,
   }) : _watchService = watchService,
        _repository = repository,
        _createFsManager = fsManagerFactory ?? FsManager.new,
+       _beforeSync = beforeSync,
        _getDocumentsDirectory =
            documentsDirectory ?? getApplicationDocumentsDirectory {
     _messageSubscription = _watchService.incomingMessages.listen(
@@ -147,14 +152,18 @@ class VoiceMemoSyncService {
   }
 
   void _handleConnectionChange(Connection connection) {
+    if (_disposed) return;
     if (connection.isConnected && !_hasAutoSynced) {
       _hasAutoSynced = true;
       // Delay slightly to allow BLE services to settle
-      Future.delayed(const Duration(seconds: 3), () {
+      _autoSyncTimer?.cancel();
+      _autoSyncTimer = Timer(const Duration(seconds: 3), () {
+        if (_disposed || !_watchService.isConnected) return;
         _log('Auto-syncing voice memos on watch connect');
         syncRecordings();
       });
     } else if (connection.isDisconnected) {
+      _autoSyncTimer?.cancel();
       _hasAutoSynced = false;
       unawaited(_resetFsManager());
     }
@@ -220,6 +229,7 @@ class VoiceMemoSyncService {
 
   /// Request recording list from the watch and sync new recordings
   Future<void> syncRecordings() async {
+    if (_disposed) return;
     if (currentState.isSyncing) {
       _log('Sync already in progress, skipping');
       return;
@@ -234,6 +244,8 @@ class VoiceMemoSyncService {
       _updateState(
         const VoiceMemoSyncState(phase: VoiceMemoSyncPhase.fetchingList),
       );
+      await _beforeSync?.call();
+      if (_disposed) return;
 
       // Register before sending: a fast response may arrive before send returns.
       final listCompleter = Completer<List<WatchRecordingInfo>>();
@@ -256,7 +268,12 @@ class VoiceMemoSyncService {
       _log('Fetched ${recordings.length} recordings from list');
 
       // Find recordings not yet downloaded
-      final undownloaded = await _repository.getUndownloadedMemos();
+      final available = recordings
+          .map((recording) => recording.filename)
+          .toSet();
+      final undownloaded = (await _repository.getUndownloadedMemos())
+          .where((memo) => available.contains(memo.filename))
+          .toList();
       if (undownloaded.isEmpty) {
         _log('All recordings already synced');
         _updateState(
@@ -544,10 +561,12 @@ class VoiceMemoSyncService {
   }
 
   void _updateState(VoiceMemoSyncState state) {
+    if (_disposed) return;
     _syncState.add(state);
   }
 
   void _resetStateAfterDelay() {
+    if (_disposed) return;
     _resetStateTimer?.cancel();
     _resetStateTimer = Timer(const Duration(seconds: 3), () {
       if (!currentState.isSyncing) {
@@ -635,6 +654,9 @@ class VoiceMemoSyncService {
 
   /// Clean up resources
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _autoSyncTimer?.cancel();
     _resetStateTimer?.cancel();
     _messageSubscription?.cancel();
     _connectionSubscription?.cancel();
@@ -643,7 +665,11 @@ class VoiceMemoSyncService {
     }
     _pendingConfirmations.clear();
     unawaited(_resetFsManager());
-    _listCompleter?.complete([]);
+    final pendingList = _listCompleter;
+    _listCompleter = null;
+    if (pendingList != null && !pendingList.isCompleted) {
+      pendingList.complete([]);
+    }
     _syncState.close();
   }
 }

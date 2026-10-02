@@ -91,6 +91,49 @@ class VoiceMemoRepository extends BaseRepository<VoiceMemo, VoiceMemoEntity> {
     );
   }
 
+  /// Repairs receipt fields only if this recording still matches the snapshot.
+  /// A concurrent delete or new watch metadata must not be undone by recovery.
+  Future<bool> reconcileReceipt({
+    required VoiceMemo expected,
+    required String? localFilePath,
+    required String? convertedFilePath,
+    required bool syncedFromWatch,
+  }) => _db.transaction(() async {
+    final current = await (_db.select(
+      _db.voiceMemos,
+    )..where((row) => row.id.equals(expected.id))).getSingleOrNull();
+    if (current == null ||
+        current.filename != expected.filename ||
+        current.timestampUtc !=
+            expected.timestampUtc.millisecondsSinceEpoch ~/ 1000 ||
+        current.sizeBytes != expected.sizeBytes ||
+        current.durationMs != expected.durationMs ||
+        current.localFilePath != expected.localFilePath ||
+        current.convertedFilePath != expected.convertedFilePath ||
+        current.syncedFromWatch != expected.syncedFromWatch ||
+        current.deletedOnWatch != expected.deletedOnWatch) {
+      return false;
+    }
+    if (current.localFilePath == localFilePath &&
+        current.convertedFilePath == convertedFilePath &&
+        current.syncedFromWatch == syncedFromWatch) {
+      return true;
+    }
+    await (_db.update(
+      _db.voiceMemos,
+    )..where((row) => row.id.equals(expected.id))).write(
+      VoiceMemosCompanion(
+        localFilePath: Value(localFilePath),
+        convertedFilePath: Value(convertedFilePath),
+        syncedFromWatch: Value(syncedFromWatch),
+        downloadedAt: Value(
+          syncedFromWatch ? current.downloadedAt ?? DateTime.now() : null,
+        ),
+      ),
+    );
+    return true;
+  });
+
   /// Mark a memo as deleted on the watch
   Future<void> markDeletedOnWatch(String filename) async {
     await _db.updateVoiceMemoDeletedOnWatch(filename);

@@ -105,6 +105,7 @@ dev_dependencies:
   # Testing
   mockito: ^5.4.5
   build_resolvers: ^2.4.3
+  sqlite3: ^2.9.4
 
 flutter:
   uses-material-design: true

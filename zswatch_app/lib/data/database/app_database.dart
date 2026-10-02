@@ -41,6 +41,9 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
+  /// Uses the same schema and migrations with an explicit executor in tests.
+  AppDatabase.forTesting(super.executor);
+
   /// Database schema version
   @override
   int get schemaVersion => 6;

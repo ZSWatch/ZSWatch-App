@@ -234,11 +234,20 @@ files via same-filesystem staging and rename before marking receipt in the DB.
 A separate Dart process is killed after staging to test preservation and retry.
 The idle-reset timer is canceled on disposal.
 
-These tests use fake transfer/repository adapters with real local file I/O.
-They do not establish actual SQLite crash recovery, mobile OS lifecycle behavior
-or permission/radio wakeups. Stale-stage cleanup, file/DB reconciliation, durable
-AI/outbox jobs and acknowledged watch deletion still remain in the implementation
-plan. Local and remote AI backends are unaffected by these changes.
+These original receipt tests use fake transfer/repository adapters with real
+local file I/O. They cover receipt races and file publication; the follow-up
+below adds actual SQLite recovery. Mobile OS lifecycle and permission/radio
+wakeups, durable AI/outbox jobs and acknowledged watch deletion remain in the
+implementation plan. Local and remote AI backends are unaffected.
+
+Follow-up: [receipt recovery is now implemented in the app](../../VOICE_MEMO_RECEIPT_RECOVERY.md).
+Add `test/voice_memo_recovery_service_test.dart` to the Flutter command above.
+The selected suites now cover 63 tests, including 17 new recovery tests using
+the actual Drift schema/repository with on-disk SQLite. Three separate Flutter
+workers are SIGKILLed after staging, after file publication and after DB receipt
+commit. App startup, list/detail and sync use the shared recovery provider.
+Closed-container adoption is conservative; unknown/ambiguous data is retained.
+Local recovery does not replace delete ACK, AI/outbox or mobile runtime ownership.
 
 Android debug APK compilation also passed with the receipt changes and native
 logging that persists BLE service starts with null action (including sticky

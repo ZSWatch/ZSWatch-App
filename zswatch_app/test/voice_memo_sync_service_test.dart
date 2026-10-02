@@ -68,6 +68,7 @@ class FakeWatch implements WatchService {
   final List<String> events;
   final VoiceMemo memo;
   final Future<void> Function()? beforeDelete;
+  bool emptyList = false;
 
   FakeWatch(this.memo, this.events, {this.beforeDelete});
 
@@ -98,14 +99,16 @@ class FakeWatch implements WatchService {
       messages.add({
         't': 'voice_memo',
         'action': 'list_result',
-        'recordings': [
-          {
-            'filename': memo.filename,
-            'timestamp': 1700000000,
-            'duration_ms': memo.durationMs,
-            'size_bytes': memo.sizeBytes,
-          },
-        ],
+        'recordings': emptyList
+            ? <Map<String, Object>>[]
+            : [
+                {
+                  'filename': memo.filename,
+                  'timestamp': 1700000000,
+                  'duration_ms': memo.durationMs,
+                  'size_bytes': memo.sizeBytes,
+                },
+              ],
       });
     } else if (action == 'delete') {
       await beforeDelete?.call();
@@ -193,12 +196,16 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  VoiceMemoSyncService createService({Future<Directory> Function()? storage}) {
+  VoiceMemoSyncService createService({
+    Future<Directory> Function()? storage,
+    Future<void> Function()? recovery,
+  }) {
     return service = VoiceMemoSyncService(
       watchService: watch,
       repository: repository,
       fsManagerFactory: (_) => fs,
       documentsDirectory: storage ?? () async => directory,
+      beforeSync: recovery,
     );
   }
 
@@ -209,6 +216,61 @@ void main() {
     expect(repository.upserts, 1);
     expect(sync.currentState.phase, VoiceMemoSyncPhase.completed);
   });
+
+  test('sync waits for startup recovery before querying the watch', () async {
+    repository.downloaded = true;
+    final ready = Completer<void>();
+    final sync = createService(recovery: () => ready.future);
+    final pending = sync.syncRecordings();
+    await Future<void>.delayed(Duration.zero);
+    expect(repository.upserts, 0);
+    expect(sync.currentState.phase, VoiceMemoSyncPhase.fetchingList);
+    ready.complete();
+    await pending;
+    expect(repository.upserts, 1);
+  });
+
+  test(
+    'disposing during startup recovery does not restart a closed sync service',
+    () async {
+      final ready = Completer<void>();
+      final sync = createService(recovery: () => ready.future);
+      final pending = sync.syncRecordings();
+      await Future<void>.delayed(Duration.zero);
+      sync.dispose();
+      ready.complete();
+      await pending;
+      expect(repository.upserts, 0);
+      expect(events, isEmpty);
+    },
+  );
+
+  test(
+    'failed startup recovery stops sync before transfer or deletion',
+    () async {
+      final sync = createService(
+        recovery: () async {
+          throw StateError('Database unavailable');
+        },
+      );
+      await sync.syncRecordings();
+      expect(sync.currentState.phase, VoiceMemoSyncPhase.failed);
+      expect(repository.upserts, 0);
+      expect(events, isEmpty);
+    },
+  );
+
+  test(
+    'missing local recording absent from watch is not blindly downloaded',
+    () async {
+      watch.emptyList = true;
+      final sync = createService();
+      await sync.syncRecordings().timeout(const Duration(seconds: 1));
+      expect(sync.currentState.completedCount, 0);
+      expect(events, isEmpty);
+      expect(repository.downloaded, false);
+    },
+  );
 
   test(
     'immediate and duplicate download callbacks commit audio before watch cleanup',
@@ -253,7 +315,8 @@ void main() {
 
   test('local storage failure preserves the watch copy', () async {
     await createService(
-      storage: () async => throw const FileSystemException('Storage unavailable'),
+      storage: () async =>
+          throw const FileSystemException('Storage unavailable'),
     ).syncRecordings();
     expect(events, isEmpty);
   });
