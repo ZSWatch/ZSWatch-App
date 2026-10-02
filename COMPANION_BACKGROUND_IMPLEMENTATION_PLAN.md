@@ -700,6 +700,22 @@ Preflight är nu BLOCKED enbart på saknad telefon, och companion-acceptans är
 NOT_RUN. Ingen flash/pairing eller native-migrering har gjorts. Foreground-baslinje
 och reproducerat bakgrundsgap återstår; etapp 0:s grind är inte uppfylld.
 
+Telefonfri fortsättning 2026-10-02: en syntetisk 5 472-byte-fil klarade avbruten
+USB-SMP-upload vid offset 256 och download vid offset 2 425 med nya klienter.
+Återupptagen fil matchade originalets SHA-256. Den unika testfilen raderades och
+recording-count återgick till samma nollvärde. Testet är körbart i
+`scripts/companion_hil/watch_file_probe.py`; det provar inte verkligt ljud eller BLE.
+
+Befintlig Flutter-voice-mottagning har samtidigt fått avgränsade säkerhetsfixar:
+listväntare registreras före send, download väntar på ett stabilt lokalt completer-
+objekt, och callbacks för andra filer/dubbletter ignoreras. Rådata och Ogg skrivs
+flushed till staging och publiceras med rename innan DB-markering/watch-cleanup.
+42 relevanta Flutter-tester passerar, varav 11 nya; separat processdöd efter staging
+bevarar tidigare fil och tillåter retry. Analyzer är ren. Native livscykelloggning
+bevarar nu även BLE-service-start med null-action, och Android debug-APK bygger.
+Detta väljer inte engine/native-arkitektur och ersätter inte beständig jobbkärna,
+file/DB-reconcile, outbox, delete-ACK eller fysiska telefoners bakgrundsacceptans.
+
 HTTP-timeout/callback-fixen genomförs som en liten sidoändring under prototyparbetet och ska vara verifierad före HTTP-acceptans. Den blockerar inte att bygga och utvärdera companion-kärnan. Mer omfattande remote-infrastruktur tas in först om de tidiga voice-proven motiverar den.
 
 ### Införande och återgång

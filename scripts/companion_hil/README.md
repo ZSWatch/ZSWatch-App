@@ -188,6 +188,62 @@ Safety regression tests run without any probe, serial port or phone:
 python3 -m pytest app/pytest_unit/test_session_safety.py -q
 ```
 
+## Synthetic file-transfer probe without a phone
+
+This explicitly creates one uniquely named `.zsw_opus` fixture on the watch.
+The header/frame structure is deterministic, but payload is synthetic data;
+it exercises file transport, not speech capture, decoding, STT or an LLM.
+
+```bash
+/tmp/zswatch-companion-hil-venv/bin/python scripts/companion_hil/watch_file_probe.py \
+  --watch-smp "$ZSW_SMP_PORT" --create-fixture \
+  --output /tmp/zswatch-file-reconnect-001
+```
+
+It checks that the watch is not recording and that its new UUID-named path is
+absent, uploads a prefix, closes the client, resumes upload, then downloads a
+prefix and resumes with a new client from the saved local prefix. It compares
+all bytes, saves SHA-256 evidence and deletes only this run's owned fixture.
+Errors and cleanup results remain in `result.json`. No reset, pairing, flash,
+microphone recording, or changes to existing recordings are performed.
+
+Verified on the physical watch on 2026-10-02: 5,472 bytes, upload interruption
+at byte 256 and download interruption at byte 2,425. The resumed file matched
+the original SHA-256. Cleanup succeeded and the recording count remained zero.
+Artifacts are in `.companion-hil-runs/20261002-usb-file-reconnect/`.
+This does not prove BLE resumption on Android/iOS or native plugin behavior.
+
+## App voice-receipt checks without a phone
+
+From `zswatch_app`:
+
+```bash
+flutter test --no-pub test/voice_memo_sync_service_test.dart \
+  test/voice_memo_file_store_test.dart test/zsw_opus_parser_test.dart --reporter expanded
+dart analyze lib/services/voice_memo/voice_memo_file_store.dart \
+  lib/services/voice_memo/voice_memo_sync_service.dart \
+  test/voice_memo_sync_service_test.dart test/voice_memo_file_store_test.dart
+flutter build apk --debug --no-pub
+```
+
+42 tests pass, including 11 new receipt/storage regressions. The service accepts
+list/download callbacks before the send/download Future returns, ignores duplicate
+and unrelated-file completions, and does not delete a watch copy on transfer,
+verification, storage or metadata-commit failure. It publishes flushed raw/Ogg
+files via same-filesystem staging and rename before marking receipt in the DB.
+A separate Dart process is killed after staging to test preservation and retry.
+The idle-reset timer is canceled on disposal.
+
+These tests use fake transfer/repository adapters with real local file I/O.
+They do not establish actual SQLite crash recovery, mobile OS lifecycle behavior
+or permission/radio wakeups. Stale-stage cleanup, file/DB reconciliation, durable
+AI/outbox jobs and acknowledged watch deletion still remain in the implementation
+plan. Local and remote AI backends are unaffected by these changes.
+
+Android debug APK compilation also passed with the receipt changes and native
+logging that persists BLE service starts with null action (including sticky
+restart evidence). Validate that restart path on a physical phone.
+
 ## Remaining stage 0 work
 
 USB SMP status/control is now verified on the connected rig. Verify exact watch
