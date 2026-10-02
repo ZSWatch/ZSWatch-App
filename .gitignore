@@ -27,3 +27,6 @@ zswatch_app/android/*.jks
 .Spotlight-V100
 .Trashes
 Thumbs.db
+
+# Local companion HIL evidence (device logs and build provenance)
+.companion-hil-runs/

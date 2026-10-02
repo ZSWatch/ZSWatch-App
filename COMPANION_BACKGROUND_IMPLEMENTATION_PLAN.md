@@ -316,6 +316,11 @@ Kommandona nedan är instruktioner för senare genomförande. De har inte körts
 
 ### 10.1 Inventera och lås rätt enheter
 
+Den första Linux/Android-grunden finns nu i `scripts/companion_hil/hil.py`.
+Körbar setup, preflight, collectors och session-probe dokumenteras i
+[`scripts/companion_hil/README.md`](scripts/companion_hil/README.md). Den inventerar
+och samlar loggar; den kör ännu inte funktionernas end-to-end-acceptans.
+
 ```bash
 adb devices -l
 adb mdns services
@@ -326,7 +331,10 @@ bluetoothctl list
 
 Registrera telefonserien som `ZSW_PHONE_SERIAL`, verifierad debugger som `ZSW_JLINK_SERIAL`, UART som `ZSW_UART_PORT` och USB-SMP-port som `ZSW_SMP_PORT`. Rikta alltid senare kommandon mot rätt serienummer. Läs J-Link-identiteten med verktygets read-only device list; använd inte gamla nummer från tidigare audit eller `devices.yaml`.
 
-Lägg till stöd för en lokal device-config utan att ändra den delade board-definitionen. Nuvarande `app/pytest/devices.yaml` innehåller äldre port-/MAC-/debuggeruppgifter. Den nya config-loadern ska explicit välja en verifierad fysisk enhet och avvisa okänd matchning.
+Firmware-pytest stöder nu `--device-config /absolut/sökväg/devices_local.yaml`
+och den befintliga lokala overriden. Ange `--board` explicit; okänd matchning
+avvisas. `app/pytest/devices.yaml` innehåller äldre port-/MAC-/debuggeruppgifter.
+Välj verifierad utrustning i lokal config och ändra inte den delade definitionen.
 
 Spara preflight: repo-revisioner och dirty diff, telefonmodell/OS, klockrevision, bond/association-status, firmwareversion, firmwarehash, appversion och APK-hash. Arbetskatalogerna har redan lokala ändringar; bevara dem och dokumentera vad som faktiskt byggdes. Ändringar i två repos spåras separat.
 
@@ -432,7 +440,13 @@ Följande kommandon är verifierade i källkoden. Skicka dem via fungerande **US
 - `--skip-flash` innebär fortfarande reset, och `reset_device` resetter före varje test.
 - Detta skulle bryta länken och förstöra den bakgrundsperiod eller crash-state som ska observeras.
 
-Inför explicit session-läge med `no flash`, `no recover`, `no implicit reset` och en separat deploymentfas. Dessa är **nya funktioner som ska byggas**, inte befintliga pytest-flaggor. Återanvänd de befintliga helperfunktionerna men anpassa fixtures. Preflight och deploymentfel ska bli FAIL/ERROR/BLOCKED; de får inte döljas som en grön testkörning med SKIP.
+Firmware-pytest har nu `--preserve-session`, som stänger av fixture-flash,
+recover, implicit reset och PPK2-power-setup. Läget kräver explicit fysisk board,
+lokal config och granskade `companion_session`-tester; vanliga boot/DFU/PC-BLE-
+och PPK2-tester avvisas före hårdvarusetup. Se `app/pytest/COMPANION_SESSIONS.md`.
+Den riktade USB-proben `app/pytest/companion_session_probe.py` läser bara state.
+Separat deployment och full scenario-runner återstår. Preflight/deploymentfel blir
+FAIL/ERROR/BLOCKED, och misslyckad vanlig deployment ger nu ERROR i stället för SKIP.
 
 ### 10.7 Watch Tools för BLE-diagnostik
 
@@ -552,7 +566,8 @@ Runnern ska:
 7. Återställa Bluetooth, Doze-testläge, fixtureinställningar och testservrar efter avslut.
 8. Markera kört/ej kört och PASS/FAIL/ERROR/BLOCKED tydligt.
 
-Förslag på output, ännu inte implementerad:
+Målstruktur för kompletta scenarier (ännu inte helt implementerad; preflight
+skriver manifest/diff-patchar och collector skriver capture/loggar/timeline):
 
 ```text
 <run-id>/
@@ -660,6 +675,16 @@ Tidsangivelserna för experiment är planeringsbudgetar, inte leveranslöften. U
 | 6. Hårdna och leverera | Stödmatris, resursbudget, långtidsprov, felsökningspaket och dokumentation. | Releasegrinden passerad på verkliga telefoner; öppna begränsningar tydligt beslutade. |
 
 Varje etapp ska kunna granskas som en avgränsad ändring med testartefakter. UI-omdesign, GPS-bakgrundssession och ytterligare watch-modeller är separata följdprojekt; de får inte maskera grinden för HTTP/notificationer/tid/voice.
+
+Genomförandestatus 2026-10-02: etapp 0 är påbörjad med körbar read-only preflight,
+provenance-patchar, UART/logcat-collector och fixtures som bevarar sessionen.
+20 tester utan hårdvara verifierar dessa skydd och collectors med fake ADB/PTY.
+Den faktiska inventeringen på Linux hittar UART
+`usb-FTDI_FT232R_USB_UART_BG00RS5E-if00-port0`, men ingen telefon eller exponerad
+USB-SMP-port. Preflight är därför BLOCKED och acceptans är NOT_RUN. Ingen
+flash/reset/pairing eller native-migrering har gjorts i denna första leverans.
+Verifierad styrkanal, foreground-baslinje och reproducerat bakgrundsgap återstår;
+etapp 0:s grind är inte uppfylld.
 
 HTTP-timeout/callback-fixen genomförs som en liten sidoändring under prototyparbetet och ska vara verifierad före HTTP-acceptans. Den blockerar inte att bygga och utvärdera companion-kärnan. Mer omfattande remote-infrastruktur tas in först om de tidiga voice-proven motiverar den.
 
