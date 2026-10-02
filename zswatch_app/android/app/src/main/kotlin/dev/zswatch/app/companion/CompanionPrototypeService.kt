@@ -1,0 +1,121 @@
+package dev.zswatch.app.companion
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
+import android.os.IBinder
+import androidx.core.app.NotificationCompat
+import dev.zswatch.app.BuildConfig
+import dev.zswatch.app.LifecycleLogger
+import java.io.File
+
+class CompanionPrototypeService : Service() {
+    companion object {
+        const val START = "dev.zswatch.app.companion.START"
+        const val STOP = "dev.zswatch.app.companion.STOP"
+        const val CHANNEL = "companion_prototype"
+        const val NOTIFICATION = 1003
+        @Volatile var instance: CompanionPrototypeService? = null
+            private set
+    }
+    var runtime: PrototypeRuntime? = null
+        private set
+    var transport: NativePrototypeTransport? = null
+        private set
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        LifecycleLogger.initialize(applicationContext)
+        LifecycleLogger.recordHistoricalExitReasons(applicationContext)
+        LifecycleLogger.log("CompanionPrototype", "service_created pid=${android.os.Process.myPid()}")
+        if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE) { stopSelf(); return }
+        instance = this
+        PrototypeHub.worker.post {
+            safely {
+                val store = PrototypeHub.journal(applicationContext)
+                val files = ReceiptFiles(File(filesDir, "companion-prototype/recordings"))
+                val link = NativePrototypeTransport(applicationContext, PrototypeHub.worker, store, files)
+                transport = link
+                runtime = PrototypeRuntime(store, link).also { link.runtime = it }
+            }
+        }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE) { stopSelf(); return START_NOT_STICKY }
+        LifecycleLogger.log("CompanionPrototype", "service_start action=${intent?.action} flags=$flags id=$startId")
+        if (intent?.action == STOP) {
+            PrototypeHub.worker.post { safely { runtime?.stop() }; PrototypeHub.main.post { stopSelf() } }
+            return START_NOT_STICKY
+        }
+        if (intent != null && intent.action != START) { stopSelf(); return START_NOT_STICKY }
+        try {
+            val manager = getSystemService(NotificationManager::class.java)
+            if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(
+                NotificationChannel(CHANNEL, "Companion prototype", NotificationManager.IMPORTANCE_LOW))
+            val open = packageManager.getLaunchIntentForPackage(packageName)
+            val stop = Intent(this, CompanionPrototypeService::class.java).setAction(STOP)
+            val notification = NotificationCompat.Builder(this, CHANNEL)
+                .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+                .setContentTitle("ZSWatch companion prototype")
+                .setContentText("Native connection and recording runtime")
+                .setOngoing(true)
+                .setContentIntent(PendingIntent.getActivity(this, 20, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+                .addAction(0, "Stop", PendingIntent.getService(this, 21, stop, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+                .build()
+            if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+            else startForeground(NOTIFICATION, notification)
+        } catch (error: Exception) {
+            LifecycleLogger.log("CompanionPrototype", "foreground_failed ${error.javaClass.simpleName}")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        val address = intent?.getStringExtra("address")
+        PrototypeHub.worker.post {
+            safely {
+                val owner = runtime ?: error("Prototype owner unavailable")
+                // Two accepted starts may reach the service before the first
+                // controller exists. Reject a switch without destroying its link.
+                if (address != null && owner.active && owner.store.control()["address"] != address) {
+                    owner.store.update("start_rejected", detail = mapOf("reason" to "Stop before changing watch", "requested_address" to address))
+                    LifecycleLogger.log("CompanionPrototype", "start_rejected activeWatchUnchanged=true")
+                    return@safely
+                }
+                if (address == null) {
+                    if (!owner.restore()) PrototypeHub.main.post { stopSelf() }
+                } else if (owner.active && owner.store.control()["phase"] in listOf("error", "disconnected")) {
+                    check(owner.store.control()["address"] == address) { "Stop before changing watch" }
+                    owner.reconnect()
+                } else owner.start(address)
+            }
+        }
+        return START_STICKY
+    }
+
+    private fun safely(action: () -> Unit) {
+        try { action() }
+        catch (error: Exception) {
+            LifecycleLogger.log("CompanionPrototype", "service_operation_failed ${error.javaClass.simpleName}: ${error.message}")
+            PrototypeHub.main.post { stopSelf() }
+        }
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        LifecycleLogger.log("CompanionPrototype", "task_removed runtimeOwnedByService=true")
+        super.onTaskRemoved(rootIntent)
+    }
+
+    override fun onDestroy() {
+        LifecycleLogger.log("CompanionPrototype", "service_destroyed explicitStop=${runtime?.store?.control()?.get("desired_running") == false}")
+        if (instance === this) instance = null
+        PrototypeHub.worker.post { safely { runtime?.destroy(); runtime = null; transport = null } }
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        super.onDestroy()
+    }
+}

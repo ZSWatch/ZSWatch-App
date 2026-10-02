@@ -102,6 +102,7 @@ object LifecycleLogger {
         if (lowerSource == "startupcause") return true
         if (lowerSource == "applifecycle" || lowerSource == "mainactivity") return true
         if (lowerSource == "bootreceiver") return true
+        if (lowerSource == "companionprototype") return true
         if (lowerSource.contains("notificationservice")) {
             return lowerMessage.contains("oncreate") ||
                 lowerMessage.contains("ondestroy") ||

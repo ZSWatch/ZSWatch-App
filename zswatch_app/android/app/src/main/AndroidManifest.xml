@@ -88,6 +88,12 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
+        <service
+            android:name=".companion.CompanionPrototypeService"
+            android:exported="false"
+            android:stopWithTask="false"
+            android:foregroundServiceType="connectedDevice" />
+
         <!-- Foreground service for on-device AI / LLM inference -->
         <service
             android:name=".LlmComputeService"

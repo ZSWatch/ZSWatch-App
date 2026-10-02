@@ -748,6 +748,23 @@ riktig Drift/SQLite vid mottagningsgränserna. Analyzer är ren och debug-APK by
 Ingen DB-migrering, modellstart, native-runtime eller firmwareändring ingår.
 Filnamnsidentitet, delete-ACK, AI/outbox och fysisk bakgrundsacceptans återstår.
 
+En separat Android native-runtime-prototyp finns nu bakom debug-flaggan
+`COMPANION_RUNTIME_PROTOTYPE=true`: se
+[ANDROID_COMPANION_RUNTIME_PROTOTYPE.md](ANDROID_COMPANION_RUNTIME_PROTOTYPE.md).
+Foreground-servicen äger GATT/NUS och MCUmgr, tidsskrivningar och recording-receipts;
+Flutter är en versionerad observer/control-UI. Legacy-start och modellinitiering
+skippas i prototypen. Beständig intent, generationsfencing, event-replay och
+fil/journal-recovery använder en separat store; Drift/schema 6 migreras inte.
+Watch-recordings raderas aldrig. Normal debug-app samt profile/release väljer
+ordinarie startup. Båda debug-varianterna bygger och Dart-analyzer är ren.
+22 JVM-kontraktstester (inklusive tre dödade JVM-processer vid staging/publicering/
+journal-commit) och 72 valda Flutter-tester (9 nya bridge/UI + 63 tidigare voice)
+passerar. Detta verifierar host-kontrakt, inte Android-service-livscykel eller BLE.
+Notifikationsforwarding, HTTP, AI-adaptrar, CDM/presence, boot/radio-triggers och
+UI/DB-integration ingår ännu inte. Arkitekturgrinden är fortsatt öppen: verklig
+Android-baseline/native-spike, jämförelse med engine-spike och iOS-bakgrundsprov
+återstår innan produktionskärnan väljs. Fysisk companion-acceptans är `NOT_RUN`.
+
 ### Införande och återgång
 
 - Inför en explicit runtime-selection per appstart under migreringen. Legacy och ny kärna får inte ansluta samtidigt till samma watch.
@@ -758,7 +775,7 @@ Filnamnsidentitet, delete-ACK, AI/outbox och fysisk bakgrundsacceptans återstå
 
 ## 14. Beslut att analysera innan implementationen låses
 
-1. Vilka Android-/iOS-versioner och tillverkare ska vara förstklassigt stödda? Nuvarande iOS deployment target är 14.0; Android minSdk kommer från Flutter och ska kontrolleras i faktisk APK.
+1. Vilka Android-/iOS-versioner och tillverkare ska vara förstklassigt stödda? Nuvarande iOS deployment target är 14.0; de verifierade Android debug-APK:erna har minSdk 24 och targetSdk 35. Det anger bygggränsen, inte den godkända stödmatrisen.
 2. Är HTTP en omedelbar godtycklig relay, eller får vissa funktioner ge cache/pending? Vilket firmwarekontrakt finns idag för detta?
 3. Vilken maximal recordinglängd, köstorlek och offline-retention ska garanteras? Vad ska hända vid full watch-/telefonlagring?
 4. Ska recording tas bort direkt efter säker phone-receipt eller behållas en extra period? Hur hanteras telefonförlust efter receipt?

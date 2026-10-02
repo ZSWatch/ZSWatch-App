@@ -10,6 +10,10 @@ class BootReceiver : BroadcastReceiver() {
         LifecycleLogger.initialize(context)
         LifecycleLogger.recordHistoricalExitReasons(context)
         val action = intent?.action
+        if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE) {
+            LifecycleLogger.log("CompanionPrototype", "boot_legacy_start_skipped action=$action")
+            return
+        }
         LifecycleLogger.recordStartupCause(
             source = "boot_receiver",
             detail = "action=$action",

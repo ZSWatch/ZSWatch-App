@@ -6,6 +6,13 @@ plugins {
 }
 
 import java.util.Properties
+import java.util.Base64
+
+val companionPrototypeRequested = project.findProperty("dart-defines")?.toString()
+    ?.split(",")?.any {
+        runCatching { String(Base64.getDecoder().decode(it)) }
+            .getOrNull() == "COMPANION_RUNTIME_PROTOTYPE=true"
+    } == true
 
 data class ReleaseKeystoreConfig(
     val propertiesFilePath: String,
@@ -52,6 +59,7 @@ val releaseKeystoreConfig =
 val hasReleaseKeystore = releaseKeystoreConfig != null
 
 android {
+    buildFeatures { buildConfig = true }
     namespace = "dev.zswatch.app"
     compileSdk = 36
     ndkVersion = "29.0.13113456" // Required by whisper_ggml_plus (highest NDK among all plugins)
@@ -86,7 +94,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "COMPANION_RUNTIME_PROTOTYPE", companionPrototypeRequested.toString())
+        }
+        getByName("profile") {
+            buildConfigField("boolean", "COMPANION_RUNTIME_PROTOTYPE", "false")
+        }
         release {
+            buildConfigField("boolean", "COMPANION_RUNTIME_PROTOTYPE", "false")
             // If a release keystore is configured via android/key.properties, sign properly.
             // Otherwise fall back to debug signing (fine for local testing, not ideal for releases).
             signingConfig = if (hasReleaseKeystore) {
@@ -99,6 +114,9 @@ android {
 }
 
 dependencies {
+    implementation("no.nordicsemi.android:mcumgr-ble:2.7.2")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")
 }
 

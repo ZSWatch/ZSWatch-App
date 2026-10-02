@@ -35,6 +35,7 @@ import java.util.TimeZone
  * - Foreground service for persistent BLE connection
  */
 class MainActivity : FlutterActivity() {
+    private var companionPrototypeBridge: dev.zswatch.app.companion.CompanionPrototypeBridge? = null
     
     companion object {
         private const val TAG = "ZSWProductivity"
@@ -137,6 +138,12 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         LifecycleLogger.log("MainActivity", "configureFlutterEngine engine=${flutterEngine.hashCode()}")
+        if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE) {
+            companionPrototypeBridge = dev.zswatch.app.companion.CompanionPrototypeBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+            stopService(Intent(this, BleConnectionForegroundService::class.java))
+            LifecycleLogger.log("CompanionPrototype", "legacy_bridges_skipped modelsNotLoaded=true")
+            return
+        }
         
         setupNotificationChannel(flutterEngine)
         setupMediaChannel(flutterEngine)
@@ -1202,6 +1209,8 @@ class MainActivity : FlutterActivity() {
     }
     
     override fun onDestroy() {
+        companionPrototypeBridge?.dispose()
+        companionPrototypeBridge = null
         LifecycleLogger.log(
             "MainActivity",
             "onDestroy foregroundBound=$foregroundServiceBound notificationSink=${notificationEventSink != null} mediaSink=${mediaEventSink != null}",

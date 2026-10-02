@@ -282,6 +282,25 @@ server result retention, bounded retry, explicit triggers and fake-watch ACK los
 The trace yields one remote job and one receipt. `CONTRACT_VERIFIED` is a host
 conformance result; mobile/background acceptance remains `NOT_RUN`.
 
+## Native Android runtime experiment without a phone
+
+See [the service-owned prototype/runbook](../../ANDROID_COMPANION_RUNTIME_PROTOTYPE.md)
+for its debug build flag, v1 Flutter bridge, separate journal and recording store,
+host checks and physical-phone scenarios. The native service owns NUS and BLE
+MCUmgr, with persisted running intent, session fencing and receipt recovery.
+Flutter detach/reattach only changes observers. The normal startup is skipped
+in the experiment; no model starts, no Drift migration occurs, and no watch
+recording is deleted.
+
+22 JVM tests include three forcibly killed JVM workers at native staging,
+publication and journal-commit boundaries. 72 selected Flutter tests include
+9 new bridge/UI tests and the existing 63 receipt/parser checks. Both prototype
+and normal debug APKs compile. The JVM workers exercise actual journal/files,
+with fake transport, rather than an Android service. Real GATT, SMP coexistence,
+screen-off execution, OS restarts and manufacturer power behavior remain `NOT_RUN`.
+Existing capture tooling records evidence; it does not automatically assert the
+new phone scenarios. Keep baseline, process reclamation and force-stop separate.
+
 ## Remaining stage 0 work
 
 USB SMP status/control is now verified on the connected rig. Verify exact watch
@@ -289,4 +308,4 @@ revision/installed firmware and preserve that provenance.
 Attach a physical phone, establish the normal bond/permissions, implement
 foreground notification/time/voice fixtures and reproduce a background failure.
 Add scenario assertions and deployment adapters separately. Mac/iPhone control,
-native lifecycle instrumentation and actual background acceptance are pending.
+instrumented phone scenarios and actual background acceptance are pending.
