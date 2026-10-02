@@ -297,7 +297,9 @@ publication and journal-commit boundaries. 72 selected Flutter tests include
 9 new bridge/UI tests and the existing 63 receipt/parser checks. Both prototype
 and normal debug APKs compile. The JVM workers exercise actual journal/files,
 with fake transport, rather than an Android service. Real GATT, SMP coexistence,
-screen-off execution, OS restarts and manufacturer power behavior remain `NOT_RUN`.
+screen-off execution, OS restarts and manufacturer power behavior require physical
+acceptance. The first [Nokia smoke report](../../ANDROID_COMPANION_NOKIA_SMOKE.md)
+records partial successes and failures; it does not satisfy that acceptance.
 Existing capture tooling records evidence; it does not automatically assert the
 new phone scenarios. Keep baseline, process reclamation and force-stop separate.
 Review regressions additionally cover canonical recording timestamps and intact
@@ -309,7 +311,9 @@ timezone offsets remains a separate known limitation in the prototype runbook.
 
 USB SMP status/control is now verified on the connected rig. Verify exact watch
 revision/installed firmware and preserve that provenance.
-Attach a physical phone, establish the normal bond/permissions, implement
-foreground notification/time/voice fixtures and reproduce a background failure.
+A Nokia G100/Android 12 is now attached and bonded. The first native smoke session
+exercised real time writes, recordings and background failures. Complete the
+ordinary-app baseline and notification/time/voice scenario assertions; resolve the
+transfer and process-recovery failures in the smoke report.
 Add scenario assertions and deployment adapters separately. Mac/iPhone control,
 instrumented phone scenarios and actual background acceptance are pending.

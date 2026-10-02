@@ -64,10 +64,20 @@ receipt is preserved rather than overwritten.
 
 Clock commands are separate, complete ATT writes: `setTime(seconds)` and
 `;E.setTimeZone(offset)`. The leading semicolon matters to the firmware parser;
-these commands cannot use the JSON fragmentation path. The connection requests
-MTU 64 and uses the actual successful callback's MTU minus three for payload
-capacity; rejection, failure or a five-second callback timeout falls back to the
-20-byte minimum. Later MTU callbacks update capacity without restarting discovery.
+these commands cannot use the JSON fragmentation path. Discovery precedes any
+local MTU request. If the watch has already negotiated sufficient capacity, the
+connection reuses that value; otherwise it requests MTU 517 after discovery.
+Capacity always comes from the successful callback's MTU minus three; rejection,
+failure or a five-second callback timeout uses the last observed capacity
+(initially 20). Later callbacks update capacity without restarting discovery.
+Repeated CONNECTED/discovery callbacks are ignored. The old MTU 64 request
+could shrink the watch's independently negotiated 247 and lose recording events
+on the Nokia test rig. GATT Service Changed fences the session and reconnects
+with fresh handles; this also interrupts an active SMP transfer. The SDK requests
+high connection priority for file transfer and retains its connection/SMP lease
+across pending files rather than toggling the service between files.
+Batch transfer validation is pending. These changes still need broader
+coexistence and failure testing.
 Android may negotiate a different size than requested; see
 [BluetoothGatt.requestMtu](https://developer.android.com/reference/android/bluetooth/BluetoothGatt#requestMtu(int)).
 JSON commands retain 20-byte chunks. Clock commands are validated together before
@@ -145,7 +155,9 @@ firmware wire contract; they do not execute the Android Bluetooth stack.
 
 Local build evidence and APKs are retained in
 `.companion-hil-runs/20261002-prototype-review-fixes/`. `verification.json`
-records hashes and source provenance. Mobile/BLE acceptance remains `NOT_RUN`.
+records hashes and source provenance. These were host-only checks. The subsequent
+[Nokia physical smoke test](ANDROID_COMPANION_NOKIA_SMOKE.md) has partial results
+and exposed unresolved recovery/transfer failures; mobile acceptance is not met.
 
 ## Physical-phone runbook
 

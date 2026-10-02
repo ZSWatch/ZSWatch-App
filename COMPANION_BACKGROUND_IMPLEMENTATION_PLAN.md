@@ -1,6 +1,6 @@
 # Plan för ZSWatchApp: bakgrundsfunktioner och automatiska tester på riktig hårdvara
 
-Datum: 2026-10-02. Status: **reviderat förslag efter review och användarens prioritering**. Dokumentet beskriver arbete som återstår; det innebär inte att bakgrundsfunktionerna eller testuppställningen redan är verifierade. [Reviewunderlaget](/home/jakkra/Documents/ZSWatchApp/COMPANION_BACKGROUND_PLAN_REVIEW.md) är inarbetat. Endast dokumentation har ändrats.
+Datum: 2026-10-02. Status: **reviderat förslag efter review och användarens prioritering**. Dokumentet beskriver arbete som återstår; det innebär inte att bakgrundsfunktionerna eller testuppställningen redan är verifierade. [Reviewunderlaget](/home/jakkra/Documents/ZSWatchApp/COMPANION_BACKGROUND_PLAN_REVIEW.md) är inarbetat. Implementationsläget och senare hårdvarufynd beskrivs i avsnitt 13.
 
 ## 1. Rekommenderat beslut
 
@@ -763,7 +763,11 @@ passerar. Detta verifierar host-kontrakt, inte Android-service-livscykel eller B
 Notifikationsforwarding, HTTP, AI-adaptrar, CDM/presence, boot/radio-triggers och
 UI/DB-integration ingår ännu inte. Arkitekturgrinden är fortsatt öppen: verklig
 Android-baseline/native-spike, jämförelse med engine-spike och iOS-bakgrundsprov
-återstår innan produktionskärnan väljs. Fysisk companion-acceptans är `NOT_RUN`.
+återstår innan produktionskärnan väljs. Ett första fysiskt native-smokeprov på
+Nokia G100/Android 12 har nu körts: se
+[rapporten](ANDROID_COMPANION_NOKIA_SMOKE.md). Grundläggande bakgrundsmottagning
+fungerade, men processåterstart och överföringsstabilitet har konkreta öppna fel.
+Fysisk companion-acceptans är inte uppfylld.
 
 Review-fixarna hämtar listmetadata efter `voice_memo/new`, eftersom eventets
 stopptid skiljer sig från filheaderns starttid. Tid och tidszon skickas som separata
@@ -774,6 +778,19 @@ separat kvarstående firmwarefel. Pytest skiljer nu okänd board (fel) från sak
 valfri PPK2-kapabilitet (skip/deselection); 12 fixture-säkerhetstester passerar,
 inklusive Linux-only CI-collection. Aktuella APK:er och evidens finns under
 `.companion-hil-runs/20261002-prototype-review-fixes/`.
+
+Första Nokia-provet har nu verifierat faktisk BLE-mottagning av mikrofoninspelningar
+med Activity i bakgrunden, serviceägarskap efter task removal och fyra mottagna
+råfiler med samma bytes/SHA-256 som på klockan. MTU 64 efter watch-initierad 247
+orsakade förlorade recording-events och är åtgärdat. Ett senare screen-off-prov
+misslyckades under SMP/återanslutning. Service Changed hanteras nu med ny session;
+SDK/SMP behålls över en kö av filer, men batchändringen väntar på fysisk verifiering.
+Två injicerade Java-processkrascher gav schemalagd sticky-restart följd av
+`am_stop_idle_service` före startcallback: automatisk BLE-recovery är alltså
+fortfarande ett reproducerat gap. En tidigarelagd foreground-promotion hjälpte
+inte och är återtagen. Prioritera isolerad transfer-/batchverifiering och utredning
+av OS-startregler/CDM-association innan längre soakprov. USB-laddat skärmsovläge
+bevisar inte Doze. Se [hela provrapporten](ANDROID_COMPANION_NOKIA_SMOKE.md).
 
 ### Införande och återgång
 

@@ -28,6 +28,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private val writes = ArrayDeque<NusWrite>()
     private var payloadSize = 20
     private var awaitingMtu = false
+    private var linkConnected = false
+    private var servicesHandled = false
     private val recordingInbox = PrototypeRecordingInbox(store) {
         // Subscription completion always requests a list, including for early hints.
         if (store.control()["phase"] == "ready") requestRecordings()
@@ -53,33 +55,42 @@ class NativePrototypeTransport(private val context: Context, private val handler
             }
             override fun onConnectionStateChange(client: BluetoothGatt, status: Int, state: Int) = accept(client) {
                 if (status == BluetoothGatt.GATT_SUCCESS && state == BluetoothProfile.STATE_CONNECTED) {
-                    awaitingMtu = true
-                    if (client.requestMtu(64)) {
-                        val expected = ++operation
-                        handler.postDelayed({
-                            if (runtime.owns(session) && gatt === client && operation == expected && awaitingMtu)
-                                safely { discover(client, session) }
-                        }, 5000)
-                    } else discover(client, session)
+                    // Some Android stacks repeat CONNECTED during bonding.
+                    if (linkConnected) return@accept
+                    linkConnected = true
+                    discover(client, session)
                 } else if (state == BluetoothProfile.STATE_DISCONNECTED || status != BluetoothGatt.GATT_SUCCESS) {
                     lost(session, "GATT disconnect status=$status")
                 }
             }
             override fun onMtuChanged(client: BluetoothGatt, mtu: Int, status: Int) = accept(client) {
                 if (status == BluetoothGatt.GATT_SUCCESS && mtu >= 23) payloadSize = mtu - 3
-                if (awaitingMtu) discover(client, session)
+                if (awaitingMtu) subscribe(client, session)
+            }
+            override fun onServiceChanged(client: BluetoothGatt) = accept(client) {
+                // Enabling/disabling the firmware's SMP service changes ATT handles.
+                // Fence the old NUS/SDK objects and rediscover on a fresh session.
+                lost(session, "GATT services changed")
             }
             override fun onServicesDiscovered(client: BluetoothGatt, status: Int) = accept(client) {
                 check(status == BluetoothGatt.GATT_SUCCESS) { "GATT discovery failed: $status" }
+                if (servicesHandled) return@accept
+                servicesHandled = true
                 val service = client.getService(NUS) ?: error("NUS service unavailable")
                 tx = service.getCharacteristic(TX) ?: error("NUS write characteristic unavailable")
-                val rx = service.getCharacteristic(RX) ?: error("NUS notify characteristic unavailable")
-                check(client.setCharacteristicNotification(rx, true)) { "Notify registration failed" }
-                val descriptor = rx.getDescriptor(CCCD) ?: error("NUS CCCD unavailable")
-                runtime.phase(session, "subscribing")
-                descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                check(client.writeDescriptor(descriptor)) { "CCCD write rejected" }
-                deadline(session, 15000, "CCCD subscription timed out")
+                // The watch initiates MTU exchange too. Reuse that result instead
+                // of issuing another request that overlaps discovery/CCCD writes.
+                if (payloadSize >= 61) subscribe(client, session)
+                else {
+                    awaitingMtu = true
+                    if (client.requestMtu(517)) {
+                        val expected = ++operation
+                        handler.postDelayed({
+                            if (runtime.owns(session) && gatt === client && operation == expected && awaitingMtu)
+                                safely { subscribe(client, session) }
+                        }, 5000)
+                    } else subscribe(client, session)
+                }
             }
             override fun onDescriptorWrite(client: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) = accept(client) {
                 if (descriptor.uuid != CCCD) return@accept
@@ -113,10 +124,21 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     private fun discover(client: BluetoothGatt, session: Long) {
-        awaitingMtu = false
         runtime.phase(session, "discovering")
         check(client.discoverServices()) { "GATT discovery rejected" }
         deadline(session, 15000, "Service discovery timed out")
+    }
+
+    private fun subscribe(client: BluetoothGatt, session: Long) {
+        awaitingMtu = false
+        val rx = client.getService(NUS)?.getCharacteristic(RX) ?: error("NUS notify characteristic unavailable")
+        check(client.setCharacteristicNotification(rx, true)) { "Notify registration failed" }
+        val descriptor = rx.getDescriptor(CCCD) ?: error("NUS CCCD unavailable")
+        runtime.phase(session, "subscribing")
+        store.update("mtu_observed", mapOf("att_payload_bytes" to payloadSize))
+        descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+        check(client.writeDescriptor(descriptor)) { "CCCD write rejected" }
+        deadline(session, 15000, "CCCD subscription timed out")
     }
 
     private fun deadline(session: Long, delay: Long, reason: String) {
@@ -236,8 +258,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
             handler.postDelayed({
                 if (runtime.owns(session) && downloading && fileOperation == transferId) safely {
                     val adapter = context.getSystemService(BluetoothManager::class.java).adapter
-                    val transport = McuMgrBleTransport(context, adapter.getRemoteDevice(address), handler)
-                    fileTransport = transport
+                    val transport = fileTransport ?: McuMgrBleTransport(context, adapter.getRemoteDevice(address), handler).also {
+                        fileTransport = it
+                        it.requestConnPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                    }
                     transfer = FsManager(transport).fileDownload("/user/recordings/${metadata["filename"]}.zsw_opus",
                         object : DownloadCallback {
                             private fun deliver(action: () -> Unit) { handler.post {
@@ -250,7 +274,13 @@ class NativePrototypeTransport(private val context: Context, private val handler
                             override fun onDownloadCanceled() = deliver { finishFile(key, metadata, "cancelled") }
                             override fun onDownloadCompleted(bytes: ByteArray) = deliver {
                                 val receipt = try { files.publish(key, metadata, bytes) }
-                                    catch (error: Exception) { finishFile(key, metadata, error.javaClass.simpleName); return@deliver }
+                                    catch (error: Exception) {
+                                        finishFile(key, metadata + mapOf("received_size_bytes" to bytes.size,
+                                            "received_sha256" to ReceiptFiles.sha(bytes),
+                                            "received_header_hex" to bytes.take(32).joinToString("") { "%02x".format(it.toInt() and 255) }),
+                                            "${error.javaClass.simpleName}: ${error.message}")
+                                        return@deliver
+                                    }
                                 store.putRecord(key, receipt)
                                 finishFile(key, receipt, null)
                                 downloadNext()
@@ -269,10 +299,19 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private fun finishFile(key: String, metadata: Map<String, Any?>, error: String?) {
         fileOperation++
         downloading = false
-        transfer?.cancel(); transfer = null
-        fileTransport?.release(); fileTransport = null
+        if (error != null) transfer?.cancel()
+        transfer = null
         if (error != null) store.putRecord(key, metadata + mapOf("state" to "failed", "error" to error))
-        if (runtime.owns(token) && store.control()["phase"] == "ready") command("GB({\"t\":\"smp\",\"status\":false})")
+        // Keep one SDK connection/SMP lease for the pending batch. Releasing it
+        // and toggling SMP between files can disconnect NUS or invalidate the
+        // next transfer's handles while that transfer is already starting.
+        val more = error == null && records().values.any {
+            it["address"] == store.control()["address"] && it["state"] == "pending"
+        }
+        if (!more) {
+            fileTransport?.release(); fileTransport = null
+            if (runtime.owns(token) && store.control()["phase"] == "ready") command("GB({\"t\":\"smp\",\"status\":false})")
+        }
         val session = token
         handler.postDelayed({ if (runtime.owns(session)) safely { downloadNext() } }, 100)
     }
@@ -297,6 +336,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         operation++; fileOperation++
         writing = false; writes.clear(); downloading = false
         awaitingMtu = false; payloadSize = 20
+        linkConnected = false; servicesHandled = false
         runCatching { transfer?.cancel() }; transfer = null
         runCatching { fileTransport?.release() }; fileTransport = null
         val previous = gatt; gatt = null; tx = null
