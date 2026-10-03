@@ -56,10 +56,13 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
   Future<void> configureWatch(WatchEntity watch) => WatchConfigDialog.show(
     context: context,
     watch: watch,
-    allowForget: false,
+    allowForget: true,
+    forgetDescription:
+        'This removes the watch and its saved history from this app '
+        'and removes its Android companion association. The Bluetooth pairing '
+        'is kept. Use Add Watch to set it up again.',
     onRename: ref.read(companionRenameWatchProvider),
-    onForget: (id) async =>
-        throw StateError('Unpairing requires native coordination'),
+    onForget: ref.read(companionForgetWatchProvider),
   );
 
   @override

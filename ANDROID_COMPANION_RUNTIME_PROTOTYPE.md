@@ -79,8 +79,8 @@ cannot enter AI/model, DB-backed recording detail, DFU, health, analytics,
 watchface or other legacy-service screens. Health stats and uncoordinated SMP
 actions are withheld. The normal router is unchanged. The developer controls
 remain available through Connection setup or Developer for known-address lab
-setup. Discovery now uses the system picker; coordinated Forget/unpair and
-fresh-bond acceptance remain open.
+setup. Discovery now uses the system picker; coordinated Forget is implemented
+in the native Android boundary, while fresh-bond acceptance remains open.
 
 Native selection bypasses the legacy last-watch/auto-reconnect preferences; its
 durable running intent remains authoritative. Migrating those product settings,
@@ -90,8 +90,8 @@ services is still required before full rollout.
 The saved-watch catalogue reuses the existing Flutter tile and rename dialog.
 Selecting a valid Android MAC explicitly requests permission and sends Start;
 selection is disabled until an active owner is stopped. Renaming updates only
-the saved row’s custom-name column and sends no BLE command. Forget/unpair remains
-withheld until native coordination is implemented. iOS IDs cannot be selected by
+the saved row’s custom-name column and sends no BLE command. Forget now uses a
+native stop/disassociate command before deleting the local row. iOS IDs cannot be selected by
 this Android prototype. Schema version 6 and its existing upgrade migrations are
 unchanged; no native recording receipt is imported into Drift.
 
@@ -241,6 +241,7 @@ Every request/subscription includes `{version: 1}`.
 | `startLocalFixture` | — | Explicit headless Dart fixture for later capable-phone testing; no model/audio processing |
 | `start` | `address`: uppercase Android BLE MAC | `{version: 1, accepted: true}` or error |
 | `stop` | — | Snapshot after saved intent is cleared and transport closed |
+| `forgetWatch` | `address`: Android BLE MAC | Snapshot plus validated `forget_receipt`; association removal and durable generation marker precede local deletion |
 | `syncTime` | — | Snapshot after queuing the write; completion arrives separately |
 | `requestDeviceInfo` | — | Requests the existing firmware `ver` response over the native NUS queue |
 | `requestRecordingList` | — | Snapshot after queuing metadata refresh; actual list receipt follows separately and preserves paused downloads/failures |
@@ -761,3 +762,34 @@ with Flutter absent, Stop fencing, current media after radio recovery, same-trac
 metadata updates and permission-loss safety. This fixture does not establish
 third-party player interoperability, volume behavior, multi-player selection,
 modern-Android or unplugged endurance. See the Nokia runbook for exact artifacts.
+
+## Coordinated Forget boundary — 2026-10-04
+
+The existing Flutter Watch Settings dialog now exposes Forget in native Android
+mode. The provider sends `forgetWatch` to the native owner first. For the selected
+watch, the owner stops the runtime before stopping presence observation and
+removing the public OS association. Forgetting another saved watch leaves the
+active owner connected. API 31/32 uses the OS's exact address spelling with
+`disassociate(String)`; API 33+ removes matching association IDs. The selected
+address and historical Ready/status projections are cleared after successful
+disassociation. A per-address `forgotten_watches` generation marker persists
+across process loss; old presence/system callbacks and picker selections remain
+fenced. Repeated Forget is supported if local deletion failed.
+
+Flutter validates a command-specific native receipt, blocks queued metadata
+saves, waits for an in-flight save to finish and deletes the exact original Drift
+row key, including a lowercase legacy key and its watch-scoped history. Voice
+data and native recordings/jobs are retained. Durable generation markers prevent
+stale Ready snapshots from recreating the row after UI reattachment; a new
+explicit connection reaching Ready at a later generation can save it again.
+
+This removes the Android companion association. Android's public API does not
+provide a supported cross-version Bluetooth-bond deletion operation, so the
+Bluetooth bond is intentionally preserved and the UI does not claim otherwise.
+108 native JVM tests and all 105 companion Flutter regressions pass; focused
+Dart analysis is clean and both debug APK variants compile. Tests cover OS-call
+ordering, process-loss/retry, preservation of another active owner, pending picker
+fencing, exact legacy-key deletion, voice-data preservation, missing confirmation,
+in-flight saves and stale snapshots. The currently paired Nokia was not forgotten
+during this pass; fresh pairing, API 33+ physical behavior and destructive Forget
+remain to be exercised on a disposable association.

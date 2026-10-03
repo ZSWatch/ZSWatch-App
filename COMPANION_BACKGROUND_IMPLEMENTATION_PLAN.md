@@ -1309,7 +1309,7 @@ The prototype must preserve the complete companion product before rollout:
 | --- | --- |
 | Connection/recovery | Native BLE, durable Stop/running intent, crash/radio/boot/update/presence and current-state Flutter observers. Bounded Nokia evidence; modern-Android and longer unplugged acceptance remain. |
 | Notifications/time/HTTP | Native handlers and existing Flutter configuration. Longer idle remote-fetch timeout still needs controlled network comparison; ATT completion is distinct from watch acceptance. |
-| Watch setup | Native system discovery plus existing saved-watch/rename/dashboard UI. Fresh bonding, coordinated Forget/unpair, legacy preference migration and multiple watches remain. |
+| Watch setup | Native system discovery plus existing saved-watch/rename/dashboard UI. Coordinated native-first Forget removes the OS companion association before exact local-key deletion and fences stale metadata. Fresh bonding, physical Forget, legacy preference migration and physical multiple-watch acceptance remain. |
 | Media | Service-owned metadata/state and watch controls, verified with a real synthetic Android session. Third-party players, volume and multiple-player selection remain. |
 | Voice notes | Durable native receipts and existing Flutter import/playback boundary. Downloads intentionally paused for core tests; processing/model/production remote integration deferred by user priority. |
 | Other companion functions | GPS, phone finding, calendar, weather/navigation and remaining handlers need an explicit inventory/native-owner migration check before broad rollout. Their protocol enums alone do not prove native handling. |
@@ -1319,3 +1319,23 @@ The prototype must preserve the complete companion product before rollout:
 Prioritize these ordinary companion gaps and lifecycle behavior over further
 recording/AI work. Keep the debug native boundary until product behavior and the
 appropriate acceptance gates are actually complete.
+
+### Progress 2026-10-04: coordinated Android Forget and metadata-save recovery
+
+The existing Flutter dialog now invokes the native Forget boundary. Selected
+owners stop before OS association removal; forgetting another saved watch does
+not interrupt an active owner. API 31/32 uses the OS's exact MAC spelling and
+API 33+ uses association IDs. A durable per-address generation marker supports
+retry after interrupted Flutter deletion and fences stale Ready projections.
+Flutter validates native confirmation, drains any in-flight catalogue save and
+deletes the original Drift row/history key. Lowercase legacy IDs are preserved
+as keys until deletion. New explicit Ready can save the watch again; voice
+receipts/data and jobs are retained.
+
+108 native JVM and 105 companion Flutter tests pass; focused analysis is clean
+and both debug variants compile. No destructive Forget was performed on the
+Nokia. OS-association removal is separate from Bluetooth-bond removal; the bond
+is preserved and the confirmation text explains this. Physical fresh pairing,
+Forget and newer-Android association behavior remain acceptance work. Next
+ordinary feature migration should address GPS and phone-finding semantics, plus
+the controlled network/idle comparison already identified in the HTTP runbook.

@@ -878,6 +878,42 @@ unpair, multiple-watch behavior or physical API 33+ callback compatibility.
 Read-only probes report NOT_RUN for broad background acceptance: the bounded
 observations above are not an overnight or current-Android production pass.
 
+## Coordinated Forget contract — 2026-10-04
+
+The native Android owner now accepts `forgetWatch` from the existing Flutter
+settings dialog. For the selected watch it stops the owner and presence observer,
+removes the public Android CompanionDeviceManager association and clears the
+selected address/Ready projections. An old saved watch can be forgotten while
+another watch stays connected. Durable per-address generation markers and a
+command-specific receipt fence stale metadata and interrupted deletion/retry;
+Flutter waits for any in-flight save and deletes the original Drift key/history.
+Delayed presence events and pending pickers are fenced by the stopped intent
+and generation. The public API
+does not safely remove the Bluetooth bond across the supported Android range, so
+the bond remains and can be reused by a later explicit pairing flow.
+
+The Nokia association was deliberately preserved; no physical Forget action was
+run. 108 native JVM and 105 companion Flutter tests pass; focused analysis is
+clean and both debug APK variants compile. Native tests cover selected and other
+watches, OS failure/retry and journal reopen; Flutter tests cover lowercase keys,
+voice preservation and delayed-save/reattachment races.
+
+Artifacts: `.companion-hil-runs/20261004-native-forget/`.
+Native APK SHA-256 `372c736400feb48778380b7e4fe61759052a75cf4830d282776f83df626027a1`;
+ordinary debug APK `b1777cb3da98d9dfe7837217d10e64dfe317bb38a1362e7b2433e4207d38bf31`.
+The first UI dump immediately after launch returned no root; a later dump of the
+same launched app succeeded. This was observation timing, not an install failure.
+
+Physical Nokia/API 31 cancellation check: the existing saved-watch settings
+opens the Forget confirmation with explicit companion-association removal,
+saved-history deletion and Bluetooth-pairing preservation wording. Cancel then
+closing settings returned to the saved watch without a command. Stop generation
+170, nine native recording dictionaries, the complete separate job/outbox journal
+and OS association entries match the baseline; no `watch_forgotten` event exists.
+The frozen installed APK hash matches. The read-only probe confirms no native
+service and stopped intent, with downloads still paused. Actual OS removal and
+re-pairing were not performed; no recording transfer, model or firmware action ran.
+
 
 ## Service-owned Android media — 2026-10-03
 

@@ -130,11 +130,12 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
-                "stop", "syncTime", "requestDeviceInfo", "requestRecordingList", "retryRecordings", "ackEvents", "configureNotifications", "configureHttp", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
+                "stop", "forgetWatch", "syncTime", "requestDeviceInfo", "requestRecordingList", "retryRecordings", "ackEvents", "configureNotifications", "configureHttp", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
                     PrototypeHub.worker.post {
                         try {
                             val store = PrototypeHub.journal(context)
                             val service = CompanionPrototypeService.instance
+                            var forgetReceipt: Map<String, Any?>? = null
                             when (call.method) {
                                 "startRemoteFixture" -> (service?.remoteFixture ?: error("Service not running")).startFixture()
                                 "startLocalFixture" -> (service?.localFixture ?: error("Service not running")).startFixture()
@@ -148,6 +149,19 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                                         "notifications" to emptyMap<String, Any>()))
                                     if (service == null) runCatching { PrototypePresence.stopObserving(context, store.control()["address"] as String) }
                                     PrototypeHub.main.post { service?.stopSelf() }
+                                }
+                                "forgetWatch" -> {
+                                    val address = call.argument<String>("address") ?: error("Address required")
+                                    val selected = store.control()["address"] == PrototypeForget.normalize(address)
+                                    try {
+                                        forgetReceipt = PrototypeForget(store, service?.runtime,
+                                            { PrototypePresence.stopObserving(context, it) },
+                                            { PrototypePresence.disassociate(context, it) }).forget(address)
+                                    } finally {
+                                        // Even OS failure must release a selected owner's stopped service.
+                                        if (selected && service?.runtime?.active != true)
+                                            PrototypeHub.main.post { service?.stopSelf() }
+                                    }
                                 }
                                 "syncTime" -> (service?.transport ?: error("Service not running")).syncTime()
                                 "requestDeviceInfo" -> (service?.transport ?: error("Service not running")).requestDeviceInfo()
@@ -180,7 +194,8 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                                     store.acknowledge(cursor.toLong())
                                 }
                             }
-                            val state = PrototypeHub.snapshot(context, service?.runtime?.active == true)
+                            val state = PrototypeHub.snapshot(context, service?.runtime?.active == true).toMutableMap()
+                            if (forgetReceipt != null) state["forget_receipt"] = forgetReceipt
                             PrototypeHub.main.post { result.success(state) }
                         } catch (error: Exception) { PrototypeHub.main.post { result.error("COMMAND_FAILED", error.message, null) } }
                     }

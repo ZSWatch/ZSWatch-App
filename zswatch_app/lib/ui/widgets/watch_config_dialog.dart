@@ -16,6 +16,7 @@ class WatchConfigDialog extends StatefulWidget {
   final Future<void> Function(String watchId, String? customName) onRename;
   final Future<void> Function(String watchId) onForget;
   final bool allowForget;
+  final String? forgetDescription;
 
   const WatchConfigDialog({
     super.key,
@@ -23,6 +24,7 @@ class WatchConfigDialog extends StatefulWidget {
     required this.onRename,
     required this.onForget,
     this.allowForget = true,
+    this.forgetDescription,
   });
 
   /// Show the dialog and return true if the watch was forgotten (deleted)
@@ -32,6 +34,7 @@ class WatchConfigDialog extends StatefulWidget {
     required Future<void> Function(String watchId, String? customName) onRename,
     required Future<void> Function(String watchId) onForget,
     bool allowForget = true,
+    String? forgetDescription,
   }) {
     return showDialog<bool>(
       context: context,
@@ -40,6 +43,7 @@ class WatchConfigDialog extends StatefulWidget {
         onRename: onRename,
         onForget: onForget,
         allowForget: allowForget,
+        forgetDescription: forgetDescription,
       ),
     );
   }
@@ -118,8 +122,7 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
         title: const Text('Forget Watch'),
         content: Text(
           'Are you sure you want to forget "$_displayName"?\n\n'
-          'This will remove the watch from your saved devices and unpair it. '
-          'You will need to pair it again to use it.',
+          '${widget.forgetDescription ?? 'This will remove the watch from your saved devices and unpair it. You will need to pair it again to use it.'}',
         ),
         actions: [
           TextButton(

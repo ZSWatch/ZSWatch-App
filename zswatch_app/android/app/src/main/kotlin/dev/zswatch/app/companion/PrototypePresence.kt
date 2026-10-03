@@ -33,6 +33,19 @@ object PrototypePresence {
         if (associated(context, address)) manager(context)!!.stopObservingDevicePresence(address)
     }
 
+    /** Removes only the public OS companion association; the Bluetooth bond is separate. */
+    fun disassociate(context: Context, address: String): Boolean {
+        val manager = manager(context) ?: return false
+        if (Build.VERSION.SDK_INT >= 33) {
+            manager.myAssociations.filter { it.deviceMacAddress?.toString().equals(address, true) }
+                .forEach { manager.disassociate(it.id) }
+        } else {
+            // Legacy address APIs are case-sensitive: use the OS's spelling.
+            manager.associations.filter { it.equals(address, true) }.forEach { manager.disassociate(it) }
+        }
+        return !associated(context, address)
+    }
+
     fun status(context: Context, address: String): Map<String, Any?> = mapOf(
         "version" to 1, "supported" to (manager(context) != null),
         "associated" to associated(context, address), "address" to address,

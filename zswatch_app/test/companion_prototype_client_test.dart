@@ -92,6 +92,51 @@ void main() {
     expect(calls, isEmpty);
   });
 
+  test('forget normalizes MAC and sends a native-first command', () async {
+    final forgotten = Map<String, Object?>.from(saved)
+      ..['runtime_active'] = false
+      ..['protocol_ready'] = false
+      ..['phase'] = 'stopped'
+      ..['address'] = ''
+      ..['forgotten_watches'] = {'AA:BB:CC:DD:EE:FF': 2}
+      ..['forget_receipt'] = {
+        'address': 'AA:BB:CC:DD:EE:FF',
+        'generation': 2,
+        'association_removed': true,
+      }
+      ..['last_ready'] = null
+      ..['watch_info'] = null;
+    messenger.setMockMethodCallHandler(methods, (call) async {
+      calls.add(call);
+      return forgotten;
+    });
+    final result = await client.forgetWatch(' aa:bb:cc:dd:ee:ff ');
+    expect(result.runtimeActive, isFalse);
+    expect(calls.single.method, 'forgetWatch');
+    expect(calls.single.arguments, {
+      'version': 1,
+      'address': 'AA:BB:CC:DD:EE:FF',
+    });
+  });
+
+  test('invalid forget address never reaches the native owner', () async {
+    await expectLater(
+      client.forgetWatch('old-ios-uuid'),
+      throwsFormatException,
+    );
+    expect(calls, isEmpty);
+  });
+
+  test(
+    'a valid snapshot without a Forget receipt cannot authorize deletion',
+    () async {
+      await expectLater(
+        client.forgetWatch('AA:BB:CC:DD:EE:FF'),
+        throwsFormatException,
+      );
+    },
+  );
+
   test(
     'notification configuration and recording pause are native commands',
     () async {

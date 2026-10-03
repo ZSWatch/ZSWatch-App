@@ -35,6 +35,35 @@ final companionRenameWatchProvider =
       };
     });
 
+/// Native-first destructive boundary. The service stops and disassociates the
+/// watch before its local row and history are removed.
+final companionForgetWatchProvider = Provider<Future<void> Function(String)>((
+  ref,
+) {
+  if (!ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native companion is not selected');
+  }
+  final db = ref.watch(databaseProvider);
+  final client = ref.watch(companionClientProvider);
+  return (id) async {
+    if (!isCompanionWatchAddress(id)) {
+      throw const FormatException('Expected an Android BLE MAC address');
+    }
+    await ref
+        .read(companionWatchPersistenceStateProvider.notifier)
+        .forget(
+          id,
+          forgetNative: () async {
+            final snapshot = await client.forgetWatch(id);
+            return (snapshot.fields['forget_receipt'] as Map)['generation']
+                as int;
+          },
+          // Drift keys preserve their original spelling, including legacy lowercase IDs.
+          delete: () => db.deleteWatch(id),
+        );
+  };
+});
+
 final companionWatchCatalogueWriterProvider =
     Provider<Future<void> Function(CompanionWatchMetadata)>((ref) {
       if (!ref.watch(nativeCompanionRuntimeProvider)) {
@@ -51,10 +80,30 @@ class CompanionWatchPersistence extends StateNotifier<AsyncValue<void>> {
   String? _committed;
   bool _writing = false;
   bool _disposed = false;
+  final _forgetting = <String>{};
+  final _forgotten = <String, int>{};
+  Completer<void>? _drained;
+  int _cursor = -1;
 
   void observe(CompanionPrototypeSnapshot snapshot) {
+    if (_disposed || snapshot.cursor < _cursor) return;
+    _cursor = snapshot.cursor;
+    final tombstones = snapshot.fields['forgotten_watches'];
+    if (tombstones is Map) {
+      for (final entry in tombstones.entries) {
+        if (entry.key is String && entry.value is int) {
+          final address = (entry.key as String).toUpperCase();
+          final generation = entry.value as int;
+          if (generation > (_forgotten[address] ?? -1)) {
+            _forgotten[address] = generation;
+          }
+        }
+      }
+    }
     final metadata = CompanionWatchMetadata.fromSnapshot(snapshot);
-    if (_disposed || metadata == null || metadata.fingerprint == _committed) {
+    if (metadata == null ||
+        _blocked(metadata) ||
+        metadata.fingerprint == _committed) {
       return;
     }
     _pending = metadata;
@@ -63,11 +112,12 @@ class CompanionWatchPersistence extends StateNotifier<AsyncValue<void>> {
 
   Future<void> _drain() async {
     _writing = true;
+    final drained = _drained = Completer<void>();
     try {
       while (!_disposed && _pending != null) {
         final metadata = _pending!;
         _pending = null;
-        if (metadata.fingerprint == _committed) continue;
+        if (_blocked(metadata) || metadata.fingerprint == _committed) continue;
         state = const AsyncValue.loading();
         try {
           await write(metadata);
@@ -79,6 +129,35 @@ class CompanionWatchPersistence extends StateNotifier<AsyncValue<void>> {
       }
     } finally {
       _writing = false;
+      drained.complete();
+    }
+  }
+
+  bool _blocked(CompanionWatchMetadata metadata) =>
+      _forgetting.contains(metadata.address) ||
+      metadata.generation <= (_forgotten[metadata.address] ?? -1);
+
+  /// Discard queued saves and await any in-flight save before deleting. Native
+  /// tombstones also fence old Ready snapshots after UI reattachment.
+  Future<void> forget(
+    String id, {
+    required Future<int> Function() forgetNative,
+    required Future<void> Function() delete,
+  }) async {
+    final address = id.toUpperCase();
+    if (_disposed || !_forgetting.add(address)) {
+      throw StateError('Watch Forget is already in progress or disposed');
+    }
+    if (_pending?.address == address) _pending = null;
+    try {
+      final generation = await forgetNative();
+      if (generation > (_forgotten[address] ?? -1)) {
+        _forgotten[address] = generation;
+      }
+      if (_writing) await _drained!.future;
+      await delete();
+    } finally {
+      _forgetting.remove(address);
     }
   }
 

@@ -46,6 +46,13 @@ class CompanionWatchMetadata {
         millis > 8640000000000000) {
       return null;
     }
+    final forgotten = fields['forgotten_watches'];
+    final forgottenGeneration = forgotten is Map
+        ? forgotten[address.toUpperCase()]
+        : null;
+    if (forgottenGeneration is int && generation <= forgottenGeneration) {
+      return null;
+    }
     final info = fields['watch_info'];
     final matching = info is Map && info['address'] == address;
     String? version(String key) {

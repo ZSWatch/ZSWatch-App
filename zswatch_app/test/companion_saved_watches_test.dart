@@ -265,6 +265,9 @@ void main() {
                     .toList();
                 catalogue.add(rows);
               }),
+              companionForgetWatchProvider.overrideWithValue((id) async {
+                throw StateError('Forget must not run during rename');
+              }),
               companionSnapshotProvider.overrideWith((ref) => snapshots.stream),
               companionConnectionPermissionsProvider.overrideWithValue(
                 () async {
@@ -292,7 +295,7 @@ void main() {
           find.descendant(of: tile, matching: find.byTooltip('Watch Settings')),
         );
         await tester.pumpAndSettle();
-        expect(find.text('Forget Watch'), findsNothing);
+        expect(find.text('Forget Watch'), findsOneWidget);
         await tester.enterText(find.byType(TextField), 'UI renamed');
         await tester.pump();
         await tester.tap(find.text('Save'));

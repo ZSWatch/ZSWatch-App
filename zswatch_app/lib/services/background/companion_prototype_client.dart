@@ -236,6 +236,33 @@ class CompanionPrototypeClient {
     }
   }
 
+  Future<CompanionPrototypeSnapshot> forgetWatch(String address) async {
+    final normalized = address.trim().toUpperCase();
+    if (!RegExp(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$').hasMatch(normalized)) {
+      throw const FormatException('Expected an Android BLE MAC address');
+    }
+    final snapshot = CompanionPrototypeSnapshot.decode(
+      await methods.invokeMethod<Object?>('forgetWatch', {
+        'version': 1,
+        'address': normalized,
+      }),
+    );
+    final receipt = snapshot.fields['forget_receipt'];
+    final tombstones = snapshot.fields['forgotten_watches'];
+    if (receipt is! Map ||
+        receipt['address'] != normalized ||
+        receipt['association_removed'] != true ||
+        receipt['generation'] is! int ||
+        (receipt['generation'] as int) < 0 ||
+        receipt['generation'] != snapshot.generation ||
+        tombstones is! Map ||
+        tombstones[normalized] != receipt['generation'] ||
+        snapshot.fields['address'] == normalized) {
+      throw const FormatException('Native Forget was not committed');
+    }
+    return snapshot;
+  }
+
   Future<Map<String, Object?>> presence(
     String address, {
     bool associate = false,
