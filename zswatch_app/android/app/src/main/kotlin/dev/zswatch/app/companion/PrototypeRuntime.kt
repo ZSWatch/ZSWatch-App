@@ -33,6 +33,13 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
         return true
     }
 
+    /** User chose this watch in an explicit picker; a newer Stop wins. */
+    fun startDiscovered(address: String, expectedGeneration: Long): Boolean {
+        if (!PrototypeDiscovery.canSelect(store.control(), active, expectedGeneration)) return false
+        start(address)
+        return true
+    }
+
     /** A delayed OS presence event cannot undo Stop or switch the selected watch. */
     fun restoreForPresence(address: String, expectedGeneration: Long): Boolean {
         return restoreForEvent(address, expectedGeneration)

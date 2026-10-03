@@ -136,7 +136,7 @@ class MainActivity : FlutterActivity() {
     }
     
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (companionPrototypeBridge?.onActivityResult(requestCode, resultCode) == true) return
+        if (companionPrototypeBridge?.onActivityResult(requestCode, resultCode, data) == true) return
         super.onActivityResult(requestCode, resultCode, data)
     }
 

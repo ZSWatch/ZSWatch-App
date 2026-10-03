@@ -14,6 +14,8 @@ import '../../../data/database/app_database.dart';
 import '../../../providers/ble_providers.dart' hide bleScannerProvider;
 import '../../../providers/watch_providers.dart' hide watchNotifierProvider;
 import '../../../providers/watch_service_provider.dart';
+import '../../../providers/companion_runtime_providers.dart';
+import 'companion_scan_view.dart';
 import '../../../services/ble/ble_scanner.dart';
 import '../../widgets/connection_status_pill.dart';
 
@@ -26,14 +28,24 @@ import '../../../providers/ble_providers.dart' as ble show bleScannerProvider;
 /// - Scan for nearby ZSWatch devices
 /// - See device signal strength
 /// - Tap a device to connect
-class ScanScreen extends ConsumerStatefulWidget {
+class ScanScreen extends ConsumerWidget {
   const ScanScreen({super.key});
 
   @override
-  ConsumerState<ScanScreen> createState() => _ScanScreenState();
+  Widget build(BuildContext context, WidgetRef ref) =>
+      ref.watch(nativeCompanionRuntimeProvider)
+      ? const CompanionScanView()
+      : const _LegacyScanScreen();
 }
 
-class _ScanScreenState extends ConsumerState<ScanScreen> {
+class _LegacyScanScreen extends ConsumerStatefulWidget {
+  const _LegacyScanScreen();
+
+  @override
+  ConsumerState<_LegacyScanScreen> createState() => _ScanScreenState();
+}
+
+class _ScanScreenState extends ConsumerState<_LegacyScanScreen> {
   bool _isInitializing = true;
   bool _hasPermissions = false;
   bool _isConnecting = false;

@@ -29,6 +29,18 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                 result.error("VERSION", "Unsupported companion bridge version", null)
             } else when (call.method) {
                 "snapshot" -> snapshot(result::success) { message -> result.error("SNAPSHOT_FAILED", message, null) }
+                "discoverWatch" -> PrototypeHub.worker.post {
+                    try {
+                        val state = PrototypeHub.journal(context).control()
+                        val generation = (state["generation"] as Number).toLong()
+                        check(PrototypeDiscovery.canSelect(state, CompanionPrototypeService.instance?.runtime?.active == true, generation)) {
+                            "Disconnect before choosing another watch"
+                        }
+                        PrototypeHub.main.post { association.discover(generation, result) }
+                    } catch (error: Exception) {
+                        PrototypeHub.main.post { result.error("DISCOVERY_FAILED", error.message, null) }
+                    }
+                }
                 "notificationStatus" -> PrototypeHub.worker.post {
                     try {
                         val selected = (PrototypeHub.journal(context).control()["notification_packages"] as? List<*>)
@@ -85,20 +97,32 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("ASSOCIATION_FAILED", error.message, null) }
                 }
-                "start" -> {
+                "start", "startDiscovered" -> {
                     try {
                         val address = call.argument<String>("address")?.uppercase() ?: error("Address required")
                         require(Regex("[0-9A-F]{2}(:[0-9A-F]{2}){5}").matches(address))
                         if (Build.VERSION.SDK_INT >= 31) require(ContextCompat.checkSelfPermission(context,
                             Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) { "Bluetooth permission required" }
+                        val expectedGeneration = if (call.method == "startDiscovered") when (val value = (call.arguments as? Map<*, *>)?.get("generation")) {
+                            is Int -> value.toLong()
+                            is Long -> value
+                            else -> error("Integer generation required")
+                        }.also { require(it >= 0) } else null
                         PrototypeHub.worker.post {
                             try {
                                 val owner = CompanionPrototypeService.instance?.runtime
                                 check(owner?.active != true || owner.store.control()["address"] == address) { "Stop before changing watch" }
+                                if (expectedGeneration != null) check(PrototypeDiscovery.canSelect(
+                                    PrototypeHub.journal(context).control(), owner?.active == true, expectedGeneration)) {
+                                    "Watch selection expired; choose again"
+                                }
                                 PrototypeHub.main.post {
                                     try {
-                                        ContextCompat.startForegroundService(context, Intent(context, CompanionPrototypeService::class.java)
-                                            .setAction(CompanionPrototypeService.START).putExtra("address", address))
+                                        val start = Intent(context, CompanionPrototypeService::class.java)
+                                            .setAction(if (expectedGeneration == null) CompanionPrototypeService.START else CompanionPrototypeService.START_DISCOVERED)
+                                            .putExtra("address", address)
+                                        if (expectedGeneration != null) start.putExtra("generation", expectedGeneration)
+                                        ContextCompat.startForegroundService(context, start)
                                         result.success(mapOf("version" to 1, "accepted" to true))
                                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                                 }
@@ -193,7 +217,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
         LifecycleLogger.log("CompanionPrototype", "ui_detached transportOwner=service")
     }
 
-    fun onActivityResult(requestCode: Int, resultCode: Int) = association.onActivityResult(requestCode, resultCode)
+    fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) = association.onActivityResult(requestCode, resultCode, data)
 
     fun dispose() { association.dispose(); detach(); methods.setMethodCallHandler(null); events.setStreamHandler(null) }
 }

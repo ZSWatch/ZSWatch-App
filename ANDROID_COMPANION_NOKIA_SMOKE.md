@@ -851,3 +851,29 @@ credential storage before first unlock. Current-Android startup rules, repeated
 recovery latency, OEM restrictions and longer unplugged endurance remain open.
 The longer idle HTTP timeout above remains a separate failed remote-fetch case;
 these later active-state passes do not resolve its cause.
+
+
+## Native discovery and existing Flutter Add Watch — 2026-10-03
+
+Private artifacts: `.companion-hil-runs/20261003-native-discovery/`.
+Final installed `native-cancel-fix.apk`, SHA-256
+`9b55cd388412ab88f438ea4f01807e5e4c021c30b7efc2e161cd0e92cc37fe2f`.
+93 native JVM tests, 52 selected Flutter UI/client regressions and focused analysis
+pass; both final ordinary/native debug APKs compile. Ordinary APK was not installed.
+
+| Check | Observation |
+| --- | --- |
+| Initial native route | Opening Add Watch preserved Stop 157 and no owner. Android picker listed ZSWatch while CONNECT was granted and SCAN denied. |
+| First cancellation | Predecessor `native.apk` (`42b0bb18…96da1`) preserved Stop but incorrectly displayed a generic error. An intermediate cancellation fix (`native-final.apk`, `f3a49b59…acd45`) still displayed that error in a prompt retest. Neither failure is replaced by the final pass. |
+| Stop during picker | Predecessor picker opened from 157; explicit native Stop advanced to 158. Choosing the visible watch afterward stayed Stop 158, with no owner. Fresh selection subsequently reached Ready 159 and the existing Flutter dashboard. |
+| Final cancellation fix | Android 12's ambiguous callback failure now briefly awaits the Activity cancellation result. Prompt Don't Allow on final APK returned quietly to Add Watch; Stop 160 unchanged, no owner, zero native notifications. |
+| Final fresh selection | Explicit Find watch/system row selection reached live native Ready 161 without developer Start. Retained lifecycle confirms START_DISCOVERED accepted. Dashboard showed MTU 247, firmware 0.8.1 and battery 87%; fresh time/status followed. SCAN stayed denied. |
+| Real HTTP | Fresh watch Trivia request was `written`, zero pending, about 2.8 s from admitted request to completion; UART reported no watch HTTP timeout. This active-state pass does not resolve the earlier long-idle remote-fetch timeout. |
+| Flutter Disconnect | Existing dashboard Disconnect advanced to Stop 162; native owner absent, durable running intent false, notifications zero. |
+| Preservation | Exact nine recording dictionaries and separate synthetic job/outbox journal match pre-test baseline. Downloads remain paused. USB confirms watchface, no recording, nine originals, 9964 KB free. No AI, transfer, firmware change or bond/association deletion ran. |
+
+The Nokia already had its bond/OS association. Discovery proves explicit system
+selection and native-owner handoff on API 31; it does not establish fresh bonding,
+unpair, multiple-watch behavior or physical API 33+ callback compatibility.
+Read-only probes report NOT_RUN for broad background acceptance: the bounded
+observations above are not an overnight or current-Android production pass.

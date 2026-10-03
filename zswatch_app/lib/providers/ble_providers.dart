@@ -11,6 +11,9 @@ import 'watch_service_provider.dart';
 
 /// Provider for the BLE scanner singleton.
 final bleScannerProvider = Provider<BleScanner>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native companion owns watch discovery');
+  }
   final scanner = BleScanner();
   ref.onDispose(() => scanner.dispose());
   return scanner;
@@ -20,6 +23,9 @@ final bleScannerProvider = Provider<BleScanner>((ref) {
 final bluetoothAdapterStateProvider = StreamProvider<BluetoothAdapterState>((
   ref,
 ) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native companion owns Bluetooth state');
+  }
   return FlutterBluePlus.adapterState;
 });
 
@@ -37,6 +43,9 @@ final scannedDevicesProvider = StreamProvider<List<ScannedWatch>>((ref) {
 
 /// Provider for whether currently scanning.
 final isScanningProvider = StreamProvider<bool>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native companion owns watch discovery');
+  }
   return FlutterBluePlus.isScanning;
 });
 

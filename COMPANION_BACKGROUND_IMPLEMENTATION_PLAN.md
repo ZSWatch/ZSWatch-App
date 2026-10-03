@@ -1249,3 +1249,30 @@ one-minute recovery check failed; longer observation succeeded. Android's ordere
 boot broadcast took about 1m41s to finish. Recovery is eventual, not an always-alive
 or instant-reboot promise. Current-Android restrictions and production latency
 acceptance remain open. Exact results and stopped-update checks are in the runbook.
+
+
+### Progress 2026-10-03: native discovery in existing Flutter Add Watch
+
+The existing Add Watch route now branches to an explicit Android system picker
+in native mode. It cannot create a Flutter scanner/GATT owner or save a watch
+before native Ready. The selected MAC/stopped-generation contract is validated
+again inside the service; delayed selection cannot undo a newer Stop or replace
+an active owner. Cancellation/disposed views send no Start; normal builds retain
+the legacy scanner. Existing saved-watch and dashboard UI remain in use.
+
+Nokia verified real discovery/selection while BLUETOOTH_SCAN stayed denied,
+quiet cancellation with Stop 160 unchanged, and a fresh selection reaching Ready
+161 with current time/status and the existing dashboard. A predecessor's selection
+after Stop 158 stayed stopped; fresh selection reached Ready 159. Its initial
+Android 12 cancellation incorrectly showed an error; the final APK fixes that
+callback ordering and the prompt cancellation test passed. Real Trivia HTTP on
+the final APK completed in about 2.8 s. Final Flutter Disconnect is Stop 162.
+Nine native recording dictionaries and the separate job/outbox journal match the
+baseline exactly; watch originals/free space are unchanged and downloads paused.
+
+93 native and 52 selected Flutter tests pass, focused analysis is clean and both
+debug variants compile. This is an already-bonded API 31 phone, not fresh-bond,
+multi-watch, current-Android or production acceptance. Next core work remains
+coordinated Forget/unpair/product preferences and controlled Android network/idle
+and reconnect verification. AI/recording processing, iOS and SMP corruption
+investigation remain deferred. See the runbook for exact artifact hashes.

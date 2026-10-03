@@ -6,6 +6,7 @@ import '../../data/models/connection_state.dart';
 import '../../data/models/watch.dart';
 import '../../data/models/companion_notification_status.dart';
 import '../../data/models/companion_http_status.dart';
+import '../../data/models/companion_watch_selection.dart';
 
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
@@ -119,6 +120,31 @@ class CompanionPrototypeClient {
       CompanionPrototypeSnapshot.decode(
         await methods.invokeMethod<Object?>('snapshot', {'version': 1}),
       );
+
+  Future<CompanionWatchSelection> discoverWatch() async =>
+      CompanionWatchSelection.decode(
+        await methods.invokeMethod<Object?>('discoverWatch', {'version': 1}),
+      );
+
+  Future<void> startDiscovered(CompanionWatchSelection selection) async {
+    // Validate even when a caller constructed the value rather than decoding it.
+    CompanionWatchSelection.decode({
+      'version': 1,
+      'associated': true,
+      'address': selection.address,
+      'generation': selection.generation,
+    });
+    final response = await methods.invokeMethod<Object?>('startDiscovered', {
+      'version': 1,
+      'address': selection.address,
+      'generation': selection.generation,
+    });
+    if (response is! Map ||
+        response['version'] != 1 ||
+        response['accepted'] != true) {
+      throw const FormatException('Watch connection was not accepted');
+    }
+  }
 
   Future<CompanionNotificationStatus> notificationStatus() async =>
       CompanionNotificationStatus.decode(

@@ -100,6 +100,10 @@ class AppRouter {
         builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
+        path: AppRoutes.scan,
+        builder: (context, state) => const ScanScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.notifications,
         builder: (context, state) => const NotificationSettingsScreen(),
       ),

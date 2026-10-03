@@ -290,6 +290,22 @@ void main() {
   );
 
   testWidgets(
+    'native Add Watch route only observes until the user starts discovery',
+    (tester) async {
+      await mount(tester, snapshot());
+      router(tester).go(AppRoutes.scan);
+      await tester.pumpAndSettle();
+      expect(find.text('Add Watch'), findsOneWidget);
+      expect(find.text('Find watch'), findsOneWidget);
+      expect(calls, isEmpty);
+      expect(permissionRequests, 0);
+      expect(forbidden, isEmpty);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'deep links to unmigrated features cannot start AI, DFU, health or DB detail services',
     (tester) async {
       await mount(tester, snapshot(active: true, ready: true));
@@ -298,7 +314,6 @@ void main() {
         AppRoutes.aiModels,
         AppRoutes.firmware,
         AppRoutes.health,
-        AppRoutes.scan,
         AppRoutes.voiceMemoDetail(12),
         AppRoutes.watchfaceBackground,
         AppRoutes.shell,

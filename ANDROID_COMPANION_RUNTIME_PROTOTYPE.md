@@ -10,7 +10,8 @@ completed companion migration or a decision to discard the engine-based option.
 
 - Known-address BLE connection, MTU negotiation, NUS discovery/subscription,
   serialized writes, fragmented UTF-8 JSON reception, operation deadlines
-  and reconnect attempts with 5–60 second delays. No discovery or bonding UI.
+  and reconnect attempts with 5–60 second delays. Explicit native discovery uses
+  Android CompanionDeviceManager through the existing Flutter Add Watch route.
 - Native notification-listener routing with an explicit package allowlist, persisted
   bounded outbox, stable IDs, updates/removals, reconnect replay and listener reconciliation.
   The existing notification settings screen can configure explicit selections;
@@ -70,13 +71,14 @@ status. Reconnect/observer failure removes the connected dashboard. Cancel and
 Disconnect go to native Stop without creating Dart auto-reconnect/foreground
 services. UI/container disposal never sends Stop.
 
-Only home/dashboard, settings, notification settings, recording status and the
+Only home/dashboard, Add Watch, settings, notification settings, recording status and the
 developer runtime controls are routable in this build. Unsupported deep links
-cannot enter AI/model, DB-backed recording detail, DFU, scan, health, analytics,
+cannot enter AI/model, DB-backed recording detail, DFU, health, analytics,
 watchface or other legacy-service screens. Health stats and uncoordinated SMP
 actions are withheld. The normal router is unchanged. The developer controls
 remain available through Connection setup or Developer for known-address lab
-setup; this is not a completed discovery/bonding/watch-management flow.
+setup. Discovery now uses the system picker; coordinated Forget/unpair and
+fresh-bond acceptance remain open.
 
 Native selection bypasses the legacy last-watch/auto-reconnect preferences; its
 durable running intent remains authoritative. Migrating those product settings,
@@ -673,3 +675,40 @@ coverage during reboot/unlock. Stop 157 survived replacement with a logged skip,
 owner absent and zero native notifications. Native receipts/jobs and all nine
 watch originals remained unchanged. Detailed provenance and failure windows are
 in the Nokia runbook. The fifteen-minute idle remote-fetch timeout remains open.
+
+
+## Native discovery through the existing Flutter UI — 2026-10-03
+
+Home's Add watch opens the existing `/scan` route, selecting a native branch.
+Opening it sends no permission, scan or connection command. Find watch explicitly
+requests connection permission, then invokes Android CompanionDeviceManager with
+a ZSWatch name filter. The Flutter BLE scanner/adapter providers are guarded in
+native mode. The normal Flutter route retains its existing implementation.
+
+The native picker returns a strictly versioned address/generation selection,
+not a Ready result or proof of Bluetooth bonding. Both picker completion and the
+service's START_DISCOVERED recheck the exact stopped generation and absence of an
+active owner. Stop/change of running intent invalidates delayed selections; there
+is no fallback to unrestricted Start. A successful native handoff returns home,
+where the existing dashboard appears only after protocol Ready. Only the existing
+Ready projection saves watch metadata. An abandoned Flutter view cannot start a
+connection from a later picker completion; UI disposal still never sends Stop.
+
+API 31/32 read the selected BLE ScanResult from the Activity result. API 33+
+uses onAssociationPending/onAssociationCreated and the association's MAC.
+See [Android's companion pairing documentation](https://developer.android.com/develop/connectivity/bluetooth/companion-device-pairing).
+Android 12 reports picker cancellation as a generic failure before returning
+RESULT_CANCELED: a bounded one-second wait lets the authoritative cancellation
+win. Pre-picker failures remain immediate; unknown errors are not classified as
+cancellation. Modern explicit cancellation reasons remain quiet. The entire
+picker has a 120-second deadline and pending-operation identity fencing.
+
+93 native JVM tests and 52 selected Flutter regressions pass; focused Dart analysis
+is clean and both debug APK variants compile. Physical Nokia evidence covers
+quiet cancellation with Stop unchanged, a newer Stop invalidating selection,
+and a fresh system selection reaching Ready with scan permission denied. Fresh
+time/status and real Trivia HTTP succeeded on the final APK. This phone already
+had its Bluetooth bond and OS association: fresh bonding, API 33+ physical
+callbacks, different/multiple watches and coordinated Forget/unpair are unverified.
+OS associations/bonds are preserved; no private bonding API or second GATT owner
+was introduced. Exact artifacts and predecessor failures are in the Nokia runbook.

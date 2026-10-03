@@ -151,6 +151,12 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
             ),
           ),
           OutlinedButton(
+            onPressed: active || busy || snapshot == null
+                ? null
+                : () => context.push(AppRoutes.scan),
+            child: const Text('Add watch'),
+          ),
+          OutlinedButton(
             onPressed: () => context.push(AppRoutes.companionRuntime),
             child: const Text('Connection setup'),
           ),
