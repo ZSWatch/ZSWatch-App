@@ -4,7 +4,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from native_runtime_probe import COMPONENT, summarize
+from native_runtime_probe import COMPONENT, summarize, summarize_jobs
+import json
+import hashlib
 
 
 class NativeRuntimeProbeTests(unittest.TestCase):
@@ -40,3 +42,20 @@ class NativeRuntimeProbeTests(unittest.TestCase):
         report = str(summarize(state, '', ''))
         self.assertNotIn('private-key', report); self.assertNotIn('private text', report)
         self.assertIn('NOT_RUN', report)
+
+    def test_committed_result_requires_a_matching_outbox_and_redacts_text(self):
+        spec = {'watch_id': 'test'}
+        identity = hashlib.sha256(json.dumps(spec, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        result_id = hashlib.sha256(('result-v1:' + identity).encode()).hexdigest()
+        job = {'spec': spec, 'state': 'result_ready', 'result': {'summary': 'private text'}}
+        state = {'version': 1, 'jobs': {identity: job}, 'outbox': {}}
+        with self.assertRaises(ValueError):
+            summarize_jobs(state)
+        payload = {'result_id': result_id, 'job_id': identity, 'watch_id': 'test', 'result': job['result']}
+        state['outbox'][result_id] = {'job_id': identity, 'payload': json.dumps(payload), 'state': 'pending'}
+        report = summarize_jobs(state)
+        self.assertEqual(report['pending_result_count'], 1)
+        self.assertNotIn('private text', str(report))
+        job['state'] = 'delivered'
+        with self.assertRaises(ValueError):
+            summarize_jobs(state)

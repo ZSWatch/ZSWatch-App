@@ -12,6 +12,33 @@ from pathlib import Path
 COMPONENT = 'dev.zswatch.app.companion.CompanionPrototypeService'
 
 
+def summarize_jobs(state):
+    jobs, outbox = state.get('jobs', {}), state.get('outbox', {})
+    if state.get('version') != 1 or not isinstance(jobs, dict) or not isinstance(outbox, dict):
+        raise ValueError('Unsupported native job journal')
+    for identity, job in jobs.items():
+        encoded = json.dumps(job['spec'], ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+        if hashlib.sha256(encoded.encode()).hexdigest() != identity:
+            raise ValueError('Job identity differs from its spec')
+        result_id = hashlib.sha256(('result-v1:' + identity).encode()).hexdigest()
+        delivery = outbox.get(result_id)
+        if job['state'] in ('result_ready', 'delivered'):
+            if not delivery or delivery.get('job_id') != identity:
+                raise ValueError('Committed result is missing its atomic outbox')
+            payload = json.loads(delivery['payload'])
+            if (payload['result_id'] != result_id or payload['job_id'] != identity or
+                    payload['watch_id'] != job['spec']['watch_id'] or
+                    payload['result'] != job['result']):
+                raise ValueError('Result and outbox disagree')
+            if job['state'] == 'delivered' and delivery['state'] != 'acked':
+                raise ValueError('Delivered job lacks an application receipt ACK')
+    return {
+        'job_count': len(jobs), 'pending_result_count': sum(d['state'] == 'pending' for d in outbox.values()),
+        'jobs': [{k: job.get(k) for k in ('state', 'fence', 'attempts', 'remote_id', 'last_error')} |
+                 {'job_id': identity} for identity, job in jobs.items()],
+    }
+
+
 def summarize(state, services, pid, expected=None):
     """Reject malformed Android JSON values and stale persisted readiness."""
     if state.get('version') != 1 or type(state.get('desired_running')) is not bool:
@@ -52,6 +79,7 @@ def main():
     parser.add_argument('--android-serial', required=True)
     parser.add_argument('--expect', choices=['ready', 'stopped'])
     parser.add_argument('--apk', type=Path, help='Optional frozen APK to verify against the installed hash')
+    parser.add_argument('--jobs', action='store_true', help='Observe the separate synthetic job/result journal without content')
     parser.add_argument('--output', type=Path, required=True, help='New JSON output file')
     args = parser.parse_args()
     if args.android_serial.startswith('emulator-'):
@@ -65,6 +93,9 @@ def main():
     pid = next((line.split()[1] for line in processes.splitlines() if line.split()[-1:] == ['com.zswatch.app']), '')
     result = summarize(state, adb('shell', 'dumpsys', 'activity', 'services', 'com.zswatch.app'), pid, args.expect)
     result['android_serial'] = args.android_serial
+    if args.jobs:
+        result['remote_jobs'] = summarize_jobs(json.loads(adb('shell', 'run-as', 'com.zswatch.app', 'cat',
+                                                            'files/companion-prototype/jobs/state-v1.json')))
     result['resumed_activity'] = next((line.strip() for line in adb('shell', 'dumpsys', 'activity', 'activities').splitlines()
                                        if 'mResumedActivity:' in line), None)
     if args.apk:

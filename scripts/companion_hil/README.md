@@ -431,3 +431,9 @@ adb -s A00000V791290707484 shell run-as com.zswatch.app /system/bin/am \
 Observe the stopped state afterward; command acceptance alone does not prove Stop.
 Bluetooth off/on after Stop must preserve desired intent=false. Leave Bluetooth on.
 This ADB-triggered cleanup is separate from autonomous recovery evidence.
+
+`native_runtime_probe.py --jobs` additionally checks the separate native job
+journal: canonical job identity, result/outbox consistency and matching persisted
+ACK state. It emits only job IDs/state/counters, never result text or specs.
+The Android loopback adapter and physical crash results are documented in
+[`REMOTE_JOB_ANDROID_PROTOTYPE.md`](../../REMOTE_JOB_ANDROID_PROTOTYPE.md).

@@ -142,7 +142,13 @@ class CompanionPrototypeClient {
   }
 
   Future<CompanionPrototypeSnapshot> command(String name, {int? cursor}) async {
-    if (!['stop', 'syncTime', 'retryRecordings', 'ackEvents'].contains(name) ||
+    if (![
+          'stop',
+          'syncTime',
+          'retryRecordings',
+          'ackEvents',
+          'startRemoteFixture',
+        ].contains(name) ||
         (name == 'ackEvents' && (cursor == null || cursor < 0))) {
       throw const FormatException('Invalid companion command');
     }

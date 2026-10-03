@@ -93,12 +93,13 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
-                "stop", "syncTime", "retryRecordings", "ackEvents", "configureNotifications", "setRecordingSync" -> {
+                "stop", "syncTime", "retryRecordings", "ackEvents", "configureNotifications", "setRecordingSync", "startRemoteFixture" -> {
                     PrototypeHub.worker.post {
                         try {
                             val store = PrototypeHub.journal(context)
                             val service = CompanionPrototypeService.instance
                             when (call.method) {
+                                "startRemoteFixture" -> (service?.remoteFixture ?: error("Service not running")).startFixture()
                                 "stop" -> {
                                     if (service?.runtime != null) {
                                         service.runtime!!.stop()
@@ -133,7 +134,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                                     store.acknowledge(cursor.toLong())
                                 }
                             }
-                            val state = store.snapshot(service?.runtime?.active == true)
+                            val state = PrototypeHub.snapshot(context, service?.runtime?.active == true)
                             PrototypeHub.main.post { result.success(state) }
                         } catch (error: Exception) { PrototypeHub.main.post { result.error("COMMAND_FAILED", error.message, null) } }
                     }
@@ -158,7 +159,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
     private fun snapshot(deliver: (Any?) -> Unit, failed: (String?) -> Unit = { sink?.error("SNAPSHOT_FAILED", it, null) }) {
         PrototypeHub.worker.post {
             try {
-                val state = PrototypeHub.journal(context).snapshot(CompanionPrototypeService.instance?.runtime?.active == true)
+                val state = PrototypeHub.snapshot(context, CompanionPrototypeService.instance?.runtime?.active == true)
                 PrototypeHub.main.post { deliver(state) }
             } catch (error: Exception) { PrototypeHub.main.post { failed(error.message) } }
         }

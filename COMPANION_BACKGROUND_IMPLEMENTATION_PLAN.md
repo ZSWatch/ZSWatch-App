@@ -925,6 +925,24 @@ Nästa arbete är mobil adapter för remote-jobbkontraktet med syntetisk loopbac
 backend, receipt/import-migrering och firmware-ACK/deduplicering som separat
 versionsförhandlad leverans. Ingen verklig ljudupload/actions körs av prototypen.
 
+### Mobil remote-adapter, 2026-10-03
+
+Native-prototypen har nu separat atomisk jobjournal, leases/fencing, oföränderliga
+backend-/generationval och result+outbox i en commit. Lokal jobmodell stöds i
+kontraktet; inference startas inte. Serviceägd loopback-fixture använder separat
+network-executor, beständiga deadlines och återupptar efter processdöd utan Flutter.
+Nokia gav ett serverjobb trots tappat submit-svar; ett väntande resultat hämtades
+efter krasch och committad outbox överlevde ytterligare krasch. Korrupt syntetisk
+jobjournal stoppade inte BLE. Inget riktigt ljud skickas, inga actions körs och
+outbox markeras inte Delivered utan firmware-ACK.
+
+57 native tester, 16 Flutter bridge/UI-tester och 40 HIL/reference/probe-tester
+passerar. Normal/prototype APK, analys och release-isolering passerar. Se
+`REMOTE_JOB_ANDROID_PROTOTYPE.md` för exakta artefakter, fysisk evidens och
+återstående krav: riktiga provideradaptrar/receipt-import/OS-scheduling,
+clock-adjustment-policy, firmwarekvittens och iPhone. Den tillfälliga servern och
+ADB-tunneln är stoppade; native runtime är stoppad och originaljournal återställd.
+
 ### Införande och återgång
 
 - Inför en explicit runtime-selection per appstart under migreringen. Legacy och ny kärna får inte ansluta samtidigt till samma watch.

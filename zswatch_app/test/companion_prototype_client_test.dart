@@ -292,6 +292,19 @@ void main() {
     expect(calls, isEmpty);
   });
 
+  test(
+    'synthetic remote fixture command contains no audio or backend override',
+    () async {
+      messenger.setMockMethodCallHandler(methods, (call) async {
+        calls.add(call);
+        return saved;
+      });
+      await client.command('startRemoteFixture');
+      expect(calls.single.method, 'startRemoteFixture');
+      expect(calls.single.arguments, {'version': 1});
+    },
+  );
+
   test('event observer delivers snapshots and cancel sends no stop', () async {
     final delivered = <CompanionPrototypeSnapshot>[];
     final subscription = client.watch().listen(delivered.add);

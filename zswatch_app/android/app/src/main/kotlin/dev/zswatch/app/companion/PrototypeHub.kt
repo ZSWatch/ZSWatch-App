@@ -14,6 +14,21 @@ object PrototypeHub {
     val main = Handler(Looper.getMainLooper())
     val observers = CopyOnWriteArraySet<() -> Unit>()
     private var store: PrototypeStore? = null
+    private var jobStore: PrototypeStore? = null
+
+    fun jobJournal(context: Context): PrototypeStore {
+        check(Looper.myLooper() == worker.looper)
+        return jobStore ?: PrototypeStore(File(context.filesDir, "companion-prototype/jobs"), 64).also { created ->
+            created.onChanged = { observers.forEach { main.post(it) } }
+            jobStore = created
+        }
+    }
+
+    fun snapshot(context: Context, active: Boolean): Map<String, Any?> {
+        val state = journal(context).snapshot(active)
+        return try { state + mapOf("remote_jobs" to PrototypeJobs(jobJournal(context)).summary()) }
+        catch (error: Exception) { state + mapOf("remote_jobs_error" to error.javaClass.simpleName) }
+    }
 
     fun journal(context: Context): PrototypeStore {
         check(Looper.myLooper() == worker.looper)

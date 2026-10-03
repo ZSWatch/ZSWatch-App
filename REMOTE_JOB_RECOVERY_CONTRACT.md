@@ -158,3 +158,14 @@ ljudupload, riktiga modeller, firmwarekvittens, verklig action-idempotens eller
 mobil SQLite-implementation. Nästa adapter ska köra samma golden trace och
 processavbrottsgränser i vald runtime; normal bakgrundsleverans kräver fysisk
 telefon enligt den större planen.
+
+## Android follow-up, 2026-10-03
+
+A native serialized-owner adapter now reuses these JSON fixtures and canonical
+identities. It uses a separate atomic-file job journal and service-owned loopback
+network executor. Real Nokia tests reunited a lost submit response with one
+server job, recovered a pending result after a crash, and retained result/outbox
+after another crash without Flutter. The temporary ADB tunnel was removed after
+testing. See [native Android adapter and limits](REMOTE_JOB_ANDROID_PROTOTYPE.md).
+Current firmware does not implement the result ACK; the physical outbox remains
+pending. No audio upload, model execution, actions or iOS acceptance are claimed.

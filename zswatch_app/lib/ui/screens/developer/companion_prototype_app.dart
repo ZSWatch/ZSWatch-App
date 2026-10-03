@@ -107,6 +107,14 @@ class _CompanionPrototypeAppState extends State<CompanionPrototypeApp> {
             'Protocol ready: ${state?.protocolReady ?? false} • generation ${state?.generation ?? 0}',
           ),
           Text('Saved recordings: ${state?.recordings.length ?? 0}'),
+          if (state?.fields['remote_jobs'] is List)
+            Text(
+              'Synthetic remote jobs: ${jsonEncode(state!.fields['remote_jobs'])}',
+            ),
+          if (state?.fields['remote_jobs_error'] != null)
+            Text(
+              'Remote job journal unavailable: ${state!.fields['remote_jobs_error']}',
+            ),
           SwitchListTile(
             title: const Text('Download recordings (experimental)'),
             value: state?.fields['recording_sync_enabled'] != false,
@@ -218,6 +226,16 @@ class _CompanionPrototypeAppState extends State<CompanionPrototypeApp> {
                         }),
                       ),
                 child: const Text('Refresh'),
+              ),
+              OutlinedButton(
+                onPressed: busy || state?.runtimeActive != true
+                    ? null
+                    : () => unawaited(
+                        run(() async {
+                          show(await client.command('startRemoteFixture'));
+                        }),
+                      ),
+                child: const Text('Start synthetic remote job'),
               ),
               OutlinedButton(
                 onPressed: busy || state?.protocolReady != true

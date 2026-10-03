@@ -102,7 +102,9 @@ On a ready connection, saved `downloading` entries or missing receipts return to
 Interrupted SDK transfers restart from the beginning. Failed transfers stay
 `failed` until explicit Retry; a session change rejects old completion callbacks.
 **No watch recording is deleted.** There is no receipt import into Drift, Ogg
-conversion, AI submission, result delivery or external action in this prototype.
+conversion, production AI submission, watch result delivery or external action.
+A separate synthetic remote-job adapter now persists metadata-only fixture results
+and an outbox; see [its recovery boundary](REMOTE_JOB_ANDROID_PROTOTYPE.md).
 
 ## Bridge v1
 
@@ -112,7 +114,8 @@ Every request/subscription includes `{version: 1}`.
 
 | Method | Extra fields | Result |
 | --- | --- | --- |
-| `snapshot` | — | Current committed state plus live runtime ownership/readiness |
+| `snapshot` | — | Current state/live readiness plus content-free synthetic job summaries |
+| `startRemoteFixture` | — | Creates/resumes the fixed metadata-only loopback job; requires running prototype |
 | `start` | `address`: uppercase Android BLE MAC | `{version: 1, accepted: true}` or error |
 | `stop` | — | Snapshot after saved intent is cleared and transport closed |
 | `syncTime` | — | Snapshot after queuing the write; completion arrives separately |

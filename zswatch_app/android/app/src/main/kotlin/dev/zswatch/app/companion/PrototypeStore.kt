@@ -81,14 +81,16 @@ class PrototypeStore(private val directory: File, private val eventLimit: Int = 
     }
 
     private fun persist(next: JSONObject) {
+        val encoded = next.toString()
         val temporary = File.createTempFile("state-", ".partial", directory)
         try {
             FileOutputStream(temporary).use { stream ->
-                stream.write(next.toString().toByteArray(Charsets.UTF_8))
+                stream.write(encoded.toByteArray(Charsets.UTF_8))
                 stream.fd.sync()
             }
             check(temporary.renameTo(file)) { "Prototype journal publication failed" }
-            data = next
+            // Keep the exact published value, without aliases to caller-owned JSON.
+            data = JSONObject(encoded)
         } finally { temporary.delete() }
         onChanged?.invoke()
     }

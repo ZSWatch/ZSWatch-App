@@ -60,6 +60,10 @@ val hasReleaseKeystore = releaseKeystoreConfig != null
 
 android {
     buildFeatures { buildConfig = true }
+    sourceSets.getByName("debug").assets.srcDir("../../../scripts/companion_hil/remote_jobs/fixtures")
+    testOptions.unitTests.all {
+        it.systemProperty("companion.fixtures", rootProject.file("../../scripts/companion_hil/remote_jobs/fixtures").absolutePath)
+    }
     namespace = "dev.zswatch.app"
     compileSdk = 36
     ndkVersion = "29.0.13113456" // Required by whisper_ggml_plus (highest NDK among all plugins)
