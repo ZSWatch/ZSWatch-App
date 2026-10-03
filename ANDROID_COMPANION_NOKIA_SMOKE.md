@@ -785,3 +785,69 @@ run lacked sandbox socket access; rerunning with loopback access passed. Updated
 `native_runtime_probe.py` verifies the frozen installed APK and reports selected
 current-generation status/HTTP metadata without content, retaining `NOT_RUN` as
 its acceptance value.
+
+
+## Fifteen-minute native-only deep-idle observation — 2026-10-03
+
+Same HTTP-settings artifact as above: hash `bb4b973e…f3a5`, PID 7962, Ready 154.
+The diagnostic finished/removed Flutter's Activity before forced idle. Across 31
+samples at 30-second intervals (900.4 s), the live native service stayed Ready,
+PID/generation stayed fixed, no Flutter Activity was present, and deep state was
+`IDLE`. Selected current-generation watch status continued; its maximum sampled
+age was 6306 ms. These are periodic watch events, not a silent BLE interval.
+
+Delayed notification 1000012 completed after UI removal. A new fixture 1000013
+queued/completed during idle in 896 ms. Touching the watch did not confirm its
+cancellation in this run; do not inherit the previous shorter test's dismissal
+pass. The final fresh Trivia request was admitted and got the relay's **Request
+timed out** error at `error_written` (6.867 s), zero pending. UART confirmed the
+error arrived without the watch's own HTTP timeout. Remote fetching therefore
+did not pass this longer idle case. The installed firmware's error callback
+limitation also remains. Android idle/battery simulation was restored afterward;
+subsequent active-state HTTP after package replacement succeeded in 2.887 s.
+
+The app was observed on the user Doze whitelist. This timeout does not alone
+establish that Doze blocked the network: DNS/API latency and connectivity still
+need controlled comparisons. Compare active/idle requests against a controlled
+endpoint and verify network policy before changing permissions or exemptions.
+USB stayed physically attached, so this is not unplugged/overnight battery or
+modern-Android acceptance. No model, recording processing, transfer or firmware
+change ran. All raw evidence stays private under the HTTP-settings artifact dir.
+
+
+## Native boot and package-replacement recovery — 2026-10-03
+
+Artifacts: `.companion-hil-runs/20261003-native-system-recovery/`.
+Frozen final `native.apk`, SHA-256
+`ff7846f385c5274d782779cfbb256c3d075a449602cc95ad30b33b6218ea213d`.
+87 native JVM tests pass; both final ordinary/native debug variants compile.
+No Flutter Activity or explicit Start was used in automatic recovery checks.
+
+| Scenario | Observation and practical limit |
+| --- | --- |
+| Replacement while running | PID 7962 → 9371, Ready 154 → 155. Retained lifecycle events confirm actual `MY_PACKAGE_REPLACED` requested `RESTORE_SYSTEM` and the service accepted it. Fresh time/status followed. |
+| HTTP after replacement | Fresh Trivia `written`, zero pending, 2.887 s, no UART HTTP timeout. Android power simulation was restored before this test. |
+| Physical phone reboot | USB ADB exceeded the initial 120-second wait before returning. The normal secure PIN screen was unlocked, enabling credential storage. The first 60-second automatic-recovery window failed; a later bounded observation succeeded. Neither failed window is overwritten by the later pass. |
+| Ordered boot delivery | Android enqueued BOOT at 20:37:29.269 local, dispatched at 20:37:29.753, finished at 20:39:11.008 (+1m41.255s). At the failed observation it was still in flight; the companion receiver was listed. Native retained events later confirm real `BOOT_COMPLETED` requested/accepted restoration. This demonstrates a substantial OS delivery delay on this phone. |
+| Post-unlock Ready | New PID 4369, Ready 156, fresh time and current-generation watch status, Flutter absent. Native restoration happened automatically. This is eventual recovery, not immediate coverage during reboot/first unlock. |
+| HTTP after reboot | Fresh Trivia `written`, zero pending, 3.429 s, no UART HTTP timeout. |
+| Explicit Stop then replacement | Stop 157 remained unchanged after another replacement install. Handler logged `system_restore_skipped`; native BLE owner absent, native notification count zero, no UI/Start. Listener process remained alive. |
+
+The package-replacement evidence script initially asserted markers from the last
+500 logcat lines; that window had missed them. The automatic Ready had already
+occurred. The bounded retained lifecycle journal proved request/acceptance; no
+manual trigger or retry was substituted for the observed recovery.
+
+Final native recording dictionaries and job/outbox journal exactly match the
+pre-replacement baseline. Downloads remain paused and local fixture processing
+stays disabled. USB confirms watchface, no active recording, nine originals and
+9964 KB free space. Phone deep state is ACTIVE, power simulation restored,
+Bluetooth enabled, and native owner deliberately stopped. No firmware reset,
+flash, transfer, new recording or AI execution occurred.
+
+Keep physical reboot, package replacement, framework crash and force-stop as
+separate scenarios. The receiver is not direct-boot aware and does not access
+credential storage before first unlock. Current-Android startup rules, repeated
+recovery latency, OEM restrictions and longer unplugged endurance remain open.
+The longer idle HTTP timeout above remains a separate failed remote-fetch case;
+these later active-state passes do not resolve its cause.

@@ -35,6 +35,15 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
 
     /** A delayed OS presence event cannot undo Stop or switch the selected watch. */
     fun restoreForPresence(address: String, expectedGeneration: Long): Boolean {
+        return restoreForEvent(address, expectedGeneration)
+    }
+
+    /** Boot/update events are fenced again when the service handles them. */
+    fun restoreForSystem(address: String, expectedGeneration: Long): Boolean {
+        return restoreForEvent(address, expectedGeneration)
+    }
+
+    private fun restoreForEvent(address: String, expectedGeneration: Long): Boolean {
         val state = store.control()
         if (state["desired_running"] != true || state["address"] != address ||
             generation != expectedGeneration) return false

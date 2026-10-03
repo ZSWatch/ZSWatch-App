@@ -36,7 +36,7 @@ router containing the migrated UI subset. Native selection skips eager Dart
 chat, voice recovery/sync, BLE, notification/media, GPS/HTTP, analytics and
 crash-persistence startup, as well as the legacy native app bridges. The legacy
 BLE foreground service is stopped on entry,
-and the legacy boot recovery path is skipped in experimental builds. No local
+and the legacy boot path is replaced by native, intent-fenced recovery in experimental builds. No local
 model is initialized by this entry point. Normal debug builds and profile/release
 builds retain the ordinary startup and full router. iOS is unchanged.
 
@@ -386,9 +386,9 @@ stable MAC is required; switching bonded/random addresses is not implemented.
    If it does not, record that result and separately test explicit relaunch/recovery.
 6. Verify Stop from both UI and service notification. Require saved
    `desired_running=false`, closed handles, no reconnect and no restored owner
-   after relaunch. Separately test force-stop and reboot; this prototype does not
-   restart itself after either and must require a user launch/start. Do not treat
-   force-stop as equivalent to ordinary framework process reclamation.
+   after relaunch. Separately test force-stop and reboot/first unlock. Native boot
+   recovery is implemented in the later checkpoint below; force-stop remains a
+   distinct OS/user boundary and must not be treated as framework reclamation.
 7. Run the planned idle/Doze and manufacturer battery tests using the lab scenario
    setup/teardown. Capture BLE receipt/time evidence separately from network jobs.
    Establish latency, reconnect and resource budgets against the normal-app baseline.
@@ -411,14 +411,16 @@ and personal notification data from committed evidence.
 
 ## Remaining before architecture selection or rollout
 
-Real Android GATT and simultaneous NUS/MCUmgr handles, SMP service changes,
-bond/encryption, CCCD/write behavior, screen-off progress, background execution,
-restart timing, OEM restrictions and battery cost are unverified. There is no
-new wake lock, CDM association/presence trigger, boot start, radio receiver or
-system time-change receiver. A handler timeout does not guarantee wakeup in Doze.
+The later checkpoints below implement Android GATT with the existing Nordic
+MCUmgr SDK, notification forwarding, HTTP, time/status, native recovery, Flutter
+control/catalogue integration and explicit recording import/playback. Their Nokia
+observations remain bounded. Current-Android restrictions, discovery/unpair,
+remaining feature migration, OEM battery cost, overnight endurance and production
+acceptance remain open. No wake lock is added. A handler timeout alone does not
+guarantee network access or timely wakeup in Doze.
 
-Notification forwarding, HTTP, playback/conversion, ordinary UI/Drift integration,
-local/remote AI scheduling and result/ACK/action contracts remain separate work.
+Local/remote AI scheduling and production result/ACK/action integration remain
+separate work and are deferred under the current user priority.
 The prototype must not delete audio or run replayed external actions while those
 contracts are absent. Test the alternative service-owned Flutter-engine spike
 and the iOS lifecycle path before selecting the production architecture. This
@@ -628,3 +630,46 @@ Harness tests need loopback socket access for synthetic server fixtures. The
 read-only native probe now emits bounded, generation-fenced HTTP metadata and the
 selected watch's current status observation timestamp. Its acceptance remains
 `NOT_RUN`: current metadata alone never establishes a scenario pass.
+
+
+## Native system recovery — 2026-10-03
+
+The opt-in native path now handles `BOOT_COMPLETED` and `MY_PACKAGE_REPLACED`
+through the existing receiver. It reads the private native journal on the serial
+worker and starts the connected-device service only for strict saved running
+intent, valid address/generation and available Bluetooth permission. It requests
+no permission and launches no Flutter, Drift or model worker. The receiver is not
+direct-boot aware; credential-encrypted storage/first unlock is the boundary.
+
+A dedicated `RESTORE_SYSTEM` command checks address, generation and running intent
+again in the service. A queued event after Stop or watch switch cannot reacquire
+BLE. Duplicate events cannot create another active GATT owner. Native policies,
+receipts and the separate job/outbox journal are preserved. Ordinary builds retain
+the existing boot preferences and handler.
+
+The official Android [foreground-service start exemptions](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start)
+include boot/package replacement, subject to service-type restrictions. This path
+uses only `connectedDevice`, with the existing Bluetooth/FGS permissions. That is
+an implementation basis, not current-Android hardware acceptance. OS restrictions
+or startup exceptions are logged; they do not silently change user intent.
+
+87 native JVM tests pass, covering permission/action/state validation, reopen,
+Stop/watch-switch fences, duplicate acquisition, suspended recovery and retained
+policy/receipts. Both debug variants compile. Nokia replacement install changed
+PID 7962 → 9371 and Ready 154 → 155 with Flutter absent and no explicit Start.
+Retained lifecycle events confirm `MY_PACKAGE_REPLACED` requested/accepted system
+restoration. Fresh time/status and real HTTP followed (2.887 s, zero pending).
+The recent logcat window missed these events; the first evidence assertion failed
+and was resolved using the app's retained lifecycle journal, without re-running or
+manually triggering recovery. The physical reboot/first-unlock check is recorded
+in the runbook, including all failed/extended observation windows.
+
+
+Physical reboot eventually restored Ready 156 (PID 4369) after first unlock,
+without UI/Start, and real HTTP then completed in 3.429 s. The first 120-second
+USB boot wait and 60-second recovery window failed; later observation succeeded.
+The ordered boot broadcast took 1m41.255s to finish. Do not promise immediate
+coverage during reboot/unlock. Stop 157 survived replacement with a logged skip,
+owner absent and zero native notifications. Native receipts/jobs and all nine
+watch originals remained unchanged. Detailed provenance and failure windows are
+in the Nokia runbook. The fifteen-minute idle remote-fetch timeout remains open.

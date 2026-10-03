@@ -4,6 +4,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import dev.zswatch.app.companion.CompanionPrototypeService
+import dev.zswatch.app.companion.PrototypeHub
+import dev.zswatch.app.companion.PrototypeSystemRecovery
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -11,7 +17,7 @@ class BootReceiver : BroadcastReceiver() {
         LifecycleLogger.recordHistoricalExitReasons(context)
         val action = intent?.action
         if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE) {
-            LifecycleLogger.log("CompanionPrototype", "boot_legacy_start_skipped action=$action")
+            restoreNative(context, action)
             return
         }
         LifecycleLogger.recordStartupCause(
@@ -45,5 +51,39 @@ class BootReceiver : BroadcastReceiver() {
             "BootReceiver",
             "foreground recovery notification start attempted started=$started sdk=${Build.VERSION.SDK_INT}",
         )
+    }
+
+    private fun restoreNative(context: Context, action: String?) {
+        if (action != Intent.ACTION_BOOT_COMPLETED && action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+        // BOOT_COMPLETED uses credential-encrypted storage after first unlock.
+        // Never attempt a direct-boot Flutter/model/database startup.
+        val application = context.applicationContext
+        val pending = goAsync()
+        PrototypeHub.worker.post {
+            try {
+                val allowed = Build.VERSION.SDK_INT < 31 || ContextCompat.checkSelfPermission(application,
+                    Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+                val request = PrototypeSystemRecovery.request(PrototypeHub.journal(application).control(), action, allowed)
+                if (request == null) {
+                    LifecycleLogger.log("CompanionPrototype", "system_restore_skipped action=$action")
+                    pending.finish()
+                    return@post
+                }
+                PrototypeHub.main.post {
+                    try {
+                        ContextCompat.startForegroundService(application,
+                            Intent(application, CompanionPrototypeService::class.java)
+                                .setAction(CompanionPrototypeService.RESTORE_SYSTEM)
+                                .putExtra("address", request.address).putExtra("generation", request.generation))
+                        LifecycleLogger.log("CompanionPrototype", "system_restore_requested action=$action")
+                    } catch (error: Exception) {
+                        LifecycleLogger.log("CompanionPrototype", "system_restore_failed ${error.javaClass.simpleName}")
+                    } finally { pending.finish() }
+                }
+            } catch (error: Exception) {
+                LifecycleLogger.log("CompanionPrototype", "system_restore_failed ${error.javaClass.simpleName}")
+                pending.finish()
+            }
+        }
     }
 }

@@ -23,6 +23,7 @@ class CompanionPrototypeService : Service() {
         const val START = "dev.zswatch.app.companion.START"
         const val STOP = "dev.zswatch.app.companion.STOP"
         const val RESTORE_PRESENCE = "dev.zswatch.app.companion.RESTORE_PRESENCE"
+        const val RESTORE_SYSTEM = "dev.zswatch.app.companion.RESTORE_SYSTEM"
         const val START_REMOTE_FIXTURE = "dev.zswatch.app.companion.START_REMOTE_FIXTURE"
         const val START_LOCAL_FIXTURE = "dev.zswatch.app.companion.START_LOCAL_FIXTURE"
         const val POST_TEST_NOTIFICATION = "dev.zswatch.app.companion.POST_TEST_NOTIFICATION"
@@ -111,7 +112,7 @@ class CompanionPrototypeService : Service() {
             }
             return START_NOT_STICKY
         }
-        if (intent != null && intent.action !in listOf(START, RESTORE_PRESENCE, START_REMOTE_FIXTURE, START_LOCAL_FIXTURE, POST_TEST_NOTIFICATION)) { stopSelf(); return START_NOT_STICKY }
+        if (intent != null && intent.action !in listOf(START, RESTORE_PRESENCE, RESTORE_SYSTEM, START_REMOTE_FIXTURE, START_LOCAL_FIXTURE, POST_TEST_NOTIFICATION)) { stopSelf(); return START_NOT_STICKY }
         try {
             val manager = getSystemService(NotificationManager::class.java)
             if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(
@@ -142,6 +143,14 @@ class CompanionPrototypeService : Service() {
                         owner.restoreForPresence(address, intent.getLongExtra("generation", -1))
                     LifecycleLogger.log("CompanionPresence", "restore_accepted=$restored")
                     if (!restored && !owner.active) PrototypeHub.main.post { stopSelf() }
+                    return@safely
+                }
+                if (intent?.action == RESTORE_SYSTEM) {
+                    val restored = address != null && owner.restoreForSystem(address, intent.getLongExtra("generation", -1))
+                    LifecycleLogger.log("CompanionPrototype", "system_restore_accepted=$restored")
+                    if (!restored && !owner.active) PrototypeHub.main.post { stopSelf() }
+                    if (restored && address != null) try { PrototypePresence.observe(applicationContext, address) }
+                    catch (error: Exception) { LifecycleLogger.log("CompanionPresence", "observe_failed ${error.javaClass.simpleName}") }
                     return@safely
                 }
                 // Two accepted starts may reach the service before the first

@@ -1225,8 +1225,27 @@ Nokia verified stopped persistence, no owner start, disabled error delivery and
 fresh enabled HTTP delivery. 84 native, 41 selected Flutter and 42 harness tests
 pass; both debug builds compile. AI/recording processing and iOS remain deferred.
 
-A longer native-only idle observation is underway. The next shared lifecycle gap
-is reboot/package-replacement recovery: the prototype currently skips the legacy
-boot handler. Add native restoration of saved running intent after credential
-storage becomes available, with address/generation fencing so delayed events
-cannot undo explicit Stop. Current-Android and production acceptance remain open.
+A 15-minute native-only idle observation retained Ready, fresh status and new
+notification ATT completion with Flutter absent. Its final remote HTTP request
+timed out and got an error reply, so remote fetching did not pass that longer
+idle case. Active-state HTTP subsequently succeeded. The app was observed on the
+Doze whitelist; use controlled endpoints/network comparisons before attributing
+this to Doze or changing exemptions. Current-Android and production acceptance
+remain open. Reboot/package-replacement recovery is the next checkpoint below.
+
+
+### Progress 2026-10-03: Android boot and package-update recovery
+
+The existing receiver now restores only strict native running intent for supported
+boot/package-replacement events and available Bluetooth permission. Service-side
+address/generation checks fence delayed events after Stop/watch switch. No Flutter,
+model or Drift worker starts. Normal builds retain their existing handler.
+
+87 native tests pass and both debug variants compile. Nokia replacement restored
+Ready 155 in a new process without UI/Start; retained events confirm the new handler
+requested/accepted restoration. Reboot/first unlock later restored Ready 156 with
+fresh time/status and Flutter absent. The first two-minute USB boot wait and first
+one-minute recovery check failed; longer observation succeeded. Android's ordered
+boot broadcast took about 1m41s to finish. Recovery is eventual, not an always-alive
+or instant-reboot promise. Current-Android restrictions and production latency
+acceptance remain open. Exact results and stopped-update checks are in the runbook.
