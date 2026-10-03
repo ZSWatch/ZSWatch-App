@@ -29,6 +29,31 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                 result.error("VERSION", "Unsupported companion bridge version", null)
             } else when (call.method) {
                 "snapshot" -> snapshot(result::success) { message -> result.error("SNAPSHOT_FAILED", message, null) }
+                "requestNotificationAccess" -> {
+                    activity.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                    result.success(mapOf("version" to 1, "accepted" to true))
+                }
+                "postTestNotification" -> {
+                    try {
+                        val delay = call.argument<Int>("delaySeconds") ?: 0
+                        val closeUi = call.argument<Boolean>("closeUi") ?: false
+                        require(delay in 0..60 && (!closeUi || delay > 0)) { "Invalid diagnostic delay" }
+                        // This synthetic fixture survives Activity disposal, not process death.
+                        // It is not a recovery scheduler or a background acceptance harness.
+                        val application = context
+                        PrototypeHub.worker.postDelayed({
+                            try {
+                                dev.zswatch.app.NotificationDebugHelper.postDebugNotification(application,
+                                    "Companion background test", "Native forwarding without Flutter BLE ownership")
+                                LifecycleLogger.log("CompanionNotifications", "synthetic_notification_posted")
+                            } catch (error: Exception) {
+                                LifecycleLogger.log("CompanionNotifications", "synthetic_notification_failed ${error.javaClass.simpleName}")
+                            }
+                        }, delay * 1000L)
+                        result.success(mapOf("version" to 1, "accepted" to true))
+                        if (closeUi) activity.finishAndRemoveTask()
+                    } catch (error: Exception) { result.error("DIAGNOSTIC_FAILED", error.message, null) }
+                }
                 "presenceStatus", "associatePresence" -> {
                     try {
                         val address = call.argument<String>("address")?.uppercase() ?: error("Address required")
@@ -68,7 +93,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
-                "stop", "syncTime", "retryRecordings", "ackEvents" -> {
+                "stop", "syncTime", "retryRecordings", "ackEvents", "configureNotifications", "setRecordingSync" -> {
                     PrototypeHub.worker.post {
                         try {
                             val store = PrototypeHub.journal(context)
@@ -80,12 +105,28 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                                         service.stopPresenceObservation()
                                     }
                                     else store.update("runtime_stopped", mapOf("desired_running" to false,
-                                        "phase" to "stopped", "generation" to (store.control()["generation"] as Number).toLong() + 1))
+                                        "phase" to "stopped", "generation" to (store.control()["generation"] as Number).toLong() + 1,
+                                        "notifications" to emptyMap<String, Any>()))
                                     if (service == null) runCatching { PrototypePresence.stopObserving(context, store.control()["address"] as String) }
                                     PrototypeHub.main.post { service?.stopSelf() }
                                 }
                                 "syncTime" -> (service?.transport ?: error("Service not running")).syncTime()
                                 "retryRecordings" -> (service?.transport ?: error("Service not running")).retryRecordings()
+                                "setRecordingSync" -> {
+                                    val enabled = call.argument<Boolean>("enabled") ?: error("Enabled required")
+                                    if (service?.transport != null) service.transport!!.setRecordingSync(enabled)
+                                    else store.update("recording_sync_configuration", mapOf("recording_sync_enabled" to enabled))
+                                }
+                                "configureNotifications" -> {
+                                    val enabled = call.argument<Boolean>("enabled") ?: error("Enabled required")
+                                    val packages = call.argument<List<String>>("packages") ?: error("Packages required")
+                                    if (enabled) check(dev.zswatch.app.NotificationListenerServiceImpl.isNotificationAccessEnabled(context)) {
+                                        "Grant notification access before enabling forwarding"
+                                    }
+                                    PrototypeNotifications(store).configure(enabled, packages)
+                                    service?.transport?.flushNotifications()
+                                    if (enabled) PrototypeHub.main.post { dev.zswatch.app.NotificationListenerServiceImpl.replayPrototypeNotifications() }
+                                }
                                 "ackEvents" -> {
                                     val cursor = call.argument<Number>("cursor") ?: error("Cursor required")
                                     require(cursor.toDouble() == cursor.toLong().toDouble()) { "Integer cursor required" }

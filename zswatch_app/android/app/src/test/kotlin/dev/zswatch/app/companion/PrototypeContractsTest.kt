@@ -26,12 +26,46 @@ class PrototypeContractsTest {
         try { action(); fail("Expected rejection") } catch (_: IllegalArgumentException) {}
     }
 
+    @Test fun journalRoundTripsNestedCollectionsAsJsonValues() {
+        val journal = store()
+        journal.update("configuration", mapOf("notification_packages" to listOf("com.zswatch.app"),
+            "nested" to mapOf("enabled" to true, "values" to listOf(1, 2)),
+            "notifications" to emptyMap<String, Any>()))
+        val saved = JSONObject(File(temporary.root, "state-v1.json").readText())
+        assertEquals("com.zswatch.app", saved.getJSONArray("notification_packages").getString(0))
+        assertTrue(saved.getJSONObject("nested").getBoolean("enabled"))
+        assertEquals(2, saved.getJSONObject("nested").getJSONArray("values").getInt(1))
+        assertEquals(0, saved.getJSONObject("notifications").length())
+        assertEquals(listOf("com.zswatch.app"), store().control()["notification_packages"])
+    }
+
     @Test fun duplicateStartDoesNotAcquireAnotherTransport() {
         val link = Link(); val runtime = PrototypeRuntime(store(), link)
         runtime.start(address); runtime.start(address)
         assertEquals(1, link.sessions.size)
         assertEquals(0, link.closes)
         assertTrue(runtime.active)
+    }
+
+    @Test fun radioSuspensionFencesCallbacksAndRecoversOnlyRunningIntent() {
+        val link = Link(); val runtime = PrototypeRuntime(store(), link)
+        runtime.start(address); val old = runtime.generation
+        runtime.suspendTransport("Bluetooth disabled")
+        assertFalse(runtime.owns(old)); assertTrue(runtime.active)
+        assertEquals(true, runtime.store.control()["desired_running"])
+        assertTrue(runtime.recoverForSystem())
+        assertEquals(2, link.sessions.size)
+        assertTrue(runtime.generation > old)
+        runtime.stop()
+        assertFalse(runtime.recoverForSystem())
+        assertEquals(2, link.sessions.size)
+    }
+
+    @Test fun systemRecoveryPreservesReadyOwner() {
+        val link = Link(); val runtime = PrototypeRuntime(store(), link)
+        runtime.start(address); runtime.phase(runtime.generation, "ready")
+        assertTrue(runtime.recoverForSystem())
+        assertEquals(1, link.sessions.size); assertEquals(0, link.closes)
     }
 
     @Test fun changingAnActiveWatchDoesNotCloseItsOwner() {

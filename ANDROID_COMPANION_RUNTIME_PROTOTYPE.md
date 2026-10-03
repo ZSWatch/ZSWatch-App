@@ -11,6 +11,11 @@ completed companion migration or a decision to discard the engine-based option.
 - Known-address BLE connection, MTU negotiation, NUS discovery/subscription,
   serialized writes, fragmented UTF-8 JSON reception, operation deadlines
   and reconnect attempts with 5–60 second delays. No discovery or bonding UI.
+- Native notification-listener routing with an explicit package allowlist, persisted
+  bounded outbox, stable IDs, updates/removals, reconnect replay and listener reconciliation.
+  The development UI currently allows only synthetic ZSWatch notifications.
+- Bluetooth-off generation fencing and recovery on Bluetooth-on; native time/timezone
+  broadcasts resynchronize a ready link. Recording downloads can be explicitly paused.
 - Time/timezone write on readiness and watch time request; explicit UI command.
   `last_time_write_utc_ms` means transport write completion, not watch receipt ACK.
 - Watch recording list entries persisted before download; new events trigger a
@@ -112,6 +117,10 @@ Every request/subscription includes `{version: 1}`.
 | `stop` | — | Snapshot after saved intent is cleared and transport closed |
 | `syncTime` | — | Snapshot after queuing the write; completion arrives separately |
 | `retryRecordings` | — | Snapshot after retry/list request; asynchronous receipts follow |
+| `setRecordingSync` | `enabled`: boolean | Persisted download policy; disabling cancels/releases the existing Nordic transfer |
+| `configureNotifications` | `enabled`, `packages`: explicit Android package list | Persisted policy; enabling requires actual notification access |
+| `requestNotificationAccess` | — | Opens Android notification-listener settings; accepted does not mean permission granted |
+| `postTestNotification` | Optional `delaySeconds` 0–60, `closeUi` | Synthetic fixture; closing UI requires a positive delay; no process-death scheduler |
 | `ackEvents` | `cursor`: committed nonnegative integer | Snapshot after cumulative diagnostic ACK |
 
 Events deliver snapshots, not commands. `owner=android_service_native`,
@@ -257,3 +266,73 @@ The prototype must not delete audio or run replayed external actions while those
 contracts are absent. Test the alternative service-owned Flutter-engine spike
 and the iOS lifecycle path before selecting the production architecture. This
 prototype supplies a compiled, testable native baseline for that comparison.
+
+## Native notification and recovery milestone (2026-10-03)
+
+The service persists at most 64 notification identities, with a 10-minute text
+retention deadline and 60-second maintenance while the process runs. Offline
+maintenance removes private text and retains removal IDs. Process suspension/death
+can delay maintenance until execution resumes; this is not a secure deletion SLA.
+Stop clears pending private notification state before closing BLE. The UI snapshot
+contains counts/configuration and IDs in diagnostics, not Android keys or text.
+Stop does not guarantee removal of notifications already shown on the watch.
+
+Notifications use the existing firmware `notify` and `notify-` messages. The firmware
+ignores duplicate IDs and has no `notify~`; changed content therefore queues remove
+then add with the same ID. Unchanged replay preserves IDs. The watch holds only 10
+notifications and truncates text fields; a 64-entry phone journal is not a promise
+of retaining all 64 on the watch. ATT write completion is not a watch application ACK
+or proof that a popup was displayed. A reinstalled app can lose its identity counter;
+reset/migration identity handling remains a production requirement.
+
+Physical Nokia/API 31 checks with paused recording downloads observed:
+
+- Synthetic notification write in foreground, then another after Flutter Activity
+  and task disposal with the launcher foreground.
+- Bluetooth-off kept running intent and fenced generation 92 to 94; Bluetooth-on
+  reached ready at generation 95, resynced time and replayed both stable IDs.
+- An injected Java process crash from that ready link changed PID 27854 to 28647.
+  Notification-listener recreation, sticky service start and CDM callbacks occurred;
+  generation 96 reached ready and replayed both notifications without a UI launch.
+  This does not isolate which OS mechanism enabled recovery, or prove low-memory
+  termination/force-stop recovery.
+- A third delayed synthetic notification completed its write with the display
+  Dozing and the Flutter Activity absent. USB was attached: unplugged deep Doze,
+  long idle and manufacturer restrictions remain unverified.
+
+The first physical build exposed Android `JSONObject.put` serializing a Kotlin
+list as a string, unlike the JVM JSON implementation. Store updates now explicitly
+wrap collections/maps; the corrected APK persisted a real package array. Final host
+checks: 49 native JVM tests, 15 Flutter bridge/UI tests, focused analysis, prototype
+and ordinary debug APK builds and release-manifest merging pass. Release has no
+prototype presence service, companion presence permissions or probe instrumentation.
+
+Evidence: `.companion-hil-runs/20261003-native-notifications/`. Tested corrected
+APK SHA-256: `90bac4f27d71d2c4c133260f28eb6e2220c09e7121d14ea804eb6ecf93e98a2f`.
+The later listener ID-bookkeeping cleanup has host verification; it was not installed
+in this physical run. No firmware was flashed, no recording deleted, and no audio
+was uploaded or passed to a model. SMP still uses Nordic 2.7.2; notifications do not
+require BLE SMP. iOS and newer Android device acceptance remain open.
+
+Explicit Stop was sent through the existing non-exported service action as the
+debuggable app UID after the phone locked (`am startservice --user 0 ... STOP`).
+It persisted generation 101/stopped, cleared all notification content and released
+the native service. Bluetooth off/on afterward did not restart it. Association
+was retained; Bluetooth was restored. The read-only runtime probe verified the
+installed APK hash and the final stopped state without unlocking the phone.
+
+### Existing MCUmgr fork audit
+
+The ordinary Flutter path resolves both Dart and native Android/iOS code from
+`Flutter-nRF-Connect-Device-Manager`, at revision
+`2aabd598990fb9fb3cba918d15f98084e9ee687c` plus the user's working changes.
+The Dart FS-manager working diff is formatting; path/remote-ID callback routing,
+one-transfer-per-device and disposal logic already exist in that fork. Android's
+`FsManagerPlugin` uses Nordic downloads and adds upload connection priority,
+logging control, detected upload MTU and `FileUploader` window 3/alignment 4.
+Those upload policies must remain when uploads migrate; the current prototype
+does not upload. Native downloads use Nordic 2.7.2 directly, with SDK high
+connection priority, cancellation before release and generation/operation fences.
+They do not invoke the fork's Dart/Pigeon/Flutter callback layer. The iOS plugin
+uses Nordic's separate `iOSMcuManagerLibrary`; shared Dart API does not imply an
+Android transport can run on iOS. No fork changes were reverted or committed here.

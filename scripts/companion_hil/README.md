@@ -393,3 +393,41 @@ ordinary-app baseline and notification/time/voice scenario assertions; resolve t
 transfer and process-recovery failures in the smoke report.
 Add scenario assertions and deployment adapters separately. Mac/iPhone control,
 instrumented phone scenarios and actual background acceptance are pending.
+
+### Read-only native state probe
+
+`native_runtime_probe.py` reads the prototype journal through `run-as`, observes
+the native service/PID/current Activity and optionally verifies a frozen APK
+against the installed hash. It rejects stringified package allowlists, persisted
+Ready without a live service, and Stop with retained content/service. Reports
+redact Android notification keys/text and always keep `acceptance=NOT_RUN`.
+
+```bash
+python3 scripts/companion_hil/native_runtime_probe.py \
+  --adb /home/jakkra/Android/Sdk/platform-tools/adb \
+  --android-serial A00000V791290707484 --expect stopped \
+  --apk /absolute/path/to/frozen-prototype.apk \
+  --output /tmp/new-native-state-observation.json
+python3 -m unittest discover -s scripts/companion_hil/tests -p test_native_runtime_probe.py -v
+```
+
+For the prototype's synthetic notification test, grant ZSWatch notification
+access in Android Settings, pause recording downloads, enable test forwarding
+and connect. `Close UI and test in 15s` schedules a fixed native notification
+and finishes/removes the Activity/task. It is an in-process diagnostic timer,
+not a process-death scheduler. Correlate `ui_detached`, synthetic post and native
+write-completion timestamps. Do not run transfer instrumentation during these
+background observations; it changes OS execution conditions.
+
+After the screen-off test locked the dedicated phone, cleanup used the existing
+non-exported Stop action as the debug app UID:
+
+```bash
+adb -s A00000V791290707484 shell run-as com.zswatch.app /system/bin/am \
+  startservice --user 0 -n com.zswatch.app/dev.zswatch.app.companion.CompanionPrototypeService \
+  -a dev.zswatch.app.companion.STOP
+```
+
+Observe the stopped state afterward; command acceptance alone does not prove Stop.
+Bluetooth off/on after Stop must preserve desired intent=false. Leave Bluetooth on.
+This ADB-triggered cleanup is separate from autonomous recovery evidence.

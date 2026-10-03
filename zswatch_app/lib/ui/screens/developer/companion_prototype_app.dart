@@ -107,6 +107,33 @@ class _CompanionPrototypeAppState extends State<CompanionPrototypeApp> {
             'Protocol ready: ${state?.protocolReady ?? false} • generation ${state?.generation ?? 0}',
           ),
           Text('Saved recordings: ${state?.recordings.length ?? 0}'),
+          SwitchListTile(
+            title: const Text('Download recordings (experimental)'),
+            value: state?.fields['recording_sync_enabled'] != false,
+            onChanged: busy || state == null
+                ? null
+                : (enabled) => unawaited(
+                    run(() async {
+                      show(await client.setRecordingSync(enabled));
+                    }),
+                  ),
+          ),
+          SwitchListTile(
+            title: const Text('Forward test notifications'),
+            subtitle: const Text('Only notifications from ZSWatch itself'),
+            value: state?.fields['notifications_enabled'] == true,
+            onChanged: busy || state == null
+                ? null
+                : (enabled) => unawaited(
+                    run(() async {
+                      show(
+                        await client.configureNotifications(enabled, [
+                          'com.zswatch.app',
+                        ]),
+                      );
+                    }),
+                  ),
+          ),
           if (presence != null)
             Text(
               'Presence supported: ${presence!['supported']} • associated: ${presence!['associated']}',
@@ -118,6 +145,42 @@ class _CompanionPrototypeAppState extends State<CompanionPrototypeApp> {
             spacing: 8,
             runSpacing: 8,
             children: [
+              OutlinedButton(
+                onPressed: busy
+                    ? null
+                    : () => unawaited(
+                        run(
+                          () => client.notificationDiagnostic(
+                            requestAccess: true,
+                          ),
+                        ),
+                      ),
+                child: const Text('Notification access'),
+              ),
+              OutlinedButton(
+                onPressed:
+                    busy || state?.fields['notifications_enabled'] != true
+                    ? null
+                    : () =>
+                          unawaited(run(() => client.notificationDiagnostic())),
+                child: const Text('Post test notification'),
+              ),
+              FilledButton(
+                onPressed:
+                    busy ||
+                        state?.protocolReady != true ||
+                        state?.fields['notifications_enabled'] != true
+                    ? null
+                    : () => unawaited(
+                        run(
+                          () => client.notificationDiagnostic(
+                            delaySeconds: 15,
+                            closeUi: true,
+                          ),
+                        ),
+                      ),
+                child: const Text('Close UI and test in 15s'),
+              ),
               FilledButton(
                 onPressed: busy ? null : () => unawaited(run(connect)),
                 child: const Text('Connect / recover'),

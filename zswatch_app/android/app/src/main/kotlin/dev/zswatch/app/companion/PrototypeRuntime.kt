@@ -47,6 +47,21 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
 
     fun owns(token: Long): Boolean = active && token == generation
 
+    /** Fence pending callbacks without changing the user's running intent. */
+    fun suspendTransport(reason: String) {
+        if (!active) return
+        store.update("transport_suspended", mapOf("generation" to generation + 1,
+            "phase" to "disconnected", "last_error" to reason))
+        transport.close()
+    }
+
+    fun recoverForSystem(): Boolean {
+        if (store.control()["desired_running"] != true) return false
+        if (!active) return restore()
+        if (store.control()["phase"] in listOf("disconnected", "error")) reconnect()
+        return true
+    }
+
     fun reconnect() {
         if (!active) return
         val address = store.control()["address"] as String
@@ -64,7 +79,7 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
 
     fun stop() {
         store.update("runtime_stopped", mapOf("desired_running" to false,
-            "generation" to generation + 1, "phase" to "stopped"))
+            "generation" to generation + 1, "phase" to "stopped", "notifications" to emptyMap<String, Any>()))
         active = false
         transport.close()
     }

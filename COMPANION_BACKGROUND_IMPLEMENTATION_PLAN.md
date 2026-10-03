@@ -894,6 +894,37 @@ reset, BLE SMP är avstängt och nio recordings finns kvar. Ingen firmware flash
 Se `ANDROID_COMPANION_NOKIA_SMOKE.md` och
 `.companion-hil-runs/20261002-existing-discovery-retry/` för avgränsade resultat.
 
+### Native notifications och recovery, 2026-10-03
+
+Debug-prototypen har nu native notification-routing, explicit package-allowlist,
+beständig begränsad outbox och stabila ID:n, update/remove, reconciliation efter
+listener-restart och replay efter reconnect. Flutter observerar state och styr
+policy; det äger inte denna BLE-session. Inspelningsdownloads kan pausas separat
+för att filkorruption inte ska blockera arkitekturarbetet. SMP använder fortsatt
+befintliga Nordic 2.7.2; användarens lokala Dart/native-fork är verifierad i den
+ordinarie biblioteksvägen och dess upload-policy är dokumenterad för migrering.
+
+Fysisk Nokia/API 31: synthetic notification-write efter Flutter Activity/task
+stängts; Bluetooth off/on gav Ready igen samt time/outbox replay; injicerad
+Java-processkrasch från Ready gav ny PID, Ready och samma replay utan UI-start.
+Notification listener, sticky-start och CDM-callbacks var aktiva, så en specifik
+wakeup-mekanism isoleras inte. Screen-off-write observerades med USB ansluten.
+Explicit Stop klarade en efterföljande radioomstart: intent=false, service borta
+och privat notification-state tomt.
+
+Androids JSONObject avslöjade en list-serialiseringsbugg som JVM-tester missade;
+explicit JSON-wrapping och fysisk array-verifiering finns nu. 49 native tester,
+15 Flutter bridge/UI-tester, fyra read-only-probe-tester, analys, normal/prototype
+APK och release-manifest-check passerar. Resultaten är avgränsad grund för native
+ägarskap/recovery, inte hela companion-acceptansen: watch-popup/application-ACK,
+äkta memory reclaim, unplugged Doze/soak, nyare Android, filintegritet och iPhone
+återstår. Native OS time/timezone handlers finns; fysisk timezone-broadcast är
+inte ännu verifierad. Se `ANDROID_COMPANION_RUNTIME_PROTOTYPE.md`.
+
+Nästa arbete är mobil adapter för remote-jobbkontraktet med syntetisk loopback-
+backend, receipt/import-migrering och firmware-ACK/deduplicering som separat
+versionsförhandlad leverans. Ingen verklig ljudupload/actions körs av prototypen.
+
 ### Införande och återgång
 
 - Inför en explicit runtime-selection per appstart under migreringen. Legacy och ny kärna får inte ansluta samtidigt till samma watch.

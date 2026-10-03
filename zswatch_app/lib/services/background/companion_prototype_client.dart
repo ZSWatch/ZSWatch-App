@@ -50,6 +50,59 @@ class CompanionPrototypeClient {
         await methods.invokeMethod<Object?>('snapshot', {'version': 1}),
       );
 
+  Future<CompanionPrototypeSnapshot> setRecordingSync(bool enabled) async =>
+      CompanionPrototypeSnapshot.decode(
+        await methods.invokeMethod<Object?>('setRecordingSync', {
+          'version': 1,
+          'enabled': enabled,
+        }),
+      );
+
+  Future<CompanionPrototypeSnapshot> configureNotifications(
+    bool enabled,
+    List<String> packages,
+  ) async {
+    if (packages.length > 64 ||
+        packages.any(
+          (p) => !RegExp(r'^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$').hasMatch(p),
+        )) {
+      throw const FormatException('Expected Android package names');
+    }
+    return CompanionPrototypeSnapshot.decode(
+      await methods.invokeMethod<Object?>('configureNotifications', {
+        'version': 1,
+        'enabled': enabled,
+        'packages': packages,
+      }),
+    );
+  }
+
+  Future<void> notificationDiagnostic({
+    bool requestAccess = false,
+    int delaySeconds = 0,
+    bool closeUi = false,
+  }) async {
+    if (delaySeconds < 0 ||
+        delaySeconds > 60 ||
+        (closeUi && delaySeconds == 0) ||
+        (requestAccess && (closeUi || delaySeconds != 0))) {
+      throw const FormatException('Invalid notification diagnostic delay');
+    }
+    final response = await methods.invokeMethod<Object?>(
+      requestAccess ? 'requestNotificationAccess' : 'postTestNotification',
+      {
+        'version': 1,
+        if (delaySeconds != 0) 'delaySeconds': delaySeconds,
+        if (closeUi) 'closeUi': true,
+      },
+    );
+    if (response is! Map ||
+        response['version'] != 1 ||
+        response['accepted'] != true) {
+      throw const FormatException('Notification diagnostic was not accepted');
+    }
+  }
+
   Future<void> start(String address) async {
     final normalized = address.trim().toUpperCase();
     if (!RegExp(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$').hasMatch(normalized)) {

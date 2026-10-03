@@ -28,7 +28,9 @@ class PrototypeStore(private val directory: File, private val eventLimit: Int = 
     @Synchronized fun update(kind: String, fields: Map<String, Any?> = emptyMap(),
                              detail: Map<String, Any?> = emptyMap()) {
         val next = JSONObject(data.toString())
-        fields.forEach { (key, value) -> next.put(key, value ?: JSONObject.NULL) }
+        // Android's JSONObject.put does not wrap Collections/Maps as JSON.
+        // Explicitly wrap so the on-device journal matches the JVM contract.
+        fields.forEach { (key, value) -> next.put(key, JSONObject.wrap(value) ?: JSONObject.NULL) }
         val sequence = next.getLong("event_cursor") + 1
         next.put("event_cursor", sequence)
         val old = next.getJSONArray("events")
@@ -73,6 +75,8 @@ class PrototypeStore(private val directory: File, private val eventLimit: Int = 
         map["runtime_active"] = active
         map["protocol_ready"] = active && data.getString("phase") == "ready"
         map["owner"] = "android_service_native"
+        // UI observes counts/configuration; private notification contents stay native.
+        map["notification_count"] = (map.remove("notifications") as? Map<*, *>)?.size ?: 0
         return map
     }
 

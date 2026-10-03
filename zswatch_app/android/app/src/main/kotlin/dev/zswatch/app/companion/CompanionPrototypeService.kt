@@ -5,10 +5,15 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.bluetooth.BluetoothAdapter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import dev.zswatch.app.BuildConfig
 import dev.zswatch.app.LifecycleLogger
 import java.io.File
@@ -27,6 +32,36 @@ class CompanionPrototypeService : Service() {
         private set
     var transport: NativePrototypeTransport? = null
         private set
+    private var receiverRegistered = false
+    private val systemEvents = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val action = intent.action
+            val radio = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)
+            PrototypeHub.worker.post {
+                safely {
+                    val owner = runtime ?: return@safely
+                    if (action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                        if (radio == BluetoothAdapter.STATE_OFF || radio == BluetoothAdapter.STATE_TURNING_OFF)
+                            owner.suspendTransport("Bluetooth disabled")
+                        else if (radio == BluetoothAdapter.STATE_ON) owner.recoverForSystem()
+                    } else if (action in listOf(Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED)) {
+                        if (owner.active && owner.store.control()["phase"] == "ready") transport?.syncTime()
+                    }
+                }
+            }
+        }
+    }
+
+    private val notificationMaintenance = object : Runnable {
+        override fun run() {
+            if (instance !== this@CompanionPrototypeService) return
+            safely {
+                runtime?.store?.let { PrototypeNotifications(it).expire(System.currentTimeMillis()) }
+                transport?.flushNotifications()
+            }
+            PrototypeHub.worker.postDelayed(this, 60000)
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -37,6 +72,12 @@ class CompanionPrototypeService : Service() {
         LifecycleLogger.log("CompanionPrototype", "service_created pid=${android.os.Process.myPid()}")
         if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE) { stopSelf(); return }
         instance = this
+        ContextCompat.registerReceiver(this, systemEvents, IntentFilter().apply {
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }, ContextCompat.RECEIVER_EXPORTED)
+        receiverRegistered = true
         PrototypeHub.worker.post {
             safely {
                 val store = PrototypeHub.journal(applicationContext)
@@ -44,6 +85,7 @@ class CompanionPrototypeService : Service() {
                 val link = NativePrototypeTransport(applicationContext, PrototypeHub.worker, store, files)
                 transport = link
                 runtime = PrototypeRuntime(store, link).also { link.runtime = it }
+                PrototypeHub.worker.post(notificationMaintenance)
             }
         }
     }
@@ -138,6 +180,8 @@ class CompanionPrototypeService : Service() {
     override fun onDestroy() {
         LifecycleLogger.log("CompanionPrototype", "service_destroyed explicitStop=${runtime?.store?.control()?.get("desired_running") == false}")
         if (instance === this) instance = null
+        if (receiverRegistered) { unregisterReceiver(systemEvents); receiverRegistered = false }
+        PrototypeHub.worker.removeCallbacks(notificationMaintenance)
         PrototypeHub.worker.post { safely { runtime?.destroy(); runtime = null; transport = null } }
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()

@@ -124,6 +124,13 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             )
             return flat != null && flat.contains(cn.flattenToString())
         }
+
+        fun replayPrototypeNotifications() {
+            val listener = instance ?: return
+            val active = listener.activeNotifications ?: return
+            dev.zswatch.app.companion.PrototypeNotificationRouter.reconcile(listener.applicationContext, active.map { it.key }.toSet())
+            active.forEach { listener.onNotificationPosted(it) }
+        }
         
         // Get currently active notifications
         fun getActiveNotifications(): List<Map<String, Any?>> {
@@ -250,6 +257,12 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         super.onListenerConnected()
         Log.d(TAG, "NotificationListenerService connected")
         LifecycleLogger.log(TAG, "onListenerConnected activeNotifications=${activeNotifications?.size ?: 0}")
+        if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE) {
+            activeNotifications?.let { active ->
+                dev.zswatch.app.companion.PrototypeNotificationRouter.reconcile(applicationContext, active.map { it.key }.toSet())
+                active.forEach { onNotificationPosted(it) }
+            }
+        }
     }
     
     override fun onListenerDisconnected() {
@@ -404,6 +417,9 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             return
         }
         
+        if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE &&
+            dev.zswatch.app.companion.PrototypeNotificationRouter.posted(applicationContext, extractNotificationData(sbn))) return
+
         // Old repeat prevention: Skip notifications with older/same timestamp than last forwarded
         // This prevents re-posts of old notifications (e.g., Messenger updating same notification)
         // From Gadgetbridge ~line 412-425
@@ -482,6 +498,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
     
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         sbn ?: return
+        if (dev.zswatch.app.companion.PrototypeNotificationRouter.removed(applicationContext, sbn.key)) return
         val isDebugNotification = sbn.notification.extras?.getBoolean(
             NotificationDebugHelper.EXTRA_DEBUG_NOTIFICATION
         ) == true
@@ -535,7 +552,9 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         val notification = sbn.notification
         val extras = notification.extras
 
-        val uniqueId = getOrCreateUniqueId(sbn)
+        // The native prototype journals its own stable IDs and never uses the
+        // legacy in-memory identity maps or SharedPreferences counter.
+        val uniqueId = if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE) 0 else getOrCreateUniqueId(sbn)
         
         // Get app name
         val pm = packageManager

@@ -39,6 +39,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var transfer: TransferController? = null
     private var downloading = false
     private var fileOperation = 0L
+    private var notificationWriting = false
 
     override fun connect(address: String, generation: Long) {
         close()
@@ -99,6 +100,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 retryDelay = 5000
                 command("GB({\"t\":\"log\",\"status\":false})")
                 syncTime()
+                flushNotifications()
                 requestRecordings()
                 recoverReceipts()
                 downloadNext()
@@ -213,6 +215,37 @@ class NativePrototypeTransport(private val context: Context, private val handler
         val item = writes.peek() ?: return
         if (item.advance()) { writes.remove(); item.done() }
         pump()
+        flushNotifications()
+    }
+
+    fun flushNotifications() {
+        if (notificationWriting || !runtime.owns(token) || store.control()["phase"] != "ready" || writes.size >= 14) return
+        if (!dev.zswatch.app.NotificationListenerServiceImpl.isNotificationAccessEnabled(context)) return
+        val inbox = PrototypeNotifications(store)
+        val delivery = inbox.next(token, System.currentTimeMillis()) ?: return
+        notificationWriting = true
+        val session = token
+        if (delivery.replace) command("GB(${JSONObject().put("t", "notify-").put("id", delivery.id)})")
+        command(delivery.packet) {
+            if (runtime.owns(session)) {
+                inbox.written(delivery, session)
+                notificationWriting = false
+                flushNotifications()
+            }
+        }
+    }
+
+    fun setRecordingSync(enabled: Boolean) {
+        store.update("recording_sync_configuration", mapOf("recording_sync_enabled" to enabled))
+        if (enabled) { downloadNext(); return }
+        // Fence the SDK callback before cancellation/release. Resume reconciles
+        // retained pending entries and never deletes a watch recording.
+        fileOperation++; downloading = false
+        runCatching { transfer?.cancel() }; transfer = null
+        runCatching { fileTransport?.release() }; fileTransport = null
+        for ((key, metadata) in records()) if (metadata["state"] == "downloading")
+            store.putRecord(key, metadata + mapOf("state" to "pending", "error" to null))
+        if (runtime.owns(token) && store.control()["phase"] == "ready") command("GB({\"t\":\"smp\",\"status\":false})")
     }
 
     private fun incoming(bytes: ByteArray) {
@@ -244,6 +277,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     private fun downloadNext() {
         if (downloading || !runtime.owns(token) || store.control()["phase"] != "ready") return
+        if (store.control()["recording_sync_enabled"] == false) return
         val address = store.control()["address"] as String
         val pending = records().entries.firstOrNull { it.value["address"] == address && it.value["state"] == "pending" } ?: return
         val key = pending.key
@@ -355,6 +389,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     override fun close() {
         operation++; fileOperation++
         writing = false; writes.clear(); downloading = false
+        notificationWriting = false
         awaitingMtu = false; payloadSize = 20
         linkConnected = false; servicesHandled = false
         runCatching { transfer?.cancel() }; transfer = null

@@ -266,14 +266,14 @@ usable source location. An authorized reset restored USB SMP; BLE SMP is disable
 and all nine recordings remain. No firmware was flashed or coredump erased.
 Evidence: `.companion-hil-runs/20261002-existing-discovery-retry/`.
 
-## Next physical work
+## Next physical work (updated 2026-10-03)
 
-1. Use Nordic's existing transport in both the native-service prototype and the
+1. Track transfer integrity separately from native ownership/recovery. Use Nordic's existing transport in both the native-service prototype and the
    ordinary Flutter-wrapper baseline on this phone. Compare lifecycle coordination
    and repeat the failed files with byte-for-byte USB verification. Preserve
    hash-only traces. The 10-second chunk timeout fixes some waiting but not the
    observed body corruption. Do not implement custom SMP sequencing or reassembly.
-2. Once transfers work, repeat the failed batch and isolated screen-off cases,
+2. For recording-transfer acceptance, repeat the failed batch and isolated screen-off cases,
    then record after task removal. Require byte comparisons after completion;
    include multiple pending files and interrupted SMP. Keep the original failed
    trials as baseline evidence.
@@ -290,3 +290,24 @@ protocol implementation or prevent work on native service ownership and recovery
 
 Neither a foreground-service migration nor rewriting the UI in native code is
 approved by these results. The prototype remains behind its debug flag.
+
+## Native notifications with paused downloads, 2026-10-03
+
+The corrected debug prototype forwarded synthetic notifications after Activity/task
+disposal and completed a write with the screen off. Bluetooth restart and an
+injected process crash from Ready both recovered protocol readiness without a
+Flutter UI launch, resynced time and replayed stable notification IDs. Explicit
+Stop cleared content and released the service; radio restart did not undo it.
+These tests have USB attached and demonstrate native ATT write completion, not
+watch popup/application receipt or unplugged Doze. The current firmware does not
+expose an application notification ACK and its notification debug logs are not
+available in the installed build. Full process/service/receipt evidence and tested
+APK hash are in `ANDROID_COMPANION_RUNTIME_PROTOTYPE.md` and
+`.companion-hil-runs/20261003-native-notifications/`.
+
+No recording downloads ran in this milestone, all nine watch recordings remain,
+and neither firmware flashing nor AI/upload/delete occurred. The phone locked
+after the screen-off test; the existing non-exported Stop action was invoked as
+the debug app UID with explicit user 0. Notification access remains granted for
+ZSWatch, its policy remains synthetic-only, downloads are paused, Bluetooth is on,
+and the runtime is stopped.

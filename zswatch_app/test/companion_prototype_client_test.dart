@@ -89,6 +89,81 @@ void main() {
   });
 
   test(
+    'notification configuration and recording pause are native commands',
+    () async {
+      await client.setRecordingSync(false);
+      await client.configureNotifications(true, ['com.zswatch.app']);
+      expect(calls.map((c) => c.method), [
+        'setRecordingSync',
+        'configureNotifications',
+      ]);
+      expect(calls.first.arguments, {'version': 1, 'enabled': false});
+      expect(calls.last.arguments, {
+        'version': 1,
+        'enabled': true,
+        'packages': ['com.zswatch.app'],
+      });
+    },
+  );
+
+  test(
+    'invalid notification package policy never reaches the service',
+    () async {
+      await expectLater(
+        client.configureNotifications(true, ['*']),
+        throwsFormatException,
+      );
+      await expectLater(
+        client.configureNotifications(true, List.filled(65, 'com.zswatch.app')),
+        throwsFormatException,
+      );
+      expect(calls, isEmpty);
+    },
+  );
+
+  test(
+    'diagnostic notification permission and posting require acceptance',
+    () async {
+      messenger.setMockMethodCallHandler(methods, (call) async {
+        calls.add(call);
+        return {'version': 1, 'accepted': true};
+      });
+      await client.notificationDiagnostic(requestAccess: true);
+      await client.notificationDiagnostic();
+      await client.notificationDiagnostic(delaySeconds: 15, closeUi: true);
+      expect(calls.map((c) => c.method), [
+        'requestNotificationAccess',
+        'postTestNotification',
+        'postTestNotification',
+      ]);
+      expect(calls.last.arguments, {
+        'version': 1,
+        'delaySeconds': 15,
+        'closeUi': true,
+      });
+      final count = calls.length;
+      await expectLater(
+        client.notificationDiagnostic(delaySeconds: 61),
+        throwsFormatException,
+      );
+      await expectLater(
+        client.notificationDiagnostic(closeUi: true),
+        throwsFormatException,
+      );
+      await expectLater(
+        client.notificationDiagnostic(requestAccess: true, delaySeconds: 15),
+        throwsFormatException,
+      );
+      expect(calls.length, count);
+      messenger.setMockMethodCallHandler(
+        methods,
+        (_) async => {'version': 1, 'accepted': false},
+      );
+      await expectLater(client.notificationDiagnostic(), throwsFormatException);
+    },
+  );
+
+  test(
     'presence setup is explicit and distinguishes association from support',
     () async {
       messenger.setMockMethodCallHandler(methods, (call) async {
