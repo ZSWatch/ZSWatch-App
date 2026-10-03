@@ -297,6 +297,30 @@ class PrototypeContractsTest {
         assertTrue((journal.control()["recordings"] as Map<*, *>).isEmpty())
     }
 
+    @Test fun unchangedAndEmptyWatchListsPersistFreshObservationWithoutRetryingOrDeletingReceipts() {
+        val journal = store()
+        journal.update("selected", mapOf("address" to address, "generation" to 7L, "recording_sync_enabled" to false))
+        val inbox = PrototypeRecordingInbox(journal) { error("Unexpected list request") }
+        val response = JSONObject("""{"t":"voice_memo","action":"list_result","recordings":[
+            {"filename":"REC_001","timestamp":1700000000,"size_bytes":5472,"duration_ms":1600}]}""")
+        inbox.receive(response)
+        val key = (journal.control()["recordings"] as Map<*, *>).keys.single() as String
+        journal.putRecord(key, journal.record(key)!! + mapOf("state" to "failed", "error" to "transfer_timeout"))
+        val retained = journal.record(key)!!
+        inbox.receive(response)
+        assertEquals(retained, journal.record(key))
+        val observation = journal.control()["recording_list"] as Map<*, *>
+        assertEquals(address, observation["address"])
+        assertEquals(7L, (observation["generation"] as Number).toLong())
+        assertEquals(1, (observation["count"] as Number).toInt())
+        assertTrue((observation["observed_ms"] as Number).toLong() > 0)
+        inbox.receive(JSONObject("""{"t":"voice_memo","action":"list_result","recordings":[]}"""))
+        val reopened = store()
+        assertEquals(retained, reopened.record(key))
+        assertEquals(false, reopened.control()["recording_sync_enabled"])
+        assertEquals(0, ((reopened.control()["recording_list"] as Map<*, *>)["count"] as Number).toInt())
+    }
+
     /** Wire-level subset of ble_gadgetbridge_input/parse_time/parse_time_zone.
      * Each call represents one ATT write; clock commands have no reassembly.
      * This tests delivery to the parser, not main.c's application of the timezone.

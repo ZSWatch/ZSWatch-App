@@ -214,6 +214,7 @@ class CompanionPrototypeClient {
           'stop',
           'syncTime',
           'requestDeviceInfo',
+          'requestRecordingList',
           'retryRecordings',
           'ackEvents',
           'startRemoteFixture',

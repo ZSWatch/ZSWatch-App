@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/background/companion_prototype_client.dart';
+import '../data/models/companion_recording.dart';
 
 /// Immutable selection for this app run. Native and Dart must not both own BLE.
 bool get useNativeCompanionRuntime =>
@@ -19,6 +20,22 @@ final nativeCompanionRuntimeProvider = Provider<bool>((ref) {
 final companionClientProvider = Provider<CompanionPrototypeClient>((ref) {
   return const CompanionPrototypeClient();
 });
+
+/// Includes retained receipts from every watch; a screen selects its watch.
+/// No DB row IDs are invented and no file/model services are started here.
+final companionRecordingsProvider =
+    Provider<AsyncValue<List<CompanionRecording>>>((ref) {
+      return ref.watch(companionSnapshotProvider).whenData((snapshot) {
+        final records = snapshot.recordings.entries
+            .map((entry) => CompanionRecording.decode(entry.key, entry.value))
+            .toList();
+        records.sort((a, b) {
+          final time = b.timestampUtc.compareTo(a.timestampUtc);
+          return time != 0 ? time : a.identity.compareTo(b.identity);
+        });
+        return List<CompanionRecording>.unmodifiable(records);
+      });
+    });
 
 /// One EventChannel subscription shared by all Flutter observers. Native emits
 /// an initial snapshot on listen, so an additional read cannot race that stream.

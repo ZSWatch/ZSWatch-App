@@ -12,6 +12,12 @@ class PrototypeRecordingInbox(private val store: PrototypeStore, private val req
             "list_result" -> {
                 val list = message.optJSONArray("recordings") ?: return
                 for (index in 0 until list.length()) queue(list.getJSONObject(index))
+                val state = store.control()
+                // Even an unchanged/empty list is a fresh watch response. This
+                // does not alter receipts, retry failures or enable downloads.
+                store.update("recording_list_received", mapOf("recording_list" to mapOf(
+                    "address" to state["address"], "generation" to state["generation"],
+                    "observed_ms" to System.currentTimeMillis(), "count" to list.length())))
             }
         }
     }

@@ -407,3 +407,46 @@ The normal APK was compiled but not installed over the frozen prototype.
 After the physical check, the developer view was also changed to clear its
 readiness diagnostics on an observer error. This guard is covered by the widget
 test and final host compilation; the phone retains the preceding frozen APK.
+
+## Native receipt status in the existing Voice Notes screen — 2026-10-03
+
+Artifacts: `.companion-hil-runs/20261003-native-recording-view/`.
+Installed/tested frozen APK SHA-256:
+`5be6de5d63f5ade5c059a79f29f9e125f612c35f6c7f171b87f891b88e4c8dd9`.
+This build opens a native receipt view through the existing `VoiceMemosScreen`
+behind the prototype flag, bypassing legacy auto-sync/repository/transcription
+startup. There is no synthetic DB row ID, audio import, playback or inference.
+
+After install/explicit service Start, the first foreground observation still
+showed Android Settings. MainActivity was explicitly reopened; this initial UI
+launch behavior was not isolated as a recovery result. The bounded recording
+test starts from observed Ready (PID 8347, generation 117).
+
+The actual screen showed nine recording records: seven earlier saved receipts
+and two earlier failed transfers. No new audio was downloaded. It also showed
+the watch's fresh list count of nine and paused downloads. Screen navigation
+retained PID/generation and shared the existing native observer.
+
+Pressing Refresh returned a real BLE `voice_memo/list_result`; the native
+`recording_list.observed_ms` advanced, count remained nine and generation stayed
+117. Comparing complete recording dictionaries before/after confirmed that all
+receipt metadata/states were unchanged and `recording_sync_enabled=false`.
+The two failures were not retried or investigated. Logs include
+`legacy_bridges_skipped modelsNotLoaded=true`, with no Dart sync-service,
+WatchService creation or Dart worker execution observed.
+
+Explicit app-UID Stop reached generation 118 with the service absent. The open
+Voice Notes screen retained the nine records, displayed disconnected/saved
+status, removed the current watch-list count and disabled Refresh. USB SMP status
+confirmed watchface, no active recording and all nine watch originals. No reset,
+flash, AI, upload or recording deletion occurred. The existing one synthetic
+remote job/result outbox remained preserved; the local fixture was not enabled.
+
+67 JVM tests and 53 selected Flutter tests pass; focused analysis is clean and
+both normal/prototype debug builds compile. Native coverage includes repeated and
+empty list observations preserving failures/receipts and paused policy. Flutter
+coverage includes receipt identity/state validation, watch separation, ordinary
+screen bypass of legacy/AI services and existing voice-memo recovery/sync tests.
+These results do not establish new audio transfer, decoded-audio integrity,
+Drift migration, real local/remote processing, watch-result application ACK,
+modern-Android endurance or iOS behavior.

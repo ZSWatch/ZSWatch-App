@@ -11,6 +11,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/models/extracted_action.dart';
 import '../../../data/models/voice_memo.dart';
 import '../../../providers/ai_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../services/ai/extracted_action_creation_service.dart';
 import '../../widgets/ai_debug_widgets.dart';
@@ -21,6 +22,7 @@ import '../../../services/voice_memo/transcription_engine.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/voice_memos/memo_list_item.dart';
 import '../../widgets/voice_memos/sync_progress_bar.dart';
+import 'companion_voice_memos_view.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Filter enum for list view
@@ -56,7 +58,7 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
       });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _autoSync();
+      if (mounted && !ref.read(nativeCompanionRuntimeProvider)) _autoSync();
     });
   }
 
@@ -80,6 +82,9 @@ class _VoiceMemosScreenState extends ConsumerState<VoiceMemosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      return const CompanionVoiceMemosView();
+    }
     final memosAsync = ref.watch(voiceMemoListProvider);
     final syncStateAsync = ref.watch(voiceMemoSyncStateProvider);
     final transcriptionConfiguredAsync = ref.watch(

@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../services/background/companion_prototype_client.dart';
 import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/watch_service_provider.dart';
+import '../voice_memos/voice_memos_screen.dart';
 
 /// An isolated prototype view. It does not create WatchService or any AI provider.
 class CompanionPrototypeApp extends ConsumerStatefulWidget {
@@ -96,11 +97,19 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
     final battery = ref.watch(batteryLevelProvider);
     return MaterialApp(
       theme: ThemeData.dark(),
+      routes: {'/voice-notes': (context) => const VoiceMemosScreen()},
       home: Scaffold(
         appBar: AppBar(title: const Text('Companion prototype')),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            Builder(
+              builder: (context) => OutlinedButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed('/voice-notes'),
+                child: const Text('Voice notes'),
+              ),
+            ),
             const Text('Native Android runtime • development build'),
             const SizedBox(height: 12),
             TextField(

@@ -63,6 +63,25 @@ read `WatchService` still need migration before that tree can run with native
 ownership. The guard exposes those remaining dependencies instead of allowing
 a second connection. See the Nokia runbook for bounded provider UI evidence.
 
+The existing `VoiceMemosScreen` now has a native receipt view when the debug
+selection is active. Its ordinary auto-sync, repository, model-configuration
+and transcription path are bypassed. `CompanionRecording` retains the native
+watch/filename/timestamp/size/duration identity rather than inventing a Drift ID;
+pending, downloading, downloaded and failed states stay distinct. A downloaded
+journal entry needs a local path and SHA-256, but decoding this DTO does not
+read or validate audio. Retained hashes on pending/failed entries never imply a
+committed receipt. The view filters the selected watch and retains saved status
+after Stop; refresh is disabled while disconnected.
+
+`requestRecordingList` queues the existing watch list command without resetting
+failed transfers or changing download policy. A fresh, including unchanged/empty,
+response persists `recording_list` with watch address, generation, count and
+observation time. The UI displays the reported watch count only for its current
+ready generation. Old receipt records are retained even if a subsequent watch
+list is empty. This is receipt/status viewing, not DB import, playback, Ogg
+conversion or AI integration. The phone still needs a separate receipt import
+and processing boundary for those features.
+
 `connectedDevice` foreground services are an Android-supported way to maintain
 a device connection, subject to permissions and foreground-start rules.
 Process death still closes BLE; `START_STICKY` is not a promise of immediate or
@@ -150,6 +169,7 @@ Every request/subscription includes `{version: 1}`.
 | `stop` | — | Snapshot after saved intent is cleared and transport closed |
 | `syncTime` | — | Snapshot after queuing the write; completion arrives separately |
 | `requestDeviceInfo` | — | Requests the existing firmware `ver` response over the native NUS queue |
+| `requestRecordingList` | — | Snapshot after queuing metadata refresh; actual list receipt follows separately and preserves paused downloads/failures |
 | `retryRecordings` | — | Snapshot after retry/list request; asynchronous receipts follow |
 | `setRecordingSync` | `enabled`: boolean | Persisted download policy; disabling cancels/releases the existing Nordic transfer |
 | `configureNotifications` | `enabled`, `packages`: explicit Android package list | Persisted policy; enabling requires actual notification access |

@@ -93,7 +93,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
-                "stop", "syncTime", "requestDeviceInfo", "retryRecordings", "ackEvents", "configureNotifications", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
+                "stop", "syncTime", "requestDeviceInfo", "requestRecordingList", "retryRecordings", "ackEvents", "configureNotifications", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
                     PrototypeHub.worker.post {
                         try {
                             val store = PrototypeHub.journal(context)
@@ -114,6 +114,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                                 }
                                 "syncTime" -> (service?.transport ?: error("Service not running")).syncTime()
                                 "requestDeviceInfo" -> (service?.transport ?: error("Service not running")).requestDeviceInfo()
+                                "requestRecordingList" -> (service?.transport ?: error("Service not running")).requestRecordings()
                                 "retryRecordings" -> (service?.transport ?: error("Service not running")).retryRecordings()
                                 "setRecordingSync" -> {
                                     val enabled = call.argument<Boolean>("enabled") ?: error("Enabled required")

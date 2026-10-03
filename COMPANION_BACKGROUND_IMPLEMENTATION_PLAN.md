@@ -999,6 +999,18 @@ Whisper/LLM ännu och startades inte på Nokia. Se
 
 ### Införande och återgång
 
+Native Voice Notes 2026-10-03: befintliga VoiceMemosScreen har en native-backed
+receiptvy bakom debugflaggan, utan legacy auto-sync/DB/model-init. Native receipt-
+identiteter bevaras separat från Drift-ID; pending/downloading/downloaded/failed
+visas som skilda tillstånd. Metadata-refresh ger en beständig observation av
+verkligt watch-list-svar utan att återförsöka failures eller ändra downloadpolicy.
+Nokia visade nio recording records (sju tidigare sparade receipts, två tidigare
+failures) och en färsk BLE-lista med oförändrad generation/receipt-state medan
+downloads var pausade. Stop behöll visningsdata och spärrade refresh. Nio watch-
+original finns kvar; inget AI/audio-download/delete kördes. 67 native tester,
+53 riktade Flutter-tester och båda debugbyggen passerar. Audio/Drift-import,
+playback och verklig processing/resultatdelivery återstår.
+
 Provider-gräns 2026-10-03: befintliga Flutter connection/phase/watch/battery-
 providers och WatchNotifier har nu native-backed grenar bakom samma debugflagga.
 Developer-UI använder dessa providers med en delad native eventprenumeration.
