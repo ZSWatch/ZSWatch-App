@@ -1059,3 +1059,51 @@ baseline. The physical burst above used the earlier `fb3211a3…2346d` artifact;
 the final safeguard has host tests plus physical owner/UI/retention verification,
 not a repeated physical burst. Capture evidence is retained privately, including
 the rejected candidate, rather than replacing failure evidence with a pass.
+
+## Watch-side Find protection and interrupted bursts — 2026-10-04
+
+Firmware source change: ZSWatch commit `d404e5d7`. Private evidence is under
+`.companion-hil-runs/20261004-find-firmware/`. Nokia keeps the verified final
+native APK `f987b6fe…070977`; no new app build was needed for this firmware work.
+The complete pairing-enforced WatchDK revision 1 build passed, as did the host
+Find controller and existing clock/timezone tests. Signed application HEX SHA-256:
+`07a3bca1b9eaa0783dfc974ab44b961bb1e2ff9a7965f3207b15dd4c9aeb2689`;
+ELF SHA-256:
+`93cfc6041a267791c15e2069f9bda053420bd1d21ca8a6780db394041cbc6680`.
+
+Before flash, nine recordings and `/lvgl_lfs/coredump.txt` were backed up through
+the existing serial SMP library. Read-only image metadata matched hash TLVs in
+the debugger-read rollback images. The archived config/layout matched the prior
+WatchDK build. Exact debugger 51022722 programmed/verified only signed app ranges:
+internal `[0x10000,0xdbfc8)` and mapped QSPI `[0x10120000,0x101959e8)`, rounding
+erase to 4 KiB within their application partitions. No bootloader/network/settings
+or user-storage erase ran. The full merged HEX was not used. The current firmware
+checkout also includes the previous UTC/timezone changes and unrelated existing
+source state; archived source/diff/submodule metadata makes that build scope clear.
+
+The initial USB keepalive failed during startup; a separate authorized reset
+reached SMP and the normal watchface. This is retained as a failed initial probe.
+An unnecessary full QSPI backup read was cancelled and replaced with a bounded
+read through offset 0x220000. Nordic BIN output included a large padded tail;
+only explicitly read code/register/application bytes were kept. These backup
+operations did not erase flash. Final verification used another reset after the
+native owner was stopped and retained USB across its twenty-second boot guard.
+
+| Check | Observation and limit |
+| --- | --- |
+| Pairing and ordinary Find | Existing Flutter Connect reached Ready 175 without re-pairing. Normal true/false worked with the phone on Home. |
+| App suspended before false | UART true at watch uptime 00:02:24.826110; SIGSTOP suspended the app's existing PID 31292. Watch-owned maximum-duration stop at 00:02:34.826110, exactly 10.000 s. SIGCONT after twelve seconds allowed delayed false at 00:02:38.190429. Same PID/generation stayed Ready. This is suspension, not process death or recovery. |
+| Disconnect mid-burst | True at 00:02:55.021270; explicit Flutter Disconnect produced BLE disconnect at 00:02:57.495941 and Find stop at 00:02:57.495971. No false consumer preceded that stop in this capture. |
+| Fresh burst after recovery | Explicit reconnect reached Ready 177. True 00:04:06.302734 → false 00:04:09.272338, about 2.970 s. Both the watch consumer and current native stop receipt are present. |
+| Notification after cleanup | Existing Close UI/test diagnostic finished and removed Flutter Activity. Delayed synthetic notification 1000016 reached the watch notification manager and native delivered revision 1/generation 177. Read-only probe retained Ready and launcher resumed. Physical haptic/display effects were not measured. |
+| Final baseline | Explicit Stop 178, no native owner/notifications, sharing off and downloads paused. Nine originals, 9964 KB free, no recording and watchface after final reset. All nine original file hashes and the preexisting crash file hash exactly match their preflash backups. Separate job/outbox remains structurally consistent. |
+
+To reproduce interrupted Find, first verify the installed native APK, Ready,
+paused downloads and sharing off. Capture UART exclusively at 115200 with DTR/RTS
+false. Tap the actual dashboard Find control; wait for the watch's true log before
+SIGSTOP of that exact app PID. Always SIGCONT in finally, wait for delayed false,
+then observe Ready. For the disconnect case, tap the real Flutter Disconnect
+after true, verify the watch's disconnect/stop logs, reconnect and run a normal
+burst. Restore Stop afterward. Do not use transfer instrumentation or count a
+successful command/ATT write as the watch stop. Direct motor measurement remains
+a separate acceptance gate; broad background probes retain `NOT_RUN`.

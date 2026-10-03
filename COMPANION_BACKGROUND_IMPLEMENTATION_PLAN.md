@@ -1409,3 +1409,36 @@ BuildConfig and MainActivity bridge construction before installation; it passes
 native/ordinary modes and rejects the failed candidate. Corrected native UI shows
 Disconnected without Start and retains Stop/data. This is artifact validation,
 not a new broad background acceptance pass.
+
+### Progress 2026-10-04: watch-owned Find deadline and disconnect cleanup
+
+Firmware commit `d404e5d7` replaces the unbounded Find loop with a ten-second
+deadline and current-connection disconnect cleanup. Duplicate true does not renew
+the deadline. Rejected motor acquisition starts no timers; false/expiry/disconnect
+stop only the active Find pattern. Queued wake work cannot restart vibration, and
+an old timeout cannot stop a newer activation before its own deadline.
+
+Host controller tests and the existing clock tests pass. A full WatchDK revision
+1 build with pairing enforced succeeds. Exact debugger 51022722 programmed only
+the signed application ranges with targeted internal/QSPI sector erase and verify.
+Preflight matched the previous partition layout; recordings/crash files and live
+signed-image rollback bytes were archived before flashing. Bootloader, radio,
+settings and storage partitions were excluded. This build includes the current
+firmware checkout, including the earlier UTC/timezone changes; private provenance
+records the source revision, dirty state, ELF/config/layout/images and hashes.
+
+With the final verified native APK, Nokia Ready 175 retained pairing. Suspending
+the app with SIGSTOP before false proved the independent watch deadline: UART
+logged stop exactly 10.000 seconds after true; resuming the same PID then allowed
+the phone's delayed false. Explicit Flutter Disconnect during a later burst
+produced watch disconnect cleanup, then Ready 177 and a fresh normal burst worked.
+A delayed notification reached the watch's actual notification manager after
+Flutter Activity removal. Final Stop 178 has no owner/native notifications,
+downloads paused and location sharing off. All nine recordings and the preexisting
+crash file have exactly matching pre/post USB file hashes.
+
+This is bounded software evidence, not motor measurement, process-death recovery,
+modern-Android acceptance or unplugged endurance. The Find lifecycle software
+gate is closed; avoid further Find/SMP troubleshooting without new evidence.
+Continue the controlled HTTP network comparison and remaining real companion
+feature/owner coordination work. iOS and model execution stay deferred.

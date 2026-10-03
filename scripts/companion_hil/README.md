@@ -474,3 +474,14 @@ journal: canonical job identity, result/outbox consistency and matching persiste
 ACK state. It emits only job IDs/state/counters, never result text or specs.
 The Android loopback adapter and physical crash results are documented in
 [`REMOTE_JOB_ANDROID_PROTOTYPE.md`](../../REMOTE_JOB_ANDROID_PROTOTYPE.md).
+
+### USB boot guard when collecting watch evidence
+
+The current `zsw_usb_manager.c` checks CDC DTR at its twenty-second boot guard.
+Establish the existing serial SMP client promptly after an authorized reset and
+keep its port open across that guard. Sending one request then closing the port
+before the guard is insufficient: DTR may be low when firmware checks it and USB
+can disappear later. Confirm `USB CDC ACM host detected` in UART before closing
+the client. UART logging is a separate FTDI port; leave its DTR/RTS false.
+This USB lab detail does not diagnose BLE service caching or justify replacing
+the existing SMP library.

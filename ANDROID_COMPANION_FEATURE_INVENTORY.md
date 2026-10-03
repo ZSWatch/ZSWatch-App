@@ -15,7 +15,7 @@ dormant provider does not establish end-to-end support.
 | Media | Native service reuses MediaSessionBridge; real synthetic session verifies watch controls and metadata with Flutter absent. | Third-party players, volume and multiple-player selection. |
 | Discovery/saved watches/Forget | System picker and fenced native handoff; existing tiles/dashboard/rename. Native-first Forget removes the OS association before exact Drift-key/history deletion and fences late metadata saves. | Fresh bonding, physical destructive Forget/re-pair, newer-Android association behavior. Bluetooth-bond preservation is explicit. |
 | GPS → Weather | Native service now handles existing `gps_power`/`gps` with explicit Flutter opt-in, Android background access and location FGS acquisition. Nokia approximate/all-time permission flow, timeout cleanup and BLE/UI independence pass. | Real fresh fix → watch Weather → HTTP remains unverified. No location write occurred in the bounded Nokia observation; explicit location-transmission approval is pending. Current Android hardware and longer unplugged operation remain. |
-| Find watch from phone | Native Find Watch action uses the existing Boolean protocol and a service-owned two-second stop timer, priority stop queue and session guards. Nokia/watch UART verifies start and stop with Flutter backgrounded. | Firmware currently has no disconnect/maximum-duration failsafe; a phone crash during the burst can leave vibration running until reconnect/false. Add that safeguard before rollout. Physical motor effects and interrupted bursts remain unverified. |
+| Find watch from phone | Native dashboard action, service-owned stop timer and priority queue. Firmware now bounds each activation to ten seconds and stops Find on BLE disconnect without cancelling unrelated patterns. Nokia/watch logs verify normal bursts, an app suspended before false, disconnect mid-burst and a fresh burst after reconnect. | Physical motor effects and modern-phone/endurance acceptance remain. Suspension isolates the watch deadline; it is not Android process-death recovery. |
 | Find phone from watch | Dart parser recognizes `findPhone` but no consumer was found. Gadgetbridge maps it to START/STOP. The explicit firmware find-phone helper found belongs to the separate Chronos protocol. | Verify the actual watch→phone JSON emitter before implementing or claiming an existing feature migration. |
 | Calendar/call/activity/navigation | Some typed protocol definitions exist; native receive dispatch has no equivalent handlers. | Identify initialized provider/UI handlers and real firmware consumers per function before choosing migration order. |
 | Voice notes/jobs | Durable native receipts, explicit existing Flutter import/playback and separate recoverable job/outbox contracts exist. | Downloads/integrity and AI/model/backend acceptance remain separate. Downloads stay paused for current core tests; AI is deferred by the user. |
@@ -57,10 +57,9 @@ dormant provider does not establish end-to-end support.
    are complete; real Nokia fix/network availability remains separate. Verify a
    fresh position reaches the watch consumer and Weather completes with Flutter
    absent. Do not treat acquisition, ATT completion or synthetic fixes as that pass.
-2. Add the watch-side Find Watch disconnect/maximum-duration safeguard before
-   rollout. Native timing, stale-session guards, priority queue and explicit
-   Flutter control are implemented; interrupted physical bursts remain a gate.
-   Do not invent a watch→phone protocol to make a test pass.
+2. Retain watch-side Find Watch disconnect/maximum-duration protection and its
+   bounded physical software evidence. Motor effects still require independent
+   observation. Do not invent a watch→phone protocol to make a test pass.
 3. Run the controlled HTTP active/idle network comparison in the Nokia runbook.
    A later active-state Trivia pass does not explain the earlier idle timeout.
 4. Continue remaining notification actions and ordinary feature migration from
