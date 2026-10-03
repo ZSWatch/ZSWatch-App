@@ -176,6 +176,24 @@ class CompanionPrototypeClient {
     return result;
   }
 
+  Future<CompanionPrototypeSnapshot> findWatch(int generation) async {
+    if (generation < 0) throw const FormatException('Invalid Ready generation');
+    final snapshot = CompanionPrototypeSnapshot.decode(
+      await methods.invokeMethod<Object?>('findWatch', {
+        'version': 1,
+        'generation': generation,
+      }),
+    );
+    final receipt = snapshot.fields['find_receipt'];
+    if (receipt is! Map ||
+        receipt['accepted'] != true ||
+        receipt['generation'] is! int ||
+        receipt['generation'] != generation) {
+      throw const FormatException('Watch finding was not accepted');
+    }
+    return snapshot;
+  }
+
   Future<CompanionPrototypeSnapshot> configureGps(bool enabled) async {
     final snapshot = CompanionPrototypeSnapshot.decode(
       await methods.invokeMethod<Object?>('configureGps', {

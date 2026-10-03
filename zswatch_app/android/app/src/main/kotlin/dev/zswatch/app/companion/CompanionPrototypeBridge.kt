@@ -130,12 +130,13 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
-                "stop", "forgetWatch", "syncTime", "requestDeviceInfo", "requestRecordingList", "retryRecordings", "ackEvents", "configureNotifications", "configureGps", "configureHttp", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
+                "stop", "forgetWatch", "findWatch", "syncTime", "requestDeviceInfo", "requestRecordingList", "retryRecordings", "ackEvents", "configureNotifications", "configureGps", "configureHttp", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
                     PrototypeHub.worker.post {
                         try {
                             val store = PrototypeHub.journal(context)
                             val service = CompanionPrototypeService.instance
                             var forgetReceipt: Map<String, Any?>? = null
+                            var findReceipt: Map<String, Any?>? = null
                             when (call.method) {
                                 "startRemoteFixture" -> (service?.remoteFixture ?: error("Service not running")).startFixture()
                                 "startLocalFixture" -> (service?.localFixture ?: error("Service not running")).startFixture()
@@ -178,6 +179,17 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                                     if (service?.transport != null) service.transport!!.configureHttp(enabled)
                                     else PrototypeHttpRelay.configure(store, enabled)
                                 }
+                                "findWatch" -> {
+                                    val generation = when (val value = (call.arguments as? Map<*, *>)?.get("generation")) {
+                                        is Int -> value.toLong()
+                                        is Long -> value
+                                        else -> error("Integer generation required")
+                                    }
+                                    require(generation >= 0)
+                                    val link = service?.transport ?: error("Native owner required")
+                                    link.findWatch(generation)
+                                    findReceipt = mapOf("generation" to generation, "accepted" to true)
+                                }
                                 "configureGps" -> {
                                     val enabled = (call.arguments as? Map<*, *>)?.get("enabled") as? Boolean
                                         ?: error("Boolean enabled required")
@@ -202,6 +214,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                             }
                             val state = PrototypeHub.snapshot(context, service?.runtime?.active == true).toMutableMap()
                             if (forgetReceipt != null) state["forget_receipt"] = forgetReceipt
+                            if (findReceipt != null) state["find_receipt"] = findReceipt
                             PrototypeHub.main.post { result.success(state) }
                         } catch (error: Exception) { PrototypeHub.main.post { result.error("COMMAND_FAILED", error.message, null) } }
                     }

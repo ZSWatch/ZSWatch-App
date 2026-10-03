@@ -24,6 +24,34 @@ class NativePrototypeTransport(private val context: Context, private val handler
     var gpsReady: (Long) -> Unit = {}
     var gpsClosed: () -> Unit = {}
     var gpsRequest: (JSONObject, Long) -> Unit = { _, _ -> }
+    private val findWatch = PrototypeFindWatch(android.os.SystemClock::elapsedRealtime,
+        { delay, action -> handler.postDelayed(action, delay) }, ::sendFindWatch,
+        { generation, state ->
+            if (runtime.owns(generation) && store.control()["phase"] == "ready") {
+                store.update("find_watch_$state", mapOf("last_find_watch" to mapOf(
+                    "address" to store.control()["address"], "generation" to generation,
+                    "state" to state, "utc_ms" to System.currentTimeMillis())))
+            }
+        })
+
+    fun findWatch(generation: Long) {
+        check(runtime.owns(generation) && store.control()["phase"] == "ready") { "Current Ready session required" }
+        findWatch.start(generation)
+    }
+
+    private fun sendFindWatch(generation: Long, enabled: Boolean, mayStart: () -> Boolean, done: () -> Unit): Boolean {
+        if (generation != token || !runtime.owns(generation) || store.control()["phase"] != "ready") return false
+        if (enabled && writes.size >= 14) return false
+        val item = NusWrite("GB({\"t\":\"find\",\"n\":$enabled})".toByteArray(Charsets.UTF_8), done, payloadSize, mayStart)
+        if (enabled) writes.add(item)
+        else {
+            // One bounded stop/reset may exceed the normal cap by one. Never
+            // preempt an in-flight packet: its remaining fragments must finish.
+            enqueueFindStop(writes, writing, item)
+        }
+        safely { pump() }
+        return runtime.owns(generation) && store.control()["phase"] == "ready"
+    }
     private var gatt: BluetoothGatt? = null
     private var tx: BluetoothGattCharacteristic? = null
     private var token = 0L
@@ -138,6 +166,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 downloadNext()
                 mediaReady(session)
                 gpsReady(session)
+                val previousFind = store.control()["last_find_watch"] as? Map<*, *>
+                findWatch.ready(session, previousFind?.get("address") == store.control()["address"] &&
+                    previousFind?.get("state") in listOf("accepted", "start_written"))
             }
             override fun onCharacteristicChanged(client: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                 val copy = characteristic.value?.clone() ?: return
@@ -504,6 +535,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     override fun close() {
         mediaClosed()
         gpsClosed()
+        findWatch.close()
         operation++; fileOperation++
         httpRelay.reset()
         writing = false; writes.clear(); downloading = false

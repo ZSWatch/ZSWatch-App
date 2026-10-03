@@ -1377,3 +1377,26 @@ position arriving at the watch or a Weather response. Automatic approval review
 requires explicit authorization before sending the real location to the watch/
 Open-Meteo endpoint; that question is pending. Continue the independent Find Watch
 migration while preserving the remaining physical GPS/Weather acceptance gate.
+
+
+### Progress 2026-10-04: native Find Watch timer and bounded queue
+
+Migrated the real phone→watch Find behavior to an explicit action on the existing
+Flutter dashboard. The native owner validates Ready generation, owns the two-
+second stop timer and prioritizes false while preserving in-flight fragments.
+Overlapping bursts, expired queued starts and late callbacks are fenced. A
+matching unfinished prior receipt supports best-effort false after reconnect;
+ordinary Ready does not interrupt unrelated watch vibration.
+
+126 native / 115 companion Flutter tests pass, clean focused analysis and both
+APK builds. Nokia/watch parser logs confirm start/stop with the phone on Home,
+about three seconds including wire latency, while BLE stays Ready. Stop cleanup
+preserves all recordings/jobs and location/download policy. Physical UI destruction
+is not claimed for that burst; widget disposal has independent coverage.
+
+Firmware currently loops Find vibration until false. Add disconnect and bounded-
+duration cleanup and validate crash/Stop mid-burst before production acceptance;
+the native timer cannot guarantee a packet reaches a disconnected watch. This is
+an explicit remaining watch-side lifecycle gate, not a reason to resume SMP/AI
+experiments. Next independent app work is the controlled HTTP idle comparison and
+remaining initialized feature migration.

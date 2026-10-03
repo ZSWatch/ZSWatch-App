@@ -997,3 +997,42 @@ may time out indoors. A fresh fix reaching the actual consumer and a successful
 Weather response are separate assertions; cached watch weather, ATT completion or
 pure synthetic fixes do not establish them. Always close Weather, disable sharing,
 Stop and restore temporary phone settings afterward.
+
+
+## Service-owned Find Watch — 2026-10-04
+
+Private evidence: `.companion-hil-runs/20261004-native-find/`.
+Installed native APK SHA-256
+`fb3211a329410c78ae530e6fb6dc15f9143b9cd1b430d116be2c1b1efac2346d`;
+ordinary APK `f8d556b57894f35c3b397105e720dacae297513a412867a066268b20c8129e62`.
+126 native JVM and 115 companion Flutter tests pass; analysis clean, both builds
+compile. Source uses the existing Boolean `find` protocol; no SMP, model or
+firmware change is involved.
+
+Replaced the stopped native APK preserving Stop 172/data, then explicit existing
+Flutter Connect reached Ready 173. The existing dashboard exposed Find watch.
+Tapped it at the observed button coordinates and immediately sent the phone to
+Home. The watch UART independently logged `find=true` at watch uptime
+26:18:50.699 and `find=false` at 26:18:53.670. Native acceptance/start-written/
+stop-written events were recorded at the same generation. Start-written to
+stop-written was about 2.95 s: the timer is two seconds plus BLE/queue delivery,
+not an exact two-second motor-duration promise. Final native state was
+stop_written/Ready and Android's launcher was resumed. This demonstrates watch
+parser consumption; no tactile motor measurement was made. The Flutter Activity
+was backgrounded, not destroyed, for this physical burst. Widget disposal and
+stale callbacks have separate deterministic tests.
+
+Only after false consumption did cleanup issue native Stop. The immediate stopped
+probe raced asynchronous Android service teardown and rejected its first read;
+the later identical read-only check verified Stop 174 with no service/notifications
+and the installed hash. Sharing remains off, all location grants remain denied,
+downloads remain paused, all nine recording dictionaries and the full job/outbox
+journal exactly equal baseline. Watch is on watchface, no recording and 9964 KB
+free. No watch data was created/deleted.
+
+The firmware has no Find disconnect or maximum-duration failsafe. Physical crash,
+radio loss or Stop mid-burst were deliberately not claimed/tested. Add the firmware
+safeguard and verify those paths before rollout. Recovery false is best effort and
+only for a matching unfinished prior find receipt; normal reconnect does not stop
+unrelated watch vibration. Real Weather/location acceptance still awaits the
+separate explicit location-transmission approval.

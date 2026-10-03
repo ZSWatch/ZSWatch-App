@@ -247,6 +247,7 @@ Every request/subscription includes `{version: 1}`.
 | `requestRecordingList` | — | Snapshot after queuing metadata refresh; actual list receipt follows separately and preserves paused downloads/failures |
 | `retryRecordings` | — | Snapshot after retry/list request; asynchronous receipts follow |
 | `setRecordingSync` | `enabled`: boolean | Persisted download policy; disabling cancels/releases the existing Nordic transfer |
+| `findWatch` | `generation`: integer for the current Ready owner | Explicit short burst acceptance receipt; service owns the stop timer |
 | `configureGps` | `enabled`: Boolean; enabling requires foreground/background location access and phone location services | Persisted explicit sharing policy; does not Start BLE or request a fix |
 | `configureNotifications` | `enabled`, `packages`: explicit Android package list | Persisted policy; enabling requires actual notification access |
 | `requestNotificationAccess` | — | Opens Android notification-listener settings; accepted does not mean permission granted |
@@ -839,3 +840,42 @@ cleanup, sharing off and Ready with Flutter closed. No native GPS write occurred
 Real Weather/location transmission awaits explicit approval; fresh-position,
 watch consumption, remote weather response and current Android hardware remain
 unverified. Private evidence and cleanup are in the Nokia report.
+
+
+## Native Find Watch burst — 2026-10-04
+
+The existing Flutter dashboard now exposes Find watch for the debug native owner.
+The ordinary Developer action and Nordic wrapper are retained. `findWatch` accepts
+only the current Ready generation and returns a command-specific acceptance
+receipt. It cannot Start the owner, choose another watch or send arbitrary JSON.
+Flutter sends one action and owns no stop timer; disposal does not send Stop BLE.
+
+Native sends existing `GB({"t":"find","n":true})`, waits two seconds after its
+write completes, then sends false. One burst is active through final stop
+completion, so overlapping actions fail with retry feedback. An unstarted start
+expires after ten seconds and an already fragmented packet still finishes before
+cleanup. Stop gets priority over pending work, retaining the current fragmented
+packet. One stop may exceed the ordinary queue cap by one. Its callbacks and
+retries are fenced by burst/session identity and disposal of the transport.
+An unfinished accepted/start-written receipt for the same selected watch causes
+best-effort false on its next Ready. Normal Ready does not send false, which the
+current firmware would use to stop unrelated vibration too. This receipt is a
+single latest-watch diagnostic, not a multi-watch durable haptic protocol or a
+crash-atomic watch ACK. `last_find_watch` records address/generation/state/time;
+acceptance and write completion do not prove physical motor actuation.
+
+The existing firmware loops until false and has neither disconnect cleanup nor a
+maximum-duration safeguard. A phone crash/link loss during the burst cannot be
+fixed solely by an Android timer. Before rollout, add a watch-side failsafe and
+test the interrupted burst. No firmware edit/flash or physical interrupted burst
+was done in this milestone. Native Stop cancels future commands/closes BLE; it
+does not claim delivery of a final false over an already closed connection.
+
+126 native JVM and 115 companion Flutter tests pass; focused analysis is clean
+and both APKs build. Eight native Find tests cover timing/admission/expiry/session
+fencing and stop priority preserving ATT fragments. Four Flutter tests cover the
+explicit receipt, Ready-only control, disposal and sanitized failure feedback.
+Nokia/watch UART confirms true then false after the dashboard action with Home
+resumed, about 2.97 seconds apart including delivery latency. Flutter's Activity
+was backgrounded for that burst, not destroyed; disposal is separately covered by
+a widget test. See Nokia evidence for hashes, timing and cleanup.

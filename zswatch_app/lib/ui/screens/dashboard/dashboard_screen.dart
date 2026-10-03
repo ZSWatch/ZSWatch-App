@@ -10,6 +10,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/models/watch.dart';
 import '../../../providers/auto_reconnect_provider.dart';
 import '../../../providers/companion_runtime_providers.dart';
+import 'companion_find_watch_button.dart';
 import '../../../providers/demo_mode_provider.dart';
 import '../../../providers/health_providers.dart';
 import '../../../data/models/crash_summary.dart';
@@ -159,6 +160,11 @@ class DashboardScreen extends ConsumerWidget {
                   ? () => _restartWatch(context, ref)
                   : null,
             ),
+
+            if (native) ...[
+              const SizedBox(height: AppTheme.spacingSm),
+              const CompanionFindWatchButton(),
+            ],
 
             const SizedBox(height: AppTheme.spacingMd),
 
