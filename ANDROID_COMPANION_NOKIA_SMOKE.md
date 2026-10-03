@@ -754,3 +754,34 @@ Remaining: longer idle/reconnect runs, current-Android hardware, production
 acceptance, migration of remaining Flutter feature controls, and watch-side
 HTTP error/late-callback correctness. Fresh error/oversize/deadline cases have
 host contracts; their complete watch-consumer outcomes remain unverified.
+
+
+## HTTP policy through the existing Flutter UI — 2026-10-03
+
+Artifacts: `.companion-hil-runs/20261003-native-http-settings/`.
+Frozen APK `native.apk`, SHA-256
+`bb4b973e645873a65dad03bd84ca3caee94abf8cd34fb50375e189f5e7a8f3a5`.
+The existing Flutter Settings screen shows **Watch internet requests**, current
+connection/pending state and the current-generation last outcome.
+
+At Stop 153, Off and On persisted while running intent stayed false and the
+native service stayed absent. Off survived force-stop/reopening of the already
+stopped app. At Ready 154, a fresh Trivia request while Off completed as
+`error_written` without UART timeout. After confirming the native policy was On,
+a fresh request completed as `written` in 2.902 s, zero pending, no UART timeout.
+An earlier attempted On tap used the stopped-layout position after the connected
+layout expanded; the policy stayed Off and that request returned another error.
+This retained observation is not an enabled-policy success.
+
+The existing developer diagnostic **Close UI and test in 15s** then finished and
+removed the Flutter Activity. Synthetic notification 1000012 completed in native
+state with Flutter absent. A 15-minute forced deep-idle observation was started;
+its outcome will be recorded separately after teardown. Downloads remain paused;
+no AI, recording processing, SMP transfer or firmware change is involved.
+
+84 native JVM, 41 selected Flutter and 42 companion harness tests pass; focused
+Dart analysis is clean and both debug variants compile. The initial full harness
+run lacked sandbox socket access; rerunning with loopback access passed. Updated
+`native_runtime_probe.py` verifies the frozen installed APK and reports selected
+current-generation status/HTTP metadata without content, retaining `NOT_RUN` as
+its acceptance value.

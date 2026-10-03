@@ -8,11 +8,15 @@ import '../data/models/http_request.dart';
 import '../services/http/http_relay_service.dart';
 import '../services/watch_service.dart';
 import 'watch_service_provider.dart';
+import 'companion_runtime_providers.dart';
 
 part 'http_providers.freezed.dart';
 
 /// HTTP relay service provider
 final httpRelayServiceProvider = Provider<HttpRelayService>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native companion owns HTTP requests');
+  }
   final service = HttpRelayService();
   ref.onDispose(() => service.dispose());
   return service;
@@ -182,6 +186,9 @@ class HttpRelayNotifier extends StateNotifier<HttpRelayState> {
 /// Provider for HTTP relay state and control
 final httpRelayNotifierProvider =
     StateNotifierProvider<HttpRelayNotifier, HttpRelayState>((ref) {
+      if (ref.watch(nativeCompanionRuntimeProvider)) {
+        throw StateError('Native companion owns HTTP requests');
+      }
       final httpService = ref.watch(httpRelayServiceProvider);
       final watchService = ref.watch(watchServiceProvider);
       return HttpRelayNotifier(httpService, watchService);
@@ -189,15 +196,24 @@ final httpRelayNotifierProvider =
 
 /// Whether HTTP relay is enabled
 final httpRelayEnabledProvider = Provider<bool>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return ref.watch(companionHttpStatusProvider).asData?.value.enabled ??
+        false;
+  }
   return ref.watch(httpRelayNotifierProvider).isEnabled;
 });
 
 /// Number of pending HTTP requests
 final httpRelayPendingCountProvider = Provider<int>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return ref.watch(companionHttpStatusProvider).asData?.value.pendingCount ??
+        0;
+  }
   return ref.watch(httpRelayNotifierProvider).pendingCount;
 });
 
 /// Recent HTTP requests (for debugging/logging)
 final httpRelayRecentRequestsProvider = Provider<List<HttpRequest>>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) return const [];
   return ref.watch(httpRelayNotifierProvider).recentRequests;
 });

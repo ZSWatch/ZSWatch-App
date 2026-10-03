@@ -16,10 +16,11 @@ class PrototypeHttpRelayTest {
         val writes = mutableListOf<Triple<String, Long, () -> Unit>>()
         val observed = mutableListOf<String>()
         var cancels = 0
+        var enabled = true
         val relay = PrototypeHttpRelay({ clock }, { delay, action -> timers.add(clock + delay to action) },
             { _, done -> callbacks.add(done); { cancels++ } },
             { packet, deadline, done -> writes.add(Triple(packet, deadline, done)); true },
-            { kind, _, result -> observed.add("$kind:$result") })
+            { kind, _, result -> observed.add("$kind:$result") }, { enabled })
         fun request(id: String = "1") = JSONObject().put("t", "http").put("id", id).put("url", "https://example.com/")
         fun tick(ms: Long) {
             clock = ms
@@ -43,6 +44,39 @@ class PrototypeHttpRelayTest {
         val f = Fixture(); assertTrue(f.relay.receive(JSONObject(messages.single()), 3))
         f.callbacks.single()(RelayResult(body = "ok"))
         assertEquals("27", JSONObject(f.writes.single().first.removePrefix("GB(").substringBeforeLast(")")).getString("id"))
+    }
+    @Test fun disablingCancelsNetworkAndBlocksNewIoWithoutDuplicatingPreparedReplies() {
+        val f = Fixture(); f.relay.receive(f.request("1"), 1)
+        f.relay.receive(f.request("2"), 1); f.callbacks[1](RelayResult(body = "prepared"))
+        f.enabled = false; f.relay.disable()
+        assertTrue(f.cancels > 0); assertEquals(2, f.writes.size)
+        assertTrue(f.writes[0].first.contains("prepared"))
+        assertTrue(f.writes[1].first.contains("HTTP relay disabled"))
+        f.callbacks[0](RelayResult(body = "late")); assertEquals(2, f.writes.size)
+        f.relay.receive(f.request("3"), 1)
+        assertEquals(2, f.callbacks.size); assertEquals(3, f.writes.size)
+        f.writes.toList().forEach { it.third() }; assertEquals(0, f.relay.pendingCount)
+        f.enabled = true; f.relay.receive(f.request("4"), 1); assertEquals(3, f.callbacks.size)
+    }
+    @Test fun stoppedPolicySurvivesReopenWithoutChangingOwnerOrOtherWork() {
+        val directory = Files.createTempDirectory("http-policy").toFile()
+        try {
+            val store = PrototypeStore(directory)
+            assertTrue(PrototypeHttpRelay.enabled(store))
+            store.update("fixture", mapOf("recording_sync_enabled" to false))
+            store.putRecord("saved", mapOf("state" to "downloaded"))
+            val before = store.control()
+            PrototypeHttpRelay.configure(store, false)
+            val reopened = PrototypeStore(directory)
+            assertFalse(PrototypeHttpRelay.enabled(reopened))
+            for (key in listOf("desired_running", "phase", "generation", "recording_sync_enabled", "recordings"))
+                assertEquals(before[key], reopened.control()[key])
+            val cursor = reopened.control()["event_cursor"]
+            PrototypeHttpRelay.configure(reopened, false); assertEquals(cursor, reopened.control()["event_cursor"])
+            PrototypeHttpRelay.configure(reopened, true); assertTrue(PrototypeHttpRelay.enabled(PrototypeStore(directory)))
+            reopened.update("invalid_fixture", mapOf("http_enabled" to "true"))
+            assertFalse(PrototypeHttpRelay.enabled(reopened))
+        } finally { directory.deleteRecursively() }
     }
     @Test fun reopeningJournalClearsInterruptedHttpWithoutChangingLifecycleOrReceipts() {
         val directory = Files.createTempDirectory("relay-recovery").toFile()

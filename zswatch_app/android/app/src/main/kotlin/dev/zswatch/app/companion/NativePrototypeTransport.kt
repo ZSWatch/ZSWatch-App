@@ -46,6 +46,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         now = { android.os.SystemClock.elapsedRealtime() },
         later = { delay, action -> handler.postDelayed(action, delay) },
         execute = httpExecutor::execute,
+        enabled = { PrototypeHttpRelay.enabled(store) },
         send = { packet, deadline, done ->
             if (!runtime.owns(token) || store.control()["phase"] != "ready" || writes.size >= 16) false
             else {
@@ -220,6 +221,11 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     fun requestRecordings() { command("GB({\"t\":\"voice_memo\",\"action\":\"list\"})") }
     fun requestDeviceInfo() { command("GB({\"t\":\"ver\"})") }
+
+    fun configureHttp(enabled: Boolean) {
+        PrototypeHttpRelay.configure(store, enabled)
+        if (!enabled) httpRelay.disable()
+    }
 
     private fun readInitialBattery(client: BluetoothGatt, session: Long) {
         val battery = client.getService(BATTERY_SERVICE)?.getCharacteristic(BATTERY_LEVEL) ?: return

@@ -595,3 +595,36 @@ The final Nokia build passed real HTTP after process crash, Bluetooth recovery
 and verified forced deep idle with Flutter absent. Earlier receive stalls remain
 documented; these checks do not establish universal recovery or long-term
 integrity. See the runbook for exact artifacts and pending acceptance work.
+
+
+## Native HTTP policy in existing Flutter Settings — 2026-10-03
+
+The opt-in Android path now includes a **Watch internet requests** switch in the
+existing Flutter Settings screen. It sends a version-1 native `configureHttp`
+command and observes the shared EventChannel. The acknowledged committed policy
+stays visible until the stream catches up; loading/failure cannot pretend that a
+change succeeded. Metadata includes current pending count and known terminal
+outcomes, never URLs, credentials or response bodies. Old journals default to
+enabled. Inactive owners and older-generation results are hidden as live work.
+
+Editing policy while stopped only commits `http_enabled`. It requests no
+permissions, starts no BLE service, and creates no Dart HTTP executor/listener.
+Turning it off cancels active network work and replies with the existing HTTP
+error format to new requests. Replies already prepared are allowed to finish as
+whole GB frames. The normal app retains its existing provider behavior.
+
+Nokia verified off/on edits at Stop 153 without starting an owner; Off survived a
+force-stop/reopen of the already-stopped app. At Ready 154, a real Trivia request
+with Off produced `error_written` and no UART timeout. With policy confirmed On,
+a fresh request produced `written` and zero pending. The installed watch's error
+callback limitation remains: ATT completion/no timeout is not proof of a terminal
+consumer error state. One intervening attempted tap hit Voice Notes after the
+connected Settings layout expanded; its request still ran with Off. It is not an
+enabled-policy pass. No playback/model execution was triggered.
+
+84 native JVM tests, 41 selected Flutter regressions and 42 companion harness
+regressions pass; focused Dart analysis is clean and both debug variants compile.
+Harness tests need loopback socket access for synthetic server fixtures. The
+read-only native probe now emits bounded, generation-fenced HTTP metadata and the
+selected watch's current status observation timestamp. Its acceptance remains
+`NOT_RUN`: current metadata alone never establishes a scenario pass.

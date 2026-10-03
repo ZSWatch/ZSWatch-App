@@ -106,7 +106,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
-                "stop", "syncTime", "requestDeviceInfo", "requestRecordingList", "retryRecordings", "ackEvents", "configureNotifications", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
+                "stop", "syncTime", "requestDeviceInfo", "requestRecordingList", "retryRecordings", "ackEvents", "configureNotifications", "configureHttp", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
                     PrototypeHub.worker.post {
                         try {
                             val store = PrototypeHub.journal(context)
@@ -133,6 +133,12 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                                     val enabled = call.argument<Boolean>("enabled") ?: error("Enabled required")
                                     if (service?.transport != null) service.transport!!.setRecordingSync(enabled)
                                     else store.update("recording_sync_configuration", mapOf("recording_sync_enabled" to enabled))
+                                }
+                                "configureHttp" -> {
+                                    val enabled = (call.arguments as? Map<*, *>)?.get("enabled") as? Boolean
+                                        ?: error("Boolean enabled required")
+                                    if (service?.transport != null) service.transport!!.configureHttp(enabled)
+                                    else PrototypeHttpRelay.configure(store, enabled)
                                 }
                                 "configureNotifications" -> {
                                     val enabled = call.argument<Boolean>("enabled") ?: error("Enabled required")

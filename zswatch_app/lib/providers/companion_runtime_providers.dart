@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../services/background/companion_prototype_client.dart';
 import '../data/models/companion_recording.dart';
 import '../data/models/companion_notification_status.dart';
+import '../data/models/companion_http_status.dart';
 
 /// Immutable selection for this app run. Native and Dart must not both own BLE.
 bool get useNativeCompanionRuntime =>
@@ -21,6 +22,14 @@ final nativeCompanionRuntimeProvider = Provider<bool>((ref) {
 
 final companionClientProvider = Provider<CompanionPrototypeClient>((ref) {
   return const CompanionPrototypeClient();
+});
+
+final companionHttpStatusProvider = Provider<AsyncValue<CompanionHttpStatus>>((
+  ref,
+) {
+  return ref
+      .watch(companionSnapshotProvider)
+      .whenData((snapshot) => CompanionHttpStatus.decode(snapshot.fields));
 });
 
 /// Requested only by an explicit Connect action, never during app startup.

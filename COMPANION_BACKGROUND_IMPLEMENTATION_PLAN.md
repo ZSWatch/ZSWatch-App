@@ -1214,3 +1214,19 @@ correctness remains a bounded firmware item. Current-Android/production testing
 and local AI require their respective later hardware/acceptance work. Do not
 spend this phase on model execution or SMP transfer-corruption diagnosis.
 Exact artifacts, observations and limits are in the Nokia runbook.
+
+
+### Progress 2026-10-03: Native HTTP controls through Flutter
+
+The existing Settings view now edits durable native HTTP policy and displays
+bounded current-generation metadata. Stopped edits cannot acquire BLE or a Dart
+HTTP executor. Disable cancels active network work; prepared frames finish whole.
+Nokia verified stopped persistence, no owner start, disabled error delivery and
+fresh enabled HTTP delivery. 84 native, 41 selected Flutter and 42 harness tests
+pass; both debug builds compile. AI/recording processing and iOS remain deferred.
+
+A longer native-only idle observation is underway. The next shared lifecycle gap
+is reboot/package-replacement recovery: the prototype currently skips the legacy
+boot handler. Add native restoration of saved running intent after credential
+storage becomes available, with address/generation fencing so delayed events
+cannot undo explicit Stop. Current-Android and production acceptance remain open.

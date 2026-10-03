@@ -15,6 +15,7 @@ internal class PrototypeHttpRelay(
     private val execute: (RelayRequest, (RelayResult) -> Unit) -> (() -> Unit),
     private val send: (String, Long, () -> Unit) -> Boolean,
     private val observe: (String, Long, String) -> Unit,
+    private val enabled: () -> Boolean = { true },
 ) {
     private class Pending(val generation: Long, val deadline: Long) {
         var cancel: () -> Unit = {}
@@ -45,6 +46,9 @@ internal class PrototypeHttpRelay(
         later(6500) { complete(id, entry, RelayResult(error = "Request timed out")) }
         later(8000) {
             if (pending[id] === entry) finish(id, entry, "delivery_expired")
+        }
+        if (!enabled()) {
+            complete(id, entry, RelayResult(error = "HTTP relay disabled")); return true
         }
         val url = message.opt("url") as? String
         val xpath = if (message.has("xpath") && !message.isNull("xpath")) message.opt("xpath") as? String else null
@@ -88,7 +92,23 @@ internal class PrototypeHttpRelay(
         interrupted.forEach { it.cancel(); observe("cancelled", it.generation, "connection_closed") }
     }
 
+    /** Stop network work. Replies already prepared remain whole on the wire. */
+    fun disable() {
+        pending.toList().forEach { (id, entry) ->
+            if (!entry.replying) complete(id, entry, RelayResult(error = "HTTP relay disabled"))
+        }
+    }
+
     companion object {
+        fun enabled(store: PrototypeStore): Boolean = when (val value = store.control()["http_enabled"]) {
+            null -> true // Older journals retain the existing enabled default.
+            is Boolean -> value
+            else -> false
+        }
+        fun configure(store: PrototypeStore, enabled: Boolean) {
+            if (store.control()["http_enabled"] != enabled)
+                store.update("http_configuration", mapOf("http_enabled" to enabled))
+        }
         /** Only diagnostic counts survive death; requests themselves are never replayed. */
         fun markProcessInterrupted(store: PrototypeStore, utcMs: Long) {
             val state = store.control()

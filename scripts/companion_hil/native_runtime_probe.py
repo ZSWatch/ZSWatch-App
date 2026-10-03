@@ -10,6 +10,8 @@ from pathlib import Path
 
 
 COMPONENT = 'dev.zswatch.app.companion.CompanionPrototypeService'
+HTTP_OUTCOMES = {'pending', 'written', 'error_written', 'delivery_expired', 'delivery_unavailable',
+                 'connection_closed', 'process_interrupted', 'invalid_id', 'busy'}
 
 
 def summarize_jobs(state):
@@ -52,12 +54,31 @@ def summarize(state, services, pid, expected=None):
     if not isinstance(notices, dict) or len(notices) > 64:
         raise ValueError('Invalid bounded notification journal')
     active = bool(re.search(r'ServiceRecord\{[^\n]*' + re.escape(COMPONENT), services))
+    live = active and bool(pid.strip())
     ready = active and bool(pid.strip()) and state.get('desired_running') is True and state.get('phase') == 'ready'
     stopped = not active and state.get('desired_running') is False and state.get('phase') == 'stopped' and not notices
     if expected == 'ready' and not ready:
         raise ValueError('Live native service is not protocol-ready')
     if expected == 'stopped' and not stopped:
         raise ValueError('Stop is not persisted, released, and cleared')
+    http_enabled, pending = state.get('http_enabled', True), state.get('http_pending_count', 0)
+    if type(http_enabled) is not bool or type(pending) is not int or not 0 <= pending <= 4:
+        raise ValueError('Invalid native HTTP policy/count')
+    last_http = state.get('last_http')
+    if last_http is not None:
+        if (not isinstance(last_http, dict) or type(last_http.get('generation')) is not int or
+                last_http['generation'] < 0 or type(last_http.get('utc_ms')) is not int or
+                last_http['utc_ms'] < 0 or last_http.get('outcome') not in HTTP_OUTCOMES):
+            raise ValueError('Invalid native HTTP outcome')
+        last_http = ({key: last_http[key] for key in ('generation', 'utc_ms', 'outcome')}
+                     if live and last_http['generation'] == state['generation'] else None)
+    info = state.get('watch_info', {})
+    observed_status = None
+    if (ready and isinstance(info, dict) and info.get('address') == state.get('address') and
+            type(info.get('status_generation')) is int and info['status_generation'] == state['generation']):
+        observed_status = info.get('status_observed_ms')
+        if type(observed_status) is not int or observed_status < 0:
+            raise ValueError('Invalid current watch status timestamp')
     return {
         'schema_version': 1, 'scope': 'READ_ONLY_NATIVE_STATE', 'acceptance': 'NOT_RUN',
         'observed_utc': datetime.now(timezone.utc).isoformat(),
@@ -67,6 +88,9 @@ def summarize(state, services, pid, expected=None):
         'notification_packages': packages, 'recording_sync_enabled': state.get('recording_sync_enabled'),
         'last_time_write_utc_ms': state.get('last_time_write_utc_ms'),
         'last_notification_write_utc_ms': state.get('last_notification_write_utc_ms'),
+        'watch_status_observed_utc_ms': observed_status,
+        'http_enabled': http_enabled, 'http_pending_count': pending if live else 0,
+        'last_http': last_http,
         # Do not emit Android keys, notification text, recordings or job content.
         'notifications': [{k: item.get(k) for k in ('id', 'revision', 'removed', 'delivered_generation', 'delivered_revision')}
                           for item in notices.values()],

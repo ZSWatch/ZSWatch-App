@@ -5,6 +5,7 @@ import '../../data/models/connection_phase.dart';
 import '../../data/models/connection_state.dart';
 import '../../data/models/watch.dart';
 import '../../data/models/companion_notification_status.dart';
+import '../../data/models/companion_http_status.dart';
 
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
@@ -133,6 +134,20 @@ class CompanionPrototypeClient {
           'enabled': enabled,
         }),
       );
+
+  Future<CompanionPrototypeSnapshot> configureHttp(bool enabled) async {
+    final result = CompanionPrototypeSnapshot.decode(
+      await methods.invokeMethod<Object?>('configureHttp', {
+        'version': 1,
+        'enabled': enabled,
+      }),
+    );
+    if (result.fields['http_enabled'] != enabled) {
+      throw const FormatException('HTTP policy was not committed');
+    }
+    CompanionHttpStatus.decode(result.fields);
+    return result;
+  }
 
   Future<CompanionPrototypeSnapshot> configureNotifications(
     bool enabled,

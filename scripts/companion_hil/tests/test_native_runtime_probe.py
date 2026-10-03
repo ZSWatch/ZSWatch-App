@@ -43,6 +43,41 @@ class NativeRuntimeProbeTests(unittest.TestCase):
         self.assertNotIn('private-key', report); self.assertNotIn('private text', report)
         self.assertIn('NOT_RUN', report)
 
+    def test_http_metadata_is_current_bounded_and_redacted(self):
+        state = self.state()
+        services = 'ServiceRecord{abc u0 com.zswatch.app/' + COMPONENT + '}'
+        state.update(http_enabled=False, http_pending_count=2,
+                     last_http={'generation': 1, 'utc_ms': 123, 'outcome': 'written',
+                                'url': 'private url', 'body': 'private body'})
+        report = summarize(state, services, '123')
+        self.assertFalse(report['http_enabled'])
+        self.assertEqual(report['http_pending_count'], 2)
+        self.assertEqual(report['last_http'], {'generation': 1, 'utc_ms': 123, 'outcome': 'written'})
+        self.assertNotIn('private', str(report))
+        for service, pid in [('', '123'), (services, '')]:
+            absent = summarize(state, service, pid)
+            self.assertEqual(absent['http_pending_count'], 0)
+            self.assertIsNone(absent['last_http'])
+        state['generation'] = 2
+        self.assertIsNone(summarize(state, services, '123')['last_http'])
+        for key, value in [('http_pending_count', True), ('http_pending_count', 5),
+                           ('http_pending_count', -1), ('http_enabled', 'false')]:
+            with self.assertRaises(ValueError):
+                summarize({**state, key: value}, services, '123')
+        state['last_http']['outcome'] = 'private body'
+        with self.assertRaises(ValueError):
+            summarize(state, services, '123')
+
+    def test_only_current_selected_watch_status_is_reported_as_live(self):
+        state = self.state(); state['address'] = 'watch'
+        state['watch_info'] = {'address': 'watch', 'status_generation': 1, 'status_observed_ms': 123}
+        services = 'ServiceRecord{abc u0 com.zswatch.app/' + COMPONENT + '}'
+        self.assertEqual(summarize(state, services, '123')['watch_status_observed_utc_ms'], 123)
+        for patch in [{'address': 'other'}, {'status_generation': 0}, {'status_generation': True}]:
+            stale = {**state, 'watch_info': {**state['watch_info'], **patch}}
+            self.assertIsNone(summarize(stale, services, '123')['watch_status_observed_utc_ms'])
+        self.assertIsNone(summarize(state, '', '123')['watch_status_observed_utc_ms'])
+
     def test_committed_result_requires_a_matching_outbox_and_redacts_text(self):
         spec = {'watch_id': 'test'}
         identity = hashlib.sha256(json.dumps(spec, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
