@@ -41,6 +41,28 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var fileOperation = 0L
     private var notificationWriting = false
     private var readingBattery = false
+    private val httpExecutor = HttpUrlRelayExecutor { action -> handler.post(action) }
+    private val httpRelay: PrototypeHttpRelay = PrototypeHttpRelay(
+        now = { android.os.SystemClock.elapsedRealtime() },
+        later = { delay, action -> handler.postDelayed(action, delay) },
+        execute = httpExecutor::execute,
+        send = { packet, deadline, done ->
+            if (!runtime.owns(token) || store.control()["phase"] != "ready" || writes.size >= 16) false
+            else {
+                val bytes = packet.toByteArray(Charsets.UTF_8)
+                val reserve = maxOf(500L, ((bytes.size + payloadSize - 1) / payloadSize) * 40L)
+                writes.add(NusWrite(bytes, done, payloadSize) {
+                    android.os.SystemClock.elapsedRealtime() + reserve < deadline
+                })
+                pump(); true
+            }
+        },
+        observe = { kind, generation, outcome ->
+            store.update("http_$kind", mapOf("http_pending_count" to httpRelay.pendingCount,
+                "last_http" to mapOf("generation" to generation, "outcome" to outcome,
+                    "utc_ms" to System.currentTimeMillis())))
+        },
+    )
 
     override fun connect(address: String, generation: Long) {
         close()
@@ -226,7 +248,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private fun command(text: String, done: () -> Unit = {}) {
         check(runtime.owns(token) && store.control()["phase"] == "ready") { "NUS not ready" }
         check(writes.size < 16) { "NUS write queue full" }
-        writes.add(NusWrite(text.toByteArray(Charsets.UTF_8), done))
+        writes.add(NusWrite(text.toByteArray(Charsets.UTF_8), done, payloadSize))
         pump()
     }
 
@@ -235,6 +257,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         val client = gatt ?: return
         val characteristic = tx ?: return
         val item = writes.first
+        if (!item.mayStart()) { writes.remove(); pump(); return }
         characteristic.value = item.packet()
         noResponse = characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE == 0
         characteristic.writeType = if (noResponse) BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
@@ -291,7 +314,11 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     private fun incoming(bytes: ByteArray) {
-        for (text in framer.feed(bytes)) {
+        val droppedBefore = framer.droppedFrames
+        val frames = framer.feed(bytes)
+        if (framer.droppedFrames > droppedBefore)
+            store.update("nus_incomplete_frame_discarded", detail = mapOf("count" to framer.droppedFrames - droppedBefore))
+        for (text in frames) {
             val message = JSONObject(text)
             // A notification may precede the CCCD completion callback. Readiness
             // sends time anyway; do not disconnect a valid subscribing link.
@@ -306,6 +333,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                     LifecycleLogger.log("CompanionNotifications", "dismiss_failed ${error.javaClass.simpleName}")
                 }
             }
+            if (store.control()["phase"] == "ready") httpRelay.receive(message, token)
             recordingInbox.receive(message)
         }
         downloadNext()
@@ -440,6 +468,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     override fun close() {
         operation++; fileOperation++
+        httpRelay.reset()
         writing = false; writes.clear(); downloading = false
         notificationWriting = false
         readingBattery = false
@@ -451,6 +480,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
         runCatching { previous?.disconnect() }; runCatching { previous?.close() }
         framer.reset()
     }
+
+    fun dispose() { close(); httpExecutor.close() }
 
     companion object {
         @Volatile var traceMcuPackets = false

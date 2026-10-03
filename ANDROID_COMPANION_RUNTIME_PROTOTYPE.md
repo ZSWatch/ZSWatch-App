@@ -553,3 +553,45 @@ model execution, remote submission or job/outbox mutation. Recording-to-job and
 legacy processing migrations remain explicit later work. The native companion
 is still opt-in under `COMPANION_RUNTIME_PROTOTYPE=true`; iOS and ordinary Dart
 BLE startup are unchanged. See the Nokia runbook for artifacts and test limits.
+
+## Android HTTP relay and shared receive recovery — 2026-10-03
+
+Current priority is Android's shared companion functions: BLE ownership,
+notifications, time, HTTP and recovery. AI execution/recording-processing work
+and iOS are deferred. The existing Flutter UI remains the UI.
+
+The opt-in native transport now handles the existing watch `t=http` GET requests
+without Dart listeners or a Flutter engine. Network IO uses two separate threads
+and a bounded queue; the BLE handler owns request state and response writes.
+At most four requests are pending. Valid string/integer IDs are echoed, including
+the firmware's bare `id` key. Duplicate IDs are suppressed for a bounded recent
+window within a connection. Reconnect clears that window and fences old IO/ATT
+completions. Requests are transient: process death records interruption but does
+not persist URLs/bodies or replay requests. The watch must issue a fresh request.
+
+The HTTP watchdog replies after 6.5 seconds; delivery expires at eight seconds,
+before the watch's existing ten-second timeout. An expired queued frame cannot
+start. Once an ATT frame has started it is completed to avoid leaving a partial
+GB command; this is not a hard end-to-end deadline guarantee under a stalled
+radio. Journal `written` means ATT completion, not a watch application ACK.
+
+HTTP/HTTPS GET, bounded redirects, explicit per-request insecure TLS and optional
+XML XPath are supported. HTTPS is verified by default, and redirects cannot
+downgrade it to HTTP. XML DTD/entities are rejected. Raw bodies are capped at
+64 KiB; the complete escaped UTF-8 GB response is limited to less than 1900 bytes
+against the firmware's 2000-byte buffer. Failures produce bounded `err` replies.
+Only the opt-in debug manifest selects the relay's HTTP network policy. Ordinary
+debug retains the loopback-only fixture policy; release/profile are unchanged.
+
+The shared compact-JSON framer now drops an incomplete frame at a newline, with
+a metadata-only discard count. Previously one lost/truncated frame could keep
+all later messages buffered until reconnect or the size limit. This protects
+time, status, notification and HTTP traffic equally. It does not repair the
+source packet or establish why the Nokia's observed receive stalls occurred.
+The final APK exercised a discard followed by continued status and successful
+HTTP. Ordinary commands now use negotiated MTU too: one notification fixture
+improved from 7.4 seconds to 1.1 seconds while retaining watch-to-phone dismissal.
+The final Nokia build passed real HTTP after process crash, Bluetooth recovery
+and verified forced deep idle with Flutter absent. Earlier receive stalls remain
+documented; these checks do not establish universal recovery or long-term
+integrity. See the runbook for exact artifacts and pending acceptance work.

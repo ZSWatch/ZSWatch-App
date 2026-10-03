@@ -25,6 +25,15 @@ för BLE/livscykel; AI-inferens och faktisk modell-/headless-worker-körning ska
 senare på en lämplig nyare telefon. Kod för att återanvända Dart kan förberedas och
 kompileras under tiden. Behåll både lokal och remote AI som val i arkitekturen.
 
+Aktuell omprioritering från användaren: Androids gemensamma companion-funktioner
+är huvudspåret, inklusive HTTP, notifikationer, tid, BLE-ägarskap och återhämtning.
+Nokia används för alla icke-AI-funktioner som den kan verifiera. AI-integration,
+modeller och fler recording-/processingförbättringar är nedprioriterade tills
+kommunikationskärnan fungerar genom bakgrundskörning och avbrott. iOS-arbete
+skjuts upp för närvarande. Behåll befintlig Flutter-UI och återanvänd befintliga
+Nordic-/Dart-fixar; detta ändrar arbetsordningen, inte slutarkitekturens val av
+lokal eller remote AI.
+
 ### Produktkrav
 
 | Funktion | Avsedd användarupplevelse | Återhämtning vid avbrott |
@@ -1158,10 +1167,50 @@ remains Stop 128, all nine native dictionaries and seven raw hashes are retained
 and the synthetic job/outbox plus logical main DB are unchanged. See the runtime
 notes/runbook for artifact hash and the limits of this bounded check.
 
-Next architecture work is the explicit mapping from verified recording imports
-to durable processing jobs and existing Flutter result/action views. Do not map
+Recording-to-job/result mapping is deferred under the subsequent user priority
+change. The next work is Android HTTP and shared companion lifecycle verification. Do not map
 legacy voice rows by filename or start models merely by opening Voice Notes.
 The Nokia remains excluded from local AI. Newer-phone model execution,
 production remote submission, multi-runtime importer ownership/retention,
 discovery/coordinated unpair, Android background acceptance and iOS restoration
 still require their own implementation and verification boundaries.
+
+### Progress 2026-10-03: Android HTTP and shared lifecycle
+
+AI/model execution, further recording-processing integration and iOS remain
+deferred under the user's latest priority. The existing Flutter UI is retained.
+Android's native owner now accepts existing watch HTTP GET requests, with a
+separate bounded IO pool, ID/deadline handling, bounded escaped GB responses,
+XPath, cancellation and generation fencing. Requests are not replayed after
+connection/process loss. Only metadata counts/outcomes are persisted. Watch-side
+HTTP callback/error fixes remain a separate firmware acceptance item.
+
+The shared parser now drops an incomplete compact JSON frame at a newline,
+rather than allowing it to swallow later traffic. Ordinary commands reuse
+negotiated MTU instead of fixed 20-byte packets; one synthetic notification
+improved from 7.4 s to 1.1 s and watch dismissal still cancelled it on Android.
+
+On the final Nokia APK with Flutter absent: an injected Java crash changed PID
+and restored Ready/time without UI or explicit Start; Bluetooth off/on likewise
+recovered. Real Trivia HTTP passed after crash, after radio recovery and while
+verified deep state remained IDLE. A parser discard followed by continued
+status/HTTP was observed. Earlier intermittent receive stalls are retained as
+failures; these bounded passes do not establish universal recovery or packet
+integrity. USB stayed attached during forced idle, and no independent watch
+application ACK/display timestamp was captured.
+
+82 native and 27 Flutter bridge/app-shell regressions pass, both debug variants
+compile, and fresh release-manifest checks exclude debug presence/network policy.
+The final APK is installed. Stop 151 released the owner and cleared its native
+notification state. Recording dictionaries and the separate job/outbox journal
+match the baseline exactly; nine watch originals, free space and paused downloads
+remain intact. The temporary approval-review usage blockage was resolved after
+reset; final hardware checks and cleanup then completed.
+
+Next: migrate remaining ordinary Flutter feature controls/status to native
+ownership and assess discovery/pairing integration; extend Android idle and
+reconnect testing across longer periods. Watch HTTP error/late-result consumer
+correctness remains a bounded firmware item. Current-Android/production testing
+and local AI require their respective later hardware/acceptance work. Do not
+spend this phase on model execution or SMP transfer-corruption diagnosis.
+Exact artifacts, observations and limits are in the Nokia runbook.

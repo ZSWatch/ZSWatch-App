@@ -24,9 +24,11 @@ object PrototypeClockCommands {
 }
 
 /** A fixed packet size keeps completion accounting independent of later MTU callbacks. */
-internal class NusWrite(val bytes: ByteArray, val done: () -> Unit = {}, private val packetSize: Int = 20) {
+internal class NusWrite(val bytes: ByteArray, val done: () -> Unit = {}, private val packetSize: Int = 20,
+                        private val canStart: () -> Boolean = { true }) {
     private var offset = 0
     init { require(bytes.isNotEmpty() && packetSize > 0) }
+    fun mayStart(): Boolean = offset > 0 || canStart()
     fun packet(): ByteArray = bytes.copyOfRange(offset, minOf(offset + packetSize, bytes.size))
     fun advance(): Boolean {
         offset = minOf(offset + packetSize, bytes.size)

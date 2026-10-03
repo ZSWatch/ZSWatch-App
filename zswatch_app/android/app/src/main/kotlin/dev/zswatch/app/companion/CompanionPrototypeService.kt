@@ -89,6 +89,7 @@ class CompanionPrototypeService : Service() {
         PrototypeHub.worker.post {
             safely {
                 val store = PrototypeHub.journal(applicationContext)
+                PrototypeHttpRelay.markProcessInterrupted(store, System.currentTimeMillis())
                 val files = ReceiptFiles(File(filesDir, "companion-prototype/recordings"))
                 val link = NativePrototypeTransport(applicationContext, PrototypeHub.worker, store, files)
                 transport = link
@@ -120,7 +121,7 @@ class CompanionPrototypeService : Service() {
             val notification = NotificationCompat.Builder(this, CHANNEL)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setContentTitle("ZSWatch companion prototype")
-                .setContentText("Native connection and recording runtime")
+                .setContentText("Native watch companion runtime")
                 .setOngoing(true)
                 .setContentIntent(PendingIntent.getActivity(this, 20, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
                 .addAction(0, "Stop", PendingIntent.getService(this, 21, stop, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
@@ -215,7 +216,7 @@ class CompanionPrototypeService : Service() {
         PrototypeHub.worker.post { safely {
             remoteFixture?.close(); remoteFixture = null
             localFixture?.close(); localFixture = null
-            runtime?.destroy(); runtime = null; transport = null
+            runtime?.destroy(); transport?.dispose(); runtime = null; transport = null
         } }
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()

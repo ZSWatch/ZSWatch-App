@@ -275,6 +275,17 @@ class PrototypeContractsTest {
         framer.feed("{\"stale\":".toByteArray()); framer.reset()
         assertEquals(listOf("{\"fresh\":1}"), framer.feed("{\"fresh\":1}".toByteArray()))
     }
+    @Test fun truncatedFrameCannotSwallowSubsequentTimeStatusOrHttpTraffic() {
+        for (broken in listOf("{\"a\":{", "{\"a\":\"unterminated", "{\"a\":\"escaped\\")) {
+            val framer = NusJsonFramer()
+            framer.feed(broken.toByteArray())
+            val fresh = "{\"t\":\"http\",\"id\":\"1\",\"url\":\"https://example.com/\"}"
+            assertEquals(listOf(fresh), framer.feed(("\n" + fresh + "\n").toByteArray()))
+            assertEquals(1L, framer.droppedFrames)
+            assertEquals(listOf("{\"t\":\"time\"}", "{\"t\":\"status\",\"bat\":80}"),
+                framer.feed("{\"t\":\"time\"}\n{\"t\":\"status\",\"bat\":80}\n".toByteArray()))
+        }
+    }
 
     @Test fun oversizedAndInvalidUtf8MessagesRejectAndReset() {
         val framer = NusJsonFramer(12)

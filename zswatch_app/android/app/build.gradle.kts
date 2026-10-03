@@ -100,6 +100,8 @@ android {
     buildTypes {
         debug {
             buildConfigField("boolean", "COMPANION_RUNTIME_PROTOTYPE", companionPrototypeRequested.toString())
+            manifestPlaceholders["companionNetworkSecurity"] = if (companionPrototypeRequested)
+                "@xml/companion_relay_network_security" else "@xml/companion_fixture_network_security"
         }
         getByName("profile") {
             buildConfigField("boolean", "COMPANION_RUNTIME_PROTOTYPE", "false")

@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
-    <application android:networkSecurityConfig="@xml/companion_fixture_network_security">
+    <application android:networkSecurityConfig="${companionNetworkSecurity}">
         <service android:name=".companion.PrototypePresenceService"
             android:exported="true" android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
             <intent-filter>

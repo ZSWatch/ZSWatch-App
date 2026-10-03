@@ -676,3 +676,81 @@ transcription/action jobs. Retained interrupted stages, concurrency between Dart
 runtimes, storage pressure, longer recordings, newer-Android background survival
 and iOS are separate acceptance work. Already-stopped app force-stops here only
 provided consistent SQLite snapshots; they do not test active BLE OS recovery.
+
+## Android HTTP and shared lifecycle — 2026-10-03
+
+Artifacts: `.companion-hil-runs/20261003-native-http-lifecycle/`.
+Final installed frozen APK: `native-final-mtu.apk`, SHA-256
+`be742c418d110695af2c67f7e786d046270f85bb927b53d6beda281c4c40c287`.
+AI/model/headless processing and iOS were deferred. Flutter remains the existing
+UI. Physical checks started only the native owner; Flutter was absent throughout.
+Downloads stayed paused. No firmware reset, flash, SMP transfer, new recording,
+watch-file deletion or model execution ran.
+
+| Final APK scenario | Observation and limit |
+| --- | --- |
+| Initial Ready | Generation 146, negotiated ATT payload 244, fresh time and watch status/version. |
+| Synthetic notification | ID 1000011 queued → ATT completion in 1,140 ms. Watch touch caused Android cancellation and listener removal of that ID. One fixture, not P95 or personal-app coverage. |
+| Injected Java crash | PID 3070 → 3688, Ready 146 → 147 without Flutter or explicit Start; fresh time. Sticky service, listener and presence were active, so no single mechanism is isolated. |
+| HTTP after crash | Fresh Trivia request, current-generation `written`, zero pending count; admission → committed completion 4.397 s. No UART HTTP timeout. |
+| Incomplete frame | One metadata-only discard during the post-crash request; subsequent status and HTTP completion continued. This exercises resynchronization but does not locate the packet loss. |
+| Forced deep idle | Deep state `IDLE` both before/after HTTP; same PID 3688/generation 147. Fresh `written`, zero pending, 3.053 s and no watch timeout. USB remained physically attached; this is not unplugged endurance. |
+| Bluetooth off/on | Persisted disconnected state, then automatic Ready 150 without UI/Start; fresh time. Subsequent Trivia HTTP completed in 1.078 s with no watch timeout. |
+| Explicit Stop | Generation 151, desired_running false, stopped, native owner absent and native notification count zero. Listener process remained alive; it is not the BLE owner. |
+
+HTTP durations above come from native admission/completion journal events, not
+an independent watch display timestamp. `written` means ATT completion. Trivia's
+UART showed no timeout/consumer parse error, but no independent watch screenshot
+or application receipt ACK was captured. The three requests used the real watch
+consumer and remote API, not an injected phone-only relay fixture.
+
+Earlier builds had repeated watch HTTP timeouts with no native admission, and
+one temporary diagnostic build completed a request at generation 135. A later
+build again stalled. These failures remain in the private evidence; the later
+passes do not establish that every intermittent receive failure is fixed.
+Code inspection found a shared weakness: an incomplete compact JSON frame could
+buffer later traffic indefinitely. Newline-boundary recovery is host-tested and
+was exercised by the final APK's discard marker. Source-packet integrity and
+long-duration receive reliability remain separate acceptance work.
+
+Ordinary native commands now use negotiated MTU, like HTTP replies. Before this
+change, notification ID 1000010 took 7,433 ms with 20-byte writes; afterward the
+fresh fixture took 1,140 ms and still dismissed correctly. Earlier touches were
+premature or occurred with Trivia active. The later checks waited for a fresh
+current-generation write before touching the watch on its watchface.
+
+82 native JVM tests and 27 selected Flutter bridge/provider/app-shell tests pass.
+Tests cover exact firmware bare-key framing, duplicate/late completions,
+watchdog cancellation, connection fencing, actual HTTP status/body bounds and
+relative redirects, XPath/DTD rejection, unsupported URL schemes, expired queued
+writes, journal reopen after interrupted HTTP, and truncated frames followed by
+HTTP/time/status. Both final debug variants compile. Fresh release manifest
+merging excludes companion presence service/permissions and the debug network
+policy; ordinary debug retains its loopback-only fixture policy.
+
+A temporary account usage limit prevented approval review and delayed final
+installation. Work resumed after the usage window reset; final installation,
+physical checks and cleanup above subsequently completed through normal review.
+
+Final native recording dictionaries exactly match the baseline: nine entries,
+seven saved downloads and two earlier failures. The separate job/outbox journal
+also matches exactly, with local fixtures disabled. USB status confirms watchface,
+no active recording, nine originals and unchanged 9964 KB free space. Battery/
+idle simulation was restored (`ACTIVE`, USB power restored), Bluetooth enabled,
+and the native owner explicitly stopped. No transfer/integrity or AI claim is
+added by these checks.
+
+Repeat through the existing USB shell helpers: `power wake`, then `app state` /
+`app close` until watchface, allowing the asynchronous close timer to run. Launch
+`app launch Trivia` and capture UART for at least twelve seconds. Compare HTTP
+markers after a pre-request cursor and require the current generation, terminal
+outcome and zero pending count; retained `last_http` from an older generation is
+not success. Close Trivia before notification-popup tests and wait for fresh
+notification write completion before `touch 200 95`. Always unforce device idle
+and reset battery simulation in a `finally` path. Preserve data with replacement
+installs and verify frozen APK identity using `native_runtime_probe.py`.
+
+Remaining: longer idle/reconnect runs, current-Android hardware, production
+acceptance, migration of remaining Flutter feature controls, and watch-side
+HTTP error/late-callback correctness. Fresh error/oversize/deadline cases have
+host contracts; their complete watch-consumer outcomes remain unverified.

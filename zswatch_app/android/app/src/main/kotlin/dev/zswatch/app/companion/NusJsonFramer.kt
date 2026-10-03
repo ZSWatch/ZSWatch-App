@@ -4,12 +4,16 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 
-/** Byte framing preserves UTF-8 split across GATT notifications and escaped braces. */
+/** Compact watch messages: preserve split UTF-8 and escaped braces. A newline
+ * ends a wire message, so an incomplete frame cannot swallow subsequent traffic.
+ */
 class NusJsonFramer(private val maximum: Int = 32768) {
     private val bytes = ByteArrayOutputStream()
     private var depth = 0
     private var quoted = false
     private var escaped = false
+    var droppedFrames = 0L
+        private set
 
     fun reset() { bytes.reset(); depth = 0; quoted = false; escaped = false }
 
@@ -17,6 +21,7 @@ class NusJsonFramer(private val maximum: Int = 32768) {
         val messages = mutableListOf<String>()
         for (byte in chunk) {
             val value = byte.toInt() and 255
+            if (value == 10 && depth > 0) { droppedFrames++; reset(); continue }
             if (depth == 0 && value != 123) continue
             bytes.write(value)
             if (bytes.size() > maximum) { reset(); throw IllegalArgumentException("NUS frame limit exceeded") }
