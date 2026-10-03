@@ -544,3 +544,43 @@ The previously passing 67 native tests cover unchanged native core sources;
 they were not rerun for this Flutter-only change. Saved-watch DB/custom names,
 scan/bonding, legacy preference migration, recording playback/import/processing,
 media/GPS/HTTP/health/analytics/DFU and iOS remain outside this app-shell subset.
+
+## Saved-watch metadata in the existing Flutter UI — 2026-10-03
+
+Artifacts: `.companion-hil-runs/20261003-native-saved-watches/`.
+Installed native APK SHA-256:
+`c0d52c3430d4c019c0bf692c4784532cc3f6e722136cc4902da7b2f37dcf6311`.
+The start screen reuses the ordinary saved-watch tile and rename dialog.
+Names come from Drift; connection and live battery remain native observations.
+Native database opening skips legacy unfinished-memo recovery. Schema 6 and
+ordinary-build recovery behavior are unchanged. Rename writes only custom_name;
+Forget/unpair is withheld. Saved Android MAC selection requires an explicit tap,
+requests permission and cannot switch an active native owner.
+
+Before install, the phone had no Flutter database. Opening the new native UI
+created an empty schema-6 catalogue and retained Stop generation 122, PID 22568.
+The real Connect button reached Ready generation 123 with the existing dashboard,
+MTU 247, firmware 0.8.1 and battery 87%. Dashboard Disconnect persisted Stop
+124. The already-stopped app was then force-stopped to close its database and
+relaunched; new PID 23079 retained Stop 124 without starting BLE. This is a
+stopped-app relaunch check, not recovery from process death during active BLE.
+
+Private SQLite snapshots had identical logical contents before Connect and after
+Stop (all watch/voice/action/chat tables empty). All nine native recording
+records were unchanged, as was the separate synthetic job/result outbox;
+local fixtures remained disabled, recording downloads paused and notification
+selection limited to ZSWatch. USB status confirmed nine watch originals, no
+active recording and the watchface. No model, audio transfer, reset, flash or
+recording deletion ran.
+
+73 targeted Flutter tests pass, including five new saved-watch checks: a real
+file-backed schema-6 reopen preserving unfinished voice state while ordinary
+recovery still works, column-only renaming and reactive metadata, alias ambiguity,
+existing tile/dialog selection through the versioned bridge, and Android address
+validation. Widget tests inject the saved catalogue; real SQLite preservation
+and rename tests exercise Drift separately. Existing UI-shell tests inject an
+empty catalogue and continue guarding against legacy BLE/AI startup. Focused
+analysis and both debug APK builds pass; native Kotlin sources are unchanged.
+Physical renamed/saved-row migration remains untested because this phone had no
+old rows. Automatic saving of newly connected watches, discovery, coordinated
+forget/unpair and recording import/playback/processing remain separate work.

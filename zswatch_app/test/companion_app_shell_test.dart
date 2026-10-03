@@ -84,6 +84,7 @@ void main() {
       ProviderScope(
         overrides: [
           nativeCompanionRuntimeProvider.overrideWithValue(true),
+          database.allWatchesProvider.overrideWith((ref) => Stream.value([])),
           companionConnectionPermissionsProvider.overrideWithValue(() async {
             permissionRequests++;
             if (denyPermission) throw StateError('Permission denied');

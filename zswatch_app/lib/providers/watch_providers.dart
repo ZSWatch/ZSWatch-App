@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database/app_database.dart';
 import '../data/repositories/watch_repository.dart';
+import 'companion_runtime_providers.dart';
 
 /// Provider for the database singleton
 final databaseProvider = Provider<AppDatabase>((ref) {
-  final db = AppDatabase();
+  final db = ref.watch(nativeCompanionRuntimeProvider)
+      ? AppDatabase.forCompanion()
+      : AppDatabase();
   ref.onDispose(() => db.close());
   return db;
 });

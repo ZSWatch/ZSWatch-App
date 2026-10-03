@@ -8,6 +8,7 @@ import '../data/models/connection_phase.dart';
 import '../data/models/connection_state.dart';
 import '../data/models/crash_summary.dart';
 import '../data/models/watch.dart';
+import '../data/database/app_database.dart' show WatchEntity;
 import '../data/repositories/watch_repository.dart';
 import '../services/ble/ble_connection_service.dart';
 import '../services/ble/ble_scanner.dart';
@@ -118,7 +119,27 @@ final watchInfoStreamProvider = StreamProvider<Watch?>((ref) {
 /// In demo mode, returns a static placeholder watch.
 final currentWatchProvider = Provider<Watch?>((ref) {
   if (ref.watch(nativeCompanionRuntimeProvider)) {
-    return ref.watch(companionSnapshotProvider).asData?.value.watch;
+    final live = ref.watch(companionSnapshotProvider).asData?.value.watch;
+    if (live == null) return null;
+    final saved =
+        ref.watch(allWatchesProvider).asData?.value ?? <WatchEntity>[];
+    // Preserve Android MAC spelling in Drift. Do not pick an arbitrary name
+    // if old rows have ambiguous aliases for one physical watch.
+    final exact = saved.where((w) => w.id == live.id).toList();
+    final matches = exact.isNotEmpty
+        ? exact
+        : saved
+              .where((w) => w.id.toUpperCase() == live.id.toUpperCase())
+              .toList();
+    if (matches.length != 1) return live;
+    final metadata = matches.single;
+    return live.copyWith(
+      name: metadata.name,
+      customName: metadata.customName,
+      isPrimary: metadata.isPrimary,
+      createdAt: metadata.createdAt,
+      lastConnectedAt: metadata.lastConnectedAt,
+    );
   }
   final demo = demoWatchOrNull(ref);
   if (demo != null) return demo;

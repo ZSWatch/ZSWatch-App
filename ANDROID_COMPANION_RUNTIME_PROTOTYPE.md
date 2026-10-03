@@ -56,8 +56,10 @@ Direct creation of the legacy `BleConnectionService` fails when native selection
 is active. UI SMP actions are withheld until coordinated with the native owner;
 this does not replace Nordic transfer support. Native crash-summary routing is
 not yet implemented. Normal builds retain the previous provider paths. The native
-path does not open or migrate Drift, so saved custom names/ordinary DB-backed
-watch lists are not yet merged here.
+path now opens the existing Drift schema for saved-watch metadata. It skips the
+legacy before-open voice-processing reset, preserving unfinished legacy rows.
+Saved names merge by exact ID or a unique case-insensitive Android MAC;
+connection and live battery still come only from native state.
 
 The existing dashboard, start page and settings screen now have native branches.
 Home observes saved intent: opening/resuming never sends Start, so deliberate
@@ -79,9 +81,17 @@ setup; this is not a completed discovery/bonding/watch-management flow.
 Native selection bypasses the legacy last-watch/auto-reconnect preferences; its
 durable running intent remains authoritative. Migrating those product settings,
 legacy filters, recordings/DB import, chat/models, DFU/media and the remaining
-services is still required before full rollout. No watch/recording DB migration
-or custom-name import is performed by this shell. See the Nokia runbook for
-bounded app-shell evidence.
+services is still required before full rollout.
+
+The saved-watch catalogue reuses the existing Flutter tile and rename dialog.
+Selecting a valid Android MAC explicitly requests permission and sends Start;
+selection is disabled until an active owner is stopped. Renaming updates only
+the saved row’s custom-name column and sends no BLE command. Forget/unpair remains
+withheld until native coordination is implemented. iOS IDs cannot be selected by
+this Android prototype. Schema version 6 and its existing upgrade migrations are
+unchanged; no native recording receipt is imported into Drift. Newly connected
+watches are not yet automatically saved to the catalogue. See the Nokia runbook
+for bounded app-shell and empty-catalogue evidence.
 
 The existing `VoiceMemosScreen` now has a native receipt view when the debug
 selection is active. Its ordinary auto-sync, repository, model-configuration

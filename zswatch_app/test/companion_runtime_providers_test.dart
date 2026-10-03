@@ -72,6 +72,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         nativeCompanionRuntimeProvider.overrideWithValue(true),
+        database.allWatchesProvider.overrideWith((ref) => Stream.value([])),
         watchServiceProvider.overrideWith(
           (ref) => throw StateError('Legacy protocol instantiated'),
         ),
@@ -90,7 +91,7 @@ void main() {
   });
 
   test(
-    'existing UI state providers share one native observer and never create legacy BLE or DB',
+    'UI providers share one native observer with an injected catalogue and no legacy BLE',
     () async {
       container.listen(watchConnectionProvider, (_, _) {});
       container.listen(connectionPhaseProvider, (_, _) {});

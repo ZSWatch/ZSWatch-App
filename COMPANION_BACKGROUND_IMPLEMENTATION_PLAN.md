@@ -1085,3 +1085,26 @@ Dessa frågor hindrar inte labbsetup, baseline, instrumentation och kontraktsarb
 Leveransen är klar när Flutter-gränssnittet använder en livscykeloberoende companion-kärna, de fyra kritiska funktionerna är godkända enligt stödmatrisen, lokal och remote AI använder samma återhämtningsbara jobbmodell och en fysisk testuppställning kan reproducera resultaten utan manuell provning för varje ändring.
 
 Till leveransen hör körbar HIL-harness, setup/runbook, exakta buildartefakter, automattester med tydliga failures, långtidsrapporter, migreringstest och dokumenterade plattformsbegränsningar. En lyckad build, foreground-notifikation, simulatorserie eller PC-BLE-session är inte ensam tillräcklig.
+
+### Progress 2026-10-03: saved watches without changing the BLE owner
+
+The native debug branch now reuses the existing Flutter saved-watch tile and
+rename dialog. It opens schema-6 Drift for metadata while bypassing the legacy
+before-open unfinished voice-processing reset; default builds retain that
+recovery behavior. Display names merge by exact ID or unique Android MAC alias.
+Native state alone determines connection and current-generation battery.
+Explicit saved-watch selection requests permission and sends native Start;
+active-owner switching and uncoordinated Forget/unpair remain withheld. Rename
+updates only custom_name, preserving saved history and voice rows. No receipt
+import or schema change is introduced.
+
+73 targeted Flutter tests, focused analysis and both APK builds pass. Nokia
+had no pre-existing Flutter DB: its empty catalogue opened without starting BLE,
+explicit Connect reached Ready and Disconnect/relaunch preserved Stop. The
+existing nine recording records and synthetic job/outbox remain unchanged;
+watch originals are intact and downloads/AI stayed disabled. These are bounded
+integration observations, not modern-Android/iOS background acceptance. Next
+product work includes saving newly connected watch metadata, discovery/unpair,
+legacy preference decisions and the durable recording import/playback/processing
+boundary; local models still require newer hardware. See the Nokia runbook for
+artifact hash and exact limits.

@@ -15,12 +15,14 @@ class WatchConfigDialog extends StatefulWidget {
   final WatchEntity watch;
   final Future<void> Function(String watchId, String? customName) onRename;
   final Future<void> Function(String watchId) onForget;
+  final bool allowForget;
 
   const WatchConfigDialog({
     super.key,
     required this.watch,
     required this.onRename,
     required this.onForget,
+    this.allowForget = true,
   });
 
   /// Show the dialog and return true if the watch was forgotten (deleted)
@@ -29,6 +31,7 @@ class WatchConfigDialog extends StatefulWidget {
     required WatchEntity watch,
     required Future<void> Function(String watchId, String? customName) onRename,
     required Future<void> Function(String watchId) onForget,
+    bool allowForget = true,
   }) {
     return showDialog<bool>(
       context: context,
@@ -36,6 +39,7 @@ class WatchConfigDialog extends StatefulWidget {
         watch: watch,
         onRename: onRename,
         onForget: onForget,
+        allowForget: allowForget,
       ),
     );
   }
@@ -198,24 +202,25 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
             const SizedBox(height: AppTheme.spacingLg),
 
             // Forget watch button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: isLoading ? null : _handleForget,
-                icon: _isForgetting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.delete_outline),
-                label: const Text('Forget Watch'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.errorColor,
-                  side: const BorderSide(color: AppTheme.errorColor),
+            if (widget.allowForget)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: isLoading ? null : _handleForget,
+                  icon: _isForgetting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline),
+                  label: const Text('Forget Watch'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.errorColor,
+                    side: const BorderSide(color: AppTheme.errorColor),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

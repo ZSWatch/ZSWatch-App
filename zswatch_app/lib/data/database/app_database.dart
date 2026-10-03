@@ -39,10 +39,18 @@ part 'app_database.g.dart';
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  final bool recoverLegacyProcessing;
+
+  AppDatabase() : recoverLegacyProcessing = true, super(_openConnection());
+
+  /// Native jobs have their own recovery owner. Opening saved-watch metadata
+  /// must not reset unrelated legacy voice-processing rows.
+  AppDatabase.forCompanion()
+    : recoverLegacyProcessing = false,
+      super(_openConnection());
 
   /// Uses the same schema and migrations with an explicit executor in tests.
-  AppDatabase.forTesting(super.executor);
+  AppDatabase.forTesting(super.executor, {this.recoverLegacyProcessing = true});
 
   /// Database schema version
   @override
@@ -81,7 +89,7 @@ class AppDatabase extends _$AppDatabase {
       },
       beforeOpen: (details) async {
         // Reset memos stuck in intermediate processing states from a crash.
-        await resetStuckProcessingMemos();
+        if (recoverLegacyProcessing) await resetStuckProcessingMemos();
       },
     );
   }

@@ -263,7 +263,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
       itemCount: sortedWatches.length,
       itemBuilder: (context, index) {
         final watch = sortedWatches[index];
-        return _WatchListTile(
+        return SavedWatchListTile(
           watch: watch,
           isConnecting: _connectingWatchId == watch.id,
           onTap: () => _connectToWatch(watch),
@@ -306,17 +306,20 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
 }
 
 /// Individual watch list tile (FR-067, FR-068, T116)
-class _WatchListTile extends StatelessWidget {
+class SavedWatchListTile extends StatelessWidget {
   final WatchEntity watch;
   final bool isConnecting;
   final VoidCallback onTap;
   final VoidCallback onConfig;
+  final bool enabled;
 
-  const _WatchListTile({
+  const SavedWatchListTile({
+    super.key,
     required this.watch,
     required this.isConnecting,
     required this.onTap,
     required this.onConfig,
+    this.enabled = true,
   });
 
   @override
@@ -353,7 +356,7 @@ class _WatchListTile extends StatelessWidget {
       ),
       subtitle: _buildSubtitle(),
       trailing: _buildTrailing(),
-      onTap: isConnecting ? null : onTap,
+      onTap: isConnecting || !enabled ? null : onTap,
     );
   }
 
