@@ -1,5 +1,10 @@
 import 'package:flutter/services.dart';
 
+import '../../data/models/connection.dart';
+import '../../data/models/connection_phase.dart';
+import '../../data/models/connection_state.dart';
+import '../../data/models/watch.dart';
+
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
   final Map<String, Object?> fields;
@@ -29,6 +34,69 @@ class CompanionPrototypeSnapshot {
   int get generation => fields['generation']! as int;
   Map<String, Object?> get recordings =>
       Map<String, Object?>.from(fields['recordings']! as Map);
+
+  /// Existing UI domain models, derived solely from the service snapshot.
+  /// Cached Ready cannot make an absent service appear connected.
+  ConnectionPhase get connectionPhase {
+    if (!runtimeActive) return const ConnectionPhase.disconnected();
+    if (protocolReady) return const ConnectionPhase.connected();
+    return switch (phase) {
+      'connecting' => const ConnectionPhase.connecting(),
+      'discovering' => const ConnectionPhase.settingUp(
+        step: SetupStep.discoveringServices,
+      ),
+      'subscribing' => const ConnectionPhase.settingUp(
+        step: SetupStep.negotiating,
+      ),
+      'disconnected' => const ConnectionPhase.reconnecting(
+        attempt: 0,
+        isBackground: true,
+      ),
+      'error' => ConnectionPhase.error(
+        type: ConnectionErrorType.unknown,
+        details: fields['last_error'] as String?,
+      ),
+      _ => const ConnectionPhase.disconnected(),
+    };
+  }
+
+  Map<Object?, Object?>? get _watchInfo {
+    final info = fields['watch_info'];
+    return info is Map && info['address'] == fields['address'] ? info : null;
+  }
+
+  bool get hasLiveStatus =>
+      protocolReady && _watchInfo?['status_generation'] == generation;
+
+  Watch? get watch {
+    final address = fields['address'];
+    if (address is! String || address.isEmpty) return null;
+    final info = _watchInfo;
+    final battery = info?['battery_level'];
+    return Watch(
+      id: address,
+      name: 'ZSWatch',
+      firmwareVersion: info?['firmware_version'] as String?,
+      hardwareVersion: info?['hardware_version'] as String?,
+      batteryLevel: battery is int && battery >= 0 && battery <= 100
+          ? battery
+          : null,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        info?['first_seen_ms'] is int ? info!['first_seen_ms'] as int : 0,
+      ),
+    );
+  }
+
+  Connection get connection => Connection(
+    watchId: watch?.id ?? '',
+    watchName: watch?.name,
+    state: connectionPhase.watchConnectionState,
+    mtu: fields['att_payload_bytes'] is int
+        ? (fields['att_payload_bytes']! as int) + 3
+        : null,
+    isCharging: _watchInfo?['is_charging'] == true,
+    errorDetails: fields['last_error'] as String?,
+  );
 }
 
 /// Observer/commands only. Disposing this client never stops the native service.
@@ -145,9 +213,11 @@ class CompanionPrototypeClient {
     if (![
           'stop',
           'syncTime',
+          'requestDeviceInfo',
           'retryRecordings',
           'ackEvents',
           'startRemoteFixture',
+          'startLocalFixture',
         ].contains(name) ||
         (name == 'ackEvents' && (cursor == null || cursor < 0))) {
       throw const FormatException('Invalid companion command');

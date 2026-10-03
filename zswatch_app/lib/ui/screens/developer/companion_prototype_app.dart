@@ -107,10 +107,18 @@ class _CompanionPrototypeAppState extends State<CompanionPrototypeApp> {
             'Protocol ready: ${state?.protocolReady ?? false} • generation ${state?.generation ?? 0}',
           ),
           Text('Saved recordings: ${state?.recordings.length ?? 0}'),
-          if (state?.fields['remote_jobs'] is List)
+          if (state?.watch != null) ...[
+            Text('Watch: ${state!.watch!.displayName}'),
+            Text('Firmware: ${state!.watch!.firmwareVersion ?? 'waiting'}'),
+            Text('Hardware: ${state!.watch!.hardwareVersion ?? 'waiting'}'),
             Text(
-              'Synthetic remote jobs: ${jsonEncode(state!.fields['remote_jobs'])}',
+              '${state!.hasLiveStatus ? 'Battery' : 'Last battery'}: '
+              '${state!.watch!.batteryLevel?.toString() ?? '?'}%'
+              '${state!.connection.isCharging ? ' • charging' : ''}',
             ),
+          ],
+          if (state?.fields['remote_jobs'] is List)
+            Text('Synthetic jobs: ${jsonEncode(state!.fields['remote_jobs'])}'),
           if (state?.fields['remote_jobs_error'] != null)
             Text(
               'Remote job journal unavailable: ${state!.fields['remote_jobs_error']}',
@@ -238,6 +246,16 @@ class _CompanionPrototypeAppState extends State<CompanionPrototypeApp> {
                 child: const Text('Start synthetic remote job'),
               ),
               OutlinedButton(
+                onPressed: busy || state?.runtimeActive != true
+                    ? null
+                    : () => unawaited(
+                        run(() async {
+                          show(await client.command('startLocalFixture'));
+                        }),
+                      ),
+                child: const Text('Start Dart worker fixture (no model)'),
+              ),
+              OutlinedButton(
                 onPressed: busy || state?.protocolReady != true
                     ? null
                     : () => unawaited(
@@ -246,6 +264,16 @@ class _CompanionPrototypeAppState extends State<CompanionPrototypeApp> {
                         }),
                       ),
                 child: const Text('Sync time'),
+              ),
+              OutlinedButton(
+                onPressed: busy || state?.protocolReady != true
+                    ? null
+                    : () => unawaited(
+                        run(() async {
+                          show(await client.command('requestDeviceInfo'));
+                        }),
+                      ),
+                child: const Text('Refresh watch info'),
               ),
               OutlinedButton(
                 onPressed: busy || state?.protocolReady != true

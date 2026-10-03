@@ -419,6 +419,37 @@ not a process-death scheduler. Correlate `ui_detached`, synthetic post and nativ
 write-completion timestamps. Do not run transfer instrumentation during these
 background observations; it changes OS execution conditions.
 
+With the native runtime intentionally running, a non-exported app-UID action
+can post that fixed notification without launching Flutter:
+
+```bash
+adb -s A00000V791290707484 shell run-as com.zswatch.app /system/bin/am \
+  startservice --user 0 -n com.zswatch.app/dev.zswatch.app.companion.CompanionPrototypeService \
+  -a dev.zswatch.app.companion.POST_TEST_NOTIFICATION
+```
+
+This action is a lab trigger, not automatic background scheduling. For a physical
+dismissal test, first verify the new synthetic ID was written. The current
+watch's `touch 200 95` command closes its notification popup. Correlate the watch
+manager's removal of that exact ID with native `watch_notification_dismiss_requested`
+and Android listener removal; a successful touch command alone proves neither.
+Keep other notifications out of the test and leave source recordings intact.
+The installed watch exposes `input report`, not the older guide's `input button`;
+read actual shell help before relying on a control command.
+
+The 2026-10-03 forced-idle scenario is documented in the Nokia report. It used
+`dumpsys battery unplug` plus `dumpsys deviceidle force-idle deep`, asserted deep
+state `IDLE` before and after a watch-origin BLE status update, and restored
+`deviceidle unforce`/`battery reset` in cleanup. USB was physically attached.
+It does not satisfy unplugged Doze/soak or network acceptance. Controlled watch
+battery events were restored to the measured baseline; do not leave injected
+charging/battery values behind. No app/service-start command should be issued
+during the receive window of that idle scenario.
+
+Use Nokia for BLE/lifecycle tests only. The prepared headless Dart worker and
+actual models are for later testing on a suitable newer phone; do not invoke
+`startLocalFixture` or run inference in this Nokia test setup.
+
 After the screen-off test locked the dedicated phone, cleanup used the existing
 non-exported Stop action as the debug app UID:
 

@@ -24,6 +24,8 @@ class CompanionPrototypeService : Service() {
         const val STOP = "dev.zswatch.app.companion.STOP"
         const val RESTORE_PRESENCE = "dev.zswatch.app.companion.RESTORE_PRESENCE"
         const val START_REMOTE_FIXTURE = "dev.zswatch.app.companion.START_REMOTE_FIXTURE"
+        const val START_LOCAL_FIXTURE = "dev.zswatch.app.companion.START_LOCAL_FIXTURE"
+        const val POST_TEST_NOTIFICATION = "dev.zswatch.app.companion.POST_TEST_NOTIFICATION"
         const val CHANNEL = "companion_prototype"
         const val NOTIFICATION = 1003
         @Volatile var instance: CompanionPrototypeService? = null
@@ -35,6 +37,8 @@ class CompanionPrototypeService : Service() {
         private set
     private var receiverRegistered = false
     var remoteFixture: PrototypeRemoteFixture? = null
+        private set
+    var localFixture: PrototypeLocalFixture? = null
         private set
     private val systemEvents = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -90,6 +94,7 @@ class CompanionPrototypeService : Service() {
                 transport = link
                 runtime = PrototypeRuntime(store, link).also { link.runtime = it }
                 remoteFixture = PrototypeRemoteFixture(applicationContext, this).also { it.startMaintenance() }
+                localFixture = PrototypeLocalFixture(applicationContext, this).also { it.startMaintenance() }
                 PrototypeHub.worker.post(notificationMaintenance)
             }
         }
@@ -105,7 +110,7 @@ class CompanionPrototypeService : Service() {
             }
             return START_NOT_STICKY
         }
-        if (intent != null && intent.action !in listOf(START, RESTORE_PRESENCE, START_REMOTE_FIXTURE)) { stopSelf(); return START_NOT_STICKY }
+        if (intent != null && intent.action !in listOf(START, RESTORE_PRESENCE, START_REMOTE_FIXTURE, START_LOCAL_FIXTURE, POST_TEST_NOTIFICATION)) { stopSelf(); return START_NOT_STICKY }
         try {
             val manager = getSystemService(NotificationManager::class.java)
             if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(
@@ -146,7 +151,10 @@ class CompanionPrototypeService : Service() {
                     return@safely
                 }
                 if (address == null) {
-                    if (!owner.restore()) PrototypeHub.main.post { stopSelf() }
+                    if (!owner.restore()) {
+                        PrototypeHub.main.post { stopSelf() }
+                        return@safely
+                    }
                 } else if (owner.active && owner.store.control()["phase"] in listOf("error", "disconnected")) {
                     check(owner.store.control()["address"] == address) { "Stop before changing watch" }
                     owner.reconnect()
@@ -157,6 +165,16 @@ class CompanionPrototypeService : Service() {
                         LifecycleLogger.log("CompanionJobs", "fixture_start_failed ${error.javaClass.simpleName}")
                         owner.store.update("remote_fixture_failed", detail = mapOf("error" to error.javaClass.simpleName))
                     }
+                }
+                if (intent?.action == START_LOCAL_FIXTURE) {
+                    try { localFixture?.startFixture() }
+                    catch (error: Exception) {
+                        LifecycleLogger.log("CompanionLocalJobs", "fixture_start_failed ${error.javaClass.simpleName}")
+                    }
+                }
+                if (intent?.action == POST_TEST_NOTIFICATION && owner.active) {
+                    dev.zswatch.app.NotificationDebugHelper.postDebugNotification(applicationContext,
+                        "Companion background test", "Native notification round trip")
                 }
                 try { PrototypePresence.observe(applicationContext, owner.store.control()["address"] as String) }
                 catch (error: Exception) {
@@ -196,6 +214,7 @@ class CompanionPrototypeService : Service() {
         PrototypeHub.worker.removeCallbacks(notificationMaintenance)
         PrototypeHub.worker.post { safely {
             remoteFixture?.close(); remoteFixture = null
+            localFixture?.close(); localFixture = null
             runtime?.destroy(); runtime = null; transport = null
         } }
         stopForeground(STOP_FOREGROUND_REMOVE)

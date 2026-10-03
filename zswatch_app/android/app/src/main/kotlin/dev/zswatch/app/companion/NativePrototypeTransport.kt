@@ -40,6 +40,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var downloading = false
     private var fileOperation = 0L
     private var notificationWriting = false
+    private var readingBattery = false
 
     override fun connect(address: String, generation: Long) {
         close()
@@ -98,8 +99,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 operation++
                 runtime.phase(session, "ready")
                 retryDelay = 5000
+                readInitialBattery(client, session)
                 command("GB({\"t\":\"log\",\"status\":false})")
                 syncTime()
+                requestDeviceInfo()
                 flushNotifications()
                 requestRecordings()
                 recoverReceipts()
@@ -117,6 +120,13 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 if (characteristic.uuid != TX || noResponse || !writing) return@accept
                 check(status == BluetoothGatt.GATT_SUCCESS) { "NUS write failed: $status" }
                 writeFinished()
+            }
+            override fun onCharacteristicRead(client: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) = accept(client) {
+                if (characteristic.uuid == BATTERY_LEVEL) finishBatteryRead(characteristic.value ?: byteArrayOf(), status)
+            }
+            override fun onCharacteristicRead(client: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray, status: Int) {
+                val copy = value.clone()
+                if (characteristic.uuid == BATTERY_LEVEL) accept(client) { finishBatteryRead(copy, status) }
             }
         }
         gatt = adapter.getRemoteDevice(address).connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
@@ -187,6 +197,31 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     fun requestRecordings() { command("GB({\"t\":\"voice_memo\",\"action\":\"list\"})") }
+    fun requestDeviceInfo() { command("GB({\"t\":\"ver\"})") }
+
+    private fun readInitialBattery(client: BluetoothGatt, session: Long) {
+        val battery = client.getService(BATTERY_SERVICE)?.getCharacteristic(BATTERY_LEVEL) ?: return
+        readingBattery = true
+        if (!client.readCharacteristic(battery)) { readingBattery = false; return }
+        // NUS writes remain queued while this optional GATT operation is active.
+        handler.postDelayed({
+            if (runtime.owns(session) && gatt === client && readingBattery) safely {
+                readingBattery = false
+                store.update("battery_read_unavailable")
+                pump()
+            }
+        }, 5000)
+    }
+
+    private fun finishBatteryRead(value: ByteArray, status: Int) {
+        if (!readingBattery) return
+        readingBattery = false
+        if (status == BluetoothGatt.GATT_SUCCESS && value.size == 1) {
+            PrototypeWatchInfo(store).receive(JSONObject().put("t", "status").put("bat", value[0].toInt() and 255),
+                token, System.currentTimeMillis())
+        } else store.update("battery_read_unavailable")
+        pump()
+    }
 
     private fun command(text: String, done: () -> Unit = {}) {
         check(runtime.owns(token) && store.control()["phase"] == "ready") { "NUS not ready" }
@@ -196,7 +231,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     private fun pump() {
-        if (writing || writes.isEmpty()) return
+        if (writing || readingBattery || writes.isEmpty()) return
         val client = gatt ?: return
         val characteristic = tx ?: return
         val item = writes.first
@@ -261,6 +296,16 @@ class NativePrototypeTransport(private val context: Context, private val handler
             // A notification may precede the CCCD completion callback. Readiness
             // sends time anyway; do not disconnect a valid subscribing link.
             if (message.optString("t") == "time" && store.control()["phase"] == "ready") syncTime()
+            PrototypeWatchInfo(store).receive(message, token, System.currentTimeMillis())
+            val dismissals = PrototypeNotifications(store).dismissalKeys(message, token, System.currentTimeMillis())
+            if (dismissals.isNotEmpty()) {
+                try {
+                    val cancelled = dev.zswatch.app.NotificationListenerServiceImpl.dismissPrototypeNotifications(dismissals)
+                    store.update("watch_notification_dismiss_requested", detail = mapOf("count" to cancelled))
+                } catch (error: Exception) {
+                    LifecycleLogger.log("CompanionNotifications", "dismiss_failed ${error.javaClass.simpleName}")
+                }
+            }
             recordingInbox.receive(message)
         }
         downloadNext()
@@ -397,6 +442,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         operation++; fileOperation++
         writing = false; writes.clear(); downloading = false
         notificationWriting = false
+        readingBattery = false
         awaitingMtu = false; payloadSize = 20
         linkConnected = false; servicesHandled = false
         runCatching { transfer?.cancel() }; transfer = null
@@ -412,5 +458,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         private val TX = UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
         private val RX = UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
         private val CCCD = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        private val BATTERY_SERVICE = UUID.fromString("0000180f-0000-1000-8000-00805f9b34fb")
+        private val BATTERY_LEVEL = UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb")
     }
 }

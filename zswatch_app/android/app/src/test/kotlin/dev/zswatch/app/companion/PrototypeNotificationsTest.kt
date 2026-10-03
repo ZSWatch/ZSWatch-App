@@ -121,4 +121,47 @@ class PrototypeNotificationsTest {
         runtime.stop()
         assertFalse(inbox.post(notification(), 1)); assertNull(inbox.next(2, 1))
     }
+
+    @Test fun watchDismissalUsesPersistedIdentityOnlyForItsActiveDeliverySession() {
+        val journal = store(); journal.update("session", mapOf("generation" to 1L))
+        val inbox = PrototypeNotifications(journal); inbox.configure(true, listOf(packageName))
+        inbox.post(notification(), 0); val delivery = inbox.next(1, 0)!!
+        val action = JSONObject().put("t", "notify").put("n", "DISMISS").put("id", delivery.id)
+        assertTrue(inbox.dismissalKeys(action, 1, 0).isEmpty())
+        inbox.written(delivery, 1)
+        val reopened = PrototypeNotifications(PrototypeStore(temporary.root))
+        assertEquals(listOf("first"), reopened.dismissalKeys(action, 1, 0))
+        journal.update("reconnect", mapOf("generation" to 2L))
+        assertTrue(inbox.dismissalKeys(action, 2, 0).isEmpty())
+        assertTrue(inbox.dismissalKeys(action, 1, 0).isEmpty())
+        inbox.written(inbox.next(2, 0)!!, 2)
+        assertEquals(listOf("first"), inbox.dismissalKeys(action, 2, 0))
+    }
+
+    @Test fun dismissAllIsScopedToAllowedUnexpiredForwardedNoticesAndStopDisablesActions() {
+        val journal = store(); journal.update("session", mapOf("generation" to 1L))
+        val inbox = PrototypeNotifications(journal); inbox.configure(true, listOf(packageName))
+        inbox.post(notification("first"), 0); inbox.written(inbox.next(1, 0)!!, 1)
+        inbox.post(notification("second"), 0)
+        val all = JSONObject("""{"t":"notify","n":"DISMISS_ALL"}""")
+        assertEquals(listOf("first"), inbox.dismissalKeys(all, 1, 0))
+        assertTrue(inbox.dismissalKeys(all, 1, PrototypeNotifications.RETENTION_MS).isEmpty())
+        inbox.configure(false, emptyList())
+        assertTrue(inbox.dismissalKeys(all, 1, 0).isEmpty())
+        journal.update("stop", mapOf("desired_running" to false))
+        assertTrue(inbox.dismissalKeys(all, 1, 0).isEmpty())
+    }
+
+    @Test fun unknownActionAndInvalidIdCannotDismissOtherAndroidNotifications() {
+        val journal = store(); journal.update("session", mapOf("generation" to 1L))
+        val inbox = PrototypeNotifications(journal); inbox.configure(true, listOf(packageName))
+        inbox.post(notification(), 0); inbox.written(inbox.next(1, 0)!!, 1)
+        for (wire in listOf(
+            """{"t":"notify","n":"OPEN","id":1000000}""",
+            """{"t":"notify","n":"DISMISS","id":1000000.5}""",
+            """{"t":"notify","n":"DISMISS","id":"1000000"}""",
+            """{"t":"notify","n":"DISMISS","id":999}""",
+            """{"t":"other","n":"DISMISS_ALL"}"""))
+            assertTrue(inbox.dismissalKeys(JSONObject(wire), 1, 0).isEmpty())
+    }
 }

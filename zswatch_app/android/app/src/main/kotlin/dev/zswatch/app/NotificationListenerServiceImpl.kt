@@ -31,7 +31,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         private const val TAG = "ZSWNotificationService"
         
         // Singleton instance for communication with Flutter
-        private var instance: NotificationListenerServiceImpl? = null
+        @Volatile private var instance: NotificationListenerServiceImpl? = null
         
         // Callback for notification events (set by Flutter plugin)
         var notificationCallback: NotificationCallback? = null
@@ -171,6 +171,21 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         // Dismiss a notification by key
         fun dismissNotification(key: String) {
             instance?.cancelNotification(key)
+        }
+
+        /** Native companion action; never cancel an ongoing/foreground notice. */
+        fun dismissPrototypeNotifications(keys: List<String>): Int {
+            val listener = instance ?: return 0
+            val requested = keys.toSet()
+            val active = listener.activeNotifications ?: return 0
+            var cancelled = 0
+            for (notice in active) {
+                if (notice.key !in requested || notice.isOngoing ||
+                    notice.notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0) continue
+                listener.cancelNotification(notice.key)
+                cancelled++
+            }
+            return cancelled
         }
         
         // Get list of apps that have posted notifications

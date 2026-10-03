@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zswatch_app/data/models/connection_state.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/developer/companion_prototype_app.dart';
 
@@ -281,6 +282,52 @@ void main() {
       'stop',
     ]);
   });
+
+  test(
+    'native snapshot supplies existing watch and connection UI models',
+    () async {
+      saved['watch_info'] = {
+        'address': 'AA:BB:CC:DD:EE:FF',
+        'firmware_version': '1.2.3',
+        'hardware_version': 'WatchDK',
+        'battery_level': 0,
+        'is_charging': true,
+        'first_seen_ms': 1000,
+        'status_generation': 2,
+      };
+      saved['att_payload_bytes'] = 244;
+      final snapshot = await client.snapshot();
+      expect(snapshot.watch!.firmwareVersion, '1.2.3');
+      expect(snapshot.watch!.batteryLevel, 0);
+      expect(snapshot.connection.state, WatchConnectionState.connected);
+      expect(snapshot.connection.mtu, 247);
+      expect(snapshot.connection.isCharging, true);
+      expect(snapshot.hasLiveStatus, true);
+      await client.command('requestDeviceInfo');
+      await client.command('startLocalFixture');
+      expect(calls.last.arguments, {'version': 1});
+    },
+  );
+
+  test(
+    'reconnection marks cached status stale and absent service is disconnected',
+    () async {
+      saved['watch_info'] = {
+        'address': 'AA:BB:CC:DD:EE:FF',
+        'battery_level': 80,
+        'status_generation': 1,
+      };
+      expect((await client.snapshot()).hasLiveStatus, false);
+      saved['runtime_active'] = false;
+      saved['protocol_ready'] = false;
+      final stopped = await client.snapshot();
+      expect(stopped.phase, 'ready');
+      expect(stopped.connection.state, WatchConnectionState.disconnected);
+      expect(stopped.watch!.batteryLevel, 80);
+      saved['address'] = '11:22:33:44:55:66';
+      expect((await client.snapshot()).watch!.batteryLevel, null);
+    },
+  );
 
   test('invalid cursor and unknown commands do not reach the owner', () async {
     await expectLater(client.command('ackEvents'), throwsFormatException);

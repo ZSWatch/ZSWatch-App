@@ -18,6 +18,13 @@ Prova först normala användarflöden och vanlig bakgrundskörning på riktiga t
 
 HTTP finns kvar i funktionsomfattningen, men de identifierade timeout-/callback-felen är ett mindre, avgränsat arbetspaket. De ska åtgärdas och regressionstestas utan att fördröja experimenten med runtime-ägarskap, återanslutning och voice-flödet.
 
+Aktuell styrning från användaren 2026-10-03: prioritera fungerande BLE och integration
+med appen före mer edge-case-hårdning. Utredningen av transferkorruption är fortsatt
+separat. Mer klock-/deadline-hårdning ska inte bli nästa huvudspår. Nokia används
+för BLE/livscykel; AI-inferens och faktisk modell-/headless-worker-körning ska testas
+senare på en lämplig nyare telefon. Kod för att återanvända Dart kan förberedas och
+kompileras under tiden. Behåll både lokal och remote AI som val i arkitekturen.
+
 ### Produktkrav
 
 | Funktion | Avsedd användarupplevelse | Återhämtning vid avbrott |
@@ -954,6 +961,41 @@ Notification-retention utgår nu från Androids post time så gammalt innehåll 
 återuppstår med nytt retentionfönster vid listener/processrestart. 59 native
 tester och båda APK-varianterna passerar. Dessa sista appändringar är endast
 host-verifierade; normal/production runtime-selection är fortsatt oförändrad.
+
+### Native watch-state och dubbelriktade notificationer, 2026-10-03
+
+Android-kärnan tar nu emot befintliga firmware-/hardware-/battery-statusmeddelanden,
+läser initial batterinivå med standard-BAS före köade NUS-skrivningar och kan
+hantera watch→phone notification-dismiss utan Flutter. Flutter-snapshoten ger
+befintliga Watch/Connection/ConnectionPhase-modeller från samma native ägare.
+Aktuell status skiljs från cache från tidigare anslutningsgeneration/klocka.
+Ordinarie providers och DB migreras inte ännu.
+
+Nokia med Flutter borta: ny synthetic notification stängdes via klockans touch,
+BLE-dismiss ledde till Android-cancellation och listener-removal/reconciliation.
+Ett tidigare anslutningsprov fick ingen retur för dismiss/status; detta finns kvar
+som separat felprov och orsaken är inte isolerad. Efter restart med BAS-bygget
+fungerade dubbelriktat prov samt initial/periodisk watch-data. Inget cache-workaround
+eller Nordic SMP-protokoll ändrades och korruption felsöktes inte.
+
+Ett begränsat forced-deep-idle-prov behöll IDLE före/efter ett watch-injicerat
+batterievent som togs emot över BLE; PID var oförändrad. USB var fysiskt ansluten
+och Androids laddning var simulerat frånkopplad. Simulering och watch-event-state
+återställdes. Efter separat Java-processkrasch återkom Ready och färsk watch-data
+utan UI. Detta ersätter inte unplugged Doze/soak, memory-reclaim, nyare Android
+eller iPhone. Nio recordings är bevarade; inga downloads, firmwareflashes eller
+AI-jobb kördes under detta BLE-prov.
+
+Flutter developer-UI visade sedan firmware, hardware och batteri från native
+snapshot. UI öppnades/stängdes utan ny process eller anslutningsgeneration;
+native service var fortsatt Ready efter UI-disposal. Ordinarie skärmar/provider-
+migrering återstår.
+
+En serviceägd headless Dart-worker är förberedd och kompilerad med deterministiskt
+fixture-resultat och samma native job/outbox-kontrakt. Den är inte kopplad till
+Whisper/LLM ännu och startades inte på Nokia. Se
+[COMPANION_DART_WORKER_PROTOTYPE.md](COMPANION_DART_WORKER_PROTOTYPE.md).
+66 native tester och 21 Flutter-tester passerar; analys är ren.
 
 ### Införande och återgång
 

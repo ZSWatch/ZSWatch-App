@@ -118,9 +118,11 @@ Every request/subscription includes `{version: 1}`.
 | --- | --- | --- |
 | `snapshot` | — | Current state/live readiness plus content-free synthetic job summaries |
 | `startRemoteFixture` | — | Creates/resumes the fixed metadata-only loopback job; requires running prototype |
+| `startLocalFixture` | — | Explicit headless Dart fixture for later capable-phone testing; no model/audio processing |
 | `start` | `address`: uppercase Android BLE MAC | `{version: 1, accepted: true}` or error |
 | `stop` | — | Snapshot after saved intent is cleared and transport closed |
 | `syncTime` | — | Snapshot after queuing the write; completion arrives separately |
+| `requestDeviceInfo` | — | Requests the existing firmware `ver` response over the native NUS queue |
 | `retryRecordings` | — | Snapshot after retry/list request; asynchronous receipts follow |
 | `setRecordingSync` | `enabled`: boolean | Persisted download policy; disabling cancels/releases the existing Nordic transfer |
 | `configureNotifications` | `enabled`, `packages`: explicit Android package list | Persisted policy; enabling requires actual notification access |
@@ -133,6 +135,39 @@ Events deliver snapshots, not commands. `owner=android_service_native`,
 and `phase` to assess the connection. Persisted `phase=ready` with no running
 service must have `protocol_ready=false`. Stop increments generation before
 closing handles. GATT and SDK callbacks check both session and operation identity.
+
+### Native watch state and notification actions
+
+The service now consumes existing `ver`/`status` messages and persists firmware,
+hardware, battery/voltage and charging data for the selected watch. An optional
+initial standard Battery Service read runs before queued NUS writes, so the UI
+does not need to wait for a periodic status event. Missing/failed battery reads
+remain optional. Messages from obsolete connection generations are rejected.
+The Flutter snapshot exposes the app's existing `Watch`, `Connection` and
+`ConnectionPhase` domain models without creating a Flutter BLE owner. Status from
+an older connection remains explicitly cached, and metadata belonging to another
+watch is not reused. Normal application providers are not migrated yet.
+
+Watch `notify` dismissal now resolves the persisted native ID to its private
+Android notification key. Only allowed, unexpired entries actually written on the
+active connection can be dismissed; `DISMISS_ALL` is restricted to that same set.
+The listener excludes ongoing/foreground-service notices. Android's removal
+callback, rather than the cancellation request, drives removal/reconciliation.
+Open/reply/mute actions remain unsupported. No Flutter callback is required.
+
+Physical Nokia/API 31, 2026-10-03: firmware/hardware and initial battery acquisition,
+watch touch → BLE dismissal → Android cancellation → native removal, and refreshed
+watch data after an injected crash all worked with Flutter absent. A forced-deep-
+idle test received a watch-injected battery status while Android reported `IDLE`
+both before and after; PID stayed 4243. USB remained attached and charging was
+simulated as disconnected for this bounded test. Android battery/idle simulation
+and watch battery-event state were restored. This is not unplugged Doze/soak,
+low-memory reclaim, iOS or production acceptance. See the updated Nokia report.
+
+A service-owned Dart worker is prepared for later testing on a suitable phone:
+see [COMPANION_DART_WORKER_PROTOTYPE.md](COMPANION_DART_WORKER_PROTOTYPE.md).
+The Nokia run did not start that worker or any model. Native BLE ownership and
+remote-job recovery do not depend on it.
 
 ## Build and host verification
 

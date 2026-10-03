@@ -65,6 +65,27 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         return true
     }
 
+    /** Scope watch dismissal to entries actually sent on this active session.
+     * Keys stay native. Cancellation completion is Android's removal callback.
+     */
+    fun dismissalKeys(message: JSONObject, generation: Long, now: Long): List<String> {
+        val state = store.control()
+        if (message.optString("t") != "notify" || state["desired_running"] != true ||
+            state["notifications_enabled"] != true || (state["generation"] as Number).toLong() != generation) return emptyList()
+        val action = message.optString("n")
+        if (action !in listOf("DISMISS", "DISMISS_ALL")) return emptyList()
+        val id = message.opt("id")
+        if (action == "DISMISS" && id !is Int && id !is Long) return emptyList()
+        val packages = state["notification_packages"] as? List<*> ?: emptyList<Any>()
+        val notices = entries()
+        return notices.keys().asSequence().filter { key ->
+            val item = notices.getJSONObject(key)
+            !item.optBoolean("removed") && item.getLong("expires_ms") > now &&
+                item.getString("package") in packages && item.optLong("delivered_generation", -1) == generation &&
+                (action == "DISMISS_ALL" || item.getLong("id") == (id as Number).toLong())
+        }.toList()
+    }
+
     /** The listener's active set is authoritative after its process is recreated. */
     fun reconcile(activeKeys: Set<String>) {
         val notices = entries()

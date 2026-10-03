@@ -268,28 +268,24 @@ Evidence: `.companion-hil-runs/20261002-existing-discovery-retry/`.
 
 ## Next physical work (updated 2026-10-03)
 
-1. Track transfer integrity separately from native ownership/recovery. Use Nordic's existing transport in both the native-service prototype and the
-   ordinary Flutter-wrapper baseline on this phone. Compare lifecycle coordination
-   and repeat the failed files with byte-for-byte USB verification. Preserve
-   hash-only traces. The 10-second chunk timeout fixes some waiting but not the
-   observed body corruption. Do not implement custom SMP sequencing or reassembly.
-2. For recording-transfer acceptance, repeat the failed batch and isolated screen-off cases,
-   then record after task removal. Require byte comparisons after completion;
-   include multiple pending files and interrupted SMP. Keep the original failed
-   trials as baseline evidence.
-3. Investigate the idle-service stop against the running Android build. Evaluate
-   the planned CompanionDeviceManager association/presence recovery path; repeat
-   with a genuine process-reclamation scenario when a reliable kill mechanism is
-   available. Keep injected crashes and explicit user recovery separately labelled.
-4. Run the ordinary Flutter-app baseline, notification forwarding, Stop,
-   permissions/radio changes and network jobs. Repeat unplugged idle/Doze and
-   longer recordings before the planned soak tests. iOS still requires a Mac/iPhone.
+1. Finish the main native BLE/application integration: connection state, two-way
+   notifications, watch data and native receipt/job/result integration. Keep the
+   existing Nordic library and the ordinary app's cache fixes.
+2. Repeat the basic BLE/lifecycle cases on a modern Android phone, then unplugged
+   idle/Doze and a longer soak. Test permission/radio changes and genuine process
+   reclamation separately from injected crashes and explicit lab starts.
+3. Test the prepared service-owned Dart worker and actual local AI only on a
+   suitable newer phone. The Nokia is for BLE/lifecycle; it is too old for useful
+   AI validation. iOS background execution still needs a Mac and physical iPhone.
+4. Keep file-integrity diagnosis as a separate deferred work item. Later transfer
+   acceptance needs the failed batch/screen-off cases and byte-for-byte source
+   checks. Preserve originals and earlier failures; never add custom SMP transport.
 
 Transfer diagnosis remains a separate work item. It must not turn into a custom
 protocol implementation or prevent work on native service ownership and recovery.
 
-Neither a foreground-service migration nor rewriting the UI in native code is
-approved by these results. The prototype remains behind its debug flag.
+These results do not establish production migration readiness. The prototype
+remains behind its debug flag; the Flutter UI is retained.
 
 ## Native notifications with paused downloads, 2026-10-03
 
@@ -299,9 +295,10 @@ injected process crash from Ready both recovered protocol readiness without a
 Flutter UI launch, resynced time and replayed stable notification IDs. Explicit
 Stop cleared content and released the service; radio restart did not undo it.
 These tests have USB attached and demonstrate native ATT write completion, not
-watch popup/application receipt or unplugged Doze. The current firmware does not
-expose an application notification ACK and its notification debug logs are not
-available in the installed build. Full process/service/receipt evidence and tested
+watch popup/application receipt or unplugged Doze. The firmware does not
+expose an application notification ACK; that capture did not include watch-side
+notification-manager logs. The later watch-control run below includes UART
+receipt/removal evidence. Full process/service/receipt evidence and tested
 APK hash are in `ANDROID_COMPANION_RUNTIME_PROTOTYPE.md` and
 `.companion-hil-runs/20261003-native-notifications/`.
 
@@ -311,3 +308,69 @@ after the screen-off test; the existing non-exported Stop action was invoked as
 the debug app UID with explicit user 0. Notification access remains granted for
 ZSWatch, its policy remains synthetic-only, downloads are paused, Bluetooth is on,
 and the runtime is stopped.
+## Native BLE watch state, dismissal and forced idle — 2026-10-03
+
+Evidence: `.companion-hil-runs/20261003-native-watch-control/` (private/ignored).
+The first tested APK SHA-256 was
+`34a5d01ff09c5cd15771abeda28b807ae794d52539c02567dcc5d28bcd22b975`.
+The subsequent APK with serialized initial Battery Service read was
+`62637491e735ffa3782443772b0028e1425ff4458cf9c27a4b758834507577d4`.
+Frozen APKs and raw state/log evidence are retained. Later source also validates
+the unexecuted local-worker response and returns immediately when saved Stop
+prevents restoration. The BLE paths were tested with the frozen battery APK;
+these later changes were host-verified.
+
+- Native service was explicitly launched from the debug app UID while Flutter
+  was absent. Lock state was not recorded at entry; the later window-policy
+  capture showed the phone awake/unlocked. This launch is lab control, not autonomous
+  wakeup evidence. Recording downloads stayed disabled throughout.
+- Generation 108 received requested firmware `0.8.1` and hardware
+  `watchdk@1/nrf5340/cpuapp`. Its initial run did not populate battery status.
+  A synthetic notice was received/stored by the watch's notification manager;
+  touch removed ID 1000004, but Android dismissal was not observed on that run.
+  An injected battery event likewise did not reach the native snapshot. The
+  cause was not isolated, and these failures are retained rather than treated
+  as a pass. No transport-corruption investigation or firmware flash followed.
+- After native Stop/install/restart, generation 111 acquired battery 87% via
+  the optional standard GATT read before NUS writes and subsequently received
+  firmware plus unsolicited voltage/charging status. NUS version/time/notification
+  writes still completed. The ordinary app's existing cache workaround was not
+  changed and Nordic SMP remains unchanged.
+- New synthetic notification ID 1000005: watch `touch 200 95` closed it, the
+  native service recorded one Android cancellation request, the listener's removal
+  callback cleared the saved entry and a watch removal write completed. Flutter
+  was absent. This is physical bidirectional notification behavior for that
+  fixture, not an application ACK for AI-result delivery.
+- Forced deep idle: `dumpsys battery unplug` and `deviceidle force-idle deep`
+  reported `IDLE`. Ten seconds later, USB SMP injected a battery event (73%,
+  charging) on the watch; its BLE status reached the existing native owner.
+  Deep state remained `IDLE` and PID stayed 4243. No service-start command, app UI
+  launch or AI job was issued during this receive test. This is forced idle with
+  USB physically attached, not unplugged endurance or remote-network acceptance.
+- Android idle/battery simulation was restored. Watch event state was restored
+  to its previously measured 87%/not-charging baseline. All nine recordings
+  remained and no recording was active.
+- A subsequent injected Java crash changed PID 4243 → 4718. Generation 112
+  reached Ready and refreshed firmware and battery/status metadata without UI.
+  Sticky service, notification listener and CDM were active, so no single recovery
+  mechanism is isolated. This does not prove low-memory reclaim or force-stop.
+- Flutter was subsequently opened and displayed Ready, generation 112, firmware
+  `0.8.1`, hardware and battery 87% from the native snapshot. Opening and closing
+  the UI retained PID 4718 and generation 112; the service remained Ready after
+  Back returned to the launcher. `flutter-ui.png` and attached/detached probes
+  record this observation. This verifies the developer UI, not migration of the
+  ordinary app's providers or database.
+
+66 native JVM tests and 21 selected Flutter tests pass; focused Dart analysis
+is clean. The new Dart worker's deterministic result contract was tested only on
+the host and its Android classes compiled. `local_fixture_enabled` stayed false;
+no headless Dart worker, Whisper or LLM was started on the Nokia, as requested.
+Actual local AI/worker testing is deferred to a suitable newer phone. Normal app
+provider/DB migration, modern-Android coverage, long soak and iOS remain open.
+
+Final cleanup explicitly stopped the native runtime (generation 113, service
+absent, notification journal empty). Downloads and the local fixture remain
+disabled; the existing synthetic remote result/outbox was preserved. Bluetooth
+is on, deep idle is `ACTIVE`, battery simulation was reset and no ADB reverse
+tunnel remains. The phone still has the frozen battery prototype installed;
+the final host build was not installed over the physically tested artifact.

@@ -5,7 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:whisper_ggml_plus_ffmpeg/whisper_ggml_plus_ffmpeg.dart';
 
 import 'app.dart';
+import 'services/background/companion_dart_worker.dart';
 import 'ui/screens/developer/companion_prototype_app.dart';
+
+@pragma('vm:entry-point')
+void companionWorkerMain() {
+  if (kDebugMode && const bool.fromEnvironment('COMPANION_RUNTIME_PROTOTYPE')) {
+    startCompanionDartWorker();
+  }
+}
 
 void main() async {
   // Ensure Flutter bindings are initialized
