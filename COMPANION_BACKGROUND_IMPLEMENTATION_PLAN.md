@@ -1339,3 +1339,18 @@ is preserved and the confirmation text explains this. Physical fresh pairing,
 Forget and newer-Android association behavior remain acceptance work. Next
 ordinary feature migration should address GPS and phone-finding semantics, plus
 the controlled network/idle comparison already identified in the HTTP runbook.
+
+### Ordinary feature inventory, 2026-10-04
+
+See [Android companion feature inventory](ANDROID_COMPANION_FEATURE_INVENTORY.md)
+for implementation paths, evidence and next requirements. Firmware Weather's
+fresh-position path requires `gps_power` → phone location → `gps` → HTTP. The
+native receiver has no GPS handler. The ordinary Flutter app initializes its
+GPS notifier in `app.dart`; native mode bypasses that legacy startup. HTTP alone
+does not establish native Weather coverage. Prioritize service-owned GPS/Weather
+and its Android permission/start contract, followed by migration of the real
+legacy Find Watch action with a
+native stop timer. Typed find-phone/call/calendar messages need consumer and
+firmware-emitter checks before they are counted as working product features.
+Legacy notification OPEN/MUTE/REPLY branches are placeholders rather than
+working features to migrate.
