@@ -90,6 +90,20 @@ class PrototypeNotificationsTest {
         assertTrue(PrototypeNotifications(PrototypeStore(temporary.root)).next(2, 0)!!.packet.contains("notify-"))
     }
 
+    @Test fun listenerRestartCannotResurrectExpiredAndroidNotificationText() {
+        val journal = store(); val inbox = PrototypeNotifications(journal)
+        inbox.configure(true, listOf(packageName))
+        val notice = notification() + mapOf("postedAt" to 0L)
+        assertTrue(inbox.post(notice, 0))
+        val expired = inbox.next(1, PrototypeNotifications.RETENTION_MS)!!
+        inbox.written(expired, 1)
+        val reopened = PrototypeNotifications(PrototypeStore(temporary.root))
+        assertFalse(reopened.post(notice, PrototypeNotifications.RETENTION_MS + 1))
+        assertNull(reopened.next(2, PrototypeNotifications.RETENTION_MS + 1))
+        assertTrue(reopened.post(notification(body = "New update") + mapOf("postedAt" to PrototypeNotifications.RETENTION_MS),
+            PrototypeNotifications.RETENTION_MS + 1))
+    }
+
     @Test fun capacityIsBoundedAndUnknownRemovalsDoNotCreateEntries() {
         val inbox = PrototypeNotifications(store()); inbox.configure(true, listOf(packageName))
         repeat(PrototypeNotifications.CAPACITY) { assertTrue(inbox.post(notification("key$it"), 0)) }

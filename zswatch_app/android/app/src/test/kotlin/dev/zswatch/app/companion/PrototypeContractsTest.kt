@@ -39,6 +39,18 @@ class PrototypeContractsTest {
         assertEquals(listOf("com.zswatch.app"), store().control()["notification_packages"])
     }
 
+    @Test fun daylightSavingOffsetChangeIsDetectedWithoutChangingTimezoneIdentity() {
+        val zone = java.util.TimeZone.getTimeZone("Europe/Stockholm")
+        val summer = java.time.Instant.parse("2026-07-01T12:00:00Z").toEpochMilli()
+        val winter = java.time.Instant.parse("2026-12-01T12:00:00Z").toEpochMilli()
+        val offset = PrototypeClockCommands.offsetHours(summer, zone)
+        val journal = store(); journal.update("clock", mapOf("last_time_zone_offset_hours" to offset))
+        val saved = store().control()["last_time_zone_offset_hours"]
+        assertFalse(PrototypeClockCommands.timezoneChanged(saved, summer, zone))
+        assertTrue(PrototypeClockCommands.timezoneChanged(saved, winter, zone))
+        assertTrue(PrototypeClockCommands.timezoneChanged(saved, winter, java.util.TimeZone.getTimeZone("UTC")))
+    }
+
     @Test fun duplicateStartDoesNotAcquireAnotherTransport() {
         val link = Link(); val runtime = PrototypeRuntime(store(), link)
         runtime.start(address); runtime.start(address)

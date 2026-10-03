@@ -60,6 +60,7 @@ class CompanionPrototypeService : Service() {
             if (instance !== this@CompanionPrototypeService) return
             safely {
                 runtime?.store?.let { PrototypeNotifications(it).expire(System.currentTimeMillis()) }
+                transport?.syncTimeIfTimezoneChanged()
                 transport?.flushNotifications()
             }
             PrototypeHub.worker.postDelayed(this, 60000)

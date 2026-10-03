@@ -1,8 +1,15 @@
 package dev.zswatch.app.companion
 
 import java.math.BigDecimal
+import java.util.TimeZone
 
 object PrototypeClockCommands {
+    fun offsetHours(nowMs: Long, zone: TimeZone): Double = zone.getOffset(nowMs) / 3600000.0
+
+    /** DST can change the effective offset without changing the timezone ID. */
+    fun timezoneChanged(savedOffset: Any?, nowMs: Long, zone: TimeZone): Boolean =
+        (savedOffset as? Number)?.toDouble() != offsetHours(nowMs, zone)
+
     /** Firmware parses these before JSON reassembly, separately for each ATT write. */
     fun packets(epochSeconds: Long, offsetHours: Double, payloadSize: Int): List<ByteArray> {
         require(offsetHours.isFinite())

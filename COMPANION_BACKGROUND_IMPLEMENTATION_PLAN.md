@@ -943,6 +943,18 @@ passerar. Normal/prototype APK, analys och release-isolering passerar. Se
 clock-adjustment-policy, firmwarekvittens och iPhone. Den tillfälliga servern och
 ADB-tunneln är stoppade; native runtime är stoppad och originaljournal återställd.
 
+### Timezone och gammal notification-replay
+
+Firmware-commit `e030c5ab` löser kända UTC-/fractional-offset-fel och osäker
+32-bit→time_t-pointercast utan att ändra BLE-wire-format/SMP. Host-test för
+POSIX/localtime passerar, liksom native_sim och WatchDK-byggen. Watchen är inte
+flashad; fysisk RTC/timezone-acceptans kvarstår. Android native maintenance
+upptäcker effective-offset/DST-ändring även om timezone-ID är samma.
+Notification-retention utgår nu från Androids post time så gammalt innehåll inte
+återuppstår med nytt retentionfönster vid listener/processrestart. 59 native
+tester och båda APK-varianterna passerar. Dessa sista appändringar är endast
+host-verifierade; normal/production runtime-selection är fortsatt oförändrad.
+
 ### Införande och återgång
 
 - Inför en explicit runtime-selection per appstart under migreringen. Legacy och ny kärna får inte ansluta samtidigt till samma watch.

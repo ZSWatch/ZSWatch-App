@@ -91,10 +91,12 @@ queuing. If a timezone command cannot fit (for example UTC+13:45 at minimum MTU)
 `last_time_error`/`time_write_failed` records that failure while recording sync
 remains available. A later successful time write clears the error.
 
-These changes fix delivery to the existing firmware parser. The firmware's
-`main.c` time-event handler separately ignores a zero timezone offset and truncates
-fractional offsets when setting its timezone; those pre-existing application
-limitations still need firmware work and physical validation. Transport completion
+These changes fix delivery to the existing firmware parser. The installed firmware
+separately ignores a zero timezone offset and truncates fractional offsets. A
+source fix is now committed in the firmware repository (`e030c5ab`), with explicit
+timezone validity, minute-precision POSIX offsets and a real `time_t` conversion.
+Its host clock regression and native_sim/WatchDK builds pass; it has not been
+flashed. Physical RTC/timezone acceptance still remains. Transport completion
 does not establish that the watch applied a correct local time.
 
 On a ready connection, saved `downloading` entries or missing receipts return to
@@ -339,3 +341,20 @@ connection priority, cancellation before release and generation/operation fences
 They do not invoke the fork's Dart/Pigeon/Flutter callback layer. The iOS plugin
 uses Nordic's separate `iOSMcuManagerLibrary`; shared Dart API does not imply an
 Android transport can run on iOS. No fork changes were reverted or committed here.
+
+## Clock and stale-notification follow-up
+
+Native maintenance now compares the effective phone timezone offset once per
+minute while executing and ready. DST can change that offset without changing
+the zone ID; a changed offset queues time synchronization and saves the offset
+only on clock-write completion. Busy queues defer the maintenance write. This
+is not an OS wakeup guarantee or a periodic clock-drift correction.
+
+Listener replay now uses Android's original notification post time for retention.
+A stale active notification cannot get a new 10-minute lifetime or reappear after
+its expired removal was written and the process restarted. A newly posted update
+can start a new window. Host regressions cover persisted DST offset comparison
+and this stale-replay boundary. The native suite now has 59 passing tests; both
+normal and prototype APK builds pass. These two follow-ups are not installed on
+the Nokia yet; its last physically tested APK and stopped state are documented
+in the remote-job milestone.

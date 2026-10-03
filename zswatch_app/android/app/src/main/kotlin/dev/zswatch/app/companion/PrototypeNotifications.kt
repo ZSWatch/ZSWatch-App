@@ -27,6 +27,10 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         if (source !in (state["notification_packages"] as? List<*> ?: emptyList<Any>())) return false
         val key = data["key"] as? String ?: return false
         if (key.length > 512) return false
+        // Listener reconnect replays active Android notifications. Their original
+        // post time must not grant stale content a fresh retention window.
+        val postedAt = minOf(now, (data["postedAt"] as? Number)?.toLong() ?: now)
+        if (postedAt + RETENTION_MS <= now) return false
         val notices = entries()
         val old = notices.optJSONObject(key)
         if (old == null && notices.length() >= CAPACITY) {
@@ -45,7 +49,7 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         if (old != null && !old.optBoolean("removed") && old.getString("packet") == wire) return false
         notices.put(key, JSONObject().put("id", id).put("package", source).put("packet", wire)
             .put("revision", (old?.optLong("revision") ?: 0) + 1).put("removed", false)
-            .put("expires_ms", now + RETENTION_MS))
+            .put("expires_ms", postedAt + RETENTION_MS))
         store.update("notification_queued", mapOf("notifications" to notices,
             "notification_next_id" to if (old == null) id + 1 else state["notification_next_id"]),
             mapOf("notification_id" to id))

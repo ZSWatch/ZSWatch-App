@@ -162,7 +162,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     fun syncTime() {
         check(store.control()["phase"] == "ready") { "NUS not ready" }
         val now = System.currentTimeMillis()
-        val offset = TimeZone.getDefault().getOffset(now) / 3600000.0
+        val offset = PrototypeClockCommands.offsetHours(now, TimeZone.getDefault())
         val packets = try { PrototypeClockCommands.packets(now / 1000, offset, payloadSize) }
         catch (error: IllegalArgumentException) {
             // Keep recordings usable if this link cannot carry a complete clock command.
@@ -173,10 +173,17 @@ class NativePrototypeTransport(private val context: Context, private val handler
         packets.forEachIndexed { index, bytes ->
             writes.add(NusWrite(bytes, {
                 if (index == packets.lastIndex) store.update("time_write_completed",
-                    mapOf("last_time_write_utc_ms" to now, "last_time_error" to null))
+                    mapOf("last_time_write_utc_ms" to now, "last_time_error" to null,
+                        "last_time_zone_offset_hours" to offset))
             }, bytes.size))
         }
         pump()
+    }
+
+    fun syncTimeIfTimezoneChanged() {
+        if (!runtime.owns(token) || store.control()["phase"] != "ready" || writes.size > 14) return
+        if (PrototypeClockCommands.timezoneChanged(store.control()["last_time_zone_offset_hours"],
+                System.currentTimeMillis(), TimeZone.getDefault())) syncTime()
     }
 
     fun requestRecordings() { command("GB({\"t\":\"voice_memo\",\"action\":\"list\"})") }
