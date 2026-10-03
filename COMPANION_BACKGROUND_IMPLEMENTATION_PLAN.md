@@ -999,6 +999,27 @@ Whisper/LLM ännu och startades inte på Nokia. Se
 
 ### Införande och återgång
 
+Native Flutter app-shell 2026-10-03: debug-native-entry öppnar nu befintliga
+ZSWatchApp/tema/dashboard i stället för att bara visa experimentskärmen.
+Flutter/Dart-UI behålls; native service äger BLE/background. Eager legacy
+chat/voice-sync/recovery/BLE/FGS/övriga tjänster initieras inte i denna gren.
+Start/settings har begränsade native-grenar. Connect ber om permission och
+skickar Start, men dashboard visas först vid protocol Ready. Cancel/Disconnect
+skickar Stop; opening/resume återstartar aldrig en avsiktligt stoppad ägare.
+En begränsad router spärrar även deep links till ännu omigrerade funktioner.
+Legacy-router/startup är oförändrade. Denna begränsning är en migrationsgräns,
+inte en plan att ersätta befintlig UI eller ta bort slutproduktens funktioner.
+
+Nokia: faktisk Connect gick via discovery till befintlig dashboard vid generation
+121. Notification/voice-navigation behöll PID/generation. När Activity/task
+stängdes fortsatte native Ready och synthetic notification skrevs över BLE efter
+UI-detach. Reopen visade samma session; faktisk Disconnect gav generation 122
+och nästa reopen förblev stoppad. Nio receipts/originals och jobb bevarades;
+downloads pausade och ingen AI/worker kördes. 40 riktade Flutter-tester, ren
+analys och båda debugbyggen passerar. Detta ersätter inte process-death/Doze/
+nyare-Android/iOS-acceptans. DB/watch-management/preferences och de återstående
+funktionernas tjänster måste fortfarande migreras innan full rollout.
+
 Native notification settings 2026-10-03: befintliga NotificationSettingsScreen
 har en native-gren bakom debugflaggan. Permission och faktisk listener-binding
 visas separat; appkatalogen innehåller aktiva notification-apps, sparade val och

@@ -31,12 +31,14 @@ completed companion migration or a decision to discard the engine-based option.
   development view. Reattachment reads native state; UI disposal never stops BLE.
   A second watch requires Stop first. An accepted Start is not connection readiness.
 
-The experimental entry point starts only the native-backed Riverpod subset,
-skipping ordinary app/WatchService startup and native app bridges. The legacy
+The experimental entry point now uses `ZSWatchApp`, its theme and a restricted
+router containing the migrated UI subset. Native selection skips eager Dart
+chat, voice recovery/sync, BLE, notification/media, GPS/HTTP, analytics and
+crash-persistence startup, as well as the legacy native app bridges. The legacy
 BLE foreground service is stopped on entry,
 and the legacy boot recovery path is skipped in experimental builds. No local
 model is initialized by this entry point. Normal debug builds and profile/release
-builds select the ordinary app. iOS is unchanged.
+builds retain the ordinary startup and full router. iOS is unchanged.
 
 ### Existing Flutter provider boundary
 
@@ -57,12 +59,29 @@ not yet implemented. Normal builds retain the previous provider paths. The nativ
 path does not open or migrate Drift, so saved custom names/ordinary DB-backed
 watch lists are not yet merged here.
 
-This is the shared state/command boundary, not activation of the full ordinary
-navigation tree. App startup services, auto-reconnect preferences, legacy filter
-migration, recordings/DB import, chat/models, DFU/media and screens that directly
-read `WatchService` still need migration before that tree can run with native
-ownership. The guard exposes those remaining dependencies instead of allowing
-a second connection. See the Nokia runbook for bounded provider UI evidence.
+The existing dashboard, start page and settings screen now have native branches.
+Home observes saved intent: opening/resuming never sends Start, so deliberate
+Stop stays stopped. Explicit Connect requests Bluetooth/notification permission
+and sends native Start; command acceptance is not readiness. The existing
+dashboard appears only after protocol Ready and uses current-generation battery
+status. Reconnect/observer failure removes the connected dashboard. Cancel and
+Disconnect go to native Stop without creating Dart auto-reconnect/foreground
+services. UI/container disposal never sends Stop.
+
+Only home/dashboard, settings, notification settings, recording status and the
+developer runtime controls are routable in this build. Unsupported deep links
+cannot enter AI/model, DB-backed recording detail, DFU, scan, health, analytics,
+watchface or other legacy-service screens. Health stats and uncoordinated SMP
+actions are withheld. The normal router is unchanged. The developer controls
+remain available through Connection setup or Developer for known-address lab
+setup; this is not a completed discovery/bonding/watch-management flow.
+
+Native selection bypasses the legacy last-watch/auto-reconnect preferences; its
+durable running intent remains authoritative. Migrating those product settings,
+legacy filters, recordings/DB import, chat/models, DFU/media and the remaining
+services is still required before full rollout. No watch/recording DB migration
+or custom-name import is performed by this shell. See the Nokia runbook for
+bounded app-shell evidence.
 
 The existing `VoiceMemosScreen` now has a native receipt view when the debug
 selection is active. Its ordinary auto-sync, repository, model-configuration

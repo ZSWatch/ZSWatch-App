@@ -415,6 +415,10 @@ For the prototype's synthetic notification test, grant ZSWatch notification
 access in Android Settings, pause recording downloads, open Notification settings,
 select only ZSWatch and enable forwarding, then connect. A fresh native journal
 has no selected apps; turning forwarding on does not populate its allowlist.
+Native builds now open the existing app shell. Use Connection setup on the start
+page (or Developer on the connected dashboard) to reach the runtime controls;
+downloads/diagnostic fixture controls remain there. The home page's Connect and
+Disconnect/Cancel control native intent. Merely opening the app never starts BLE.
 `Close UI and test in 15s` schedules a fixed native notification
 and finishes/removes the Activity/task. It is an in-process diagnostic timer,
 not a process-death scheduler. Correlate `ui_detached`, synthetic post and native

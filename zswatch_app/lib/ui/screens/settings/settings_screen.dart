@@ -10,12 +10,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/ai_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/demo_mode_provider.dart';
 import '../../../providers/permission_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../navigation/app_router.dart';
 import '../onboarding/permission_onboarding_screen.dart';
+import 'companion_settings_view.dart';
 
 /// Settings screen for app configuration
 ///
@@ -35,6 +37,9 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      return const CompanionSettingsView();
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(

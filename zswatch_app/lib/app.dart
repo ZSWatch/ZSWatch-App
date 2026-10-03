@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/utils/lifecycle_logger.dart';
@@ -10,6 +11,7 @@ import 'data/models/connection_state.dart';
 import 'providers/analytics_providers.dart';
 import 'providers/ble_providers.dart';
 import 'providers/chat_providers.dart';
+import 'providers/companion_runtime_providers.dart';
 import 'providers/coredump_providers.dart';
 import 'providers/developer_providers.dart';
 import 'providers/foreground_service_providers.dart';
@@ -34,11 +36,17 @@ class ZSWatchApp extends ConsumerStatefulWidget {
 
 class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     with WidgetsBindingObserver {
+  GoRouter? _nativeRouter;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     LifecycleLogger.log('AppLifecycle', 'initState');
+    if (ref.read(nativeCompanionRuntimeProvider)) {
+      _nativeRouter = AppRouter.createNativeRouter();
+      return; // Observe the existing service; UI startup never sends Start.
+    }
     try {
       ref.read(watchChatServiceProvider);
       debugPrint('[app] watchChatServiceProvider initialized in initState');
@@ -71,6 +79,7 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
   void dispose() {
     LifecycleLogger.log('AppLifecycle', 'dispose');
     WidgetsBinding.instance.removeObserver(this);
+    _nativeRouter?.dispose();
     super.dispose();
   }
 
@@ -120,6 +129,7 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
   Future<void> _syncForegroundServiceLifecycleState(
     AppLifecycleState state,
   ) async {
+    if (ref.read(nativeCompanionRuntimeProvider)) return;
     if (!Platform.isAndroid) return;
 
     final foregroundService = ref.read(foregroundServiceProvider);
@@ -171,7 +181,9 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
   Widget build(BuildContext context) {
     // Keep the chat service alive for the full app lifetime so incoming
     // question_ready messages are always consumed even if no chat UI is open.
-    ref.watch(watchChatServiceProvider);
+    if (!ref.watch(nativeCompanionRuntimeProvider)) {
+      ref.watch(watchChatServiceProvider);
+    }
 
     return MaterialApp.router(
       title: 'ZSWatch',
@@ -183,7 +195,7 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
       themeMode: ThemeMode.dark,
 
       // Router configuration
-      routerConfig: AppRouter.router,
+      routerConfig: _nativeRouter ?? AppRouter.router,
 
       // Builder for global overlays/providers
       builder: (context, child) {

@@ -496,3 +496,51 @@ packages by the developer toggle. This is settings integration evidence; it does
 not expand prior notification delivery or process-recovery acceptance, prove
 personal-app notification filtering, migrate the legacy blocklist or activate
 the full ordinary app navigation/startup tree.
+
+## Existing Flutter app shell with native ownership — 2026-10-03
+
+Artifacts: `.companion-hil-runs/20261003-native-app-shell/`.
+Frozen installed APK SHA-256:
+`6d81df629bde29549ea07bd67017f7254604f44920e73c063729c4b5f2cea254`.
+The opt-in native build now opens `ZSWatchApp` with its existing theme and
+dashboard, plus restricted native branches of start/settings. Flutter remains
+the UI; the developer screen is reachable through Connection setup/Developer.
+Normal debug/profile/release routing and eager service startup remain unchanged.
+
+Cold app open retained the explicit Stop at generation 120, PID 14077, paused
+downloads and the synthetic-only notification policy. Pressing the real home
+Connect button started native BLE; an intermediate screenshot showed service
+discovery, then the existing dashboard displayed Connected, MTU 247, firmware
+0.8.1 and battery 87% at Ready generation 121. Notifications and Voice shortcuts
+opened their native-backed screens without changing PID/generation. Voice Notes
+showed all nine records, seven saved receipts, two earlier failed transfers and
+paused downloads. No transfer was attempted.
+
+Through the developer diagnostic, `Close UI and test in 15s` finished/removed the
+Activity/task. Persisted events show task removal, UI detachment and Activity
+destruction before the native notification write. After the timer, the service
+was still Ready at PID 14077/generation 121 and the synthetic notice's delivered
+revision/generation and transport write timestamp advanced. Android Settings was
+foreground. This confirms native write completion with Flutter UI gone, not an
+application receipt ACK or an OS process-death/Doze acceptance test.
+
+Reopening the shell displayed the same session. The real dashboard Disconnect
+then released the service and persisted Stop at generation 122. Closing and
+reopening again retained stopped intent and did not issue Start. All nine phone
+receipt dictionaries were unchanged, the synthetic job/outbox was preserved and
+the separate job journal had no enabled local fixture. USB status confirmed nine
+watch originals and no active recording; the synthetic popup was closed with
+the existing `touch` command. An initial `input touch` command was rejected with
+usage text and did not mutate recordings. No reset, flash, AI, new download,
+upload or deletion ran.
+
+40 selected Flutter tests pass, including five actual-app-shell integration
+tests, existing native provider/client/settings/receipt tests and theme checks.
+Guarded legacy BLE/reconnect/foreground/chat/AI/database providers were never
+created during native startup, safe routing or resume. Tests cover permission
+denial, Start acceptance versus Ready, Cancel/Disconnect, observer failure and
+blocking unmigrated deep links. Focused analysis and both APK builds pass.
+The previously passing 67 native tests cover unchanged native core sources;
+they were not rerun for this Flutter-only change. Saved-watch DB/custom names,
+scan/bonding, legacy preference migration, recording playback/import/processing,
+media/GPS/HTTP/health/analytics/DFU and iOS remain outside this app-shell subset.

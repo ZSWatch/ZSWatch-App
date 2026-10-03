@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../services/background/companion_prototype_client.dart';
 import '../data/models/companion_recording.dart';
@@ -21,6 +22,18 @@ final nativeCompanionRuntimeProvider = Provider<bool>((ref) {
 final companionClientProvider = Provider<CompanionPrototypeClient>((ref) {
   return const CompanionPrototypeClient();
 });
+
+/// Requested only by an explicit Connect action, never during app startup.
+final companionConnectionPermissionsProvider =
+    Provider<Future<void> Function()>((ref) {
+      return () async {
+        final status = await Permission.bluetoothConnect.request();
+        if (!status.isGranted) {
+          throw StateError('Bluetooth permission is required to connect');
+        }
+        await Permission.notification.request();
+      };
+    });
 
 final companionNotificationStatusProvider =
     FutureProvider.autoDispose<CompanionNotificationStatus>((ref) {

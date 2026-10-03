@@ -9,6 +9,7 @@ import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/watch.dart';
 import '../../../providers/auto_reconnect_provider.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/demo_mode_provider.dart';
 import '../../../providers/health_providers.dart';
 import '../../../data/models/crash_summary.dart';
@@ -70,9 +71,10 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final native = ref.watch(nativeCompanionRuntimeProvider);
     final watch = ref.watch(currentWatchProvider);
     final connection = ref.watch(watchConnectionProvider);
-    final healthSummary = ref.watch(healthSummaryProvider);
+    final healthSummary = native ? null : ref.watch(healthSummaryProvider);
     final crashSummary = ref.watch(crashSummaryProvider);
     final showCrash = ref.watch(showCrashIndicatorProvider);
 
@@ -113,10 +115,13 @@ class DashboardScreen extends ConsumerWidget {
 
             // Stats row - 4 compact cards
             _StatsRow(
-              batteryLevel: watch?.batteryLevel,
+              batteryLevel: native
+                  ? ref.watch(batteryLevelProvider)
+                  : watch?.batteryLevel,
               firmwareVersion: watch?.shortFirmwareVersion,
-              todaySteps: healthSummary.todaySteps,
-              latestHeartRate: healthSummary.latestHeartRate,
+              todaySteps: healthSummary?.todaySteps ?? 0,
+              latestHeartRate: healthSummary?.latestHeartRate,
+              showHealth: !native,
             ),
 
             const SizedBox(height: AppTheme.spacingMd),
@@ -128,18 +133,22 @@ class DashboardScreen extends ConsumerWidget {
 
             // Quick actions
             _QuickActionsSection(
-              onFirmwareUpdate: () => context.push(AppRoutes.firmware),
+              onFirmwareUpdate: native
+                  ? null
+                  : () => context.push(AppRoutes.firmware),
               onDisconnect: () async {
                 // In demo mode, just turn off the flag
-                if (ref.read(demoModeProvider)) {
+                if (!native && ref.read(demoModeProvider)) {
                   ref.read(demoModeProvider.notifier).state = false;
                   if (context.mounted) context.go(AppRoutes.home);
                   return;
                 }
                 // Suppress auto-reconnect when user manually disconnects
-                ref
-                    .read(autoReconnectNotifierProvider.notifier)
-                    .suppressForSession();
+                if (!native) {
+                  ref
+                      .read(autoReconnectNotifierProvider.notifier)
+                      .suppressForSession();
+                }
                 final notifier = ref.read(watchNotifierProvider.notifier);
                 await notifier.disconnect();
                 if (context.mounted) {
@@ -154,7 +163,7 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: AppTheme.spacingMd),
 
             // Feature shortcuts
-            _FeatureShortcuts(),
+            _FeatureShortcuts(native: native),
           ],
         ),
       ),
@@ -235,12 +244,14 @@ class _ConnectionStatusCard extends StatelessWidget {
 
 /// Compact stats row with 4 mini cards
 class _StatsRow extends StatelessWidget {
+  final bool showHealth;
   final int? batteryLevel;
   final String? firmwareVersion;
   final int todaySteps;
   final int? latestHeartRate;
 
   const _StatsRow({
+    this.showHealth = true,
     this.batteryLevel,
     this.firmwareVersion,
     this.todaySteps = 0,
@@ -270,24 +281,26 @@ class _StatsRow extends StatelessWidget {
                 : AppTheme.textSecondary,
           ),
         ),
-        const SizedBox(width: AppTheme.spacingSm),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.directions_walk,
-            label: 'Steps',
-            value: _formatSteps(todaySteps),
-            color: AppTheme.secondaryColor,
+        if (showHealth) ...[
+          const SizedBox(width: AppTheme.spacingSm),
+          Expanded(
+            child: _StatCard(
+              icon: Icons.directions_walk,
+              label: 'Steps',
+              value: _formatSteps(todaySteps),
+              color: AppTheme.secondaryColor,
+            ),
           ),
-        ),
-        const SizedBox(width: AppTheme.spacingSm),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.favorite,
-            label: 'Heart Rate',
-            value: latestHeartRate != null ? '$latestHeartRate' : '--',
-            color: AppTheme.errorColor,
+          const SizedBox(width: AppTheme.spacingSm),
+          Expanded(
+            child: _StatCard(
+              icon: Icons.favorite,
+              label: 'Heart Rate',
+              value: latestHeartRate != null ? '$latestHeartRate' : '--',
+              color: AppTheme.errorColor,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -441,7 +454,7 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _QuickActionsSection extends StatelessWidget {
-  final VoidCallback onFirmwareUpdate;
+  final VoidCallback? onFirmwareUpdate;
   final VoidCallback onDisconnect;
   final VoidCallback? onRestartWatch;
 
@@ -460,23 +473,25 @@ class _QuickActionsSection extends StatelessWidget {
         const SizedBox(height: AppTheme.spacingSm),
         Row(
           children: [
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: onFirmwareUpdate,
-                  icon: const Icon(Icons.system_update, size: 18),
-                  label: const Text('Update Firmware'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 12,
+            if (onFirmwareUpdate != null) ...[
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: onFirmwareUpdate,
+                    icon: const Icon(Icons.system_update, size: 18),
+                    label: const Text('Update Firmware'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: AppTheme.spacingSm),
+              const SizedBox(width: AppTheme.spacingSm),
+            ],
             Expanded(
               child: SizedBox(
                 height: 48,
@@ -519,6 +534,8 @@ class _QuickActionsSection extends StatelessWidget {
 }
 
 class _FeatureShortcuts extends StatelessWidget {
+  final bool native;
+  const _FeatureShortcuts({this.native = false});
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -533,30 +550,35 @@ class _FeatureShortcuts extends StatelessWidget {
           mainAxisSpacing: AppTheme.spacingSm,
           crossAxisSpacing: AppTheme.spacingSm,
           children: [
-            _FeatureTile(
-              icon: Icons.favorite,
-              label: 'Health',
-              onTap: () => context.push(AppRoutes.health),
-            ),
+            if (!native)
+              _FeatureTile(
+                icon: Icons.favorite,
+                label: 'Health',
+                onTap: () => context.push(AppRoutes.health),
+              ),
             _FeatureTile(
               icon: Icons.notifications,
               label: 'Notifications',
               onTap: () => context.push(AppRoutes.notifications),
             ),
-            _FeatureTile(
-              icon: Icons.analytics,
-              label: 'Analytics',
-              onTap: () => context.push(AppRoutes.analytics),
-            ),
-            _FeatureTile(
-              icon: Icons.watch,
-              label: 'Watchface',
-              onTap: () => context.push(AppRoutes.watchfaceBackground),
-            ),
+            if (!native)
+              _FeatureTile(
+                icon: Icons.analytics,
+                label: 'Analytics',
+                onTap: () => context.push(AppRoutes.analytics),
+              ),
+            if (!native)
+              _FeatureTile(
+                icon: Icons.watch,
+                label: 'Watchface',
+                onTap: () => context.push(AppRoutes.watchfaceBackground),
+              ),
             _FeatureTile(
               icon: Icons.code,
               label: 'Developer',
-              onTap: () => context.push(AppRoutes.developer),
+              onTap: () => context.push(
+                native ? AppRoutes.companionRuntime : AppRoutes.developer,
+              ),
             ),
             _FeatureTile(
               icon: Icons.mic,
