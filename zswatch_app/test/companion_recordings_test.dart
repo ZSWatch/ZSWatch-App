@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:zswatch_app/data/database/companion_recording_database.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/models/companion_recording.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
+import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
 import 'package:zswatch_app/providers/voice_memo_providers.dart';
 import 'package:zswatch_app/providers/watch_providers.dart' as database;
 import 'package:zswatch_app/providers/watch_service_provider.dart';
@@ -40,8 +44,8 @@ CompanionPrototypeSnapshot snapshot(
   'generation': 7,
   'events': <Object?>[],
   'address': watchId,
-        'recording_sync_enabled': false,
-        'recording_list': {'address': watchId, 'generation': 7, 'count': 3},
+  'recording_sync_enabled': false,
+  'recording_list': {'address': watchId, 'generation': 7, 'count': 3},
   'recordings': recordings,
 });
 
@@ -125,6 +129,9 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           nativeCompanionRuntimeProvider.overrideWithValue(true),
+          companionRecordingImportsProvider.overrideWith(
+            (ref) => Stream.value([]),
+          ),
           companionSnapshotProvider.overrideWith(
             (ref) => Stream.value(
               snapshot({
@@ -185,6 +192,9 @@ void main() {
         ProviderScope(
           overrides: [
             nativeCompanionRuntimeProvider.overrideWithValue(true),
+            companionRecordingImportsProvider.overrideWith(
+              (ref) => Stream.value([]),
+            ),
             companionSnapshotProvider.overrideWith(
               (ref) => Stream.value(state),
             ),
@@ -219,6 +229,195 @@ void main() {
       await tester.pumpAndSettle();
       expect(calls, ['requestRecordingList']);
       expect(state.fields['recording_sync_enabled'], false);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+  );
+  testWidgets(
+    'playback preparation is explicit, local and safe if the view closes',
+    (tester) async {
+      final saved = {
+        ...record(state: 'downloaded'),
+        'local_path': '/private/raw.zsw_opus',
+        'sha256': hash,
+      };
+      final state = snapshot({identity(saved): saved}, ready: false);
+      final pending = Completer<ImportedRecording>();
+      var prepares = 0;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            nativeCompanionRuntimeProvider.overrideWithValue(true),
+            companionSnapshotProvider.overrideWith(
+              (ref) => Stream.value(state),
+            ),
+            companionRecordingImportsProvider.overrideWith(
+              (ref) => Stream.value([]),
+            ),
+            companionPreparePlaybackProvider.overrideWithValue((recording) {
+              prepares++;
+              return pending.future;
+            }),
+            watchServiceProvider.overrideWith(
+              (ref) => throw StateError('Unexpected Dart BLE'),
+            ),
+            voiceMemoSyncServiceProvider.overrideWith(
+              (ref) => throw StateError('Unexpected sync'),
+            ),
+            transcriptionEngineProvider.overrideWith(
+              (ref) => throw StateError('Unexpected AI'),
+            ),
+          ],
+          child: const MaterialApp(home: VoiceMemosScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(prepares, 0);
+      await tester.tap(find.byTooltip('Prepare playback'));
+      await tester.pump();
+      expect(prepares, 1);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.ancestor(
+                of: find.byTooltip('Prepare playback'),
+                matching: find.byType(IconButton),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.pumpWidget(const SizedBox());
+      pending.completeError(StateError('interrupted'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('preparation failure retains the original and offers retry', (
+    tester,
+  ) async {
+    final saved = {
+      ...record(state: 'downloaded'),
+      'local_path': '/private/raw.zsw_opus',
+      'sha256': hash,
+    };
+    var prepares = 0;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          nativeCompanionRuntimeProvider.overrideWithValue(true),
+          companionSnapshotProvider.overrideWith(
+            (ref) =>
+                Stream.value(snapshot({identity(saved): saved}, ready: false)),
+          ),
+          companionRecordingImportsProvider.overrideWith(
+            (ref) => Stream.value([]),
+          ),
+          companionPreparePlaybackProvider.overrideWithValue((recording) async {
+            prepares++;
+            throw StateError('invalid');
+          }),
+          watchServiceProvider.overrideWith(
+            (ref) => throw StateError('Unexpected Dart BLE'),
+          ),
+          transcriptionEngineProvider.overrideWith(
+            (ref) => throw StateError('Unexpected AI'),
+          ),
+        ],
+        child: const MaterialApp(home: VoiceMemosScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Prepare playback'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Could not prepare playback. The original recording is retained.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<IconButton>(
+            find.ancestor(
+              of: find.byTooltip('Prepare playback'),
+              matching: find.byType(IconButton),
+            ),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(prepares, 1);
+    expect(saved['state'], 'downloaded');
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
+  testWidgets(
+    'stale imports do not claim playback readiness; successful preparation opens the local player',
+    (tester) async {
+      final saved = {
+        ...record(state: 'downloaded'),
+        'local_path': '/private/raw.zsw_opus',
+        'sha256': hash,
+      };
+      final stale = ImportedRecording(
+        identity: identity(saved),
+        watchId: watchId,
+        filename: 'memo_001',
+        timestampUtc: 1000,
+        durationMs: 2000,
+        sizeBytes: 100,
+        sourcePath: '/private/raw.zsw_opus',
+        sourceSha256:
+            'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        playbackPath: '/nonexistent/playback.ogg',
+        playbackSha256: hash,
+        converterVersion: 1,
+        importedAt: DateTime.utc(2026),
+      );
+      var prepares = 0;
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            nativeCompanionRuntimeProvider.overrideWithValue(true),
+            companionSnapshotProvider.overrideWith(
+              (ref) => Stream.value(
+                snapshot({identity(saved): saved}, ready: false),
+              ),
+            ),
+            companionRecordingImportsProvider.overrideWith(
+              (ref) => Stream.value([stale]),
+            ),
+            companionPreparePlaybackProvider.overrideWithValue((
+              recording,
+            ) async {
+              prepares++;
+              return stale.copyWith(sourceSha256: hash);
+            }),
+            watchServiceProvider.overrideWith(
+              (ref) => throw StateError('Unexpected Dart BLE'),
+            ),
+            transcriptionEngineProvider.overrideWith(
+              (ref) => throw StateError('Unexpected AI'),
+            ),
+          ],
+          child: const MaterialApp(home: VoiceMemosScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(prepares, 0);
+      expect(find.textContaining('Playback prepared'), findsNothing);
+      expect(find.byTooltip('Play recording'), findsNothing);
+      await tester.tap(find.byTooltip('Prepare playback'));
+      await tester.pumpAndSettle();
+      expect(prepares, 1);
+      expect(find.text('Close'), findsOneWidget);
+      expect(find.text('Audio file not found'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.text('Close'), findsNothing);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
     },

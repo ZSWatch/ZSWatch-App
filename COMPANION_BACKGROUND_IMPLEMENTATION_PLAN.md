@@ -1137,3 +1137,31 @@ Nokia runbook for exact artifacts and limits. Next feature integration is the
 durable recording import/playback boundary; processing/model execution remains
 separate and local AI still requires newer hardware. Discovery/coordinated
 unpair, preference migration and broader Android/iOS acceptance also remain.
+
+
+### Progress 2026-10-03: durable local receipt import and existing Flutter playback
+
+A downloaded native receipt can now be explicitly prepared and played from the
+existing Flutter Voice Notes screen, including while BLE is stopped. Canonical
+path, raw SHA/size and exact closed-container metadata are verified before the
+existing Ogg converter publishes a flushed derivative. A separate schema-1
+import ledger pins the complete native identity and immutable hashes. The main
+schema-6 database and legacy filename-based voice state remain unchanged. No
+automatic import, inference, remote submission or watch cleanup occurs.
+
+File-backed tests kill actual Flutter workers at staging, publication and DB
+commit, then reopen/retry to one import. Other regressions cover multi-watch
+filename collisions, conflicts, malformed receipts, no-op retries and local
+player lifecycle. Nokia verifies explicit offline preparation, Android playback,
+completion/reset and prepared-state persistence after reopen. The native owner
+remains Stop 128, all nine native dictionaries and seven raw hashes are retained,
+and the synthetic job/outbox plus logical main DB are unchanged. See the runtime
+notes/runbook for artifact hash and the limits of this bounded check.
+
+Next architecture work is the explicit mapping from verified recording imports
+to durable processing jobs and existing Flutter result/action views. Do not map
+legacy voice rows by filename or start models merely by opening Voice Notes.
+The Nokia remains excluded from local AI. Newer-phone model execution,
+production remote submission, multi-runtime importer ownership/retention,
+discovery/coordinated unpair, Android background acceptance and iOS restoration
+still require their own implementation and verification boundaries.

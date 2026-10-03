@@ -8,6 +8,7 @@ import 'package:zswatch_app/providers/ai_providers.dart';
 import 'package:zswatch_app/providers/auto_reconnect_provider.dart';
 import 'package:zswatch_app/providers/chat_providers.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
+import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
 import 'package:zswatch_app/providers/companion_watch_providers.dart';
 import 'package:zswatch_app/services/background/companion_watch_catalogue.dart';
 import 'package:zswatch_app/providers/foreground_service_providers.dart';
@@ -87,6 +88,9 @@ void main() {
       ProviderScope(
         overrides: [
           nativeCompanionRuntimeProvider.overrideWithValue(true),
+          companionRecordingImportsProvider.overrideWith(
+            (ref) => Stream.value([]),
+          ),
           database.allWatchesProvider.overrideWith((ref) => Stream.value([])),
           companionWatchCatalogueWriterProvider.overrideWithValue((
             metadata,

@@ -1,11 +1,10 @@
-import 'dart:io';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:just_audio/just_audio.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/extracted_action.dart';
@@ -21,6 +20,7 @@ import '../../../services/ai/ai_debug_info.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/voice_memos/memo_list_item.dart';
+import '../../widgets/voice_memos/audio_playback_bar.dart';
 import '../../widgets/voice_memos/sync_progress_bar.dart';
 import 'companion_voice_memos_view.dart';
 
@@ -934,147 +934,12 @@ class _DetailAudioPlayer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (hasLocalAudio(memo)) {
-      return _AudioPlayerBar(memo: memo);
+      return AudioPlaybackBar(
+        filePath: memo.convertedFilePath ?? memo.localFilePath,
+      );
     }
 
     return _SyncPromptCard(memo: memo);
-  }
-}
-
-class _AudioPlayerBar extends ConsumerStatefulWidget {
-  final VoiceMemo memo;
-  const _AudioPlayerBar({required this.memo});
-
-  @override
-  ConsumerState<_AudioPlayerBar> createState() => _AudioPlayerBarState();
-}
-
-class _AudioPlayerBarState extends ConsumerState<_AudioPlayerBar> {
-  AudioPlayer? _player;
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  bool _isPlaying = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _initPlayer();
-  }
-
-  Future<void> _initPlayer() async {
-    final path = widget.memo.convertedFilePath ?? widget.memo.localFilePath;
-    if (path == null || !File(path).existsSync()) {
-      setState(() => _error = 'Audio file not found');
-      return;
-    }
-
-    try {
-      _player = AudioPlayer();
-      final duration = await _player!.setFilePath(path);
-      if (duration != null && mounted) {
-        setState(() => _duration = duration);
-      }
-
-      _player!.positionStream.listen((position) {
-        if (mounted) setState(() => _position = position);
-      });
-
-      _player!.playerStateStream.listen((state) {
-        if (!mounted) return;
-        setState(() => _isPlaying = state.playing);
-        if (state.processingState == ProcessingState.completed) {
-          _player!.seek(Duration.zero);
-          _player!.pause();
-        }
-      });
-    } catch (error) {
-      if (mounted) {
-        setState(() => _error = 'Failed to load audio: $error');
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _player?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_error != null) {
-      return Text(_error!, style: const TextStyle(color: AppTheme.errorColor));
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.elevatedSurfaceColor.withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.textSecondary.withValues(alpha: 0.08),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Play button
-          GestureDetector(
-            onTap: () {
-              if (_isPlaying) {
-                _player?.pause();
-              } else {
-                _player?.play();
-              }
-            },
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: const BoxDecoration(
-                color: AppTheme.primaryColor,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: Colors.black,
-                size: 22,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Slider
-          Expanded(
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 3,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-              ),
-              child: Slider(
-                padding: EdgeInsets.zero,
-                value: _duration.inMilliseconds == 0
-                    ? 0
-                    : _position.inMilliseconds
-                          .clamp(0, _duration.inMilliseconds)
-                          .toDouble(),
-                max: _duration.inMilliseconds == 0
-                    ? 1
-                    : _duration.inMilliseconds.toDouble(),
-                onChanged: (value) =>
-                    _player?.seek(Duration(milliseconds: value.toInt())),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            '${_formatDuration(_position)} / ${_formatDuration(_duration)}',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -2827,12 +2692,6 @@ bool _matchesQuery(VoiceMemo memo, String query) {
   ].join(' ').toLowerCase();
 
   return haystack.contains(query);
-}
-
-String _formatDuration(Duration duration) {
-  final minutes = duration.inMinutes;
-  final seconds = duration.inSeconds % 60;
-  return '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
 ButtonStyle _compactOutlinedButtonStyle() {

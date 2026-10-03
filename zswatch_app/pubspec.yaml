@@ -11,6 +11,7 @@ dependencies:
     sdk: flutter
 
   # UI Components
+  crypto: ^3.0.7
   cupertino_icons: ^1.0.8
   fl_chart: ^0.69.2
   flutter_svg: ^2.0.10+1
@@ -90,6 +91,7 @@ dependencies:
   flutter_tts: ^4.2.5
 
 dev_dependencies:
+  just_audio_platform_interface: ^4.6.0
   flutter_test:
     sdk: flutter
 

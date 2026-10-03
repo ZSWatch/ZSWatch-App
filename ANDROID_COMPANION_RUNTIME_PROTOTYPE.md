@@ -129,9 +129,8 @@ failed transfers or changing download policy. A fresh, including unchanged/empty
 response persists `recording_list` with watch address, generation, count and
 observation time. The UI displays the reported watch count only for its current
 ready generation. Old receipt records are retained even if a subsequent watch
-list is empty. This is receipt/status viewing, not DB import, playback, Ogg
-conversion or AI integration. The phone still needs a separate receipt import
-and processing boundary for those features.
+list is empty. The explicit local playback boundary is described below;
+processing and AI integration remain separate.
 
 The existing `NotificationSettingsScreen` also has a native branch under the
 same debug flag. Opening it reads saved native policy and a versioned
@@ -511,3 +510,46 @@ and this stale-replay boundary. The native suite now has 59 passing tests; both
 normal and prototype APK builds pass. These two follow-ups are not installed on
 the Nokia yet; its last physically tested APK and stopped state are documented
 in the remote-job milestone.
+
+
+## Explicit native receipt import and Flutter playback — 2026-10-03
+
+The existing Flutter Voice Notes screen now offers **Prepare playback** for a
+committed native recording. Opening the screen only observes receipts and the
+import ledger. Pressing the control validates the canonical private raw path,
+byte size, SHA-256, closed v1 container, timestamp, exact frame count, duration
+and full framing. Pending/failed entries cannot be imported. The initial
+converter contract supports the existing 16 kHz mono / 160-sample (10 ms)
+profile; other profiles fail explicitly. It reuses `ZswOpusParser`,
+`OggOpusWriter` and the flushed `VoiceMemoFileStore` staging helper.
+
+Playback derivatives and `imports.sqlite` live under application support's
+`companion-recording-imports-v1/`. This separate Drift schema-1 ledger uses the
+full native recording identity and immutable source/playback hashes. The main
+schema-6 database and legacy filename-based voice rows are unchanged; identical
+filenames on different watches cannot collide. No existing transcription,
+action or processing state is adopted by filename.
+
+A flushed Ogg stage is published before its ledger row. Retrying after process
+death before publication creates a fresh stage and retains the interrupted one.
+Retrying after publication adopts only the exact deterministic bytes. Retrying
+after DB commit verifies/reuses the existing row without SQL changes. Missing
+playback can be rebuilt from its verified source. Conflicting source identities,
+metadata, symlinks or corrupt existing derivatives fail without overwriting or
+deleting files. This is process-interruption recovery, not a filesystem
+power-loss guarantee. Serialization covers this UI's Dart runtime; a future
+headless/native importer needs coordinated ownership before enabling concurrency.
+Interrupted stages remain private until a separate retention policy is agreed.
+
+The shared Flutter `AudioPlaybackBar` preserves the existing player appearance.
+The playback sheet loads the local derivative but waits for an explicit Play;
+position/duration/error updates and disposal are fenced against old loads. File
+wrapping and ledger commit do not certify codec decoding, audio quality or AI
+readiness. A bounded Nokia check exercised actual Android decoding for one
+existing recording; production format/length acceptance remains broader work.
+
+Preparation, playback and reopening perform no BLE, Nordic SMP, watch deletion,
+model execution, remote submission or job/outbox mutation. Recording-to-job and
+legacy processing migrations remain explicit later work. The native companion
+is still opt-in under `COMPANION_RUNTIME_PROTOTYPE=true`; iOS and ordinary Dart
+BLE startup are unchanged. See the Nokia runbook for artifacts and test limits.

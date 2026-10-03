@@ -633,3 +633,46 @@ duplicate callback stability, generation fencing and new session/watch changes.
 Focused analysis and both debug APK builds pass. This advances Android metadata
 and UI integration only; it does not establish long-duration/modern-Android/iOS
 acceptance or enable recording import/playback/processing, discovery or unpairing.
+
+
+## Explicit offline recording import and playback — 2026-10-03
+
+Artifacts: `.companion-hil-runs/20261003-native-recording-playback/`.
+Final installed native APK SHA-256:
+`795c626c417692a76acb2f5970f64740d9e2585e92a9ef2414a63dbbaa47a0e4`.
+Native owner remains Stop generation 128; no BLE Start or recording-list refresh
+was sent. Voice Notes displayed nine retained records / seven saved on phone.
+Only the smallest existing committed receipt, `20261002_200103` (14,129 raw
+bytes, 3,840 ms), was explicitly prepared. No audio contents were inspected or
+uploaded, and no model/headless AI worker ran on this phone.
+
+The dedicated schema-1 ledger contains exactly one immutable import. Raw receipt
+size/hash/container validation passed; the playback derivative hash agrees with
+the ledger. The schema-6 main database has identical logical contents and passes
+SQLite integrity checks. All nine native recording dictionaries, all seven raw
+SHA-256 values and the synthetic job/result outbox are unchanged. Downloads
+remain paused and local fixtures disabled. No command touched the watch or its
+original recordings; no reset, flash, transfer or deletion was needed.
+
+The existing Flutter sheet loaded the local Ogg with a roughly four-second
+Android duration and no autoplay. Explicit Play progressed to 0:01, then
+completion paused/reset to 0:00. Closing releases the player. The prepared row
+survived replacement/reopening with the final build and repeated preparation;
+other recordings remained unprepared. The final preparation indicator clears
+before the playback sheet opens. These observations exercise local decoding for
+one existing receipt, not audio-quality acceptance across every recording.
+
+145 targeted Flutter regressions pass. Import tests use real file-backed Drift
+and SIGKILL actual Flutter workers at staged, published and committed boundaries,
+then retry/reopen to one import. Coverage also includes conflicting source hashes,
+filename collisions across watches, malformed/truncated/dirty containers,
+symlinks, corrupt retained derivatives, no-op SQL retry and player/view disposal.
+The pending-load/player fixture is a host simulation, not Android hardware.
+Focused analysis is clean and both ordinary/native debug APKs compile.
+
+This is explicit local playback integration. The dedicated ledger avoids changing
+legacy voice-row identity or schema, but does not yet connect recordings to
+transcription/action jobs. Retained interrupted stages, concurrency between Dart
+runtimes, storage pressure, longer recordings, newer-Android background survival
+and iOS are separate acceptance work. Already-stopped app force-stops here only
+provided consistent SQLite snapshots; they do not test active BLE OS recovery.
