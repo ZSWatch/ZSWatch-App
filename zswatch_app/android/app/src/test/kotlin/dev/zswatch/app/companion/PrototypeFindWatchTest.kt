@@ -9,6 +9,7 @@ class PrototypeFindWatchTest {
     private class Rig {
         var time = 0L
         var admission = true
+        var observationFails = false
         val writes = mutableListOf<Write>()
         val timers = mutableListOf<Pair<Long, () -> Unit>>()
         val states = mutableListOf<String>()
@@ -16,7 +17,10 @@ class PrototypeFindWatchTest {
             { token, enabled, guard, done ->
                 if (admission) writes.add(Write(token, enabled, guard, done))
                 admission
-            }, { _, state -> states.add(state) })
+            }, { _, state ->
+                if (observationFails) error("Journal unavailable")
+                states.add(state)
+            })
         fun ready() { controller.ready(1); writes.clear(); states.clear() }
         fun advance(ms: Long) {
             time += ms
@@ -85,6 +89,17 @@ class PrototypeFindWatchTest {
     @Test fun ordinaryReadyDoesNotSendFindFalseAndInterruptUnrelatedVibration() {
         val rig = Rig(); rig.controller.ready(1)
         assertTrue(rig.writes.isEmpty())
+    }
+
+    @Test fun failedDiagnosticCannotPreventSchedulingTheStop() {
+        val rig = Rig(); rig.ready(); rig.observationFails = true
+        assertThrows(IllegalStateException::class.java) { rig.controller.start(1) }
+        assertThrows(IllegalStateException::class.java) { rig.writes.single().done() }
+        rig.observationFails = false
+        rig.advance(2000)
+        assertFalse(rig.writes.last().enabled)
+        rig.writes.last().done()
+        assertEquals("stop_written", rig.states.last())
     }
 
     @Test fun priorityStopPreservesInflightFragmentAndPrecedesUnstartedWork() {

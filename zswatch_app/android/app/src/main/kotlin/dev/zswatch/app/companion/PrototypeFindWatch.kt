@@ -34,14 +34,14 @@ internal class PrototypeFindWatch(
             burst === next && !next.stopping && now() < next.deadline
         }, {
             if (burst === next && !next.stopping) {
-                observe(token, "start_written")
                 later(2000) { stop(next) }
+                observe(token, "start_written")
             }
         })
         if (!accepted) { burst = null; error("Watch command queue unavailable") }
-        observe(token, "accepted")
         // If start sits in the queue too long, cancel it and clean up any partial write.
         later(10000) { if (burst === next) stop(next) }
+        observe(token, "accepted")
     }
 
     private fun stop(expected: Burst) {

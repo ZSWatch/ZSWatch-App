@@ -1005,7 +1005,7 @@ Private evidence: `.companion-hil-runs/20261004-native-find/`.
 Installed native APK SHA-256
 `fb3211a329410c78ae530e6fb6dc15f9143b9cd1b430d116be2c1b1efac2346d`;
 ordinary APK `f8d556b57894f35c3b397105e720dacae297513a412867a066268b20c8129e62`.
-126 native JVM and 115 companion Flutter tests pass; analysis clean, both builds
+127 native JVM and 115 companion Flutter tests pass; analysis clean, both builds
 compile. Source uses the existing Boolean `find` protocol; no SMP, model or
 firmware change is involved.
 
@@ -1036,3 +1036,26 @@ safeguard and verify those paths before rollout. Recovery false is best effort a
 only for a matching unfinished prior find receipt; normal reconnect does not stop
 unrelated watch vibration. Real Weather/location acceptance still awaits the
 separate explicit location-transmission approval.
+
+
+Final timer/artifact follow-up: stop/watchdog scheduling was moved before
+optional diagnostic observations; a new failure-injection test brings native
+coverage to 127. An early copy accidentally installed the ordinary artifact.
+A later candidate (`2e3ba559…56f01`) had native Flutter UI with compiled Android
+flag=false/no bridge, producing a loading screen and MissingPluginException.
+It was rejected; journal Stop 174 and all recordings/jobs stayed unchanged.
+The native gate discrepancy beyond the first copy mistake was not diagnosed to
+a specific compiler/cache cause. Do not label that candidate a passed native build.
+
+A fresh frozen `native-flag-check.apk`/corrected `native-final.apk`, SHA-256
+`f987b6fe4540ca4c5f2cee0f29325c2d2c2f080d06d71e8c1ecc2e724e070977`, has
+compiled flag=true and native MainActivity bridge construction. Final ordinary
+APK SHA-256 `30164352bce267b64ef77bc8a178dc7e7d9232cf3bc67f62dddab5b79009f37f`
+has flag=false/no bridge. The new read-only APK verifier independently passes
+both intended modes and rejects the retained mismatched artifact. Corrected native
+replacement opens the existing disconnected Flutter view, installed hash matches,
+no service and Stop 174 remain, and exact recordings/jobs/policies still match
+baseline. The physical burst above used the earlier `fb3211a3…2346d` artifact;
+the final safeguard has host tests plus physical owner/UI/retention verification,
+not a repeated physical burst. Capture evidence is retained privately, including
+the rejected candidate, rather than replacing failure evidence with a pass.

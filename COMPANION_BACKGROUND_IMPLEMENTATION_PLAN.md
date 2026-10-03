@@ -1388,7 +1388,7 @@ Overlapping bursts, expired queued starts and late callbacks are fenced. A
 matching unfinished prior receipt supports best-effort false after reconnect;
 ordinary Ready does not interrupt unrelated watch vibration.
 
-126 native / 115 companion Flutter tests pass, clean focused analysis and both
+127 native / 115 companion Flutter tests pass, clean focused analysis and both
 APK builds. Nokia/watch parser logs confirm start/stop with the phone on Home,
 about three seconds including wire latency, while BLE stays Ready. Stop cleanup
 preserves all recordings/jobs and location/download policy. Physical UI destruction
@@ -1400,3 +1400,12 @@ the native timer cannot guarantee a packet reaches a disconnected watch. This is
 an explicit remaining watch-side lifecycle gate, not a reason to resume SMP/AI
 experiments. Next independent app work is the controlled HTTP idle comparison and
 remaining initialized feature migration.
+
+
+Find follow-up schedules timers before diagnostic writes and adds a native failure
+test (127 native tests total). An APK variant mismatch found during final checks
+was corrected with a fresh build. The new read-only APK gate checks packaged
+BuildConfig and MainActivity bridge construction before installation; it passes
+native/ordinary modes and rejects the failed candidate. Corrected native UI shows
+Disconnected without Start and retains Stop/data. This is artifact validation,
+not a new broad background acceptance pass.

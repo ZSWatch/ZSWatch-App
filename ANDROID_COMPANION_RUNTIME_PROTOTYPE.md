@@ -871,11 +871,28 @@ test the interrupted burst. No firmware edit/flash or physical interrupted burst
 was done in this milestone. Native Stop cancels future commands/closes BLE; it
 does not claim delivery of a final false over an already closed connection.
 
-126 native JVM and 115 companion Flutter tests pass; focused analysis is clean
-and both APKs build. Eight native Find tests cover timing/admission/expiry/session
+127 native JVM and 115 companion Flutter tests pass; focused analysis is clean
+and both APKs build. Nine native Find tests cover timing/admission/expiry/session
 fencing and stop priority preserving ATT fragments. Four Flutter tests cover the
 explicit receipt, Ready-only control, disposal and sanitized failure feedback.
 Nokia/watch UART confirms true then false after the dashboard action with Home
 resumed, about 2.97 seconds apart including delivery latency. Flutter's Activity
 was backgrounded for that burst, not destroyed; disposal is separately covered by
 a widget test. See Nokia evidence for hashes, timing and cleanup.
+
+
+Find timing follow-up: both the two-second stop and ten-second admission watchdog
+are scheduled before diagnostic writes, so a failed journal observation cannot
+prevent their scheduling. A separate native test injects those failures. Transport
+closure still fences timers and the firmware disconnect safeguard remains required.
+
+
+Before installation, run `scripts/companion_hil/verify_android_owner_apk.py`
+with `--apk <frozen-apk> --owner native` (or `flutter` for the ordinary APK) and
+`--apkanalyzer <Android-SDK>/cmdline-tools/latest/bin/apkanalyzer`; set JAVA_HOME
+for the installed SDK tool. It inspects the packaged BuildConfig field and
+MainActivity bridge construction, then prints the artifact hash. A filename,
+successful build or installed hash does not alone prove the native gate. This
+check is read-only and separately labels hardware/Dart acceptance NOT_RUN.
+The final Find artifact with verified native gate is SHA-256
+`f987b6fe4540ca4c5f2cee0f29325c2d2c2f080d06d71e8c1ecc2e724e070977`.
