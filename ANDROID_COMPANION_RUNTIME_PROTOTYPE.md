@@ -89,9 +89,30 @@ selection is disabled until an active owner is stopped. Renaming updates only
 the saved row’s custom-name column and sends no BLE command. Forget/unpair remains
 withheld until native coordination is implemented. iOS IDs cannot be selected by
 this Android prototype. Schema version 6 and its existing upgrade migrations are
-unchanged; no native recording receipt is imported into Drift. Newly connected
-watches are not yet automatically saved to the catalogue. See the Nokia runbook
-for bounded app-shell and empty-catalogue evidence.
+unchanged; no native recording receipt is imported into Drift.
+
+The native journal now retains `last_ready` (address, session generation and UTC
+milliseconds) when a fenced connection first reaches Ready. Duplicate Ready
+callbacks retain the same record; Stop retains it as historical metadata and
+still clears running intent. Old journals without this optional field fabricate
+no connection history and perform no automatic save until another verified Ready.
+Only the selected address’s latest verified session is projected; this is not a
+multi-watch native history or proof of bonding.
+
+An app-lifetime Flutter observer projects that record into the saved catalogue,
+including after Stop or UI reattachment. It never requests permission, sends
+Start/Stop or uses the legacy watch repository/BLE service. New rows keep default
+non-primary selection; existing ID spelling, name/custom name, primary flag and
+creation time are preserved. Firmware/hardware and cached battery are copied
+only from metadata for that recorded generation. Drift’s second precision is
+normalized, and equal values cause no SQL update; newer saved connection times
+are not regressed. One serial writer coalesces pending snapshots. Failed saves
+remain retryable through further observations or Retry saving watch on the start
+screen. UI disposal stops projection while the native journal continues. Saving
+does not imply a live connection, run a model or import recordings. The Ready
+time is phone wall-clock time; creation time for a new row is its first projected
+Ready, not an Android pairing timestamp. See the Nokia runbook for bounded
+physical auto-save, rename, relaunch and saved-tile selection evidence.
 
 The existing `VoiceMemosScreen` now has a native receipt view when the debug
 selection is active. Its ordinary auto-sync, repository, model-configuration

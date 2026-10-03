@@ -1103,8 +1103,37 @@ had no pre-existing Flutter DB: its empty catalogue opened without starting BLE,
 explicit Connect reached Ready and Disconnect/relaunch preserved Stop. The
 existing nine recording records and synthetic job/outbox remain unchanged;
 watch originals are intact and downloads/AI stayed disabled. These are bounded
-integration observations, not modern-Android/iOS background acceptance. Next
-product work includes saving newly connected watch metadata, discovery/unpair,
-legacy preference decisions and the durable recording import/playback/processing
+integration observations, not modern-Android/iOS background acceptance. Automatic saving is implemented in the following checkpoint. Remaining
+product work includes discovery/unpair, legacy preference decisions and the durable recording import/playback/processing
 boundary; local models still require newer hardware. See the Nokia runbook for
 artifact hash and exact limits.
+
+### Progress 2026-10-03: native Ready history → saved-watch catalogue
+
+The native service now atomically records the selected address, session generation
+and phone UTC time at Ready. That optional journal field survives Stop and UI
+absence; it never changes desired_running. Flutter's existing app shell projects
+this verified history into schema-6 Drift, including when reattaching to a
+stopped service. Old journals without the field perform no automatic save until
+another Ready. This is only the selected watch's last session, not multi-watch
+history or proof of pairing.
+
+A serial metadata writer coalesces snapshots, retries failed writes and performs
+no SQL update when values are unchanged. Existing row ID spelling, custom/default
+name, primary selection, creation time and unrelated voice state are preserved;
+new rows remain non-primary. Firmware/hardware and cached battery require the
+recorded generation. Live connection/battery remain native observations. UI
+startup, metadata retry and renaming send no BLE control command and load no
+models. New-row creation time means first projected Ready; last connection time
+comes from the native Ready record at SQLite second precision.
+
+82 targeted Flutter tests and 69 native tests pass, focused analysis is clean and
+both APK variants compile. Nokia verified automatic insertion, ordinary tile/
+rename-dialog use, rename persistence while stopped, and saved-tile reconnect
+preserving the name/row while advancing connection time. The temporary label was
+restored to ZSWatch, and final intent is Stop. No audio transfer, deletion or AI
+ran; nine watch originals and native recording records remain intact. See the
+Nokia runbook for exact artifacts and limits. Next feature integration is the
+durable recording import/playback boundary; processing/model execution remains
+separate and local AI still requires newer hardware. Discovery/coordinated
+unpair, preference migration and broader Android/iOS acceptance also remain.

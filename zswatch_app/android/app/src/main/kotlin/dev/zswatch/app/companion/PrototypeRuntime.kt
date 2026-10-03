@@ -73,7 +73,16 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
     fun phase(token: Long, phase: String, error: String? = null): Boolean {
         if (!owns(token)) return false
         require(phase in setOf("connecting", "discovering", "subscribing", "ready", "disconnected", "error"))
-        store.update("connection_state", mapOf("phase" to phase, "last_error" to error))
+        val fields = mutableMapOf<String, Any?>("phase" to phase, "last_error" to error)
+        // Durable metadata projection may happen after Flutter has detached or Stop.
+        // This receipt records readiness, not pairing or application delivery.
+        val previousReady = store.control()["last_ready"] as? Map<*, *>
+        if (phase == "ready" && ((previousReady?.get("generation") as? Number)?.toLong() != token ||
+                previousReady?.get("address") != store.control()["address"])) {
+            fields["last_ready"] = mapOf("address" to store.control()["address"],
+                "generation" to token, "utc_ms" to System.currentTimeMillis())
+        }
+        store.update("connection_state", fields)
         return true
     }
 

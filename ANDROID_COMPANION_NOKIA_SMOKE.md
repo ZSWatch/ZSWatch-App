@@ -584,3 +584,52 @@ analysis and both debug APK builds pass; native Kotlin sources are unchanged.
 Physical renamed/saved-row migration remains untested because this phone had no
 old rows. Automatic saving of newly connected watches, discovery, coordinated
 forget/unpair and recording import/playback/processing remain separate work.
+
+## Automatic watch saving and ordinary saved-watch controls — 2026-10-03
+
+Artifacts: `.companion-hil-runs/20261003-native-watch-autosave/`.
+Installed native APK SHA-256:
+`44b5fd0e14cab174a2f7b6040a64b70ed1d5848dddd2369d58b2da5a98cb88a7`.
+The service commits optional `last_ready` address/generation/time metadata;
+Flutter's app-lifetime projection saves it without acquiring BLE, changing
+primary selection or invoking models. This selected-watch history survives Stop.
+Old journals lacking it are not inferred from cached phase/version information.
+
+Initial app open kept Stop 124, PID 23772, and the empty schema-6 watch catalogue.
+The home Connect button reached Ready 125. SQLite showed one auto-saved row for
+the test watch with firmware 0.8.1, hardware watchdk@1/nrf5340/cpuapp, cached
+battery 87%, default name ZSWatch, no custom name, non-primary selection and
+creation/last-connection times from native Ready. The real dashboard Disconnect
+persisted Stop 126; the ordinary saved-watch tile then appeared.
+
+The existing rename dialog had no Forget action. Saving temporary
+CompanionLabWatch changed only custom_name in SQLite and retained Stop 126.
+The already-stopped app was force-stopped and reopened, PID 24515: both start
+header and saved tile showed that name while native intent remained stopped.
+Selecting the saved tile explicitly reached Ready 127. Automatic persistence
+kept the same ID, custom name, default name, primary flag, creation time and
+capability flag; it advanced last_connected_at without inserting another row.
+Dashboard Disconnect persisted Stop 128. The temporary name was restored through
+the same dialog to ZSWatch (custom_name null) before the final relaunch.
+Final PID 24884 retained Stop 128, one watch row and identical logical SQLite
+contents across that reattachment.
+
+These force-stops closed already-stopped apps for consistent SQLite snapshots;
+they do not test OS recovery during active BLE. On every Ready the ordinary
+dashboard displayed Connected, MTU 247, firmware 0.8.1 and battery 87%. Physical
+SQLite integrity checks passed. Nine native recording dictionaries and the
+separate synthetic job/result outbox were preserved, downloads stayed paused,
+local fixtures disabled and notification selection limited to ZSWatch. USB status
+confirmed nine originals, no active recording, unchanged free space and watchface.
+No audio/model work, reset, flash, new upload or recording deletion ran.
+
+82 targeted Flutter tests include eight new catalogue checks plus app-shell
+historical-Ready integration. Real SQLite tests cover idempotence through actual
+file reopen, no-op SQL updates, legacy-column/voice-state preservation, alias
+ambiguity and stale observations. Serial-writer tests cover repeated events,
+coalescing, retry and disposal; malformed/old Ready records cannot create rows.
+69 native tests pass, including Ready-record persistence through Stop/reopen,
+duplicate callback stability, generation fencing and new session/watch changes.
+Focused analysis and both debug APK builds pass. This advances Android metadata
+and UI integration only; it does not establish long-duration/modern-Android/iOS
+acceptance or enable recording import/playback/processing, discovery or unpairing.

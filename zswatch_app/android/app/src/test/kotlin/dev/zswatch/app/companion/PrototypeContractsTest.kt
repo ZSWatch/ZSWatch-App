@@ -26,6 +26,40 @@ class PrototypeContractsTest {
         try { action(); fail("Expected rejection") } catch (_: IllegalArgumentException) {}
     }
 
+    @Test fun readyReceiptSurvivesStopAndJournalReopenWithoutRestoringIntent() {
+        val runtime = PrototypeRuntime(store(), Link()); runtime.start(address)
+        val token = runtime.generation
+        assertTrue(runtime.phase(token, "ready"))
+        val ready = runtime.store.control()["last_ready"] as Map<*, *>
+        assertEquals(address, ready["address"]); assertEquals(token, (ready["generation"] as Number).toLong())
+        assertTrue((ready["utc_ms"] as Number).toLong() > 0)
+        runtime.phase(token, "ready")
+        assertEquals(ready, runtime.store.control()["last_ready"])
+        runtime.stop()
+        assertFalse(runtime.phase(token, "ready"))
+        val reopened = PrototypeRuntime(store(), Link())
+        assertEquals(ready, reopened.store.control()["last_ready"])
+        assertFalse(reopened.restore())
+        assertFalse(reopened.active)
+    }
+
+    @Test fun newSessionReadyReplacesReceiptButConnectingCannotClaimReadiness() {
+        val runtime = PrototypeRuntime(store(), Link()); runtime.start(address)
+        assertNull(runtime.store.control()["last_ready"])
+        runtime.phase(runtime.generation, "ready")
+        val first = runtime.store.control()["last_ready"]
+        runtime.reconnect()
+        assertEquals(first, runtime.store.control()["last_ready"])
+        runtime.phase(runtime.generation, "ready")
+        val next = runtime.store.control()["last_ready"] as Map<*, *>
+        assertEquals(runtime.generation, (next["generation"] as Number).toLong())
+        assertNotEquals(first, next)
+        runtime.stop(); runtime.start("11:22:33:44:55:66")
+        assertEquals(next, runtime.store.control()["last_ready"])
+        runtime.phase(runtime.generation, "ready")
+        assertEquals("11:22:33:44:55:66", (runtime.store.control()["last_ready"] as Map<*, *>)["address"])
+    }
+
     @Test fun journalRoundTripsNestedCollectionsAsJsonValues() {
         val journal = store()
         journal.update("configuration", mapOf("notification_packages" to listOf("com.zswatch.app"),

@@ -67,6 +67,7 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
     final snapshot = ref.watch(companionSnapshotProvider).asData?.value;
     final watch = ref.watch(currentWatchProvider);
     final saved = ref.watch(database.allWatchesProvider);
+    final persistence = ref.watch(companionWatchPersistenceStateProvider);
     final active = snapshot?.runtimeActive == true;
     final busy =
         changingConnection || ref.watch(watchNotifierProvider).isLoading;
@@ -106,6 +107,17 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
           ),
           const SizedBox(height: 16),
           Text('Saved watches', style: Theme.of(context).textTheme.titleMedium),
+          if (persistence.hasError) ...[
+            const Text('Could not save watch information'),
+            TextButton(
+              onPressed: snapshot == null
+                  ? null
+                  : () => ref
+                        .read(companionWatchPersistenceStateProvider.notifier)
+                        .observe(snapshot),
+              child: const Text('Retry saving watch'),
+            ),
+          ],
           saved.when(
             data: (watches) => Column(
               children: [

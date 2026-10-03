@@ -12,6 +12,7 @@ import 'providers/analytics_providers.dart';
 import 'providers/ble_providers.dart';
 import 'providers/chat_providers.dart';
 import 'providers/companion_runtime_providers.dart';
+import 'providers/companion_watch_providers.dart';
 import 'providers/coredump_providers.dart';
 import 'providers/developer_providers.dart';
 import 'providers/foreground_service_providers.dart';
@@ -181,7 +182,9 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
   Widget build(BuildContext context) {
     // Keep the chat service alive for the full app lifetime so incoming
     // question_ready messages are always consumed even if no chat UI is open.
-    if (!ref.watch(nativeCompanionRuntimeProvider)) {
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      ref.watch(companionWatchPersistenceProvider);
+    } else {
       ref.watch(watchChatServiceProvider);
     }
 

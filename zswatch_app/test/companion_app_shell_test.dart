@@ -8,6 +8,8 @@ import 'package:zswatch_app/providers/ai_providers.dart';
 import 'package:zswatch_app/providers/auto_reconnect_provider.dart';
 import 'package:zswatch_app/providers/chat_providers.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
+import 'package:zswatch_app/providers/companion_watch_providers.dart';
+import 'package:zswatch_app/services/background/companion_watch_catalogue.dart';
 import 'package:zswatch_app/providers/foreground_service_providers.dart';
 import 'package:zswatch_app/providers/health_providers.dart';
 import 'package:zswatch_app/providers/notification_providers.dart';
@@ -58,6 +60,7 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   final calls = <MethodCall>[];
+  final metadataWrites = <CompanionWatchMetadata>[];
   final subscriptions = <String>[];
   final forbidden = <String>[];
   late Map<String, Object?> saved;
@@ -85,6 +88,11 @@ void main() {
         overrides: [
           nativeCompanionRuntimeProvider.overrideWithValue(true),
           database.allWatchesProvider.overrideWith((ref) => Stream.value([])),
+          companionWatchCatalogueWriterProvider.overrideWithValue((
+            metadata,
+          ) async {
+            metadataWrites.add(metadata);
+          }),
           companionConnectionPermissionsProvider.overrideWithValue(() async {
             permissionRequests++;
             if (denyPermission) throw StateError('Permission denied');
@@ -139,6 +147,7 @@ void main() {
 
   setUp(() {
     calls.clear();
+    metadataWrites.clear();
     subscriptions.clear();
     forbidden.clear();
     permissionRequests = 0;
@@ -169,6 +178,30 @@ void main() {
     messenger.setMockMethodCallHandler(events, null);
     expect(forbidden, isEmpty);
   });
+
+  testWidgets(
+    'app projects a historical Ready receipt without starting a stopped owner',
+    (tester) async {
+      final savedState = snapshot();
+      savedState['last_ready'] = {
+        'address': savedState['address'],
+        'generation': 10,
+        'utc_ms': 1700000000123,
+      };
+      await mount(tester, savedState);
+      expect(find.text('Watch disconnected'), findsOneWidget);
+      expect(metadataWrites, hasLength(1));
+      expect(
+        metadataWrites.single.readyAt.millisecondsSinceEpoch,
+        1700000000000,
+      );
+      expect(calls, isEmpty);
+      expect(permissionRequests, 0);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+    },
+  );
 
   testWidgets(
     'cold startup, safe navigation and lifecycle observe without starting legacy services or BLE',
