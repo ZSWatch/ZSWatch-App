@@ -959,3 +959,41 @@ application ACK. Control acceptance means Android dispatched to the controller;
 the synthetic callback provides separate evidence of receipt. Third-party music
 apps, volume effects, session selection, display details, modern Android and
 longer unplugged operation remain separate acceptance work.
+
+
+## Native GPS request and permission boundary — 2026-10-04
+
+Private evidence: `.companion-hil-runs/20261004-native-gps/`.
+Initial `native.apk` SHA-256
+`48d54cb0cd6006794fff38904b5262f5c1c701a1a66cb6a9e9f9715f28a06d94`.
+Final installed `native-final.apk` (accessible switch label) SHA-256
+`68e723c92e7cc6590324f7200f9fa23d13d1baff11e7668a72432a5101afcf13`.
+Final ordinary APK SHA-256
+`4e5acd037e7f98cb4b4930d976e2fe989785dfd2f087df2923cf99a96fb46ddf`.
+118 native JVM / 111 companion Flutter tests pass, focused analysis clean and both
+final debug variants compile. Ten native GPS tests include foreground rejection,
+synchronous-source cleanup, late callbacks and queue/fix deadlines. Six Flutter
+tests cover opt-in cancellation, permission denial, committed policy and no legacy
+BLE/location ownership.
+
+| Check | Observation and limit |
+| --- | --- |
+| Existing Flutter Settings | Watch location defaults off. Disclosure Cancel kept Stop 170 and sharing absent/off, with no permission grant or Start. |
+| OS permission flow | Explicit Continue requested Android foreground access, then opened the all-time location page. Approximate was selected: coarse/background granted, fine denied. The permission activity was missing from UIAutomator's tree; focused activity plus screenshot confirmed the actual prompt. No plugin-stall conclusion is warranted. |
+| Policy only | The accepted switch showed waiting for a request; journal sharing=true while Stop 170 and desired_running=false remained. Permission/policy do not Start BLE. |
+| Existing Connect | Explicit Flutter Connect reached Ready 171. Downloads remained paused. |
+| Periodic watch request | Existing periodic firmware behavior sent a request while connected. Journal recorded acquiring followed by location_unavailable about ten seconds later. No last_gps_write was created; no fresh position was delivered. This is first-fix failure/release evidence, not Weather success. |
+| Sharing off / UI closed | Flutter switch committed sharing=false/disabled while Ready 171 continued. Existing diagnostic finished/removed the Flutter Activity; read-only APK-matched probe retained Ready and current watch status with launcher resumed. Synthetic delayed notification forwarded separately. |
+| Real Weather launch | Not executed. Automatic approval review rejected the combined launch/capture command because real phone location would go to the watch and Open-Meteo endpoint without explicit destination-specific authorization. The user question is pending. No bypass or synthetic-as-real acceptance was used. |
+| Cleanup/final APK | Native Stop 172 persisted, no owner/notifications, sharing off, all phone location grants revoked to the original baseline, downloads paused. Final APK replacement retained Stop. All nine recording dictionaries and the full separate job/outbox journal exactly equal the baseline. `last_gps_write` remains absent. Watch stayed on watchface and no recording/transfer/AI/firmware action ran. |
+
+For later real acceptance, get explicit approval to transmit location, enable
+sharing through Flutter and grant approximate or precise plus all-time access.
+Use explicit Connect, finish/remove Flutter through the existing diagnostic, then
+USB `power wake`, confirm `app state` is watchface and `app launch Weather`.
+Capture native acquiring/write/release and HTTP outcome together with watch UART
+consumer logs; keep coordinate-bearing logs private. The controller and watchdog
+may time out indoors. A fresh fix reaching the actual consumer and a successful
+Weather response are separate assertions; cached watch weather, ATT completion or
+pure synthetic fixes do not establish them. Always close Weather, disable sharing,
+Stop and restore temporary phone settings afterward.

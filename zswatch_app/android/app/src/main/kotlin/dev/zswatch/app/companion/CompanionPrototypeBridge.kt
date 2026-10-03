@@ -130,7 +130,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
-                "stop", "forgetWatch", "syncTime", "requestDeviceInfo", "requestRecordingList", "retryRecordings", "ackEvents", "configureNotifications", "configureHttp", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
+                "stop", "forgetWatch", "syncTime", "requestDeviceInfo", "requestRecordingList", "retryRecordings", "ackEvents", "configureNotifications", "configureGps", "configureHttp", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
                     PrototypeHub.worker.post {
                         try {
                             val store = PrototypeHub.journal(context)
@@ -177,6 +177,12 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                                         ?: error("Boolean enabled required")
                                     if (service?.transport != null) service.transport!!.configureHttp(enabled)
                                     else PrototypeHttpRelay.configure(store, enabled)
+                                }
+                                "configureGps" -> {
+                                    val enabled = (call.arguments as? Map<*, *>)?.get("enabled") as? Boolean
+                                        ?: error("Boolean enabled required")
+                                    if (service?.gps != null) service.gps!!.configure(enabled)
+                                    else AndroidPrototypeGps.configureStopped(context, store, enabled)
                                 }
                                 "configureNotifications" -> {
                                     val enabled = call.argument<Boolean>("enabled") ?: error("Enabled required")

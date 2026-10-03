@@ -7,6 +7,7 @@ import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../navigation/app_router.dart';
 import 'companion_http_settings_tile.dart';
+import 'companion_gps_settings_tile.dart';
 
 /// Legacy background preferences and model settings are withheld until their
 /// contracts migrate. The native owner retains persistent connection intent.
@@ -47,6 +48,7 @@ class CompanionSettingsView extends ConsumerWidget {
             onTap: () => context.push(AppRoutes.voiceMemos),
           ),
           const CompanionHttpSettingsTile(),
+          const CompanionGpsSettingsTile(),
         ],
       ),
     );

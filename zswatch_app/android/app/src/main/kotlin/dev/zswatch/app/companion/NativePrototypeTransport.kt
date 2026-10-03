@@ -21,6 +21,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
     var mediaReady: (Long) -> Unit = {}
     var mediaClosed: () -> Unit = {}
     var mediaControl: (JSONObject, Long) -> Unit = { _, _ -> }
+    var gpsReady: (Long) -> Unit = {}
+    var gpsClosed: () -> Unit = {}
+    var gpsRequest: (JSONObject, Long) -> Unit = { _, _ -> }
     private var gatt: BluetoothGatt? = null
     private var tx: BluetoothGattCharacteristic? = null
     private var token = 0L
@@ -134,6 +137,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 recoverReceipts()
                 downloadNext()
                 mediaReady(session)
+                gpsReady(session)
             }
             override fun onCharacteristicChanged(client: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                 val copy = characteristic.value?.clone() ?: return
@@ -239,6 +243,15 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 "generation" to generation, "utc_ms" to System.currentTimeMillis())))
         }
         return true
+    }
+
+    fun sendGps(generation: Long, packet: String, mayStart: () -> Boolean, done: () -> Unit): Boolean {
+        if (generation != token || !runtime.owns(generation) || store.control()["phase"] != "ready" || writes.size >= 14) return false
+        val bytes = packet.toByteArray(Charsets.UTF_8)
+        if (bytes.size > 1024) return false
+        writes.add(NusWrite(bytes, done, payloadSize, mayStart))
+        safely { pump() }
+        return runtime.owns(generation) && store.control()["phase"] == "ready"
     }
 
     private fun readInitialBattery(client: BluetoothGatt, session: Long) {
@@ -355,6 +368,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
             }
             if (store.control()["phase"] == "ready") httpRelay.receive(message, token)
             if (store.control()["phase"] == "ready") mediaControl(message, token)
+            if (store.control()["phase"] == "ready") gpsRequest(message, token)
             recordingInbox.receive(message)
         }
         downloadNext()
@@ -489,6 +503,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     override fun close() {
         mediaClosed()
+        gpsClosed()
         operation++; fileOperation++
         httpRelay.reset()
         writing = false; writes.clear(); downloading = false

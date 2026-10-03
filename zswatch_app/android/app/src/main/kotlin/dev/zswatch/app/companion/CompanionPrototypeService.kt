@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IntentFilter
 import android.bluetooth.BluetoothAdapter
+import android.location.LocationManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -43,6 +44,9 @@ class CompanionPrototypeService : Service() {
     var localFixture: PrototypeLocalFixture? = null
         private set
     private var media: AndroidPrototypeMedia? = null
+    internal var gps: AndroidPrototypeGps? = null
+        private set
+    @Volatile private var gpsForeground = false
     private val systemEvents = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val action = intent.action
@@ -56,6 +60,8 @@ class CompanionPrototypeService : Service() {
                         else if (radio == BluetoothAdapter.STATE_ON) owner.recoverForSystem()
                     } else if (action in listOf(Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED)) {
                         if (owner.active && owner.store.control()["phase"] == "ready") transport?.syncTime()
+                    } else if (action == LocationManager.PROVIDERS_CHANGED_ACTION) {
+                        gps?.refresh()
                     }
                 }
             }
@@ -70,6 +76,7 @@ class CompanionPrototypeService : Service() {
                 transport?.syncTimeIfTimezoneChanged()
                 transport?.flushNotifications()
                 runtime?.let { if (it.active && it.store.control()["phase"] == "ready") media?.refresh(it.generation) }
+                gps?.refresh()
             }
             PrototypeHub.worker.postDelayed(this, 60000)
         }
@@ -97,6 +104,7 @@ class CompanionPrototypeService : Service() {
             addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
             addAction(Intent.ACTION_TIME_CHANGED)
             addAction(Intent.ACTION_TIMEZONE_CHANGED)
+            addAction(LocationManager.PROVIDERS_CHANGED_ACTION)
         }, ContextCompat.RECEIVER_EXPORTED)
         receiverRegistered = true
         PrototypeHub.worker.post {
@@ -107,9 +115,19 @@ class CompanionPrototypeService : Service() {
                 val link = NativePrototypeTransport(applicationContext, PrototypeHub.worker, store, files)
                 transport = link
                 runtime = PrototypeRuntime(store, link).also { link.runtime = it }
+                gps = AndroidPrototypeGps(applicationContext, store,
+                    foreground = { enabled ->
+                        if (instance === this) {
+                            publishForeground(enabled)
+                            gpsForeground = enabled
+                        } else check(!enabled) { "Companion service was destroyed" }
+                    }, send = link::sendGps)
                 link.mediaReady = { media?.ready(it) }
                 link.mediaClosed = { media?.close() }
                 link.mediaControl = { message, generation -> media?.control(message, generation) }
+                link.gpsReady = { gps?.ready(it) }
+                link.gpsClosed = { gps?.close() }
+                link.gpsRequest = { message, generation -> gps?.receive(message, generation) }
                 remoteFixture = PrototypeRemoteFixture(applicationContext, this).also { it.startMaintenance() }
                 localFixture = PrototypeLocalFixture(applicationContext, this).also { it.startMaintenance() }
                 PrototypeHub.worker.post(notificationMaintenance)
@@ -129,21 +147,7 @@ class CompanionPrototypeService : Service() {
         }
         if (intent != null && intent.action !in listOf(START, START_DISCOVERED, RESTORE_PRESENCE, RESTORE_SYSTEM, START_REMOTE_FIXTURE, START_LOCAL_FIXTURE, POST_TEST_NOTIFICATION)) { stopSelf(); return START_NOT_STICKY }
         try {
-            val manager = getSystemService(NotificationManager::class.java)
-            if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Companion prototype", NotificationManager.IMPORTANCE_LOW))
-            val open = packageManager.getLaunchIntentForPackage(packageName)
-            val stop = Intent(this, CompanionPrototypeService::class.java).setAction(STOP)
-            val notification = NotificationCompat.Builder(this, CHANNEL)
-                .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-                .setContentTitle("ZSWatch companion prototype")
-                .setContentText("Native watch companion runtime")
-                .setOngoing(true)
-                .setContentIntent(PendingIntent.getActivity(this, 20, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
-                .addAction(0, "Stop", PendingIntent.getService(this, 21, stop, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
-                .build()
-            if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
-            else startForeground(NOTIFICATION, notification)
+            publishForeground(gpsForeground)
         } catch (error: Exception) {
             LifecycleLogger.log("CompanionPrototype", "foreground_failed ${error.javaClass.simpleName}")
             stopSelf()
@@ -227,6 +231,27 @@ class CompanionPrototypeService : Service() {
         }
     }
 
+    private fun publishForeground(location: Boolean) {
+        val manager = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(
+            NotificationChannel(CHANNEL, "Companion prototype", NotificationManager.IMPORTANCE_LOW))
+        val open = packageManager.getLaunchIntentForPackage(packageName)
+        val stop = Intent(this, CompanionPrototypeService::class.java).setAction(STOP)
+        val notification = NotificationCompat.Builder(this, CHANNEL)
+            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setContentTitle("ZSWatch companion prototype")
+            .setContentText(if (location) "Sharing phone location with watch" else "Native watch companion runtime")
+            .setOngoing(true)
+            .setContentIntent(PendingIntent.getActivity(this, 20, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+            .addAction(0, "Stop", PendingIntent.getService(this, 21, stop, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+            .build()
+        if (Build.VERSION.SDK_INT >= 29) {
+            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
+                if (location) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
+            startForeground(NOTIFICATION, notification, type)
+        } else startForeground(NOTIFICATION, notification)
+    }
+
     private fun safely(action: () -> Unit) {
         try { action() }
         catch (error: Exception) {
@@ -247,6 +272,7 @@ class CompanionPrototypeService : Service() {
         if (receiverRegistered) { unregisterReceiver(systemEvents); receiverRegistered = false }
         PrototypeHub.worker.removeCallbacks(notificationMaintenance)
         PrototypeHub.worker.post { safely {
+            gps?.close(); gps = null
             remoteFixture?.close(); remoteFixture = null
             localFixture?.close(); localFixture = null
             runtime?.destroy(); transport?.dispose(); runtime = null; transport = null

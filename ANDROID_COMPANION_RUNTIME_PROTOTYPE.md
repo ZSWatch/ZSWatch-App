@@ -247,6 +247,7 @@ Every request/subscription includes `{version: 1}`.
 | `requestRecordingList` | — | Snapshot after queuing metadata refresh; actual list receipt follows separately and preserves paused downloads/failures |
 | `retryRecordings` | — | Snapshot after retry/list request; asynchronous receipts follow |
 | `setRecordingSync` | `enabled`: boolean | Persisted download policy; disabling cancels/releases the existing Nordic transfer |
+| `configureGps` | `enabled`: Boolean; enabling requires foreground/background location access and phone location services | Persisted explicit sharing policy; does not Start BLE or request a fix |
 | `configureNotifications` | `enabled`, `packages`: explicit Android package list | Persisted policy; enabling requires actual notification access |
 | `requestNotificationAccess` | — | Opens Android notification-listener settings; accepted does not mean permission granted |
 | `postTestNotification` | Optional `delaySeconds` 0–60, `closeUi` | Synthetic fixture; closing UI requires a positive delay; no process-death scheduler |
@@ -793,3 +794,48 @@ fencing, exact legacy-key deletion, voice-data preservation, missing confirmatio
 in-flight saves and stale snapshots. The currently paired Nokia was not forgotten
 during this pass; fresh pairing, API 33+ physical behavior and destructive Forget
 remain to be exercised on a disposable association.
+
+
+## Service-owned GPS and Weather boundary — 2026-10-04
+
+The native owner now receives the existing exact Boolean `gps_power` request.
+Sharing defaults off for old/new journals. The existing Flutter Settings provides
+an explicit disclosure and permission flow before `configureGps(true)`. Granting
+permission or changing policy never starts BLE or location acquisition. Approximate
+location is supported; a watch callback never opens permission UI.
+
+Acquisition requires coarse or fine access, background access on API 29+, and
+phone location services. The debug manifest adds background location and the
+location FGS type. The service adds that type only during acquisition and returns
+to its connected-device notification afterward. Android's companion background
+start exemption does not itself grant location access: see official
+[location FGS requirements](https://developer.android.com/develop/background-work/services/fgs/service-types#location)
+and [background location permission](https://developer.android.com/develop/sensors-and-location/location/permissions/background).
+Release declarations and the ordinary Flutter startup are unchanged.
+
+Native LocationManager uses enabled network and, when fine access exists, GPS
+providers on the same worker as BLE. Fixes older than thirty seconds, future or
+invalid coordinates are rejected. The existing `GB(gps)` schema and speed/accuracy
+mapping are preserved. The shared queue coalesces updates, limits admission to
+once per five seconds and fences pending writes/late callbacks by both session
+and acquisition identity. A packet already being fragmented finishes to preserve
+watch framing. No first admission within ten seconds releases acquisition; a
+later watch request can retry. This is a bounded first-fix attempt, not a promise
+of an indoor GPS fix or continuous tracking after an acquisition timeout.
+
+`gps_power=false`, policy off, Stop/disconnect/new session and detected permission
+or services loss release registrations and reject unstarted fixes. Provider
+changes and service maintenance recheck access; Android may kill the process on
+permission revocation. Process recovery reacquires only after a new watch request.
+The journal/Flutter boundary contains policy, permissions and content-free state/
+generation/timestamps, never coordinates. Coordinates exist only in native memory
+and the watch packet; firmware Weather puts them in its Open-Meteo request.
+
+118 native JVM and 111 companion Flutter tests pass, including ten GPS controller
+and six Flutter permission/UI tests. Focused analysis is clean and both debug
+variants compile. Nokia verified opt-in cancellation, approximate/all-time
+permission grant, no owner Start from policy, explicit Connect, first-fix timeout
+cleanup, sharing off and Ready with Flutter closed. No native GPS write occurred.
+Real Weather/location transmission awaits explicit approval; fresh-position,
+watch consumption, remote weather response and current Android hardware remain
+unverified. Private evidence and cleanup are in the Nokia report.

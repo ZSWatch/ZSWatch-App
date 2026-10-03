@@ -1354,3 +1354,26 @@ native stop timer. Typed find-phone/call/calendar messages need consumer and
 firmware-emitter checks before they are counted as working product features.
 Legacy notification OPEN/MUTE/REPLY branches are placeholders rather than
 working features to migrate.
+
+
+### Progress 2026-10-04: native GPS/Weather request path
+
+Implemented service-owned location behind the debug native boundary and retained
+the existing Flutter UI. Watch `gps_power` requests require explicit sharing
+opt-in, Android foreground/background permission and enabled location services;
+approximate access works. One worker owns acquisition and the existing BLE queue.
+Session/acquisition fencing, fresh-fix validation, coalescing and bounded initial
+acquisition protect Stop, disconnect, permission loss and late callbacks. No
+coordinates enter durable native diagnostics or Flutter snapshots. The location
+FGS type is acquired only while serving a watch request; companion BLE exemptions
+do not grant background location access.
+
+118 native JVM and 111 companion Flutter tests pass, clean focused analysis and
+both debug APK builds. Nokia cancellation/all-time approximate permission flow,
+policy without Start, explicit Connect and UI-closed Ready pass. A spontaneous
+periodic watch request timed out without a fresh fix; acquisition released and
+BLE remained Ready. Sharing was disabled afterward. This does not verify a
+position arriving at the watch or a Weather response. Automatic approval review
+requires explicit authorization before sending the real location to the watch/
+Open-Meteo endpoint; that question is pending. Continue the independent Find Watch
+migration while preserving the remaining physical GPS/Weather acceptance gate.

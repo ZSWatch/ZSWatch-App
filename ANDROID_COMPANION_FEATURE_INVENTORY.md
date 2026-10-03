@@ -1,6 +1,6 @@
 # Android companion feature inventory — 2026-10-04
 
-Implementation baseline: `2f6f422` on `codex/companion-background-foundation`.
+Inventory baseline: `2f6f422`; GPS migration added later on `codex/companion-background-foundation`.
 Flutter remains the UI; the native owner remains an opt-in debug boundary.
 This targeted inventory checks handlers and consumers. A protocol enum or a
 dormant provider does not establish end-to-end support.
@@ -14,7 +14,7 @@ dormant provider does not establish end-to-end support.
 | HTTP | Native relay/policy/deadlines and shared BLE queue; active Trivia and disabled-policy Nokia checks pass. | Controlled active/deep-idle endpoint comparison for the retained long-idle remote timeout, plus watch error-callback handling. |
 | Media | Native service reuses MediaSessionBridge; real synthetic session verifies watch controls and metadata with Flutter absent. | Third-party players, volume and multiple-player selection. |
 | Discovery/saved watches/Forget | System picker and fenced native handoff; existing tiles/dashboard/rename. Native-first Forget removes the OS association before exact Drift-key/history deletion and fences late metadata saves. | Fresh bonding, physical destructive Forget/re-pair, newer-Android association behavior. Bluetooth-bond preservation is explicit. |
-| GPS → Weather | Firmware requests `gps_power`, consumes `gps`, then issues HTTP. The ordinary Flutter app initializes its existing GPS notifier in `app.dart`. The native app deliberately bypasses that legacy startup and native dispatch has no GPS handler. | Move the existing GPS behavior into native location ownership with Flutter opt-in/permission integration. HTTP alone cannot satisfy Weather's fresh-position path. |
+| GPS → Weather | Native service now handles existing `gps_power`/`gps` with explicit Flutter opt-in, Android background access and location FGS acquisition. Nokia approximate/all-time permission flow, timeout cleanup and BLE/UI independence pass. | Real fresh fix → watch Weather → HTTP remains unverified. No location write occurred in the bounded Nokia observation; explicit location-transmission approval is pending. Current Android hardware and longer unplugged operation remain. |
 | Find watch from phone | Legacy Developer Find action calls `WatchService.findDevice(true)`, waits two seconds and sends false. Firmware parses `find` and loops the vibration pattern. | Route the existing action through native; own its stop timer in the service so UI disposal cannot leave vibration running. |
 | Find phone from watch | Dart parser recognizes `findPhone` but no consumer was found. Gadgetbridge maps it to START/STOP. The explicit firmware find-phone helper found belongs to the separate Chronos protocol. | Verify the actual watch→phone JSON emitter before implementing or claiming an existing feature migration. |
 | Calendar/call/activity/navigation | Some typed protocol definitions exist; native receive dispatch has no equivalent handlers. | Identify initialized provider/UI handlers and real firmware consumers per function before choosing migration order. |
@@ -25,7 +25,7 @@ dormant provider does not establish end-to-end support.
 
 - [`NativePrototypeTransport.kt`](zswatch_app/android/app/src/main/kotlin/dev/zswatch/app/companion/NativePrototypeTransport.kt)
   dispatches time, watch information, notification dismissals, HTTP, media and
-  recording messages. No `gps_power`/find-phone/call/calendar handling is present.
+  recording and `gps_power` messages. Find-phone/call/calendar handlers remain absent.
 - [`gps_providers.dart`](zswatch_app/lib/providers/gps_providers.dart) and
   [`gps_service.dart`](zswatch_app/lib/services/location/gps_service.dart)
   implement the Dart GPS path.
@@ -52,14 +52,11 @@ dormant provider does not establish end-to-end support.
 
 ## Next work
 
-1. Implement native GPS/Weather. Establish Android's location-permission and
-   foreground-service contract for explicit Start and background restoration
-   before acquisition. Use Flutter for opt-in and permission feedback; never
-   request permission from a watch callback. Respect `gps_power=false`, Stop,
-   disconnect, permission loss and session changes. Fence stale fixes/late
-   callbacks and keep coordinates out of durable diagnostic journals. Separate
-   deterministic location fixtures from real Nokia fix/network availability,
-   then verify Weather's watch consumer with Flutter absent.
+1. Finish physical GPS/Weather acceptance after explicit approval for real
+   location transmission. Implementation and deterministic lifecycle/queue tests
+   are complete; real Nokia fix/network availability remains separate. Verify a
+   fresh position reaches the watch consumer and Weather completes with Flutter
+   absent. Do not treat acquisition, ATT completion or synthetic fixes as that pass.
 2. Migrate the existing Find Watch action with a service-owned two-second stop
    timer and exact allowlist. Check firmware start/stop, UI disposal, Stop and
    reconnect. Do not invent a watch→phone protocol to make a test pass.

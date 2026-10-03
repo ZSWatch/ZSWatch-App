@@ -8,6 +8,7 @@ import '../services/background/companion_prototype_client.dart';
 import '../data/models/companion_recording.dart';
 import '../data/models/companion_notification_status.dart';
 import '../data/models/companion_http_status.dart';
+import '../data/models/companion_gps_status.dart';
 
 /// Immutable selection for this app run. Native and Dart must not both own BLE.
 bool get useNativeCompanionRuntime =>
@@ -30,6 +31,28 @@ final companionHttpStatusProvider = Provider<AsyncValue<CompanionHttpStatus>>((
   return ref
       .watch(companionSnapshotProvider)
       .whenData((snapshot) => CompanionHttpStatus.decode(snapshot.fields));
+});
+
+final companionGpsStatusProvider = Provider<AsyncValue<CompanionGpsStatus>>((
+  ref,
+) {
+  return ref
+      .watch(companionSnapshotProvider)
+      .whenData((snapshot) => CompanionGpsStatus.decode(snapshot.fields));
+});
+
+/// Explicit UI opt-in only; native watch callbacks never open permission dialogs.
+final companionGpsPermissionsProvider = Provider<Future<void> Function()>((
+  ref,
+) {
+  return () async {
+    if (!(await Permission.locationWhenInUse.request()).isGranted) {
+      throw StateError('Location permission required');
+    }
+    if (!(await Permission.locationAlways.request()).isGranted) {
+      throw StateError('Background location permission required');
+    }
+  };
 });
 
 /// Requested only by an explicit Connect action, never during app startup.

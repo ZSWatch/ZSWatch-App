@@ -7,6 +7,7 @@ import '../../data/models/watch.dart';
 import '../../data/models/companion_notification_status.dart';
 import '../../data/models/companion_http_status.dart';
 import '../../data/models/companion_watch_selection.dart';
+import '../../data/models/companion_gps_status.dart';
 
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
@@ -173,6 +174,20 @@ class CompanionPrototypeClient {
     }
     CompanionHttpStatus.decode(result.fields);
     return result;
+  }
+
+  Future<CompanionPrototypeSnapshot> configureGps(bool enabled) async {
+    final snapshot = CompanionPrototypeSnapshot.decode(
+      await methods.invokeMethod<Object?>('configureGps', {
+        'version': 1,
+        'enabled': enabled,
+      }),
+    );
+    if (snapshot.fields['gps_enabled'] != enabled) {
+      throw const FormatException('Location policy was not committed');
+    }
+    CompanionGpsStatus.decode(snapshot.fields);
+    return snapshot;
   }
 
   Future<CompanionPrototypeSnapshot> configureNotifications(
