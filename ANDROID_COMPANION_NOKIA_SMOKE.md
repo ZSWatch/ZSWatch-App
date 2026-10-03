@@ -450,3 +450,49 @@ screen bypass of legacy/AI services and existing voice-memo recovery/sync tests.
 These results do not establish new audio transfer, decoded-audio integrity,
 Drift migration, real local/remote processing, watch-result application ACK,
 modern-Android endurance or iOS behavior.
+
+## Native notification settings in the existing Flutter screen — 2026-10-03
+
+Artifacts: `.companion-hil-runs/20261003-native-notification-settings/`.
+Installed/tested frozen APK SHA-256:
+`e11425942a8c587eb6bc0b1a53d43168f8f0c898de2d3aac4502d3dd5cc6bfc4`.
+The debug native branch of `NotificationSettingsScreen` controls the existing
+service policy rather than creating Dart notification/WatchService instances.
+Its catalogue shows active-notification apps, saved selections and ZSWatch;
+permission grant and actual listener binding are distinct observations.
+
+Opening settings retained stopped generation 118/PID 12018. The screen correctly
+showed permission granted, listener connected and watch disconnected. Through
+the actual controls, forwarding was disabled, only the ZSWatch selection was
+removed/restored, and forwarding was re-enabled. Journal captures confirm the
+allowlist went from `[com.zswatch.app]` to empty and back, without changing
+running intent, generation or paused recording downloads. Other catalogue apps
+were never selected. An enabled policy alone did not start BLE.
+
+An explicit service Start then reached Ready at generation 119, with the same
+PID. Refreshing the catalogue retained Ready, PID/generation and the synthetic-only
+policy. Explicit Stop released the service at generation 120. All nine phone
+receipt dictionaries were unchanged; the existing synthetic remote job and its
+pending result remained preserved. The separate job journal had no enabled
+local fixture. Persisted lifecycle events include
+`legacy_bridges_skipped modelsNotLoaded=true`. USB status confirmed watchface,
+no active recording and nine watch originals. No AI worker, model, new transfer,
+reset, flash, upload or deletion ran.
+
+The final build additionally disposes the status read when the screen closes,
+so reopening re-reads current permission/catalogue metadata. Its installed frozen
+APK SHA-256 is
+`9d4c57ab30152dae0b16f958b50d4790d866864502e65de0fa91e7751fee4ea6`;
+the complete policy-edit/live-refresh sequence above used the first APK.
+The final APK was installed and its settings screen opened separately: PID
+12939, generation 120, owner absent, permission/listener connected, only ZSWatch
+selected and recording downloads still paused. This final open did not start BLE.
+
+67 native tests and 60 selected Flutter tests pass; focused analysis is clean and
+both normal/prototype APKs compile. New coverage checks versioned status decoding,
+legacy-service guards, stopped-service edits, delayed native event delivery,
+permission revocation/resume/reopening, settings-launch errors and preservation of selected
+packages by the developer toggle. This is settings integration evidence; it does
+not expand prior notification delivery or process-recovery acceptance, prove
+personal-app notification filtering, migrate the legacy blocklist or activate
+the full ordinary app navigation/startup tree.

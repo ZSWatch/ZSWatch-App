@@ -114,6 +114,20 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         // Check if service is running
         val isRunning: Boolean
             get() = instance != null
+
+        val isPrototypeConnected: Boolean
+            get() = instance?.prototypeConnected == true
+
+        /** App metadata only: no notice keys/text/icons cross the core bridge. */
+        fun getPrototypeNotificationApps(context: android.content.Context, selected: List<String>): List<Map<String, String>> {
+            val active = instance?.takeIf { it.prototypeConnected }?.activeNotifications?.map { it.packageName } ?: emptyList()
+            return (selected + context.packageName + active).distinct()
+                .filter { Regex("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+").matches(it) }.take(256).map { name ->
+                val label = try { context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(name, 0)).toString() }
+                    catch (_: PackageManager.NameNotFoundException) { name }
+                mapOf("packageName" to name, "appName" to label.take(160))
+            }.sortedBy { it["appName"] }
+        }
         
         // Check if notification access is enabled
         fun isNotificationAccessEnabled(context: android.content.Context): Boolean {
@@ -246,6 +260,8 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         fun onNotificationPosted(notification: Map<String, Any?>)
         fun onNotificationRemoved(notification: Map<String, Any?>)
     }
+
+    @Volatile private var prototypeConnected = false
     
     override fun onCreate() {
         super.onCreate()
@@ -262,6 +278,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
     }
     
     override fun onDestroy() {
+        prototypeConnected = false
         super.onDestroy()
         instance = null
         Log.d(TAG, "NotificationListenerService destroyed")
@@ -270,6 +287,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
     
     override fun onListenerConnected() {
         super.onListenerConnected()
+        prototypeConnected = true
         Log.d(TAG, "NotificationListenerService connected")
         LifecycleLogger.log(TAG, "onListenerConnected activeNotifications=${activeNotifications?.size ?: 0}")
         if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE) {
@@ -282,6 +300,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
     
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
+        prototypeConnected = false
         Log.d(TAG, "NotificationListenerService disconnected")
         LifecycleLogger.log(TAG, "onListenerDisconnected")
     }

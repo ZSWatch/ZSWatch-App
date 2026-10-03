@@ -999,6 +999,22 @@ Whisper/LLM ännu och startades inte på Nokia. Se
 
 ### Införande och återgång
 
+Native notification settings 2026-10-03: befintliga NotificationSettingsScreen
+har en native-gren bakom debugflaggan. Permission och faktisk listener-binding
+visas separat; appkatalogen innehåller aktiva notification-apps, sparade val och
+ZSWatch, utan att skicka notificationinnehåll över UI-bron. Att öppna/refresh
+skärmen startar inte BLE och ändrar inte policy. Explicit allowlist-val och
+enable/disable sparas i native-journalen; val bevaras även vid fördröjda events.
+Legacy Flutter-blocklist migreras inte automatiskt. Komplett installed-app-
+picker och produktbeslut för filtermigration återstår före rollout.
+
+Nokia: settings-edits behöll stoppad generation 118; endast ZSWatch av-/valdes.
+Efter explicit Start behöll katalogrefresh PID/generation 119 och Stop släppte
+ägaren vid generation 120. Nio phone receipts och watch-original är oförändrade;
+downloads pausade och ingen local worker/AI startades. 67 native/60 riktade
+Flutter-tester, ren analys och båda debugbyggen passerar. Det är ett ytterligare
+steg i befintlig Flutter-UI-migration, inte nya recovery-/delivery-acceptansprov.
+
 Native Voice Notes 2026-10-03: befintliga VoiceMemosScreen har en native-backed
 receiptvy bakom debugflaggan, utan legacy auto-sync/DB/model-init. Native receipt-
 identiteter bevaras separat från Drift-ID; pending/downloading/downloaded/failed

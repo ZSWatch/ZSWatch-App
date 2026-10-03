@@ -4,6 +4,7 @@ import '../../data/models/connection.dart';
 import '../../data/models/connection_phase.dart';
 import '../../data/models/connection_state.dart';
 import '../../data/models/watch.dart';
+import '../../data/models/companion_notification_status.dart';
 
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
@@ -116,6 +117,13 @@ class CompanionPrototypeClient {
   Future<CompanionPrototypeSnapshot> snapshot() async =>
       CompanionPrototypeSnapshot.decode(
         await methods.invokeMethod<Object?>('snapshot', {'version': 1}),
+      );
+
+  Future<CompanionNotificationStatus> notificationStatus() async =>
+      CompanionNotificationStatus.decode(
+        await methods.invokeMethod<Object?>('notificationStatus', {
+          'version': 1,
+        }),
       );
 
   Future<CompanionPrototypeSnapshot> setRecordingSync(bool enabled) async =>

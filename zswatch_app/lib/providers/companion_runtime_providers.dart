@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/background/companion_prototype_client.dart';
 import '../data/models/companion_recording.dart';
+import '../data/models/companion_notification_status.dart';
 
 /// Immutable selection for this app run. Native and Dart must not both own BLE.
 bool get useNativeCompanionRuntime =>
@@ -20,6 +21,14 @@ final nativeCompanionRuntimeProvider = Provider<bool>((ref) {
 final companionClientProvider = Provider<CompanionPrototypeClient>((ref) {
   return const CompanionPrototypeClient();
 });
+
+final companionNotificationStatusProvider =
+    FutureProvider.autoDispose<CompanionNotificationStatus>((ref) {
+      if (!ref.watch(nativeCompanionRuntimeProvider)) {
+        throw StateError('Native companion runtime is not selected');
+      }
+      return ref.watch(companionClientProvider).notificationStatus();
+    });
 
 /// Includes retained receipts from every watch; a screen selects its watch.
 /// No DB row IDs are invented and no file/model services are started here.

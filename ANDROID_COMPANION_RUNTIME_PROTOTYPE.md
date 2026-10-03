@@ -13,7 +13,8 @@ completed companion migration or a decision to discard the engine-based option.
   and reconnect attempts with 5–60 second delays. No discovery or bonding UI.
 - Native notification-listener routing with an explicit package allowlist, persisted
   bounded outbox, stable IDs, updates/removals, reconnect replay and listener reconciliation.
-  The development UI currently allows only synthetic ZSWatch notifications.
+  The existing notification settings screen can configure explicit selections;
+  physical lab tests retain only synthetic ZSWatch notifications in the allowlist.
 - Bluetooth-off generation fencing and recovery on Bluetooth-on; native time/timezone
   broadcasts resynchronize a ready link. Recording downloads can be explicitly paused.
 - Time/timezone write on readiness and watch time request; explicit UI command.
@@ -57,8 +58,8 @@ path does not open or migrate Drift, so saved custom names/ordinary DB-backed
 watch lists are not yet merged here.
 
 This is the shared state/command boundary, not activation of the full ordinary
-navigation tree. App startup services, auto-reconnect preferences, notification
-settings, recordings/DB import, chat/models, DFU/media and screens that directly
+navigation tree. App startup services, auto-reconnect preferences, legacy filter
+migration, recordings/DB import, chat/models, DFU/media and screens that directly
 read `WatchService` still need migration before that tree can run with native
 ownership. The guard exposes those remaining dependencies instead of allowing
 a second connection. See the Nokia runbook for bounded provider UI evidence.
@@ -81,6 +82,26 @@ ready generation. Old receipt records are retained even if a subsequent watch
 list is empty. This is receipt/status viewing, not DB import, playback, Ogg
 conversion or AI integration. The phone still needs a separate receipt import
 and processing boundary for those features.
+
+The existing `NotificationSettingsScreen` also has a native branch under the
+same debug flag. Opening it reads saved native policy and a versioned
+`notificationStatus` response; it does not instantiate Dart notification/BLE
+services, start the native BLE owner or enable forwarding. Permission grant and
+the listener's actual connected callback state are displayed separately. Resume
+and explicit Refresh re-read permission and app metadata. Settings edits remain
+available while the BLE owner is stopped and do not change its running intent.
+
+The catalogue includes apps with active notifications, saved selections and
+ZSWatch itself, capped at 256 entries. Only package names and bounded labels
+cross this bridge; no notice content, keys or icons. Saved packages remain
+removable even if Android cannot resolve their labels. This is not a complete
+installed-app picker. Users explicitly select up to 64 packages; a fresh journal
+selects none. Enable/disable preserves selections, and an accepted command's
+committed policy bridges any delay before the shared event stream catches up.
+The legacy Flutter blocklist is not automatically converted into this allowlist;
+that product migration needs an explicit decision before rollout. No additional
+package-visibility permission was added. On Nokia only ZSWatch was selected;
+personal notification forwarding was not tested.
 
 `connectedDevice` foreground services are an Android-supported way to maintain
 a device connection, subject to permissions and foreground-start rules.

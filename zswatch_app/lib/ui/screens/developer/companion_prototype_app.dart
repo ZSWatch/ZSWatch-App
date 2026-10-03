@@ -9,6 +9,7 @@ import '../../../services/background/companion_prototype_client.dart';
 import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../voice_memos/voice_memos_screen.dart';
+import '../notifications/notification_settings_screen.dart';
 
 /// An isolated prototype view. It does not create WatchService or any AI provider.
 class CompanionPrototypeApp extends ConsumerStatefulWidget {
@@ -95,9 +96,15 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
     final watch = ref.watch(currentWatchProvider);
     final connection = ref.watch(watchConnectionProvider);
     final battery = ref.watch(batteryLevelProvider);
+    final packages = ((state?.fields['notification_packages'] as List?) ?? [])
+        .cast<String>();
+    final testAllowed = packages.contains('com.zswatch.app');
     return MaterialApp(
       theme: ThemeData.dark(),
-      routes: {'/voice-notes': (context) => const VoiceMemosScreen()},
+      routes: {
+        '/voice-notes': (context) => const VoiceMemosScreen(),
+        '/notifications': (context) => const NotificationSettingsScreen(),
+      },
       home: Scaffold(
         appBar: AppBar(title: const Text('Companion prototype')),
         body: ListView(
@@ -111,6 +118,13 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
               ),
             ),
             const Text('Native Android runtime • development build'),
+            Builder(
+              builder: (context) => OutlinedButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed('/notifications'),
+                child: const Text('Notification settings'),
+              ),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: address,
@@ -156,17 +170,18 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
                     ),
             ),
             SwitchListTile(
-              title: const Text('Forward test notifications'),
-              subtitle: const Text('Only notifications from ZSWatch itself'),
+              title: const Text('Forward notifications'),
+              subtitle: Text('${packages.length} selected apps'),
               value: state?.fields['notifications_enabled'] == true,
               onChanged: busy || state == null
                   ? null
                   : (enabled) => unawaited(
                       run(() async {
                         show(
-                          await client.configureNotifications(enabled, [
-                            'com.zswatch.app',
-                          ]),
+                          await client.configureNotifications(
+                            enabled,
+                            packages,
+                          ),
                         );
                       }),
                     ),
@@ -196,7 +211,9 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
                 ),
                 OutlinedButton(
                   onPressed:
-                      busy || state?.fields['notifications_enabled'] != true
+                      busy ||
+                          !testAllowed ||
+                          state?.fields['notifications_enabled'] != true
                       ? null
                       : () => unawaited(
                           run(() => client.notificationDiagnostic()),
@@ -206,6 +223,7 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
                 FilledButton(
                   onPressed:
                       busy ||
+                          !testAllowed ||
                           state?.protocolReady != true ||
                           state?.fields['notifications_enabled'] != true
                       ? null

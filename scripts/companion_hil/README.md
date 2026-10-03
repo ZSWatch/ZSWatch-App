@@ -412,8 +412,10 @@ python3 -m unittest discover -s scripts/companion_hil/tests -p test_native_runti
 ```
 
 For the prototype's synthetic notification test, grant ZSWatch notification
-access in Android Settings, pause recording downloads, enable test forwarding
-and connect. `Close UI and test in 15s` schedules a fixed native notification
+access in Android Settings, pause recording downloads, open Notification settings,
+select only ZSWatch and enable forwarding, then connect. A fresh native journal
+has no selected apps; turning forwarding on does not populate its allowlist.
+`Close UI and test in 15s` schedules a fixed native notification
 and finishes/removes the Activity/task. It is an in-process diagnostic timer,
 not a process-death scheduler. Correlate `ui_detached`, synthetic post and native
 write-completion timestamps. Do not run transfer instrumentation during these

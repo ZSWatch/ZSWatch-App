@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/notification.dart';
 import '../../../providers/notification_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
+import 'companion_notification_settings_view.dart';
 
 /// Notification settings screen for Android.
 ///
@@ -33,7 +35,7 @@ class _NotificationSettingsScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadApps();
+    if (!ref.read(nativeCompanionRuntimeProvider)) _loadApps();
   }
 
   @override
@@ -44,6 +46,7 @@ class _NotificationSettingsScreenState
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (ref.read(nativeCompanionRuntimeProvider)) return;
     // Refresh permission status when app resumes (user may have granted permission)
     if (state == AppLifecycleState.resumed) {
       ref.read(notificationForwardingProvider.notifier).refreshPermission();
@@ -74,6 +77,9 @@ class _NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      return const CompanionNotificationSettingsView();
+    }
     final isSupported = ref.watch(isNotificationForwardingSupported);
 
     if (!isSupported) {

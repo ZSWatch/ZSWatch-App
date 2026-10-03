@@ -29,6 +29,19 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                 result.error("VERSION", "Unsupported companion bridge version", null)
             } else when (call.method) {
                 "snapshot" -> snapshot(result::success) { message -> result.error("SNAPSHOT_FAILED", message, null) }
+                "notificationStatus" -> PrototypeHub.worker.post {
+                    try {
+                        val selected = (PrototypeHub.journal(context).control()["notification_packages"] as? List<*>)
+                            ?.filterIsInstance<String>() ?: emptyList()
+                        val state = mapOf("version" to 1,
+                            "access_granted" to dev.zswatch.app.NotificationListenerServiceImpl.isNotificationAccessEnabled(context),
+                            "listener_connected" to dev.zswatch.app.NotificationListenerServiceImpl.isPrototypeConnected,
+                            "apps" to dev.zswatch.app.NotificationListenerServiceImpl.getPrototypeNotificationApps(context, selected))
+                        PrototypeHub.main.post { result.success(state) }
+                    } catch (error: Exception) {
+                        PrototypeHub.main.post { result.error("NOTIFICATION_STATUS_FAILED", error.message, null) }
+                    }
+                }
                 "requestNotificationAccess" -> {
                     activity.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
                     result.success(mapOf("version" to 1, "accepted" to true))
