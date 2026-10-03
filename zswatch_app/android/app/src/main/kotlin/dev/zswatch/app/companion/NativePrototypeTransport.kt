@@ -18,6 +18,9 @@ import java.util.UUID
 class NativePrototypeTransport(private val context: Context, private val handler: Handler,
                                private val store: PrototypeStore, private val files: ReceiptFiles) : PrototypeTransport {
     lateinit var runtime: PrototypeRuntime
+    var mediaReady: (Long) -> Unit = {}
+    var mediaClosed: () -> Unit = {}
+    var mediaControl: (JSONObject, Long) -> Unit = { _, _ -> }
     private var gatt: BluetoothGatt? = null
     private var tx: BluetoothGattCharacteristic? = null
     private var token = 0L
@@ -130,6 +133,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 requestRecordings()
                 recoverReceipts()
                 downloadNext()
+                mediaReady(session)
             }
             override fun onCharacteristicChanged(client: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                 val copy = characteristic.value?.clone() ?: return
@@ -225,6 +229,16 @@ class NativePrototypeTransport(private val context: Context, private val handler
     fun configureHttp(enabled: Boolean) {
         PrototypeHttpRelay.configure(store, enabled)
         if (!enabled) httpRelay.disable()
+    }
+
+    fun sendMedia(generation: Long, packet: String): Boolean {
+        if (generation != token || !runtime.owns(generation) || store.control()["phase"] != "ready" || writes.size >= 14) return false
+        if (packet.toByteArray(Charsets.UTF_8).size > 1024) return false
+        command(packet) {
+            store.update("media_write_completed", mapOf("last_media_write" to mapOf(
+                "generation" to generation, "utc_ms" to System.currentTimeMillis())))
+        }
+        return true
     }
 
     private fun readInitialBattery(client: BluetoothGatt, session: Long) {
@@ -340,6 +354,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 }
             }
             if (store.control()["phase"] == "ready") httpRelay.receive(message, token)
+            if (store.control()["phase"] == "ready") mediaControl(message, token)
             recordingInbox.receive(message)
         }
         downloadNext()
@@ -473,6 +488,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     override fun close() {
+        mediaClosed()
         operation++; fileOperation++
         httpRelay.reset()
         writing = false; writes.clear(); downloading = false

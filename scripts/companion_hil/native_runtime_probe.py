@@ -73,6 +73,17 @@ def summarize(state, services, pid, expected=None):
         last_http = ({key: last_http[key] for key in ('generation', 'utc_ms', 'outcome')}
                      if live and last_http['generation'] == state['generation'] else None)
     info = state.get('watch_info', {})
+    media = {}
+    for key in ('last_media_write', 'last_media_control'):
+        value = state.get(key)
+        if value is not None:
+            if (not isinstance(value, dict) or type(value.get('generation')) is not int or
+                    value['generation'] < 0 or type(value.get('utc_ms')) is not int or value['utc_ms'] < 0 or
+                    (key == 'last_media_control' and type(value.get('accepted')) is not bool)):
+                raise ValueError('Invalid native media receipt')
+        fields = ('generation', 'utc_ms', 'accepted') if key == 'last_media_control' else ('generation', 'utc_ms')
+        media[key] = ({field: value[field] for field in fields}
+                      if value is not None and ready and value['generation'] == state['generation'] else None)
     observed_status = None
     if (ready and isinstance(info, dict) and info.get('address') == state.get('address') and
             type(info.get('status_generation')) is int and info['status_generation'] == state['generation']):
@@ -91,6 +102,7 @@ def summarize(state, services, pid, expected=None):
         'watch_status_observed_utc_ms': observed_status,
         'http_enabled': http_enabled, 'http_pending_count': pending if live else 0,
         'last_http': last_http,
+        **media,
         # Do not emit Android keys, notification text, recordings or job content.
         'notifications': [{k: item.get(k) for k in ('id', 'revision', 'removed', 'delivered_generation', 'delivered_revision')}
                           for item in notices.values()],

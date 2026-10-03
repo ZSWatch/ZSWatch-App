@@ -12,6 +12,8 @@ completed companion migration or a decision to discard the engine-based option.
   serialized writes, fragmented UTF-8 JSON reception, operation deadlines
   and reconnect attempts with 5–60 second delays. Explicit native discovery uses
   Android CompanionDeviceManager through the existing Flutter Add Watch route.
+- Service-owned Android media sessions, current metadata/state and supported watch
+  controls using the existing MediaSessionBridge; no Activity/Flutter lifetime dependency.
 - Native notification-listener routing with an explicit package allowlist, persisted
   bounded outbox, stable IDs, updates/removals, reconnect replay and listener reconciliation.
   The existing notification settings screen can configure explicit selections;
@@ -712,3 +714,50 @@ had its Bluetooth bond and OS association: fresh bonding, API 33+ physical
 callbacks, different/multiple watches and coordinated Forget/unpair are unverified.
 OS associations/bonds are preserved; no private bonding API or second GATT owner
 was introduced. Exact artifacts and predecessor failures are in the Nokia runbook.
+
+
+## Service-owned Android media — 2026-10-03
+
+The native service now reuses MediaSessionBridge independently of Flutter. On
+protocol Ready it registers a controller and sends current GB `musicinfo` and
+`musicstate`; disconnect/Stop releases it. Main-thread controller work and worker
+NUS writes share a session-identity fence. Old callbacks, offline controls and
+controls delayed more than two seconds are discarded rather than replayed.
+Ready/reconnect reads a fresh Android snapshot, including session removal and
+same-track album/duration changes. The minute maintenance pass retries failed
+queue admission and discovers newly granted media access. The existing Flutter
+media provider is guarded in native mode; normal builds retain their path.
+
+Supported watch commands are the existing exact `play`, `pause`, `next`,
+`previous`, `volumeup` and `volumedown` strings. No arbitrary intent or seek command
+is accepted. Controller access requires the app's notification-listener grant;
+revocation blocks controls and callbacks release the controller/clear watch state.
+The bridge reads current state rather than forwarding stale callback payloads.
+[Android MediaSessionManager](https://developer.android.com/reference/android/media/session/MediaSessionManager)
+documents access through an enabled notification listener.
+
+Metadata is bounded below the watch's 100-byte fields using encoded UTF-8 size,
+valid code points and escaped compact JSON. Queue admission uses the shared
+serialized negotiated-MTU transport, with coalescing and retry of unadmitted
+packets. Titles/artists/albums stay in memory and are not included in native
+journals, snapshots or retained metadata logs. Only generation/time and a control
+acceptance boolean are retained. `last_media_write` is ATT completion, not a
+watch application ACK or verified display update. Native read-only probes expose
+these receipts only for a live Ready session of the current generation.
+
+A private debug-only CompanionMediaFixtureService creates a real Android
+MediaSession with fixed synthetic metadata and no audio playback. It is not
+exported, starts only through an explicit lab action, does not survive process
+loss automatically and rejects ordinary debug selection. Its foreground notice
+is filtered by normal notification routing. The fixture service and its media
+FGS permission are absent from the release manifest. No new production media
+playback service/permission is required by the device companion bridge.
+
+102 native tests, 53 selected Flutter regressions and 44 companion-harness tests
+pass; Dart analysis is clean and both final debug APK variants compile. The first
+sandbox-only harness run failed because localhost sockets were unavailable; the
+same 44 tests passed with authorized socket access. Nokia proves watch controls
+with Flutter absent, Stop fencing, current media after radio recovery, same-track
+metadata updates and permission-loss safety. This fixture does not establish
+third-party player interoperability, volume behavior, multi-player selection,
+modern-Android or unplugged endurance. See the Nokia runbook for exact artifacts.

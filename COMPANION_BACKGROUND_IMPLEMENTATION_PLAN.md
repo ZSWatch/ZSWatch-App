@@ -1276,3 +1276,46 @@ multi-watch, current-Android or production acceptance. Next core work remains
 coordinated Forget/unpair/product preferences and controlled Android network/idle
 and reconnect verification. AI/recording processing, iOS and SMP corruption
 investigation remain deferred. See the runbook for exact artifact hashes.
+
+
+### Progress 2026-10-03: service-owned Android media and broader feature coverage
+
+The next ordinary companion feature, media, now runs through the existing native
+MediaSessionBridge under service ownership. Ready reads current music metadata;
+watch play/pause/next/previous/volume commands are exact-allowlisted and fenced
+across Stop/reconnect with a two-second admission deadline. Metadata stays in
+memory; native receipts carry no title/artist/album. Permission loss fails safely
+without stopping BLE. Flutter's existing UI is retained and its legacy media
+provider cannot create another owner in native mode.
+
+Nokia with Flutter absent verifies real synthetic MediaSession callbacks from
+watch Music controls, same-track album updates, no late command after Stop,
+current snapshot after radio recovery, denied/restored access and continued real
+Trivia HTTP. The old Nokia terminated both `svc bluetooth` shell processes with
+137 after their effects occurred; authoritative radio/native observations show
+OFF/disconnected followed by ON/Ready 169 and fresh media. The aborted scripted
+radio workflow is retained; an offline metadata mutation was not performed by it.
+No fresh media playback inference is drawn from that missing step.
+
+102 native, 53 selected Flutter and 44 harness tests pass; analysis is clean and
+both final debug builds compile. Final fixture and owner are stopped (170),
+notification access restored, Bluetooth ON. Watchface/nine originals/9964 KB,
+native recording dictionaries and job/outbox journal are preserved. AI, transfers,
+firmware changes and iOS work remain deferred. Exact evidence is in the runbook.
+
+The prototype must preserve the complete companion product before rollout:
+
+| Area | Current native coverage and next requirement |
+| --- | --- |
+| Connection/recovery | Native BLE, durable Stop/running intent, crash/radio/boot/update/presence and current-state Flutter observers. Bounded Nokia evidence; modern-Android and longer unplugged acceptance remain. |
+| Notifications/time/HTTP | Native handlers and existing Flutter configuration. Longer idle remote-fetch timeout still needs controlled network comparison; ATT completion is distinct from watch acceptance. |
+| Watch setup | Native system discovery plus existing saved-watch/rename/dashboard UI. Fresh bonding, coordinated Forget/unpair, legacy preference migration and multiple watches remain. |
+| Media | Service-owned metadata/state and watch controls, verified with a real synthetic Android session. Third-party players, volume and multiple-player selection remain. |
+| Voice notes | Durable native receipts and existing Flutter import/playback boundary. Downloads intentionally paused for core tests; processing/model/production remote integration deferred by user priority. |
+| Other companion functions | GPS, phone finding, calendar, weather/navigation and remaining handlers need an explicit inventory/native-owner migration check before broad rollout. Their protocol enums alone do not prove native handling. |
+| Nordic SMP/DFU | Existing Nordic libraries/fork retained. UI DFU still requires coordination with the native owner; do not create a custom protocol or resume corruption experiments in this phase. |
+| iOS/local AI | Deferred under the user's current scope; newer hardware required for local-model acceptance. |
+
+Prioritize these ordinary companion gaps and lifecycle behavior over further
+recording/AI work. Keep the debug native boundary until product behavior and the
+appropriate acceptance gates are actually complete.

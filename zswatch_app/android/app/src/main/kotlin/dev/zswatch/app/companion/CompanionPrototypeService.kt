@@ -42,6 +42,7 @@ class CompanionPrototypeService : Service() {
         private set
     var localFixture: PrototypeLocalFixture? = null
         private set
+    private var media: AndroidPrototypeMedia? = null
     private val systemEvents = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val action = intent.action
@@ -68,6 +69,7 @@ class CompanionPrototypeService : Service() {
                 runtime?.store?.let { PrototypeNotifications(it).expire(System.currentTimeMillis()) }
                 transport?.syncTimeIfTimezoneChanged()
                 transport?.flushNotifications()
+                runtime?.let { if (it.active && it.store.control()["phase"] == "ready") media?.refresh(it.generation) }
             }
             PrototypeHub.worker.postDelayed(this, 60000)
         }
@@ -82,6 +84,15 @@ class CompanionPrototypeService : Service() {
         LifecycleLogger.log("CompanionPrototype", "service_created pid=${android.os.Process.myPid()}")
         if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE) { stopSelf(); return }
         instance = this
+        media = AndroidPrototypeMedia(applicationContext,
+            send = { generation, packet -> transport?.sendMedia(generation, packet) == true },
+            observe = { kind, generation, accepted ->
+                val owner = runtime
+                if (owner?.owns(generation) == true && owner.store.control()["phase"] == "ready") {
+                    owner.store.update("media_$kind", mapOf("last_media_control" to mapOf(
+                        "generation" to generation, "accepted" to accepted, "utc_ms" to System.currentTimeMillis())))
+                }
+            })
         ContextCompat.registerReceiver(this, systemEvents, IntentFilter().apply {
             addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
             addAction(Intent.ACTION_TIME_CHANGED)
@@ -96,6 +107,9 @@ class CompanionPrototypeService : Service() {
                 val link = NativePrototypeTransport(applicationContext, PrototypeHub.worker, store, files)
                 transport = link
                 runtime = PrototypeRuntime(store, link).also { link.runtime = it }
+                link.mediaReady = { media?.ready(it) }
+                link.mediaClosed = { media?.close() }
+                link.mediaControl = { message, generation -> media?.control(message, generation) }
                 remoteFixture = PrototypeRemoteFixture(applicationContext, this).also { it.startMaintenance() }
                 localFixture = PrototypeLocalFixture(applicationContext, this).also { it.startMaintenance() }
                 PrototypeHub.worker.post(notificationMaintenance)
@@ -229,6 +243,7 @@ class CompanionPrototypeService : Service() {
     override fun onDestroy() {
         LifecycleLogger.log("CompanionPrototype", "service_destroyed explicitStop=${runtime?.store?.control()?.get("desired_running") == false}")
         if (instance === this) instance = null
+        media?.close()
         if (receiverRegistered) { unregisterReceiver(systemEvents); receiverRegistered = false }
         PrototypeHub.worker.removeCallbacks(notificationMaintenance)
         PrototypeHub.worker.post { safely {

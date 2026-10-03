@@ -877,3 +877,49 @@ selection and native-owner handoff on API 31; it does not establish fresh bondin
 unpair, multiple-watch behavior or physical API 33+ callback compatibility.
 Read-only probes report NOT_RUN for broad background acceptance: the bounded
 observations above are not an overnight or current-Android production pass.
+
+
+## Service-owned Android media — 2026-10-03
+
+Private evidence: `.companion-hil-runs/20261003-native-media/`.
+Final installed `native-complete.apk`, SHA-256
+`501e04623aafd58b7bfa7cb92116c6e7bffa3d4e6b31dc2d206e2b05088d5f92`.
+102 native JVM, 53 selected Flutter and 44 harness tests pass; both final debug
+variants compile and analysis is clean. Release manifest excludes the synthetic
+service and debug media-playback permission. The first default-sandbox harness
+run could not open localhost sockets; the authorized rerun passed all 44.
+
+| Check | Evidence and limit |
+| --- | --- |
+| Predecessor native-only session | `native.apk` (`abe9dc1d…ff7e4`) Ready 163, Flutter Activity finished/removed through existing diagnostic. Real debug MediaSession produced native write completion. Watch center/next/previous touches produced fixture `watch_play`, `watch_pause`, `watch_next`, `watch_previous`. No audio was played. |
+| Intermediate safeguard build | `native-final.apk` (`bc1a7c5a…f8368`) automatically restored Ready 164 after replacement without Flutter/Start and published current media. All four watch controls reached fixture callbacks. Stop 165 followed by a late watch tap left fixture sequence and native media write unchanged. |
+| Complete build | Replacement while stopped retained Stop 165. Explicit lab Start reached Ready 166; same-track album change produced a fresh media write without Flutter. The final metadata callback includes album/duration changes despite legacy title/artist deduplication. |
+| Radio workflow interruption | Nokia killed `svc bluetooth disable` with 137 after radio changed to enabled=false/BLE_ON and native 168/disconnected. The script ended before its planned offline metadata mutation. `svc bluetooth enable` also exited 137; later authoritative state was enabled=true/ON and Ready 169 with current-generation media write. Do not describe the unexecuted offline mutation as passed. |
+| After radio recovery | Final watch play/pause produced corresponding real fixture callbacks and accepted native controls at generation 169 with Flutter absent. |
+| Permission loss/restoration | Temporary notification-listener revocation blocked a watch control: fixture unchanged, accepted=false, BLE remained Ready 169. Access was restored in finally; a later watch pause reached the fixture and accepted=true. |
+| Other shared work | Fresh Trivia HTTP after media/radio recovery completed `written`, zero pending, about 4.0 s, no UART watch HTTP timeout. This active-state pass does not resolve the earlier long-idle timeout. Fresh watch status/time remained visible in the native-only probe. |
+| Cleanup | Fixture explicitly stopped/released, native Stop 170, no owner and zero native notifications. Current probe hides historical media receipts while stopped. Notification access restored and Bluetooth ON. Watchface, no recording, nine originals and 9964 KB free. Exact nine recording dictionaries and separate job/outbox journal match baseline; downloads paused and local fixture disabled. No media titles appear in the native journal. |
+
+Reproduce using the opt-in native debug APK and the existing Flutter Connect
+control, or an explicitly labelled lab Start. The private fixture component is
+`com.zswatch.app/dev.zswatch.app.companion.CompanionMediaFixtureService`.
+Use `adb shell run-as com.zswatch.app /system/bin/am start-foreground-service --user 0
+-n <component> -a START`; subsequent `startservice` actions are PLAY, PAUSE, NEXT,
+PREVIOUS, METADATA and STOP. METADATA changes only the synthetic album; journal
+`files/companion-media-fixture/state-v1.json` carries fixed synthetic state/callback
+counters. Always STOP/release it after the bounded test. It is not a player or
+background acceptance scheduler and introduces no local AI.
+
+Use USB shell `power wake`, close any prior app until `app state` reports watchface,
+then `app launch Music`. On this installed 240×240 firmware, `touch 120 120` is
+play/pause, `touch 185 120` next and `touch 55 120` previous. These positions were
+confirmed by the real fixture callbacks; source layouts or successful shell
+returns alone do not prove an action. The USB shell helpers use the existing SMP
+client in `watch_file_probe.py`; calling its full `probe` would write a file and
+is unnecessary here. No firmware instrumentation/flash is needed for this check.
+
+Native `last_media_write` proves ATT completion, not track rendering or a watch
+application ACK. Control acceptance means Android dispatched to the controller;
+the synthetic callback provides separate evidence of receipt. Third-party music
+apps, volume effects, session selection, display details, modern Android and
+longer unplugged operation remain separate acceptance work.

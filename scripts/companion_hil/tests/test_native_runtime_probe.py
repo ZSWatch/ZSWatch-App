@@ -78,6 +78,27 @@ class NativeRuntimeProbeTests(unittest.TestCase):
             self.assertIsNone(summarize(stale, services, '123')['watch_status_observed_utc_ms'])
         self.assertIsNone(summarize(state, '', '123')['watch_status_observed_utc_ms'])
 
+    def test_media_receipts_are_current_ready_only_and_never_export_payload(self):
+        state = self.state(); services = 'ServiceRecord{abc u0 com.zswatch.app/' + COMPONENT + '}'
+        state['last_media_write'] = {'generation': 1, 'utc_ms': 123, 'track': 'private title'}
+        state['last_media_control'] = {'generation': 1, 'utc_ms': 124, 'accepted': True, 'album': 'private album'}
+        report = summarize(state, services, '123')
+        self.assertEqual(report['last_media_write'], {'generation': 1, 'utc_ms': 123})
+        self.assertTrue(report['last_media_control']['accepted'])
+        self.assertNotIn('private', str(report))
+        for patch, service, pid in [({'generation': 2}, services, '123'),
+                                    ({'phase': 'disconnected'}, services, '123'),
+                                    ({}, '', '123'), ({}, services, '')]:
+            report = summarize({**state, **patch}, service, pid)
+            self.assertIsNone(report['last_media_write']); self.assertIsNone(report['last_media_control'])
+
+    def test_malformed_media_receipts_cannot_fabricate_completion(self):
+        for field, value in [('generation', True), ('generation', '1'), ('utc_ms', -1),
+                              ('utc_ms', True), ('accepted', 'true'), ('accepted', 1)]:
+            state = self.state()
+            state['last_media_control'] = {'generation': 1, 'utc_ms': 123, 'accepted': True, field: value}
+            with self.assertRaises(ValueError): summarize(state, '', '')
+
     def test_committed_result_requires_a_matching_outbox_and_redacts_text(self):
         spec = {'watch_id': 'test'}
         identity = hashlib.sha256(json.dumps(spec, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
