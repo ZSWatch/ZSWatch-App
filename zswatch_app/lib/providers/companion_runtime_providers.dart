@@ -1,0 +1,62 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../services/background/companion_prototype_client.dart';
+
+/// Immutable selection for this app run. Native and Dart must not both own BLE.
+bool get useNativeCompanionRuntime =>
+    kDebugMode &&
+    !kIsWeb &&
+    defaultTargetPlatform == TargetPlatform.android &&
+    const bool.fromEnvironment('COMPANION_RUNTIME_PROTOTYPE');
+
+final nativeCompanionRuntimeProvider = Provider<bool>((ref) {
+  return useNativeCompanionRuntime;
+});
+
+final companionClientProvider = Provider<CompanionPrototypeClient>((ref) {
+  return const CompanionPrototypeClient();
+});
+
+/// One EventChannel subscription shared by all Flutter observers. Native emits
+/// an initial snapshot on listen, so an additional read cannot race that stream.
+/// Disposing Flutter observers cancels observation, never the service.
+final companionSnapshotProvider = StreamProvider<CompanionPrototypeSnapshot>((
+  ref,
+) {
+  if (!ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native companion runtime is not selected');
+  }
+  final values = StreamController<CompanionPrototypeSnapshot>();
+  final observer = ref
+      .watch(companionClientProvider)
+      .watch()
+      .listen(values.add, onError: values.addError, onDone: values.close);
+  // Cancel the platform subscription explicitly even if a consumer's pending
+  // .future retains a listener while the provider is being disposed.
+  ref.onDispose(() {
+    unawaited(observer.cancel());
+    unawaited(values.close());
+  });
+  return values.stream;
+});
+
+/// Adapts shared AsyncValue state to the existing StreamProvider APIs without
+/// opening another platform subscription or using Riverpod's deprecated .stream.
+Stream<T> companionValues<T>(
+  Ref ref,
+  T Function(CompanionPrototypeSnapshot) project,
+) {
+  final values = StreamController<T>();
+  ref.listen(companionSnapshotProvider, (previous, next) {
+    next.when(
+      data: (snapshot) => values.add(project(snapshot)),
+      error: values.addError,
+      loading: () {},
+    );
+  }, fireImmediately: true);
+  ref.onDispose(() => unawaited(values.close()));
+  return values.stream;
+}

@@ -30,11 +30,38 @@ completed companion migration or a decision to discard the engine-based option.
   development view. Reattachment reads native state; UI disposal never stops BLE.
   A second watch requires Stop first. An accepted Start is not connection readiness.
 
-The experimental entry point skips the ordinary Riverpod/WatchService startup
-and native app bridges. The legacy BLE foreground service is stopped on entry,
+The experimental entry point starts only the native-backed Riverpod subset,
+skipping ordinary app/WatchService startup and native app bridges. The legacy
+BLE foreground service is stopped on entry,
 and the legacy boot recovery path is skipped in experimental builds. No local
 model is initialized by this entry point. Normal debug builds and profile/release
 builds select the ordinary app. iOS is unchanged.
+
+### Existing Flutter provider boundary
+
+The debug native selection now backs the existing connection/phase, watch-info
+and battery providers in `watch_service_provider.dart`, plus the connection
+providers in `ble_providers.dart`. `WatchNotifier` routes Connect, Disconnect,
+device-info refresh and time sync to native commands. The developer view consumes
+these same providers, rather than maintaining another BLE service. All observers
+share one versioned EventChannel subscription; container disposal explicitly
+cancels that subscription without sending Stop. Loading/error snapshots cannot
+retain a connected or live-battery view. Cached watch metadata remains separate
+from current-generation battery status.
+
+Direct creation of the legacy `BleConnectionService` fails when native selection
+is active. UI SMP actions are withheld until coordinated with the native owner;
+this does not replace Nordic transfer support. Native crash-summary routing is
+not yet implemented. Normal builds retain the previous provider paths. The native
+path does not open or migrate Drift, so saved custom names/ordinary DB-backed
+watch lists are not yet merged here.
+
+This is the shared state/command boundary, not activation of the full ordinary
+navigation tree. App startup services, auto-reconnect preferences, notification
+settings, recordings/DB import, chat/models, DFU/media and screens that directly
+read `WatchService` still need migration before that tree can run with native
+ownership. The guard exposes those remaining dependencies instead of allowing
+a second connection. See the Nokia runbook for bounded provider UI evidence.
 
 `connectedDevice` foreground services are an Android-supported way to maintain
 a device connection, subject to permissions and foreground-start rules.

@@ -999,6 +999,16 @@ Whisper/LLM ännu och startades inte på Nokia. Se
 
 ### Införande och återgång
 
+Provider-gräns 2026-10-03: befintliga Flutter connection/phase/watch/battery-
+providers och WatchNotifier har nu native-backed grenar bakom samma debugflagga.
+Developer-UI använder dessa providers med en delad native eventprenumeration.
+Direct legacy BLE-instansiering spärras när native äger anslutningen. Nokia visade
+metadata och behöll PID/generation 114 vid UI attach/detach; 30 riktade Flutter-
+tester (inklusive sex legacy setup-tester) och båda debugbyggen passerar.
+Detta aktiverar inte ordinarie navigation/appstartup. DB/custom-name/import,
+direkta WatchService-användare, auto-reconnect/settings och övriga tjänster
+måste migreras kontrollerat innan den trädet kan använda native-kärnan.
+
 - Inför en explicit runtime-selection per appstart under migreringen. Legacy och ny kärna får inte ansluta samtidigt till samma watch.
 - Bevara tidigare protocol-/firmwarekompatibilitet tills versionsförhandlingen är verifierad. Dokumentera minsta firmware för eventuella nya ACK/jobbfunktioner.
 - Lägg schemaändringar och recordingmigrering bakom verifierad, upprepningssäker migration med backup/testfixtures.

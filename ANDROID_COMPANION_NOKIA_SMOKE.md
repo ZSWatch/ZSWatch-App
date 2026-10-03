@@ -363,7 +363,7 @@ these later changes were host-verified.
 
 66 native JVM tests and 21 selected Flutter tests pass; focused Dart analysis
 is clean. The new Dart worker's deterministic result contract was tested only on
-the host and its Android classes compiled. `local_fixture_enabled` stayed false;
+the host and its Android classes compiled. The local fixture was never enabled;
 no headless Dart worker, Whisper or LLM was started on the Nokia, as requested.
 Actual local AI/worker testing is deferred to a suitable newer phone. Normal app
 provider/DB migration, modern-Android coverage, long soak and iOS remain open.
@@ -374,3 +374,36 @@ disabled; the existing synthetic remote result/outbox was preserved. Bluetooth
 is on, deep idle is `ACTIVE`, battery simulation was reset and no ADB reverse
 tunnel remains. The phone still has the frozen battery prototype installed;
 the final host build was not installed over the physically tested artifact.
+
+## Existing Flutter providers backed by native BLE — 2026-10-03
+
+The shared connection/phase, watch-info and battery providers now have native
+branches behind the prototype flag, along with the existing watch command
+notifier. The developer view uses those providers. One EventChannel observer
+serves them all; legacy BLE creation is guarded. This does not activate the
+ordinary app's navigation, DB migration, model or startup-service graph.
+
+Physical artifacts: `.companion-hil-runs/20261003-native-provider-ui/`.
+Installed frozen APK SHA-256:
+`a4976a22f3fb662dba3c71cc9049e8605f80956ce379bf49b6fed9e96c94edbe`.
+An explicit app-UID Start reached Ready with UI absent (PID 5926, generation 114).
+Flutter then displayed firmware `0.8.1`, hardware and battery 87% through the
+existing providers. Connect/recover was pressed while Ready; generation and PID
+remained unchanged. Back disposed the Flutter view, a single native attach/detach
+was logged and the service stayed Ready at the same generation. The logs include
+`legacy_bridges_skipped modelsNotLoaded=true`; no Dart worker was created.
+
+Downloads remained paused. The local fixture flag is absent in the persisted
+journal, meaning not enabled; the existing one synthetic remote result/outbox
+remained unchanged. USB SMP status confirmed watchface, no active recording and
+all nine recordings. No reset, firmware flash, recording mutation, AI or upload
+was performed. Final explicit Stop reached generation 115 with the service absent.
+
+Thirty selected Flutter tests pass, including six existing legacy watch-setup
+tests. Provider tests cover one shared subscription, native-only commands,
+observer cancellation, stale generation/error handling and actual UI rendering.
+Focused analysis is clean; both prototype and normal debug APK builds pass.
+The normal APK was compiled but not installed over the frozen prototype.
+After the physical check, the developer view was also changed to clear its
+readiness diagnostics on an observer error. This guard is covered by the widget
+test and final host compilation; the phone retains the preceding frozen APK.

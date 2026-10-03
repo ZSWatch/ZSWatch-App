@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/models/connection_state.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
@@ -373,14 +375,49 @@ void main() {
   testWidgets(
     'prototype UI detach and remount leave native receipts and owner alone',
     (tester) async {
-      await tester.pumpWidget(const CompanionPrototypeApp());
+      saved['watch_info'] = {
+        'address': saved['address'],
+        'first_seen_ms': 1000,
+        'firmware_version': '0.8.1',
+        'hardware_version': 'watchdk',
+        'battery_level': 87,
+        'status_generation': saved['generation'],
+      };
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [nativeCompanionRuntimeProvider.overrideWithValue(true)],
+          child: const CompanionPrototypeApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await messenger.handlePlatformMessage(
+        eventControl.name,
+        const StandardMethodCodec().encodeSuccessEnvelope(saved),
+        (_) {},
+      );
       await tester.pumpAndSettle();
       expect(find.text('Companion prototype'), findsOneWidget);
+      expect(find.text('Firmware: 0.8.1'), findsOneWidget);
+      expect(find.text('Battery: 87%'), findsOneWidget);
+      await messenger.handlePlatformMessage(
+        eventControl.name,
+        const StandardMethodCodec().encodeErrorEnvelope(
+          code: 'SNAPSHOT_FAILED',
+        ),
+        (_) {},
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Protocol ready: false • generation 0'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
-      await tester.pumpWidget(const CompanionPrototypeApp());
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [nativeCompanionRuntimeProvider.overrideWithValue(true)],
+          child: const CompanionPrototypeApp(),
+        ),
+      );
       await tester.pumpAndSettle();
-      expect(calls.map((call) => call.method), ['snapshot', 'snapshot']);
+      expect(calls, isEmpty);
       expect(saved['runtime_active'], true);
       expect(
         ((saved['recordings']! as Map)['memo'] as Map)['state'],
