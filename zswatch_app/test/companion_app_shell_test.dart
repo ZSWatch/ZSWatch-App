@@ -306,6 +306,18 @@ void main() {
   );
 
   testWidgets(
+    'native watchface route retains existing gallery without a legacy owner',
+    (tester) async {
+      await mount(tester, snapshot(active: true, ready: true));
+      router(tester).go(AppRoutes.watchfaceBackground);
+      await tester.pumpAndSettle();
+      expect(find.text('Watchface Background'), findsOneWidget);
+      expect(find.text('Fume Guilloche'), findsOneWidget);
+      expect(forbidden, isEmpty);
+    },
+  );
+
+  testWidgets(
     'deep links to unmigrated features cannot start AI, DFU, health or DB detail services',
     (tester) async {
       await mount(tester, snapshot(active: true, ready: true));
@@ -315,7 +327,6 @@ void main() {
         AppRoutes.firmware,
         AppRoutes.health,
         AppRoutes.voiceMemoDetail(12),
-        AppRoutes.watchfaceBackground,
       ]) {
         routes.go(path);
         await tester.pumpAndSettle();

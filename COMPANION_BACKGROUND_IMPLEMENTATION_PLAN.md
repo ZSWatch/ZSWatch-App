@@ -1553,3 +1553,30 @@ verified debug APKs. Nonempty log download remains physical acceptance; no log
 fixture was created on the user's watch. Continue with watchface/DFU coordination
 and wider Android lifecycle acceptance, keeping the remaining HTTP requirements and pending
 location-transmission approval explicit and iOS/AI deferred.
+
+
+### Checkpoint 2026-10-04: existing Flutter watchface gallery through native owner
+
+The existing background gallery and crop UI now use service-owned watchface
+upload, complete readback verification, NUS apply/reset and result tracking. The
+native adapter preserves the user's resolved Nordic FileUploader settings
+(window 3, alignment 4, high connection priority). Fixed image/path validation,
+exclusive SDK operations, bounded progress/deadlines, Stop/generation fencing
+and process-interruption reporting are implemented. Images are not journaled or
+automatically replayed. Unknown apply/reset results require reconnect before
+explicit retry because existing firmware has no result request ID.
+
+The first real upload completed while Android's launcher was resumed. It exposed
+a Flutter reattachment bug when only the terminal snapshot arrived; the fix has
+a failing-then-passing regression and the final APK repeats the Home scenario.
+Native reset and byte-for-byte original background restoration are checked over
+the independent USB control path. The smoke report retains exact APKs, timings,
+failed trial, original-file preservation and acceptance limits.
+
+Remaining migration work includes DFU using the existing Nordic upgrade manager
+and its reset/reconnect lifecycle, plus actual initialized consumers identified
+in the feature inventory. Do not expose the legacy DFU owner in the native build.
+Retain current-Android/endurance gates, physical process-loss tests during SDK
+work, nonempty log download and the explicit GPS/Weather location approval.
+Home completion is bounded background evidence, not engine destruction or
+production acceptance. Continue Android core work; iOS and AI remain deferred.

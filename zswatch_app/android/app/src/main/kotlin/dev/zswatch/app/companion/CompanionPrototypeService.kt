@@ -111,6 +111,7 @@ class CompanionPrototypeService : Service() {
             safely {
                 val store = PrototypeHub.journal(applicationContext)
                 PrototypeHttpRelay.markProcessInterrupted(store, System.currentTimeMillis())
+                PrototypeWatchface.markInterrupted(store)
                 val files = ReceiptFiles(File(filesDir, "companion-prototype/recordings"))
                 val link = NativePrototypeTransport(applicationContext, PrototypeHub.worker, store, files)
                 transport = link

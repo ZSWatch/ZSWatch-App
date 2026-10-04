@@ -9,6 +9,7 @@ import '../data/models/companion_recording.dart';
 import '../data/models/companion_notification_status.dart';
 import '../data/models/companion_http_status.dart';
 import '../data/models/companion_gps_status.dart';
+import '../data/models/companion_watchface_status.dart';
 
 /// Immutable selection for this app run. Native and Dart must not both own BLE.
 bool get useNativeCompanionRuntime =>
@@ -24,6 +25,15 @@ final nativeCompanionRuntimeProvider = Provider<bool>((ref) {
 final companionClientProvider = Provider<CompanionPrototypeClient>((ref) {
   return const CompanionPrototypeClient();
 });
+
+final companionWatchfaceStatusProvider =
+    Provider<AsyncValue<CompanionWatchfaceStatus?>>((ref) {
+      return ref
+          .watch(companionSnapshotProvider)
+          .whenData(
+            (snapshot) => CompanionWatchfaceStatus.decode(snapshot.fields),
+          );
+    });
 
 final companionHttpStatusProvider = Provider<AsyncValue<CompanionHttpStatus>>((
   ref,

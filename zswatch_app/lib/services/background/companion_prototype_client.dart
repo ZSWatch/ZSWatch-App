@@ -10,6 +10,7 @@ import '../../data/models/companion_watch_selection.dart';
 import '../../data/models/companion_gps_status.dart';
 import '../../data/models/companion_shell_result.dart';
 import '../../data/models/companion_log_files.dart';
+import '../../data/models/companion_watchface_status.dart';
 
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
@@ -338,6 +339,51 @@ class CompanionPrototypeClient {
       throw const FormatException('Unsupported SMP preparation response');
     }
     return value['generation'] as int;
+  }
+
+  Future<String> startWatchface(
+    int generation,
+    Uint8List bytes,
+    String name,
+  ) async {
+    CompanionWatchfaceStatus.validateImage(bytes);
+    if (name.trim().isEmpty ||
+        name.length > 64 ||
+        RegExp(r'[\x00-\x1f\x7f-\x9f]').hasMatch(name)) {
+      throw const FormatException('Invalid background name');
+    }
+    return _watchfaceCommand('startWatchface', generation, {
+      'bytes': bytes,
+      'name': name,
+    });
+  }
+
+  Future<String> resetWatchface(int generation) =>
+      _watchfaceCommand('resetWatchface', generation, {});
+  Future<String> _watchfaceCommand(
+    String method,
+    int generation,
+    Map<String, Object?> extra,
+  ) async {
+    if (generation < 0) {
+      throw const FormatException('Invalid watchface generation');
+    }
+    final value = await methods.invokeMethod<Object?>(method, {
+      'version': 1,
+      'generation': generation,
+      ...extra,
+    });
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['generation'] is! int ||
+        value['generation'] != generation ||
+        value['accepted'] != true ||
+        value['id'] is! String ||
+        (value['id'] as String).isEmpty ||
+        (value['id'] as String).length > 64) {
+      throw const FormatException('Unsupported watchface acceptance');
+    }
+    return value['id'] as String;
   }
 
   Future<CompanionLogFiles> inspectLogs(int generation, {String? path}) async {

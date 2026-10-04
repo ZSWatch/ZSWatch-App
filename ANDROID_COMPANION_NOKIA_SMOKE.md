@@ -1228,3 +1228,58 @@ requests, UI-engine destruction, multi-watch cache isolation and modern Android
 remain unverified. This firmware has no existing log fixture to download. Do
 not count synthetic byte-validation tests or an empty listing as that acceptance.
 The Files tab itself retains the existing empty implementation.
+
+
+## 2026-10-04 — native-owned existing Flutter watchface gallery
+
+Private evidence: `.companion-hil-runs/20261004-native-watchface/`. The existing
+Flutter gallery, crop and reset controls are retained. Native mode owns accepted
+Nordic upload/full readback verification/NUS apply and the watch acknowledgement.
+Recording downloads stayed paused; no AI, recording creation or deletion occurred.
+
+| Check | Observation and limit |
+| --- | --- |
+| Original/background backup | `/user/bg.bin` initially contained 115,212 bytes, SHA-256 `979df7661e05c5a9caa4ac04c46c8147f1a909571c0b7b04370bcb594f547842`; staging was absent and the app was Watchface. Private `original-bg.bin` matches the existing Retro Sunburst asset. |
+| Initial pipeline/Home | APK `native.apk`, SHA-256 `cde6feb1ada1c795040aca977b95e15e088b5805e1bc8955446b4c0685f2349a`, cold preparation recovered Ready 211→212. Fume Guilloche was accepted, uploaded, fully verified and acknowledged in 18.236 seconds after native acceptance. All seven bounded foreground observations showed the launcher. USB confirmed exact fixture bytes and staging absent. |
+| Retained UI failure | Returning from Home left the initial gallery busy when its first delivered status was terminal. `gallery-after-home.png` retains the failure. The terminal-only regression failed before the fix and passes afterward; this initial APK is not a UI reattachment pass. Stop 214 released it before replacement. |
+| Final UI pipeline APK | `native-ui-tested.apk`, SHA-256 `a36868a965d1a65c01d831d98675224d6ceb35b74de2b0ad5562779e6fb0eedb`, owner/installed hash verified. Replacement retained Stop 214; explicit Connect reached Ready 215. |
+| Reset | Existing Reset to Default completed on generation 215 with an actual watch reset result. Independent USB verified both background and staging absent, SMP disabled and app still Watchface. This is NUS-only reset, not a filesystem delete issued by Flutter. |
+| Selection error retained | The first restoration tap used a still-settling scroll and selected Topographic. Its native pipeline completed on Home; operation name and USB hash identified the wrong fixture. `final-restore-verified.json` is a failed restoration comparison, not a restore pass. The subsequent selection used a settled screen. |
+| Exact restore/Home | Retro Sunburst completed on Ready 218 after 65.685 seconds from native acceptance: upload→verification 14.777 seconds, verification→apply 50.059 seconds, apply→ack 0.849 seconds. All sixteen samples showed the launcher. An earlier USB comparison (`watch-restored.json`) ran before completion and failed; only `original-restored-after-completion.json` is the successful restore check. It matches the original hash above, staging absent, SMP disabled and app still Watchface. The slower verification is retained, without attributing it to the phone or treating it as endurance acceptance. |
+| Fixed gallery | `final-home-return-settled.png` and `original-restored-gallery.png` show an idle usable gallery after completion on Home; no stuck preparation bar. This is UI reattachment, not physical Flutter-engine destruction. |
+| Stop/preservation | After asynchronous shutdown settled, Stop 220 was persisted/released, desired intent false, native service/notifications absent. `watch-preservation-final.json` confirms all nine recordings and the existing crash file exactly match the pre-HTTP firmware hashes. The original background is restored. |
+
+Validation: 169 native JVM tests, zero failures/errors; 138 full Flutter companion
+regressions plus nine focused watchface tests after the last progress-label edit;
+focused analysis clean. Every built-in binary (33) meets the image contract.
+Native tests cover full verification gating, copied input, duplicate/stale SDK
+callbacks, generation/Stop/deadlines, unknown-result quarantine, progress bounds,
+journal failure cleanup and disk-backed interrupted-operation recovery. A definite
+negative watch response is a known failure and permits explicit retry on the same
+generation; only uncertain outcomes require reconnect. That last classification
+correction has native regression coverage and is built/installed in the final
+APK; physical pipeline runs above used its immediate UI-tested predecessor.
+
+Final source APKs both build and pass compiled-owner verification:
+`ordinary-final.apk` SHA-256 `80165143c826e0eea814a1315619db0a540c8a2e874adb0ccb0fe0d35214dd20` (Flutter owner, absent native bridge),
+and `native-final.apk` SHA-256 `59b4bfe409ce382540f9429295b8d6d1ffc694fd16bed8e492ae82f5fe13122f` (native owner/bridge). Final native
+replacement retains Stop 220 and its installed hash matches; the physical
+upload/reset runs used `native-ui-tested.apk` above. No additional background
+change was made for the reporting-only correction.
+
+To reproduce, first back up any existing background over the independent USB
+control path and verify no recording is active. Freeze and verify the native APK,
+keep recording downloads paused, explicitly connect the saved paired watch, and
+open Developer → Watchface background. Select a fixture from a settled gallery,
+then Home; record native operation ID/name/phase/timestamps and resumed Activity.
+Wait for acknowledged completion before a read-only USB file comparison. Reopen
+the gallery and verify controls are usable. Test reset only with an exact backup,
+then restore and compare original bytes; finish with settled Stop verification.
+Never use an accepted receipt, a staging file or a premature comparison as an
+apply/restore pass. Keep private image data and recordings out of Git.
+
+Physical process death during SDK work/apply, custom photo picker/upload,
+concurrent competing requests, current Android and longer unplugged operation
+remain acceptance. A process-interruption JVM test or Home observation does not
+establish those passes. DFU remains guarded in the native router and requires
+its own coordinated Nordic upgrade lifecycle before exposure.

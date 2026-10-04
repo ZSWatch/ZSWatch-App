@@ -123,6 +123,10 @@ class AppRouter {
         path: AppRoutes.fileSystem,
         builder: (context, state) => const FileSystemScreen(),
       ),
+      GoRoute(
+        path: AppRoutes.watchfaceBackground,
+        builder: (context, state) => const WatchfaceBackgroundScreen(),
+      ),
     ],
     errorBuilder: (context, state) => const Scaffold(
       body: Center(child: Text('This feature is not available in this build')),

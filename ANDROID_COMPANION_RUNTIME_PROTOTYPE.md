@@ -74,9 +74,10 @@ Disconnect go to native Stop without creating Dart auto-reconnect/foreground
 services. UI/container disposal never sends Stop.
 
 Only home/dashboard, Add Watch, settings, notification settings, recording status,
-the coordinated Shell screen and developer runtime controls are routable in this build. Unsupported deep links
+the coordinated Shell, log-files and watchface-background screens and developer
+runtime controls are routable in this build. Unsupported deep links
 cannot enter AI/model, DB-backed recording detail, DFU, health, analytics,
-watchface or other legacy-service screens. Health stats and uncoordinated SMP
+or other legacy-service screens. Health stats and uncoordinated SMP
 actions are withheld. The normal router is unchanged. The developer controls
 remain available through Connection setup or Developer for known-address lab
 setup. Discovery now uses the system picker; coordinated Forget is implemented
@@ -971,3 +972,43 @@ actual SDK error variants, existing Files UI and UI disposal without legacy BLE.
 Physical nonempty log download, mutable log content, UI-engine destruction,
 multi-watch local-cache isolation, modern Android and concurrent DFU acceptance
 remain. See the Nokia report for bounded hardware observations and APK hashes.
+
+
+## Service-owned watchface backgrounds — 2026-10-04
+
+The existing Flutter background gallery, built-in assets, image picker and crop
+workflow now submit to the Android service in the opt-in native build. The
+ordinary build retains its existing Flutter owner. The service owns the complete
+accepted upload → full readback verification → existing NUS apply → watch-result
+pipeline; Flutter sends neither a competing SMP request nor the later apply.
+Reset uses the existing NUS reset/result contract without enabling SMP.
+
+The image contract is the existing LVGL v9 RGB565 240×240 header and 115,212-byte
+file. The Android path preserves the resolved user fork's Nordic FileUploader
+window 3/alignment 4 and high connection priority. It uploads only
+`/user/bg_new.bin`, checks its status length and downloads every byte through the
+existing checked Nordic filesystem path. A mismatch prevents apply. No custom
+SMP protocol or fork modifications were added. The existing watch-side apply
+continues to replace `/user/bg.bin` and acknowledge the result.
+
+Shell, logs, SMP preparation, watchface work and background recordings exclude
+one another on the shared SDK owner. Native progress and terminal metadata are
+journaled without image bytes. Upload has a five-minute overall deadline; the
+apply/reset result has a ten-second deadline. Stop/disconnect cancel outstanding
+work and fence late SDK callbacks. Image work never automatically replays after
+process loss. Startup marks an active persisted operation interrupted; an
+apply/reset with no definite response remains explicitly uncertain. Because
+firmware responses lack request IDs, an uncertain action cannot be retried on
+that same connection generation. Reconnect before explicit retry.
+
+Accepted work survives UI disposal. The existing gallery projects progress from
+the native snapshot and handles the terminal-only snapshot that may first arrive
+after Home. That case failed in the first hardware trial and now has a regression.
+The UI reports unknown/interrupted outcomes on reattachment. Built-in/cropped
+image preparation still happens in Flutter before service acceptance; process
+loss during that preparation requires a new user action.
+
+Validation and bounded Nokia/watch results are in the smoke report. This is still
+a debug prototype boundary. Physical process death during upload/apply, a custom
+photo upload, current Android hardware, DFU coordination and endurance remain
+acceptance work; Home completion does not prove Flutter-engine destruction.

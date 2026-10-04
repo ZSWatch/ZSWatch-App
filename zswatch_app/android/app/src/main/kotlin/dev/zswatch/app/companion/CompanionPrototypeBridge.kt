@@ -130,6 +130,22 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
+                "startWatchface", "resetWatchface" -> PrototypeHub.worker.post {
+                    try {
+                        val args = call.arguments as? Map<*, *> ?: error("Arguments required")
+                        val generation = when (val value = args["generation"]) {
+                            is Int -> value.toLong()
+                            is Long -> value
+                            else -> error("Integer generation required")
+                        }
+                        require(generation >= 0)
+                        val link = CompanionPrototypeService.instance?.transport ?: error("Native owner required")
+                        val id = if (call.method == "resetWatchface") link.resetWatchface(generation)
+                            else link.startWatchface(generation, args["bytes"] as? ByteArray ?: error("Image bytes required"),
+                                args["name"] as? String ?: error("Image name required"))
+                        PrototypeHub.main.post { result.success(mapOf("version" to 1, "generation" to generation, "id" to id, "accepted" to true)) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("WATCHFACE_FAILED", error.message, null) } }
+                }
                 "inspectLogs" -> PrototypeHub.worker.post {
                     try {
                         val args = call.arguments as? Map<*, *> ?: error("Arguments required")
