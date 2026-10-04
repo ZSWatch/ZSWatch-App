@@ -1,5 +1,18 @@
 # Plan för ZSWatchApp: bakgrundsfunktioner och automatiska tester på riktig hårdvara
 
+**Aktuell genomförandeordning, användarbeslut 2026-10-04:** följ
+[den korta slutförandeplanen](ANDROID_COMPANION_FINISH_PLAN.md). Gör Android-refaktorn
+direkt med befintlig Flutter-UI och native ägarskap i alla bygglägen. Ingen gammal
+Android-runtime bakom flagga, stegvis utrullning eller kompatibel DB-migrering
+behövs; engångsåterställning av appdata och ny behörighetssetup är tillåten.
+Välj nästa arbete efter beroenden och kvarvarande funktioner. När update-flödet
+provas ska firmware nå cirka 20 KB/s eller bättre före större filesystembilder;
+det kräver inte att firmwareuppdateringar blir nästa uppgift. Fixa även påträffade
+firmwarebuggar och bygg/flasha/verifiera med tillgänglig debugger. Fortsätt implementationen; långtidsprov läggs efter
+fungerande flöden och ska inte stoppa varje delsteg. Detta ersätter motstridiga
+äldre grindar, migreringskrav och arbetsordningar nedan. Historiska testresultat
+gäller fortfarande endast för respektive testad version.
+
 Datum: 2026-10-02. Status: **reviderat förslag efter review och användarens prioritering**. Dokumentet beskriver arbete som återstår; det innebär inte att bakgrundsfunktionerna eller testuppställningen redan är verifierade. [Reviewunderlaget](/home/jakkra/Documents/ZSWatchApp/COMPANION_BACKGROUND_PLAN_REVIEW.md) är inarbetat. Implementationsläget och senare hårdvarufynd beskrivs i avsnitt 13.
 
 ## 1. Rekommenderat beslut
