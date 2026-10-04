@@ -45,6 +45,7 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
             resourceTransfer?.close(); resourceTransfer = null; preparedResources = null
             val transport = sdk ?: error("Prepared Nordic transport required")
             val callback = object : FirmwareUpgradeCallback<FirmwareUpgradeManager.State> {
+                private var loggedLink = false
                 private fun deliver(action: () -> Unit) { handler.post {
                     if (sdk === transport && operation.state?.id == state.id) {
                         safely(action)
@@ -62,7 +63,13 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
                     }
                     phase?.let { operation.sdkPhase(state.id, it) }
                 }
-                override fun onUploadProgressChanged(current: Int, total: Int, timestamp: Long) = deliver { operation.progress(state.id, current, total) }
+                override fun onUploadProgressChanged(current: Int, total: Int, timestamp: Long) = deliver {
+                    if (!loggedLink) {
+                        loggedLink = true
+                        android.util.Log.i("ZSWCompanionBle", "firmware_upload max_packet=${transport.maxPacketLength} window=${FirmwareSdkContract.settings().windowCapacity}")
+                    }
+                    operation.progress(state.id, current, total)
+                }
                 override fun onUpgradeCompleted() = deliver { operation.sdkCompleted(state.id, sdkResetObserved) }
                 override fun onUpgradeFailed(phase: FirmwareUpgradeManager.State?, error: McuMgrException?) = deliver { operation.fail(state.id, "sdk_failed") }
                 override fun onUpgradeCanceled(phase: FirmwareUpgradeManager.State?) = deliver { operation.sdkCancelled(state.id) }

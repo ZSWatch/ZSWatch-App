@@ -2,6 +2,7 @@ package dev.zswatch.app.companion
 
 internal data class PrototypeSmpSession(val generation: Long, val address: String?,
     val desired: Boolean, val ready: Boolean, val available: Boolean)
+internal class PrototypeSmpServicePending : IllegalStateException("SMP service change pending")
 
 /** Preparation never executes a shell command. A service-change reconnect may
  * advance once; Stop, another watch or further generations cancel the request.
@@ -52,8 +53,15 @@ internal class PrototypeSmpPreparation(
                     entry.connectingGeneration = state.generation
                     connect(state.generation) { result ->
                         val latest = current()
-                        if (request === entry && latest.generation == state.generation && latest.ready && result.isFailure)
-                            finish(entry, Result.failure(result.exceptionOrNull()!!))
+                        if (request === entry && latest.generation == state.generation && latest.ready && result.isFailure) {
+                            val error = result.exceptionOrNull()!!
+                            // A cold enable can race Android's Service Changed
+                            // callback. Keep waiting for the permitted fresh
+                            // generation within the original preparation deadline.
+                            if (error is PrototypeSmpServicePending && latest.generation == entry.generation)
+                                entry.connectingGeneration = null
+                            else finish(entry, Result.failure(error))
+                        }
                     }
                 }
                 later(200) { poll(entry) }

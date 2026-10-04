@@ -93,6 +93,17 @@ class PrototypeSmpPreparationTest {
         assertTrue(r.results.single().isFailure); assertTrue(r.prepared.isEmpty())
     }
 
+    @Test fun coldServiceMissingBeforeServiceChangedWaitsForFreshGeneration() {
+        val r = Rig(); r.start(); r.advance(2000)
+        r.connections.single().second(Result.failure(PrototypeSmpServicePending()))
+        assertTrue(r.results.isEmpty()); assertTrue(r.preparation.busy)
+        r.state = r.state.copy(generation = 8, ready = false); r.advance(200)
+        r.state = r.state.copy(ready = true); r.advance(200)
+        r.state = r.state.copy(available = true)
+        r.connections.last().second(Result.success(Unit)); r.advance(200)
+        assertEquals(8L, r.results.single().getOrThrow())
+    }
+
     @Test fun sdkClosedDuringServiceChangeDoesNotCancelUnexecutedPreparation() {
         val r = Rig(); r.start(); r.advance(2000)
         r.state = r.state.copy(ready = false)

@@ -19,7 +19,7 @@ class FirmwareSdkContractTest {
     }
     @Test fun existingSettingsPreserveUserDataAndUploadConfiguration() {
         val settings=FirmwareSdkContract.settings()
-        assertFalse(settings.eraseAppSettings);assertEquals(1,settings.windowCapacity);assertEquals(4,settings.memoryAlignment)
+        assertFalse(settings.eraseAppSettings);assertEquals(3,settings.windowCapacity);assertEquals(4,settings.memoryAlignment)
     }
     @Test fun nordicParserPreservesSingleExternalImageIndexAndCopiesInput() {
         val bytes=image();val parsed=FirmwareSdkContract.parse(listOf(2 to bytes)).single()

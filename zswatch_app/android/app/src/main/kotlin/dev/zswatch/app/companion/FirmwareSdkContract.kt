@@ -4,7 +4,7 @@ import io.runtime.mcumgr.dfu.mcuboot.FirmwareUpgradeManager
 import io.runtime.mcumgr.dfu.mcuboot.model.TargetImage
 import io.runtime.mcumgr.response.img.McuMgrImageStateResponse
 
-/** Exact existing SDK policy; no image-format parser or SMP implementation here. */
+/** Nordic owns image parsing and the SMP transport. */
 internal object FirmwareSdkContract {
     fun parse(images: List<Pair<Int, ByteArray>>): List<TargetImage> {
         require(images.size in 1..3 && images.map { it.first }.distinct().size == images.size)
@@ -12,7 +12,9 @@ internal object FirmwareSdkContract {
         return images.map { TargetImage(it.first, it.second.copyOf()) }
     }
     fun settings(): FirmwareUpgradeManager.Settings = FirmwareUpgradeManager.Settings.Builder()
-        .setEraseAppSettings(false).setWindowCapacity(1).setMemoryAlignment(4).build()
+        // The watch has four SMP buffers. Leave one free while keeping three
+        // requests in flight, as the existing file uploader already does.
+        .setEraseAppSettings(false).setWindowCapacity(3).setMemoryAlignment(4).build()
 
     fun checkActive(targets: List<FirmwareTarget>, response: McuMgrImageStateResponse) {
         check(response.isSuccess) { "Image state rejected" }

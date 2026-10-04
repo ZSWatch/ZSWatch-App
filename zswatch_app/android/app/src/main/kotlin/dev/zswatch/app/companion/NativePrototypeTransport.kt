@@ -6,6 +6,7 @@ import android.content.Context
 import android.os.Handler
 import dev.zswatch.app.LifecycleLogger
 import io.runtime.mcumgr.ble.McuMgrBleTransport
+import io.runtime.mcumgr.ble.exception.McuMgrNotSupportedException
 import io.runtime.mcumgr.McuMgrCallback
 import io.runtime.mcumgr.McuMgrTransport
 import io.runtime.mcumgr.managers.ImageManager
@@ -59,7 +60,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
                     done(Result.failure(IllegalStateException("Nordic connection deferred")))
                 } }
                 override fun onError(error: Throwable) { handler.post {
-                    done(Result.failure(IllegalStateException(error.javaClass.simpleName)))
+                    done(Result.failure(if (error is McuMgrNotSupportedException) PrototypeSmpServicePending()
+                        else IllegalStateException(error.javaClass.simpleName)))
                 } }
             })
         },
@@ -767,7 +769,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
             }
         }.also {
             fileTransport = it
-            it.requestConnPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+            // The watch's SMP controller requests 7.5-11.25 ms. Android HIGH
+            // can arrive later and replace that with 15 ms (observed on Nokia).
+            // Keep the same peripheral-owned policy as the existing DFU path.
         }
     }
 
