@@ -1580,3 +1580,50 @@ Retain current-Android/endurance gates, physical process-loss tests during SDK
 work, nonempty log download and the explicit GPS/Weather location approval.
 Home completion is bounded background evidence, not engine destruction or
 production acceptance. Continue Android core work; iOS and AI remain deferred.
+
+
+### Next DFU implementation: preserve Nordic and coordinate the reboot lifecycle
+
+Targeted inspection of the existing app and resolved user fork establishes these
+requirements before exposing the current Firmware Update screen in native mode:
+
+- Keep `FirmwareManager` and the existing Flutter selection/download/package UI.
+  `FirmwareImage.slot` is populated from manifest `image_index`; preserve that
+  target image index for single and multi-image packages. It is not MCUboot's
+  primary/secondary slot selector.
+- Use the existing Nordic 2.7.2 `FirmwareUpgradeManager`, `TargetImage` and
+  `ImageSet`. Retain the app's CONFIRM_ONLY, erase-app-settings=false, window 1
+  and alignment 4 policy. The local wrapper's multi-image path applies these
+  settings; its single-image overload only applies mode/erase settings. Configure
+  one explicit ImageSet/settings path in the native adapter so a selected single
+  image's manifest index and configuration are preserved. Leave the user's fork
+  and ordinary owner unchanged.
+- DFU needs a service-owned exclusive upgrade lifetime. The existing native
+  transport closes its SDK work on every NUS service change/disconnect; the
+  watchface request lifetime therefore cannot be reused for a firmware operation
+  that deliberately reboots. Fence ordinary NUS callbacks/reconnect/maintenance
+  during the upgrade, let Nordic own the upgrade's expected reset/reconnect,
+  and restore the saved companion intent through a fresh NUS generation after
+  the SDK has released its lease. Verify the actual Nordic mode/reset callbacks
+  and watch SMP boot window before choosing the handoff details. Avoid releasing
+  the only BLE connection between SMP preparation and SDK takeover.
+- Reject competing Shell/log/watchface/recording work before accepting firmware.
+  Persist operation identity, watch address, image indices/hashes and stage, not
+  firmware bytes or an automatic flash replay. UI reattachment observes progress;
+  a UI reset/dispose must not erase or cancel accepted service work. Process loss
+  or an unknown reset/confirmation outcome requires an explicit recovery outcome
+  and fresh watch-version/status inspection, not a successful-update banner.
+- Preserve the separate resource-filesystem workflow. Existing `startBothUpdates`
+  uploads resources before firmware; filesystem-only upload explicitly resets
+  the watch. The gallery's fixed `/user/bg_new.bin` adapter is not a substitute.
+  Gate unsupported controls in the retained screen until their native upload,
+  verification, reset and combined-package sequence are coordinated.
+- Cover expected reset, unexpected disconnect, Stop/radio changes, critical
+  cancellation, stale callbacks, process recovery and UI lifetime in deterministic
+  tests, plus no initialization of the legacy Flutter BLE/DFU provider. Compile
+  both owners. Physical DFU needs a known board-matching image, independent USB
+  preservation/recovery access and before/after version evidence; uploading bytes
+  or receiving a Nordic start callback alone is not acceptance.
+
+This is the next implementation contract, not an implemented DFU feature or a
+physical firmware-upgrade pass. The native firmware route remains guarded.
