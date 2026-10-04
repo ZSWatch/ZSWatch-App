@@ -151,5 +151,8 @@ internal class PrototypeFirmware(
         val next = old.copy(phase = phase, error = error, resultUnknown = phase != "completed")
         try { observe(next) } finally { release(next) }
     }
+    // Boot/slot swapping may outlast the first NUS connection attempt. Keep
+    // its existing boot-check deadline and verification; never replay upload.
+    fun connectionRetry() { if (request?.phase != "reconnecting") close() }
     fun close() { request?.let { fail(it.id, "interrupted") } }
 }

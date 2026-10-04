@@ -206,6 +206,7 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
     fun fenced(reason: String) {
         if (probe != null) { finishProbe("interrupted"); return }
         if (reason == "reconnect" && operation.state?.phase == "verifying" && link.firmwareCheckPreparing && preparationRecoveries++ == 0) return
+        if (reason == "reconnect") { operation.connectionRetry(); return }
         operation.close()
     }
     private fun safely(action: () -> Unit) {

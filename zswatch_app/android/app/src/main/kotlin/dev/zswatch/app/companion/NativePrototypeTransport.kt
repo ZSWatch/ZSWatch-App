@@ -742,6 +742,15 @@ class NativePrototypeTransport(private val context: Context, private val handler
         val adapter = context.getSystemService(BluetoothManager::class.java).adapter
         return object : McuMgrBleTransport(context, adapter.getRemoteDevice(address), handler) {
             private var packet = 0L
+            init {
+                setConnectionParametersListener { _, interval, latency, timeout ->
+                    android.util.Log.i("ZSWCompanionBle", "sdk_parameters session=$session interval_units=$interval latency=$latency timeout_units=$timeout")
+                }
+            }
+            override fun onDeviceReady() {
+                super.onDeviceReady()
+                android.util.Log.i("ZSWCompanionBle", "sdk_ready session=$session mtu=${getMtu()} max_packet=$maxPacketLength")
+            }
             override fun getMinLogPriority() = if (traceMcuPackets) android.util.Log.INFO else android.util.Log.WARN
             override fun log(priority: Int, message: String) {
                 if (!traceMcuPackets) return

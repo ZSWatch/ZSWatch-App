@@ -44,6 +44,25 @@ class PrototypeFirmwareTest {
         assertThrows(IllegalStateException::class.java) { r.start() }
         assertTrue(r.launches.isEmpty());assertTrue(r.states.isEmpty())
     }
+    @Test fun bootConnectionRetryPreservesVerificationWithoutReplayingUpload() {
+        val r=Rig();val id=r.start();r.owner.sdkCompleted(id)
+        r.owner.connectionRetry();r.owner.connectionRetry()
+        assertTrue(r.owner.busy);assertEquals("reconnecting",r.owner.state?.phase)
+        assertEquals(1,r.launches.size);assertEquals(1,r.reconnects.size)
+        r.owner.ready("AA:BB:CC:DD:EE:FF")
+        r.checks.single().second(Result.success(Unit))
+        assertEquals("completed",r.states.last().phase)
+    }
+    @Test fun bootConnectionRetriesKeepOriginalDeadlineAndStopStillWins() {
+        val r=Rig();val id=r.start();r.owner.sdkCompleted(id)
+        r.advance(89000);r.owner.connectionRetry();r.advance(1001)
+        assertEquals("boot_check_timeout",r.states.last().error)
+        val stopped=Rig();val stoppedId=stopped.start();stopped.owner.sdkCompleted(stoppedId)
+        stopped.owner.connectionRetry();stopped.owner.close()
+        assertEquals("interrupted",stopped.states.last().error);assertFalse(stopped.owner.busy)
+        val uploading=Rig();uploading.start();uploading.owner.connectionRetry()
+        assertEquals("interrupted",uploading.states.last().error)
+    }
     @Test fun sdkCompletionAloneCannotCompleteWithoutFreshWatchVerification() {
         val r=Rig();val id=r.start()
         r.owner.sdkPhase(id,"uploading");r.owner.progress(id,1024,2048)
