@@ -16,12 +16,12 @@ import android.util.Log
 import java.io.ByteArrayOutputStream
 
 /**
- * NotificationListenerService implementation that forwards Android notifications to Flutter.
+ * NotificationListenerService implementation that forwards Android notifications to the companion service.
  * 
  * This service:
  * - Listens to all posted/removed notifications
  * - Extracts relevant notification data
- * - Sends notification events to Flutter via a shared singleton
+ * - Dispatches independently of Flutter/Activity lifetime
  * 
  * Note: User must grant notification access permission in system settings.
  */
@@ -272,7 +272,6 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             detail = "component=${javaClass.simpleName}",
         )
         instance = this
-        initializeIdCounter(applicationContext)
         Log.d(TAG, "NotificationListenerService created")
         LifecycleLogger.log(TAG, "onCreate")
     }
@@ -290,12 +289,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         prototypeConnected = true
         Log.d(TAG, "NotificationListenerService connected")
         LifecycleLogger.log(TAG, "onListenerConnected activeNotifications=${activeNotifications?.size ?: 0}")
-        if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE) {
-            activeNotifications?.let { active ->
-                dev.zswatch.app.companion.PrototypeNotificationRouter.reconcile(applicationContext, active.map { it.key }.toSet())
-                active.forEach { onNotificationPosted(it) }
-            }
-        }
+        replayPrototypeNotifications()
     }
     
     override fun onListenerDisconnected() {
@@ -451,144 +445,21 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             return
         }
         
-        if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE &&
-            dev.zswatch.app.companion.PrototypeNotificationRouter.posted(applicationContext, extractNotificationData(sbn))) return
-
-        // Old repeat prevention: Skip notifications with older/same timestamp than last forwarded
-        // This prevents re-posts of old notifications (e.g., Messenger updating same notification)
-        // From Gadgetbridge ~line 412-425
-        val notificationWhen = notification.`when`
-        val previousWhen = notificationOldRepeatPrevention[sbn.packageName]
-        if (previousWhen != null && notificationWhen > 0 && notificationWhen <= previousWhen) {
-            Log.d(TAG, "Skipping old/repeat notification from ${sbn.packageName}, when=$notificationWhen <= previous=$previousWhen")
-            return
-        }
-        
-        // Burst prevention: Skip notifications that come too frequently from same source
-        // From Gadgetbridge ~line 427-445
-        if (BURST_PREVENTION_TIMEOUT_NS > 0) {
-            val curTime = System.nanoTime()
-            val lastBurstTime = notificationBurstPrevention[sbn.packageName]
-            if (lastBurstTime != null) {
-                val diff = curTime - lastBurstTime
-                if (diff < BURST_PREVENTION_TIMEOUT_NS) {
-                    Log.d(TAG, "Skipping burst notification from ${sbn.packageName}, ${diff / 1_000_000}ms since last")
-                    return
-                }
-            }
-            notificationBurstPrevention[sbn.packageName] = curTime
-        }
-        
-        val notificationData = extractNotificationData(sbn)
-        
-        // Check if this is an update to an already-forwarded notification with identical content
-        // This prevents duplicate notifications when user taps a notification and the app re-posts it
-        val title = notificationData["title"] as? String ?: ""
-        val body = notificationData["body"] as? String ?: ""
-        val contentHash = (title + body).hashCode()
-        val previousHash = notificationContentHashes[sbn.key]
-        
-        val isAlreadyForwarded = forwardedNotificationKeys.contains(sbn.key)
-        val isSameContent = previousHash != null && previousHash == contentHash
-        
-        if (isAlreadyForwarded && isSameContent) {
-            Log.d(TAG, "Skipping duplicate notification (same content): ${notificationData["appName"]} - ${notificationData["title"]}")
-            return
-        }
-        
-        // Update content hash
-        notificationContentHashes[sbn.key] = contentHash
-        
-        Log.d(TAG, "Notification posted: ${notificationData["appName"]} - ${notificationData["title"]} (isUpdate=${isAlreadyForwarded})")
-        
-        if (notificationCallback == null) {
-            Log.w(TAG, "Notification callback is null - Flutter not listening!")
-            LifecycleLogger.log(
-                TAG,
-                "drop posted notification callback=null package=${sbn.packageName} key=${sbn.key}",
-            )
-        } else {
-            Log.d(TAG, "Forwarding notification to Flutter via callback")
-            LifecycleLogger.log(
-                TAG,
-                "forward posted notification package=${sbn.packageName} key=${sbn.key}",
-            )
-            // Track that this notification was forwarded
-            forwardedNotificationKeys.add(sbn.key)
-            
-            // Update old repeat prevention timestamp after successful forward
-            // From Gadgetbridge ~line 596-604
-            // Only track if notification.when is valid (>0) and not in the future
-            val notificationWhen = notification.`when`
-            if (notificationWhen > 0 && notificationWhen <= System.currentTimeMillis() + 30_000L) {
-                notificationOldRepeatPrevention[sbn.packageName] = notificationWhen
-            } else {
-                Log.d(TAG, "Not tracking notification.when for ${sbn.packageName}: when=$notificationWhen (invalid or future)")
-            }
-            
-            notificationCallback?.onNotificationPosted(notificationData)
-        }
+        dev.zswatch.app.companion.PrototypeNotificationRouter.posted(applicationContext, extractNotificationData(sbn))
     }
-    
+
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         sbn ?: return
-        if (dev.zswatch.app.companion.PrototypeNotificationRouter.removed(applicationContext, sbn.key)) return
-        val isDebugNotification = sbn.notification.extras?.getBoolean(
-            NotificationDebugHelper.EXTRA_DEBUG_NOTIFICATION
-        ) == true
-        
-        // Skip our own notifications
-        if (sbn.packageName == packageName && !isDebugNotification) {
-            return
-        }
-
-        // Only send removal events for notifications that were actually forwarded
-        // This prevents phantom dismiss events for filtered notifications
-        if (!forwardedNotificationKeys.remove(sbn.key)) {
-            Log.d(TAG, "Skipping removal for non-forwarded notification: ${sbn.packageName}")
-            return
-        }
-
-        // Get the unique ID that was assigned when posted
-        val uniqueId = keyToUniqueId[sbn.key]
-        if (uniqueId == null) {
-            Log.w(TAG, "No unique ID found for removed notification: ${sbn.key}")
-            return
-        }
-
-        val notificationData = mapOf(
-            "id" to uniqueId,
-            "packageName" to sbn.packageName,
-            "key" to sbn.key
-        )
-
-        Log.d(TAG, "Notification removed: ${sbn.packageName} - $uniqueId")
-
-        if (notificationCallback == null) {
-            LifecycleLogger.log(
-                TAG,
-                "drop removed notification callback=null package=${sbn.packageName} key=${sbn.key}",
-            )
-        } else {
-            LifecycleLogger.log(
-                TAG,
-                "forward removed notification package=${sbn.packageName} key=${sbn.key}",
-            )
-        }
-        notificationCallback?.onNotificationRemoved(notificationData)
-
-        // Clean up mappings for this notification
-        clearUniqueId(sbn.key)
-        notificationContentHashes.remove(sbn.key)
+        dev.zswatch.app.companion.PrototypeNotificationRouter.removed(applicationContext, sbn.key)
     }
-    
+
     private fun extractNotificationData(sbn: StatusBarNotification): Map<String, Any?> {
         val notification = sbn.notification
         val extras = notification.extras
 
         // The native prototype journals its own stable IDs and never uses the
         // legacy in-memory identity maps or SharedPreferences counter.
-        val uniqueId = if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE) 0 else getOrCreateUniqueId(sbn)
+        val uniqueId = 0 // The service journal owns persistent notification IDs.
         
         // Get app name
         val pm = packageManager

@@ -118,3 +118,13 @@ Use targeted source reads and one short pass/fail/pending list. Preserve existin
 evidence; stop duplicating checkpoint narratives into multiple long documents.
 Ask for input only when required information or authorization actually blocks the
 next useful step. Do not ask again about accepting a clean phone database/setup.
+
+## Current checks (2026-10-04)
+
+- Direct cutover implemented: normal debug/profile/release builds compile; 205 native
+  and 158 companion Flutter tests pass. Ordinary debug APK on Nokia reaches Ready,
+  remains connected with launcher visible, reattaches the same generation, and
+  Flutter Disconnect settles Stop with the service absent. Evidence:
+  `.companion-hil-runs/20261004-direct-native-cutover/`.
+- Pending: firmware HTTP callback fix, measured firmware upload, physical resource/combined
+  updates, and the final consolidated background/recovery pass.

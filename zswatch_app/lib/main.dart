@@ -10,7 +10,7 @@ import 'services/background/companion_dart_worker.dart';
 
 @pragma('vm:entry-point')
 void companionWorkerMain() {
-  if (kDebugMode && const bool.fromEnvironment('COMPANION_RUNTIME_PROTOTYPE')) {
+  if (kDebugMode && useNativeCompanionRuntime) {
     startCompanionDartWorker();
   }
 }

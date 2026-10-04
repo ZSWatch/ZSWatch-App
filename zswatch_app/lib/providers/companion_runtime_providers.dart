@@ -11,12 +11,9 @@ import '../data/models/companion_http_status.dart';
 import '../data/models/companion_gps_status.dart';
 import '../data/models/companion_watchface_status.dart';
 
-/// Immutable selection for this app run. Native and Dart must not both own BLE.
+/// Android always uses the service owner; other platforms retain their own path.
 bool get useNativeCompanionRuntime =>
-    kDebugMode &&
-    !kIsWeb &&
-    defaultTargetPlatform == TargetPlatform.android &&
-    const bool.fromEnvironment('COMPANION_RUNTIME_PROTOTYPE');
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
 final nativeCompanionRuntimeProvider = Provider<bool>((ref) {
   return useNativeCompanionRuntime;

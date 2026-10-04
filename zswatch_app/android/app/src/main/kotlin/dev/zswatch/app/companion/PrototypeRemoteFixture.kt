@@ -37,7 +37,7 @@ class PrototypeRemoteFixture(private val context: Context, private val service: 
     fun startMaintenance() { PrototypeHub.worker.post(tick) }
 
     fun startFixture(): String {
-        check(BuildConfig.COMPANION_RUNTIME_PROTOTYPE && running()) { "Running prototype required" }
+        check(BuildConfig.DEBUG && running()) { "Running prototype required" }
         val spec = context.assets.open("job-v1.json").bufferedReader().use { JSONObject(it.readText()) }
         val id = jobs.create(spec)
         PrototypeHub.jobJournal(context).update("remote_fixture_enabled", mapOf("fixture_enabled" to true))
@@ -46,7 +46,7 @@ class PrototypeRemoteFixture(private val context: Context, private val service: 
     }
 
     fun advance() {
-        if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE || failedClosed || busy || !running() ||
+        if (!BuildConfig.DEBUG || failedClosed || busy || !running() ||
             PrototypeHub.jobJournal(context).control()["fixture_enabled"] != true) return
         val now = System.currentTimeMillis() / 1000
         val claim = jobs.identities().asSequence().mapNotNull { id ->

@@ -23,9 +23,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
 
     init {
         methods.setMethodCallHandler { call, result ->
-            if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE) {
-                result.error("DISABLED", "Prototype requires its debug build flag", null)
-            } else if ((call.arguments as? Map<*, *>)?.get("version") != 1) {
+            if ((call.arguments as? Map<*, *>)?.get("version") != 1) {
                 result.error("VERSION", "Unsupported companion bridge version", null)
             } else when (call.method) {
                 "snapshot" -> snapshot(result::success) { message -> result.error("SNAPSHOT_FAILED", message, null) }
@@ -59,6 +57,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                     result.success(mapOf("version" to 1, "accepted" to true))
                 }
                 "postTestNotification" -> {
+                    if (!BuildConfig.DEBUG) { result.notImplemented(); return@setMethodCallHandler }
                     try {
                         val delay = call.argument<Int>("delaySeconds") ?: 0
                         val closeUi = call.argument<Boolean>("closeUi") ?: false
@@ -312,7 +311,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
         }
         events.setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, eventSink: EventChannel.EventSink) {
-                if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE || (arguments as? Map<*, *>)?.get("version") != 1) {
+                if ((arguments as? Map<*, *>)?.get("version") != 1) {
                     eventSink.error("DISABLED_OR_VERSION", "Unsupported prototype subscription", null); return
                 }
                 sink = eventSink

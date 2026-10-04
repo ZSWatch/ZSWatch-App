@@ -23,7 +23,7 @@ class CompanionMediaFixtureService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE || intent?.action !in setOf("START", "PLAY", "PAUSE", "NEXT", "PREVIOUS", "METADATA", "STOP")) {
+        if (!BuildConfig.DEBUG || intent?.action !in setOf("START", "PLAY", "PAUSE", "NEXT", "PREVIOUS", "METADATA", "STOP")) {
             stopSelf(); return START_NOT_STICKY
         }
         if (intent?.action == "STOP") { stopSelf(); return START_NOT_STICKY }

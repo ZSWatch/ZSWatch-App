@@ -6,13 +6,6 @@ plugins {
 }
 
 import java.util.Properties
-import java.util.Base64
-
-val companionPrototypeRequested = project.findProperty("dart-defines")?.toString()
-    ?.split(",")?.any {
-        runCatching { String(Base64.getDecoder().decode(it)) }
-            .getOrNull() == "COMPANION_RUNTIME_PROTOTYPE=true"
-    } == true
 
 data class ReleaseKeystoreConfig(
     val propertiesFilePath: String,
@@ -98,16 +91,7 @@ android {
     }
 
     buildTypes {
-        debug {
-            buildConfigField("boolean", "COMPANION_RUNTIME_PROTOTYPE", companionPrototypeRequested.toString())
-            manifestPlaceholders["companionNetworkSecurity"] = if (companionPrototypeRequested)
-                "@xml/companion_relay_network_security" else "@xml/companion_fixture_network_security"
-        }
-        getByName("profile") {
-            buildConfigField("boolean", "COMPANION_RUNTIME_PROTOTYPE", "false")
-        }
         release {
-            buildConfigField("boolean", "COMPANION_RUNTIME_PROTOTYPE", "false")
             // If a release keystore is configured via android/key.properties, sign properly.
             // Otherwise fall back to debug signing (fine for local testing, not ideal for releases).
             signingConfig = if (hasReleaseKeystore) {

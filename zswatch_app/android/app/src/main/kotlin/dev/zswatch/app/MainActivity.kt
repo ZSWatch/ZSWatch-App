@@ -5,24 +5,19 @@ import android.accounts.Account
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ActivityNotFoundException
-import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
-import android.os.IBinder
 import android.os.PowerManager
 import android.provider.CalendarContract
 import android.util.Log
 import android.provider.Settings
 import androidx.core.content.ContextCompat
-import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.util.TimeZone
 
@@ -30,19 +25,14 @@ import java.util.TimeZone
  * Main activity for ZSWatch companion app.
  * 
  * Sets up MethodChannels for:
- * - Notification forwarding (NotificationListenerService)
- * - Media control (MediaSession)
- * - Foreground service for persistent BLE connection
+ * - Service-owned companion control and observation
+ * - Lifecycle diagnostics, power settings and explicit AI/productivity actions
  */
 class MainActivity : FlutterActivity() {
     private var companionPrototypeBridge: dev.zswatch.app.companion.CompanionPrototypeBridge? = null
     
     companion object {
         private const val TAG = "ZSWProductivity"
-        private const val NOTIFICATION_CHANNEL = "dev.zswatch.app/notifications"
-        private const val NOTIFICATION_EVENTS_CHANNEL = "dev.zswatch.app/notification_events"
-        private const val MEDIA_CHANNEL = "dev.zswatch.app/media"
-        private const val MEDIA_EVENTS_CHANNEL = "dev.zswatch.app/media_events"
         private const val FOREGROUND_SERVICE_CHANNEL = "dev.zswatch.app/foreground_service"
         private const val LLM_COMPUTE_CHANNEL = "dev.zswatch.app/llm_compute"
         private const val PRODUCTIVITY_CHANNEL = "dev.zswatch.app/productivity"
@@ -57,36 +47,8 @@ class MainActivity : FlutterActivity() {
         val isPrimary: Boolean,
     )
     
-    private var mediaBridge: MediaSessionBridge? = null
-    private var notificationEventSink: EventChannel.EventSink? = null
-    private var mediaEventSink: EventChannel.EventSink? = null
     private var liteRtLmBridge: LiteRtLmBridge? = null
-    
-    // Foreground service
-    private var foregroundService: BleConnectionForegroundService? = null
-    private var foregroundServiceBound = false
-    private var pendingDisconnectCallback: (() -> Unit)? = null
-    
-    private val foregroundServiceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            LifecycleLogger.log("MainActivity", "foreground service connected component=$name")
-            val binder = service as BleConnectionForegroundService.LocalBinder
-            foregroundService = binder.getService()
-            foregroundServiceBound = true
-            
-            // Set up disconnect callback
-            foregroundService?.onDisconnectRequested = {
-                pendingDisconnectCallback?.invoke()
-            }
-        }
-        
-        override fun onServiceDisconnected(name: ComponentName?) {
-            LifecycleLogger.log("MainActivity", "foreground service disconnected component=$name")
-            foregroundService = null
-            foregroundServiceBound = false
-        }
-    }
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LifecycleLogger.initialize(applicationContext)
@@ -98,7 +60,6 @@ class MainActivity : FlutterActivity() {
         LifecycleLogger.log("MainActivity", "onCreate savedInstanceState=${savedInstanceState != null}")
         
         // Create notification channels for foreground services
-        BleConnectionForegroundService.createNotificationChannel(this)
         LlmComputeService.createNotificationChannel(this)
     }
 
@@ -143,16 +104,8 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         LifecycleLogger.log("MainActivity", "configureFlutterEngine engine=${flutterEngine.hashCode()}")
-        if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE) {
-            companionPrototypeBridge = dev.zswatch.app.companion.CompanionPrototypeBridge(this, flutterEngine.dartExecutor.binaryMessenger)
-            stopService(Intent(this, BleConnectionForegroundService::class.java))
-            LifecycleLogger.log("CompanionPrototype", "legacy_bridges_skipped modelsNotLoaded=true")
-            return
-        }
-        
-        setupNotificationChannel(flutterEngine)
-        setupMediaChannel(flutterEngine)
-        setupForegroundServiceChannel(flutterEngine)
+        companionPrototypeBridge = dev.zswatch.app.companion.CompanionPrototypeBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+        setupLifecycleAndPowerChannel(flutterEngine)
         setupLlmComputeChannel(flutterEngine)
         setupProductivityChannel(flutterEngine)
         
@@ -160,265 +113,9 @@ class MainActivity : FlutterActivity() {
         liteRtLmBridge!!.setup(flutterEngine)
     }
     
-    private fun setupNotificationChannel(flutterEngine: FlutterEngine) {
-        // Method channel for notification commands
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NOTIFICATION_CHANNEL).setMethodCallHandler { call, result ->
-            when (call.method) {
-                "isNotificationAccessEnabled" -> {
-                    val enabled = NotificationListenerServiceImpl.isNotificationAccessEnabled(this)
-                    result.success(enabled)
-                }
-                "requestNotificationAccess" -> {
-                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                    startActivity(intent)
-                    result.success(null)
-                }
-                "getActiveNotifications" -> {
-                    val notifications = NotificationListenerServiceImpl.getActiveNotifications()
-                    result.success(notifications)
-                }
-                "dismissNotification" -> {
-                    val key = call.argument<String>("key")
-                    if (key != null) {
-                        NotificationListenerServiceImpl.dismissNotification(key)
-                        result.success(true)
-                    } else {
-                        result.error("INVALID_ARGUMENT", "key is required", null)
-                    }
-                }
-                "getNotificationApps" -> {
-                    val apps = NotificationListenerServiceImpl.getNotificationApps(this)
-                    result.success(apps)
-                }
-                "isServiceRunning" -> {
-                    result.success(NotificationListenerServiceImpl.isRunning)
-                }
-                "sendTestNotification" -> {
-                    val title = call.argument<String>("title") ?: "ZSWatch debug notification"
-                    val body = call.argument<String>("body") ?: "This is a native Android test notification."
-
-                    val notificationsEnabled = NotificationManagerCompat.from(this).areNotificationsEnabled()
-                    if (!notificationsEnabled) {
-                        result.error(
-                            "NOTIFICATIONS_DISABLED",
-                            "Posting notifications is not allowed (permission not granted)",
-                            null
-                        )
-                        return@setMethodCallHandler
-                    }
-
-                    try {
-                        val posted = NotificationDebugHelper.postDebugNotification(this, title, body)
-                        result.success(posted)
-                    } catch (e: SecurityException) {
-                        result.error(
-                            "NOTIFICATION_PERMISSION",
-                            "Missing POST_NOTIFICATIONS permission",
-                            e.localizedMessage
-                        )
-                    } catch (e: Exception) {
-                        result.error(
-                            "NOTIFICATION_ERROR",
-                            e.localizedMessage ?: "Failed to post notification",
-                            null
-                        )
-                    }
-                }
-                else -> result.notImplemented()
-            }
-        }
-        
-        // Event channel for notification events (posted/removed)
-        EventChannel(flutterEngine.dartExecutor.binaryMessenger, NOTIFICATION_EVENTS_CHANNEL).setStreamHandler(
-            object : EventChannel.StreamHandler {
-                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                    android.util.Log.d("ZSWNotificationBridge", "Flutter started listening to notification events")
-                    LifecycleLogger.log("NotificationBridge", "onListen args=$arguments sink=${events != null}")
-                    notificationEventSink = events
-                    
-                    // Set up callback to forward notifications to Flutter
-                    NotificationListenerServiceImpl.notificationCallback = object : NotificationListenerServiceImpl.NotificationCallback {
-                        override fun onNotificationPosted(notification: Map<String, Any?>) {
-                            android.util.Log.d("ZSWNotificationBridge", "Callback invoked, forwarding to Flutter event sink")
-                            LifecycleLogger.log(
-                                "NotificationBridge",
-                                "onNotificationPosted callback sinkAvailable=${notificationEventSink != null} package=${notification["packageName"]}",
-                            )
-                            runOnUiThread {
-                                notificationEventSink?.success(mapOf(
-                                    "event" to "posted",
-                                    "notification" to notification
-                                ))
-                            }
-                        }
-                        
-                        override fun onNotificationRemoved(notification: Map<String, Any?>) {
-                            LifecycleLogger.log(
-                                "NotificationBridge",
-                                "onNotificationRemoved callback sinkAvailable=${notificationEventSink != null} package=${notification["packageName"]}",
-                            )
-                            runOnUiThread {
-                                notificationEventSink?.success(mapOf(
-                                    "event" to "removed",
-                                    "notification" to notification
-                                ))
-                            }
-                        }
-                    }
-                }
-                
-                override fun onCancel(arguments: Any?) {
-                    android.util.Log.d("ZSWNotificationBridge", "Flutter stopped listening to notification events")
-                    LifecycleLogger.log("NotificationBridge", "onCancel args=$arguments")
-                    notificationEventSink = null
-                    NotificationListenerServiceImpl.notificationCallback = null
-                }
-            }
-        )
-    }
-    
-    private fun setupMediaChannel(flutterEngine: FlutterEngine) {
-        mediaBridge = MediaSessionBridge(this)
-        
-        // Method channel for media commands
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_CHANNEL).setMethodCallHandler { call, result ->
-            when (call.method) {
-                "initialize" -> {
-                    val success = mediaBridge?.initialize() ?: false
-                    result.success(success)
-                }
-                "dispose" -> {
-                    mediaBridge?.dispose()
-                    result.success(null)
-                }
-                "play" -> {
-                    val success = mediaBridge?.play() ?: false
-                    result.success(success)
-                }
-                "pause" -> {
-                    val success = mediaBridge?.pause() ?: false
-                    result.success(success)
-                }
-                "playPause" -> {
-                    val success = mediaBridge?.playPause() ?: false
-                    result.success(success)
-                }
-                "next" -> {
-                    val success = mediaBridge?.next() ?: false
-                    result.success(success)
-                }
-                "previous" -> {
-                    val success = mediaBridge?.previous() ?: false
-                    result.success(success)
-                }
-                "volumeUp" -> {
-                    val success = mediaBridge?.volumeUp() ?: false
-                    result.success(success)
-                }
-                "volumeDown" -> {
-                    val success = mediaBridge?.volumeDown() ?: false
-                    result.success(success)
-                }
-                "seekTo" -> {
-                    val position = call.argument<Int>("position") ?: 0
-                    val success = mediaBridge?.seekTo(position) ?: false
-                    result.success(success)
-                }
-                "getCurrentState" -> {
-                    val state = mediaBridge?.getCurrentState()
-                    result.success(state)
-                }
-                "hasActiveSession" -> {
-                    val hasSession = mediaBridge?.hasActiveSession() ?: false
-                    result.success(hasSession)
-                }
-                else -> result.notImplemented()
-            }
-        }
-        
-        // Event channel for media events (state/metadata changes)
-        EventChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_EVENTS_CHANNEL).setStreamHandler(
-            object : EventChannel.StreamHandler {
-                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                    LifecycleLogger.log("MediaBridge", "event channel onListen args=$arguments sink=${events != null}")
-                    mediaEventSink = events
-                    
-                    mediaBridge?.setCallback(object : MediaSessionBridge.MediaCallback {
-                        override fun onPlaybackStateChanged(state: Map<String, Any?>) {
-                            LifecycleLogger.log(
-                                "MediaBridge",
-                                "onPlaybackStateChanged sinkAvailable=${mediaEventSink != null} state=${state["state"]}",
-                            )
-                            runOnUiThread {
-                                mediaEventSink?.success(mapOf(
-                                    "event" to "playbackState",
-                                    "data" to state
-                                ))
-                            }
-                        }
-                        
-                        override fun onMetadataChanged(metadata: Map<String, Any?>) {
-                            LifecycleLogger.log(
-                                "MediaBridge",
-                                "onMetadataChanged sinkAvailable=${mediaEventSink != null} track=${metadata["track"]}",
-                            )
-                            runOnUiThread {
-                                mediaEventSink?.success(mapOf(
-                                    "event" to "metadata",
-                                    "data" to metadata
-                                ))
-                            }
-                        }
-                    })
-                }
-                
-                override fun onCancel(arguments: Any?) {
-                    LifecycleLogger.log("MediaBridge", "event channel onCancel args=$arguments")
-                    mediaEventSink = null
-                    mediaBridge?.setCallback(null)
-                }
-            }
-        )
-    }
-    
-    private fun setupForegroundServiceChannel(flutterEngine: FlutterEngine) {
+    private fun setupLifecycleAndPowerChannel(flutterEngine: FlutterEngine) {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FOREGROUND_SERVICE_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
-                "start" -> {
-                    val watchName = call.argument<String>("watchName") ?: "ZSWatch"
-                    val connectionState = call.argument<String>("connectionState") 
-                        ?: BleConnectionForegroundService.STATE_CONNECTED
-                    LifecycleLogger.log("ForegroundChannel", "start watchName=$watchName state=$connectionState")
-                    
-                    val started = BleConnectionForegroundService.start(this, watchName, connectionState)
-                    
-                    // Bind to service to receive disconnect callbacks
-                    val intent = Intent(this, BleConnectionForegroundService::class.java)
-                    bindService(intent, foregroundServiceConnection, Context.BIND_AUTO_CREATE)
-                    
-                    result.success(started)
-                }
-                "stop" -> {
-                    LifecycleLogger.log("ForegroundChannel", "stop bound=$foregroundServiceBound")
-                    if (foregroundServiceBound) {
-                        unbindService(foregroundServiceConnection)
-                        foregroundServiceBound = false
-                    }
-                    result.success(BleConnectionForegroundService.stop(this))
-                }
-                "updateNotification" -> {
-                    val watchName = call.argument<String>("watchName") ?: "ZSWatch"
-                    val connectionState = call.argument<String>("connectionState") 
-                        ?: BleConnectionForegroundService.STATE_CONNECTED
-                    LifecycleLogger.log("ForegroundChannel", "updateNotification watchName=$watchName state=$connectionState")
-                    
-                    result.success(BleConnectionForegroundService.updateNotification(this, watchName, connectionState))
-                }
-                "isRunning" -> {
-                    val running = BleConnectionForegroundService.isRunning()
-                    LifecycleLogger.log("ForegroundChannel", "isRunning=$running")
-                    result.success(running)
-                }
                 "isBatteryOptimizationDisabled" -> {
                     val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
                     val isIgnoring = pm.isIgnoringBatteryOptimizations(packageName)
@@ -467,21 +164,6 @@ class MainActivity : FlutterActivity() {
                         result.error("BATTERY_OPT_SETTINGS_ERROR", e.localizedMessage, null)
                     }
                 }
-                "setDisconnectCallback" -> {
-                    // Store callback ID to invoke later
-                    // For now, we'll use event channel for this
-                    result.success(true)
-                }
-                "syncBackgroundPreferences" -> {
-                    val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
-                    val snapshot = NativeBackgroundPreferences.sync(this, args)
-                    result.success(snapshot.toMap())
-                }
-                "getBackgroundPreferences" -> {
-                    val snapshot = NativeBackgroundPreferences.getSnapshot(this)
-                    LifecycleLogger.log("ForegroundChannel", "getBackgroundPreferences watchId=${snapshot.lastWatchId}")
-                    result.success(snapshot.toMap())
-                }
                 "recordLifecycleEvent" -> {
                     val args = call.arguments as? Map<*, *> ?: emptyMap<String, Any?>()
                     val source = args["source"] as? String ?: "Flutter"
@@ -516,13 +198,6 @@ class MainActivity : FlutterActivity() {
             }
         }
         
-        // Set up disconnect callback to notify Flutter
-        pendingDisconnectCallback = {
-            LifecycleLogger.log("ForegroundChannel", "native disconnect callback invoked")
-            // Use method channel to notify Flutter of disconnect request
-            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FOREGROUND_SERVICE_CHANNEL)
-                .invokeMethod("onDisconnectRequested", null)
-        }
     }
 
     private fun setupLlmComputeChannel(flutterEngine: FlutterEngine) {
@@ -1216,17 +891,7 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         companionPrototypeBridge?.dispose()
         companionPrototypeBridge = null
-        LifecycleLogger.log(
-            "MainActivity",
-            "onDestroy foregroundBound=$foregroundServiceBound notificationSink=${notificationEventSink != null} mediaSink=${mediaEventSink != null}",
-        )
-        if (foregroundServiceBound) {
-            unbindService(foregroundServiceConnection)
-            foregroundServiceBound = false
-        }
-        mediaBridge?.dispose()
-        mediaBridge = null
-        NotificationListenerServiceImpl.notificationCallback = null
+        LifecycleLogger.log("MainActivity", "onDestroy companionObserverDetached=true")
         super.onDestroy()
     }
 }

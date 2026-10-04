@@ -20,6 +20,13 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />
+    <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
+
     <!-- Notification access (requires user to enable in settings) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -40,6 +47,7 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
     <application
+        android:networkSecurityConfig="@xml/companion_relay_network_security"
         android:label="ZSWatch"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
@@ -82,17 +90,11 @@
             </intent-filter>
         </service>
         
-        <!-- Foreground service for persistent BLE connection (FR-089 to FR-092) -->
-        <service
-            android:name=".BleConnectionForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
-
         <service
             android:name=".companion.CompanionPrototypeService"
             android:exported="false"
             android:stopWithTask="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice|location" />
 
         <!-- Foreground service for on-device AI / LLM inference -->
         <service
@@ -100,7 +102,14 @@
             android:exported="false"
             android:foregroundServiceType="shortService" />
 
-        <!-- Conservative recovery scaffold for background connection after boot/update. -->
+        <service android:name=".companion.PrototypePresenceService"
+            android:exported="true" android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
+            <intent-filter>
+                <action android:name="android.companion.CompanionDeviceService" />
+            </intent-filter>
+        </service>
+
+        <!-- Recover the native owner after boot/update according to saved user intent. -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"

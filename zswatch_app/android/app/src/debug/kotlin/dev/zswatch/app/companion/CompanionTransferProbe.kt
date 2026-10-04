@@ -39,7 +39,7 @@ class CompanionTransferProbe : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
-            check(BuildConfig.COMPANION_RUNTIME_PROTOTYPE) { "Requires experimental debug APK" }
+            check(BuildConfig.DEBUG) { "Requires debug APK" }
             val address = arguments.getString("address")?.uppercase() ?: error("Explicit watch address required")
             require(Regex("[0-9A-F]{2}(:[0-9A-F]{2}){5}").matches(address))
             val seconds = arguments.getString("seconds", "120").toLong()

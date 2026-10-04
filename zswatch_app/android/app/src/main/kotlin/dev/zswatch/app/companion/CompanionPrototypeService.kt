@@ -92,7 +92,6 @@ class CompanionPrototypeService : Service() {
         LifecycleLogger.initialize(applicationContext)
         LifecycleLogger.recordHistoricalExitReasons(applicationContext)
         LifecycleLogger.log("CompanionPrototype", "service_created pid=${android.os.Process.myPid()}")
-        if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE) { stopSelf(); return }
         instance = this
         media = AndroidPrototypeMedia(applicationContext,
             send = { generation, packet -> transport?.sendMedia(generation, packet) == true },
@@ -136,15 +135,16 @@ class CompanionPrototypeService : Service() {
                 link.gpsReady = { gps?.ready(it) }
                 link.gpsClosed = { gps?.close() }
                 link.gpsRequest = { message, generation -> gps?.receive(message, generation) }
-                remoteFixture = PrototypeRemoteFixture(applicationContext, this).also { it.startMaintenance() }
-                localFixture = PrototypeLocalFixture(applicationContext, this).also { it.startMaintenance() }
+                if (BuildConfig.DEBUG) {
+                    remoteFixture = PrototypeRemoteFixture(applicationContext, this).also { it.startMaintenance() }
+                    localFixture = PrototypeLocalFixture(applicationContext, this).also { it.startMaintenance() }
+                }
                 PrototypeHub.worker.post(notificationMaintenance)
             }
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE) { stopSelf(); return START_NOT_STICKY }
         LifecycleLogger.log("CompanionPrototype", "service_start action=${intent?.action} flags=$flags id=$startId")
         if (intent?.action == STOP) {
             PrototypeHub.worker.post {
@@ -154,6 +154,10 @@ class CompanionPrototypeService : Service() {
             return START_NOT_STICKY
         }
         if (intent != null && intent.action !in listOf(START, START_DISCOVERED, RESTORE_PRESENCE, RESTORE_SYSTEM, START_REMOTE_FIXTURE, START_LOCAL_FIXTURE, POST_TEST_NOTIFICATION, INSPECT_FIRMWARE_HANDOFF)) { stopSelf(); return START_NOT_STICKY }
+        if (!BuildConfig.DEBUG && intent?.action in listOf(START_REMOTE_FIXTURE, START_LOCAL_FIXTURE, POST_TEST_NOTIFICATION, INSPECT_FIRMWARE_HANDOFF)) {
+            if (instance?.runtime?.active != true) stopSelf()
+            return START_NOT_STICKY
+        }
         try {
             publishForeground(gpsForeground)
         } catch (error: Exception) {

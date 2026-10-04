@@ -3,14 +3,12 @@ package dev.zswatch.app.companion
 import android.companion.CompanionDeviceService
 import android.content.Intent
 import androidx.core.content.ContextCompat
-import dev.zswatch.app.BuildConfig
 import dev.zswatch.app.LifecycleLogger
 
 /** Bound by Android; never starts Flutter or implements an MCUmgr transport. */
 @Suppress("DEPRECATION")
 class PrototypePresenceService : CompanionDeviceService() {
     override fun onDeviceAppeared(address: String) {
-        if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE) return
         LifecycleLogger.log("CompanionPresence", "device_appeared")
         PrototypeHub.worker.post {
             try {
@@ -35,8 +33,7 @@ class PrototypePresenceService : CompanionDeviceService() {
     }
 
     override fun onDeviceDisappeared(address: String) {
-        if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE)
-            LifecycleLogger.log("CompanionPresence", "device_disappeared")
+        LifecycleLogger.log("CompanionPresence", "device_disappeared")
         // Radio/link recovery stays with the existing service; never change user intent.
     }
 }

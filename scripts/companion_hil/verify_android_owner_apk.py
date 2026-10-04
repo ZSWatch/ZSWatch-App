@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only APK owner gate; does not establish Dart flags or hardware acceptance."""
+"""Read-only native-owner APK check; does not establish hardware acceptance."""
 import argparse
 import hashlib
 import json
@@ -14,18 +14,15 @@ def verify(apk, analyzer, owner):
                               check=True, capture_output=True, text=True, timeout=30).stdout
     config = code('dev.zswatch.app.BuildConfig')
     activity = code('dev.zswatch.app.MainActivity')
-    flag = re.search(r'^\.field public static final COMPANION_RUNTIME_PROTOTYPE:Z = (true|false)$',
-                     config, re.MULTILINE)
-    if flag is None:
-        raise ValueError('Missing or unsupported compiled owner flag')
+    if 'COMPANION_RUNTIME_PROTOTYPE' in config:
+        raise ValueError('Legacy Android owner selection flag is still compiled')
     method = re.search(r'^\.method public configureFlutterEngine\([^\n]*\n(.*?)^\.end method$',
                        activity, re.MULTILINE | re.DOTALL)
     if method is None:
         raise ValueError('Missing compiled engine setup')
-    native = owner == 'native'
     bridge = 'Ldev/zswatch/app/companion/CompanionPrototypeBridge;-><init>' in method.group(1)
-    if (flag.group(1) == 'true') != native or bridge != native:
-        raise ValueError('Compiled owner flag/bridge differs from the intended APK variant')
+    if owner != 'native' or not bridge or 'BleConnectionForegroundService' in activity:
+        raise ValueError('Expected one native Android owner without the legacy service')
     digest = hashlib.sha256()
     with apk.open('rb') as file:
         while chunk := file.read(1024 * 1024):
@@ -38,7 +35,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apk', type=Path, required=True)
     parser.add_argument('--apkanalyzer', type=Path, required=True)
-    parser.add_argument('--owner', choices=['native', 'flutter'], required=True)
+    parser.add_argument('--owner', choices=['native'], default='native')
     args = parser.parse_args()
     try:
         print(json.dumps(verify(args.apk, args.apkanalyzer, args.owner), indent=2))

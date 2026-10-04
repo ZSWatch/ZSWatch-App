@@ -29,7 +29,7 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
     }
     fun startMaintenance() { PrototypeHub.worker.post(tick) }
     fun startFixture(): String {
-        check(BuildConfig.COMPANION_RUNTIME_PROTOTYPE && running()) { "Running prototype required" }
+        check(BuildConfig.DEBUG && running()) { "Running prototype required" }
         val spec = context.assets.open("job-v1.json").bufferedReader().use { JSONObject(it.readText()) }
             .put("backend", "local").put("provider", "dart-fixture").put("upload_authorized", false)
             .put("recording_id", "fixture-recording-local-001")
@@ -39,7 +39,7 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         return id
     }
     private fun advance() {
-        if (!BuildConfig.COMPANION_RUNTIME_PROTOTYPE || busy || !running() ||
+        if (!BuildConfig.DEBUG || busy || !running() ||
             PrototypeHub.jobJournal(context).control()["local_fixture_enabled"] != true) return
         val now = System.currentTimeMillis() / 1000
         val claim = jobs.identities().asSequence().mapNotNull { id ->

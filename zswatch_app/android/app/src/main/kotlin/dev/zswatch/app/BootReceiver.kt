@@ -16,41 +16,7 @@ class BootReceiver : BroadcastReceiver() {
         LifecycleLogger.initialize(context)
         LifecycleLogger.recordHistoricalExitReasons(context)
         val action = intent?.action
-        if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE) {
-            restoreNative(context, action)
-            return
-        }
-        LifecycleLogger.recordStartupCause(
-            source = "boot_receiver",
-            detail = "action=$action",
-        )
-        if (action != Intent.ACTION_BOOT_COMPLETED && action != Intent.ACTION_MY_PACKAGE_REPLACED) {
-            LifecycleLogger.log("BootReceiver", "ignored action=$action")
-            return
-        }
-
-        val snapshot = NativeBackgroundPreferences.getSnapshot(context)
-        LifecycleLogger.log(
-            "BootReceiver",
-            "received action=$action background=${snapshot.backgroundConnectionEnabled} " +
-                "autoReconnect=${snapshot.autoReconnectEnabled} watchId=${snapshot.lastWatchId}",
-        )
-
-        if (!snapshot.backgroundConnectionEnabled || !snapshot.autoReconnectEnabled || !snapshot.hasKnownWatch) {
-            LifecycleLogger.log("BootReceiver", "skipping foreground recovery: recovery is disabled or no known watch")
-            return
-        }
-
-        val watchName = snapshot.lastWatchName ?: "ZSWatch"
-        val started = BleConnectionForegroundService.start(
-            context,
-            watchName,
-            BleConnectionForegroundService.STATE_RECONNECTING,
-        )
-        LifecycleLogger.log(
-            "BootReceiver",
-            "foreground recovery notification start attempted started=$started sdk=${Build.VERSION.SDK_INT}",
-        )
+        restoreNative(context, action)
     }
 
     private fun restoreNative(context: Context, action: String?) {

@@ -4,14 +4,13 @@ import android.companion.CompanionDeviceManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import dev.zswatch.app.BuildConfig
 import dev.zswatch.app.LifecycleLogger
 
 /** OS association is separate from the Bluetooth bond and the transport owner. */
 @Suppress("DEPRECATION") // Address APIs support the Android 12 test rig and API 31+.
 object PrototypePresence {
     fun manager(context: Context): CompanionDeviceManager? =
-        if (BuildConfig.COMPANION_RUNTIME_PROTOTYPE && Build.VERSION.SDK_INT >= 31 &&
+        if (Build.VERSION.SDK_INT >= 31 &&
             context.packageManager.hasSystemFeature(PackageManager.FEATURE_COMPANION_DEVICE_SETUP))
             context.getSystemService(CompanionDeviceManager::class.java) else null
 
