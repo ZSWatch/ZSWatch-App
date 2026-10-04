@@ -1,5 +1,12 @@
 # Plan för ZSWatchApp: bakgrundsfunktioner och automatiska tester på riktig hårdvara
 
+> Current direction (2026-10-04): the OnePlus goal in
+> [ANDROID_COMPANION_FINISH_PLAN.md](ANDROID_COMPANION_FINISH_PLAN.md#next-goal-oneplus-voice-processing-and-android-acceptance)
+> prioritizes real local transcription/AI and modern-phone feature acceptance.
+> It supersedes this document's earlier Android AI deferral, rollout/migration
+> requirements and prototype flags. iOS remains deferred; progress notes below
+> retain historical evidence rather than setting the current work order.
+
 **Aktuell genomförandeordning, användarbeslut 2026-10-04:** följ
 [den korta slutförandeplanen](ANDROID_COMPANION_FINISH_PLAN.md). Gör Android-refaktorn
 direkt med befintlig Flutter-UI och native ägarskap i alla bygglägen. Ingen gammal

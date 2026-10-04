@@ -5,7 +5,174 @@ staging, compatibility and work-order recommendations in the background plan and
 progress review. Keep the existing Flutter UI; finish the native Android owner.
 Continue on `codex/companion-background-foundation` and commit completed work.
 
-## Revised goal wording
+## Next goal: OnePlus voice processing and Android acceptance
+
+User direction, 2026-10-04. The earlier Nokia implementation milestone is
+complete. This section defines the next goal and supersedes earlier AI deferral
+and pairing-first suggestions for Android. iOS remains deferred. Use the existing
+OnePlus NE2213 (Android 16/API 36, ADB `ae49cb83`), watch and current branch.
+Keep the existing Flutter UI and the single native companion owner.
+
+### Goal text
+
+Complete the remaining Android voice-note and AI integration in ZSWatchApp and
+validate the native companion on the OnePlus, following the OnePlus goal in
+ANDROID_COMPANION_FINISH_PLAN.md. Prioritize a real watch recording → verified
+phone copy → local transcription → local AI → persisted result → acknowledged
+watch delivery flow that runs without an open Flutter UI. Reuse the existing
+Whisper/LLM code, user-modified libraries, durable job/outbox contracts and Nordic
+SMP SDK. Restore the existing voice/model/result controls through the native
+owner. Keep local, hybrid and remote processing choices explicit; integrate and
+validate real remote processing when a provider, credentials and upload consent
+are available, recording any dependency separately. Verify the existing features
+on the newer phone, BLE responsiveness during inference, interrupted-work
+recovery, firmware transfer performance and a release-build smoke test. Fix
+actual app/firmware blockers, preserve watch originals, and commit completed work.
+Pairing cleanup follows the main functional work unless it blocks progress.
+Avoid a new native UI, legacy fallback, custom SMP, broad model benchmarks or iOS
+work. Finish with one evidence-backed pass/fail/pending matrix and clear limits
+for externally blocked or physically unavailable tests.
+
+### What the review found
+
+- The service-owned headless Dart worker is implemented as a deterministic
+  fixture. Real Whisper/LLM plugin execution was deliberately never run on Nokia.
+- Native recording receipts and Flutter import/playback exist, but recordings
+  are not connected to the production processing/job/result chain. Downloads
+  were paused in the final Nokia core tests. Earlier audio transfers sometimes
+  differed from independent USB hashes; do not assume the OnePlus fixes this.
+- The native app currently withholds the old AI-model settings and voice detail/
+  action routes. Source/model availability is not working product integration.
+- The remote job adapter tested recovery against a synthetic loopback backend;
+  it is not a real audio/text provider integration. Current watch result handling
+  lacks the job contract's application ACK and durable duplicate suppression.
+- GPS/Weather already passed on the OnePlus with Flutter destroyed. Nokia firmware,
+  filesystem and core passes remain useful evidence, but do not establish modern
+  Android inference, OEM background behavior or unplugged endurance.
+
+### Work order and acceptance
+
+1. **Deliver a small real local flow first.** Check existing model files and actual
+   phone RAM/storage; choose one practical existing STT model and one existing
+   LLM, initially supporting short Swedish and English samples. Use known-content
+   speech fixtures for repeatable assertions plus a real watch-origin recording.
+   Verify downloaded bytes against an independent USB reference and decode/play
+   them before blaming model output. Bound any integrity diagnosis to what blocks
+   this flow; use the user's Nordic fork, not a replacement transport. Preserve
+   source audio and originals; use only owned temporary fixtures for deletion
+   tests. Run one short headless-engine/plugin check, then connect real inference.
+   A precomputed transcript or deterministic fixture is not an inference pass.
+
+2. **Make the flow an ordinary app feature.** Native owns discovery/download,
+   committed recording identities, scheduling, job state and result delivery.
+   Reuse the existing Dart transcription/LLM/parser code behind a minimal
+   headless worker, registering only necessary plugins and no second BLE owner.
+   Reconnect existing Flutter model selection/download, transcript/summary,
+   playback, processing/retry/cancel and action controls to this state. Do not
+   start models just because a dashboard opens or BLE reconnects. Allow explicit
+   automatic processing policy, and persist enough input/configuration to retry
+   after interruption. Reuse the existing journals rather than building another
+   job framework or compatibility layer.
+
+3. **Close the result and action boundary.** Deliver a real result to the watch
+   through its existing voice-result UX, adding only the bounded firmware
+   capability/receipt/deduplication support actually required. Persist before
+   sending; require watch application acceptance before marking Delivered.
+   Reconnect or lost ACK must not create duplicate reminders, timers or alarms.
+   Restore existing confirmation/undo behavior where implemented. Validate notes,
+   reminders/events and timer/alarm interpretation, including Swedish/English
+   relative times and timezone handling. Draft/action extraction, watch receipt
+   and actual calendar/alarm creation are separate acceptance results. Use owned
+   test items and cleanup; record any permission or platform limitation rather
+   than calling an unsupported external action complete.
+
+4. **Support remote choices without blocking local progress.** Keep local STT,
+   remote STT/audio analysis and local/remote text analysis as separate choices.
+   Local STT plus remote text analysis does not accelerate transcription. Use
+   existing durable jobs for adapters; start with one selected provider, not a
+   new backend server or a catalog of providers. Test upload/submission, real
+   result parsing, retry/cancel, offline/credential errors and watch delivery.
+   Ask for provider/credentials/upload authorization only when necessary, while
+   continuing local and core work. No automatic local-to-cloud fallback. A
+   fixture can validate the adapter contract while configuration is missing,
+   but real remote inference stays explicitly pending until actually exercised.
+
+5. **Protect BLE while processing.** Initially serialize heavy model work. Measure
+   STT elapsed time/real-time factor, LLM elapsed time/tokens per second, memory,
+   thermal/battery behavior and response latency of notification/time/status and
+   a bounded HTTP request during inference. Unload models when appropriate.
+   Test short and one longer recording, silence/malformed input, cancellation,
+   missing model/storage and process interruption at meaningful boundaries.
+   Completed transcripts/results survive; interrupted inference may restart
+   from saved input. Explicit companion Stop remains respected. Choose Android
+   execution/scheduling and foreground-service types for the actual processing
+   task; a connected-device service alone is not proof of inference lifetime.
+   Android 16 long-running WorkManager work can consume job quota even with a
+   foreground service ([official documentation](https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/long-running));
+   service types have their own prerequisites/budgets
+   ([official documentation](https://developer.android.com/develop/background-work/services/fgs/service-types)).
+   Choose the smallest supported execution path; introduce a separate process
+   only if measured interference or crash isolation requires it.
+
+6. **Run one consolidated OnePlus feature pass.** Cover ordinary Flutter connect/
+   saved watches/disconnect, notifications (receive/update/dismiss), fresh time/
+   timezone, Internet policy/error recovery, GPS/Weather, media metadata/control,
+   Find Watch, recording discovery/download/playback/processing, Shell, log files,
+   watchface gallery/custom image and firmware/resource selection/progress.
+   Include outstanding Nokia cases: a nonempty log download checked independently,
+   relevant changing-file/cache isolation, Shell UI destruction and transfer/DFU
+   arbitration, watchface interruption/reattachment, and a real third-party media
+   player rather than only a synthetic MediaSession. Exercise what the shipped
+   UI actually supports; protocol enums and legacy placeholders for Find Phone,
+   calls/activity/navigation are not instructions to invent new products. Record
+   each absent/unsupported feature and decide any newly discovered real regression
+   against the pre-refactor behavior.
+
+7. **Verify updates and modern lifecycle, then finish.** On OnePlus, measure a
+   real board-matching application upload before another large filesystem test.
+   Record negotiated connection parameters, MTU/window/buffers, acknowledged
+   active upload speed, reboot/image verification and native recovery. The
+   accepted 17.6 KB/s remains a practical floor and old-app 20 KB/s+ a comparison;
+   investigate only a material regression, with one same-phone comparison if
+   needed. Then run one resource/combined path with deliberate integrity checking
+   and Flutter closed; reuse Nokia evidence and backups, avoiding repeated huge
+   downloads. Keep unavailable network-core image 1 verification explicit.
+   Run bounded radio/out-of-range/watch-reset recovery, process interruption,
+   Stop persistence, UI reattachment and one phone-reboot case where unlock is
+   available. Test one screen-off quiet period with real network requests and
+   queued AI work, followed by one approximately eight-hour endurance window after
+   functional fixes. Record physical power and OnePlus battery settings; USB or
+   forced idle does not prove unplugged operation. Prepare wireless ADB before
+   physical phone disconnection if available; save evidence locally during a
+   cable-free interval rather than requiring continuous polling. Do not disable
+   battery optimization silently. Intentional Android force-stop is reported
+   separately from recoverable process interruption and ordinary task dismissal.
+
+### Completion and iteration rules
+
+The main deliverable is a working real local voice/AI round trip in the ordinary
+app with Flutter absent, durable results and no observed loss of core BLE service
+under the tested workloads. Restore the existing UI features needed to use it.
+Run affected tests/builds after meaningful changes and verify the headless entry,
+plugins and one physical AI/core smoke in release, since debug fixture execution
+alone does not establish a shipping build. Record model/artifact versions and
+latency, without spending this goal optimizing every model or chasing maximum
+throughput. Keep one short pass/fail/pending matrix in this plan.
+
+After main functionality and the consolidated pass, address the pairing/recovery
+rough edge with one reproducible scenario and a focused fix. Do not require
+repeated unpair/reset rituals for normal use; if it blocks the main flow, move
+only that blocking correction earlier. Do not repeatedly rerun unrelated suites
+or extend tiny diagnostics while larger deliverables remain.
+
+Report remote-provider configuration, unavailable image targets or physically
+unavailable unplugged/reboot tests as specific pending acceptance, never as
+passed. A local milestone may be complete with those explicitly separated; do
+not describe all remote or endurance behavior as complete. iOS is outside this
+goal. Preserve unrelated changes and all original watch audio/background/crash
+files; use targeted firmware flashing and existing test tools.
+
+## Earlier Nokia goal wording (completed milestone)
 
 Finish the Android native companion refactor in the existing Flutter app. Make
 native ownership the normal Android path in all build modes and remove the
@@ -47,7 +214,7 @@ investigations.
 - No development freeze. Record the APK/firmware revision used for each relevant
   hardware result; continue editing and building normally.
 
-## Work order for Sol
+## Earlier Nokia work order (historical)
 
 Use this order as a practical default; finish prerequisites and active changes
 where that is more efficient. Firmware upload validation precedes large resource
