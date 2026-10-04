@@ -11,6 +11,7 @@ import '../../data/models/companion_gps_status.dart';
 import '../../data/models/companion_shell_result.dart';
 import '../../data/models/companion_log_files.dart';
 import '../../data/models/companion_watchface_status.dart';
+import '../../data/models/companion_firmware_status.dart';
 
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
@@ -339,6 +340,52 @@ class CompanionPrototypeClient {
       throw const FormatException('Unsupported SMP preparation response');
     }
     return value['generation'] as int;
+  }
+
+  Future<CompanionFirmwareAcceptance> startFirmware(
+    int generation,
+    List<CompanionFirmwareImage> images,
+  ) async {
+    if (generation < 0) {
+      throw const FormatException('Invalid firmware generation');
+    }
+    CompanionFirmwareImage.validate(images);
+    final value = await methods.invokeMethod<Object?>('startFirmware', {
+      'version': 1,
+      'generation': generation,
+      'images': images
+          .map((image) => {'index': image.index, 'bytes': image.bytes})
+          .toList(),
+    });
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['accepted'] != true ||
+        !CompanionFirmwareStatus.validId(value['id']) ||
+        value['generation'] is! int ||
+        value['generation'] != generation + 1) {
+      // An invalid/lost receipt does not prove that the native start was rejected.
+      throw const FormatException(
+        'Firmware acceptance is unknown. Check native status before retrying.',
+      );
+    }
+    return CompanionFirmwareAcceptance(
+      value['id'] as String,
+      value['generation'] as int,
+    );
+  }
+
+  Future<void> cancelFirmware(String id) async {
+    if (!CompanionFirmwareStatus.validId(id)) {
+      throw const FormatException('Invalid firmware operation ID');
+    }
+    final value = await methods.invokeMethod<Object?>('cancelFirmware', {
+      'version': 1,
+      'id': id,
+    });
+    if (value is! Map || value['version'] != 1 || value['accepted'] != true) {
+      throw const FormatException('Firmware cancellation was not accepted');
+    }
+    // The service snapshot, not this receipt, establishes terminal cancellation.
   }
 
   Future<String> startWatchface(

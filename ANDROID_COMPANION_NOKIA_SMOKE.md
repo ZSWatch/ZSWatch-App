@@ -1339,3 +1339,50 @@ network-core state must remain an explicit unknown outcome when selected. The
 read-only handoff does not substitute for a successful complete update. Existing
 Flutter firmware UI wiring and wider Android/endurance remain implementation/
 acceptance work; iOS and AI stay deferred.
+
+
+## Existing Flutter firmware UI checkpoint — 2026-10-04
+
+The existing Firmware Update screen is now wired to the service-owned Nordic
+backend in the native debug build. Firmware-only controls use native status/start/
+cancel; resource and combined actions remain explicitly disabled. Ordinary Flutter
+build behavior is retained. This checkpoint exercises the real screen and owner
+boundary on the Nokia, without a firmware/resource upload or watch reset.
+
+Frozen APKs and app-only UI/native observations are under the ignored private
+`.companion-hil-runs/20261004-native-firmware-ui/` directory:
+
+- `ordinary.apk`: SHA-256 `5e648f47f355f5ccba8d99eec4de4b58b991b7bda591a1884101d2081e3e4dea`;
+  compiled owner Flutter, native bridge absent (`ordinary-owner.json`).
+- `native.apk`: SHA-256 `378aaad1708a9f6ea49359b312f0a5e16c49ce303089b989fb526f73499e8f52`;
+  compiled owner native, bridge present (`native-owner.json`). Installed package
+  hash matched this file throughout the route/cleanup observations.
+
+The installation retained Stop generation 226. Startup displayed the existing
+saved-watch view. Its Connect action reached fresh native Ready generation 227,
+PID 20521; the paired watch reported 0.8.1/87% and fresh status/time. Recording
+sync stayed disabled, and the existing result-ready job/pending result stayed
+unchanged.
+
+The observed dashboard's Update Firmware button opened the existing screen:
+Available Releases, CI Builds, local ZIP picker and rotated-display option were
+present. No releases/builds were fetched and no package was selected. FW/FS
+buttons were disabled. Show Logs displayed `Companion firmware status available`.
+Native probes before and on the screen remained Ready in generation 227 with the
+same app PID, current watch-status observations and installed hash. Leaving the
+screen returned to the dashboard; its Disconnect action settled at Stop 228,
+no foreground service/notification and desired-running false. Recording sync and
+job/outbox counts were retained. Evidence includes `ui-start.json`,
+`ui-dashboard.json`, `ui-firmware.json`, `ui-firmware-logs.json`,
+`ready-before-navigation.json`, `ready-on-firmware-screen.json`,
+`ui-dashboard-return.json`, `ui-stopped.json` and `final-stopped.json`.
+
+Source validation: 153 final companion Flutter tests pass; 23 focused firmware/
+router tests also pass. The touched Dart source/tests have a clean analyzer check.
+Both debug APKs build and pass compiled-owner verification. The preceding native
+backend's 193 JVM tests remain its validation checkpoint; Kotlin was not changed
+by this UI wiring. Active-operation reattachment, unknown start acceptance,
+critical cancellation, process-loss metadata and unavailable image verification
+are deterministic test coverage here. Actual firmware upload/reset/postflight and
+physical process loss during an update remain unverified. The service stayed
+foreground/resumed for this navigation test; it is not an endurance test.

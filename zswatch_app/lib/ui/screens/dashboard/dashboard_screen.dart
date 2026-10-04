@@ -134,9 +134,7 @@ class DashboardScreen extends ConsumerWidget {
 
             // Quick actions
             _QuickActionsSection(
-              onFirmwareUpdate: native
-                  ? null
-                  : () => context.push(AppRoutes.firmware),
+              onFirmwareUpdate: () => context.push(AppRoutes.firmware),
               onDisconnect: () async {
                 // In demo mode, just turn off the flag
                 if (!native && ref.read(demoModeProvider)) {

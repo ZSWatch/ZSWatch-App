@@ -7,6 +7,8 @@ import 'package:zswatch_app/app.dart';
 import 'package:zswatch_app/providers/ai_providers.dart';
 import 'package:zswatch_app/providers/auto_reconnect_provider.dart';
 import 'package:zswatch_app/providers/chat_providers.dart';
+import 'package:zswatch_app/providers/dfu_providers.dart';
+import 'package:zswatch_app/providers/filesystem_providers.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
 import 'package:zswatch_app/providers/companion_watch_providers.dart';
@@ -101,6 +103,10 @@ void main() {
             permissionRequests++;
             if (denyPermission) throw StateError('Permission denied');
           }),
+          dfuServiceProvider.overrideWith((ref) => legacy('legacy DFU')),
+          filesystemUploadServiceProvider.overrideWith(
+            (ref) => legacy('legacy FS'),
+          ),
           database.databaseProvider.overrideWith((ref) => legacy('Drift')),
           watchServiceProvider.overrideWith(
             (ref) => legacy('Dart WatchService'),
@@ -258,7 +264,7 @@ void main() {
       expect(find.byType(DashboardScreen), findsOneWidget);
       expect(find.text('87%'), findsOneWidget);
       expect(find.text('Health'), findsNothing);
-      expect(find.text('Update Firmware'), findsNothing);
+      expect(find.text('Update Firmware'), findsOneWidget);
       await tester.tap(find.text('Disconnect'));
       await tester.pumpAndSettle();
       expect(calls.last.method, 'stop');
@@ -318,13 +324,28 @@ void main() {
   );
 
   testWidgets(
-    'deep links to unmigrated features cannot start AI, DFU, health or DB detail services',
+    'native firmware route preserves selection UI without legacy transport',
+    (tester) async {
+      await mount(tester, snapshot(active: true, ready: true));
+      router(tester).go(AppRoutes.firmware);
+      await tester.pumpAndSettle();
+      expect(find.text('Firmware Update'), findsOneWidget);
+      expect(find.text('Available Releases'), findsOneWidget);
+      expect(find.text('Select .zip firmware file'), findsOneWidget);
+      expect(forbidden, isEmpty);
+      expect(calls, isEmpty);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'deep links to unmigrated features cannot start AI, health or DB detail services',
     (tester) async {
       await mount(tester, snapshot(active: true, ready: true));
       final routes = router(tester);
       for (final path in [
         AppRoutes.aiModels,
-        AppRoutes.firmware,
         AppRoutes.health,
         AppRoutes.voiceMemoDetail(12),
       ]) {

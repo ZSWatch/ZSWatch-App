@@ -124,6 +124,10 @@ class AppRouter {
         builder: (context, state) => const FileSystemScreen(),
       ),
       GoRoute(
+        path: AppRoutes.firmware,
+        builder: (context, state) => const FirmwareUpdateScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.watchfaceBackground,
         builder: (context, state) => const WatchfaceBackgroundScreen(),
       ),

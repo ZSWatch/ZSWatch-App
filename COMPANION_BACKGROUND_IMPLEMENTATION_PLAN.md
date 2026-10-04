@@ -1662,3 +1662,45 @@ firmware update with independent preservation/recovery access and before/after
 image/version evidence. Actual flash/reboot, process loss during DFU, all-target
 verification, current Android and endurance remain acceptance work. The read-only
 handoff is not a completed physical firmware upgrade.
+
+
+### Checkpoint 2026-10-04: retained Flutter firmware UI uses native owner
+
+The existing Firmware Update route, dashboard action and DFU providers now use
+native status/start/cancel in the opt-in Android build. Selection/download/ZIP
+preparation and rotated variants remain Flutter; no competing Dart BLE/DFU
+service starts. Manifest indices, payload bounds and known board metadata are
+checked before SDK preparation. The exclusive handoff receipt has a distinct
+generation. Reattachment, terminal-only observations, cached owner loss,
+cancellation and an unknown start receipt cannot invent completion or replay a
+flash. 153 companion Flutter tests pass and touched-file analyzer checks are clean.
+
+Firmware-only controls can now enter the native route. Resource and combined
+controls remain visibly disabled, with guarded notifier methods and an isolated
+filesystem progress view. Ordinary builds retain their original owner and route.
+The preceding full-route guard requirement is now satisfied for firmware-only
+work; it is not a claim that the separate resource workflow is complete.
+
+Next implementation: give `/S/full_fs` its native resource-upload/verification
+lifetime and coordinate the existing resource-first combined sequence. A combined
+operation must be accepted by the service with all selected payloads; no Flutter
+await chain may own its second stage. Filesystem-only updates need an explicit
+reset/reattachment result. Preserve original watch data and do not use the gallery
+adapter for resources. Then test a known board-matching firmware artifact with
+independent USB recovery and actual active-image evidence. Keep network-core
+verification unavailable/unknown explicit until supported by a real watch check.
+
+
+Targeted resource-source check: `app/src/filesystem/zsw_custom_fs.c` maps
+`/S/full_fs` directly to the `lvgl_raw_partition`. Opening for write starts a
+stream-flash session and resets its exposed length; close flushes the tail. The
+read path rejects while writing and otherwise reads raw flash, so full-byte
+verification is available in the current source after close. This is source
+inspection, not proof of the installed firmware's behavior. Treat this upload as
+an in-place resource replacement, with an unknown/partial outcome after failure
+or process loss. Preserve the full original resource image and verify the installed
+firmware supports readback before physical write tests; the background/recording
+backups alone cannot restore that partition. Validate the package's table/trailer,
+lengths and board partition bound before accepting it. Do not use an arbitrary
+small filesystem fixture on `/S/full_fs`, or inherit gallery cancellation/retry
+semantics without accounting for raw-flash replacement.

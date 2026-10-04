@@ -1077,3 +1077,52 @@ both debug variants compile and pass owner verification. Actual firmware upload,
 reset, postflight and process-loss recovery on hardware remain unverified. UI
 wiring, filesystem/combined updates, network-core verification and modern Android/
 endurance remain goal work; no complete DFU feature or production switch is claimed.
+
+
+## Existing Flutter firmware screen — 2026-10-04
+
+The native debug app now exposes the existing Firmware Update route and dashboard
+button. Selection, releases/artifacts, local ZIP extraction, rotated firmware,
+progress cards and logs remain Flutter. The native branch of `dfu_providers.dart`
+never constructs DfuService, WatchService, a Dart BluetoothDevice or the legacy
+filesystem upload service. Ordinary builds retain their original DFU path.
+
+Prepared payloads preserve manifest `image_index`, including a single external
+index 2. Ambiguous multiple images without indices, duplicate targets, known
+board mismatches, changed file sizes and images over 8 MiB reject before native
+SMP preparation. The installed Nordic parser remains the authority for MCUboot
+structure. Preparation retains the existing one-generation SMP recovery; start
+acceptance must name a new exclusive generation (`prepared + 1`). There is one
+start command, with no timeout retry or automatic replay.
+
+Acceptance keeps the view busy until its operation appears in the snapshot.
+A missing/malformed start receipt produces an explicit unknown outcome and blocks
+another start until an intentional local reset. A reattached view derives progress
+and outcome from the shared native snapshot; entering/resetting/leaving the view
+does not clear or cancel native work. Cached active metadata cannot claim a live
+owner when the native service is absent. Only the backend's verified `completed`
+receipt displays success. SDK completion remains reconnecting/verifying; missing
+network-core image state displays an unverified result. Native failure views do
+not offer a one-tap Retry using the old payload. Reset dismisses the local receipt
+and selection without changing the native journal.
+
+Cancellation names the current operation and is offered only during upload while
+no cancellation is already requested. Its acceptance keeps the operation busy
+until Nordic publishes terminal status. Upgrade validation/confirmation/reset/
+postflight cannot be cancelled through this screen. Native critical-phase guidance
+asks the user to keep the watch powered and Bluetooth enabled; app-screen lifetime
+is not the upgrade owner. The combined log observer is bounded and disposed with
+the screen; it cannot stop the service.
+
+Resource and combined-update controls are explicitly disabled in this prototype,
+and their notifier entry points reject without creating a legacy owner. The
+firmware screen has a separate filesystem view so a retained watchface upload
+receipt cannot masquerade as a successful resource update. Resource-first combined
+updates and filesystem-only reset remain the next implementation step. A real
+board-matching firmware flash, process loss during DFU, network-core proof,
+modern Android and endurance are still acceptance gates.
+
+Validation: the final companion Flutter suite passes 153 tests; the 23 focused
+firmware/router tests also passed before that suite. Analyzer checks on all
+changed Dart files and tests are clean. No generated Freezed model or local
+Nordic wrapper changes are required for this wiring.

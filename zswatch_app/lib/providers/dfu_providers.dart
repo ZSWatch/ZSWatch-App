@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -8,6 +9,8 @@ import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../data/models/dfu_state.dart';
+import '../data/models/companion_firmware_status.dart';
+import 'companion_runtime_providers.dart';
 import '../data/models/filesystem_image.dart';
 import '../data/models/firmware_image.dart';
 import '../services/dfu/dfu_service.dart';
@@ -19,6 +22,9 @@ part 'dfu_providers.freezed.dart';
 
 /// Provider for the DFU service singleton
 final dfuServiceProvider = Provider<DfuService>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native firmware owner is selected');
+  }
   final service = DfuService();
   ref.onDispose(() => service.dispose());
   return service;
@@ -37,8 +43,81 @@ final dfuStateStreamProvider = StreamProvider<DfuState>((ref) {
   return service.stateStream;
 });
 
+final companionFirmwareStatusProvider =
+    Provider<AsyncValue<CompanionFirmwareStatus?>>((ref) {
+      return ref.watch(companionSnapshotProvider).whenData((snapshot) {
+        final status = CompanionFirmwareStatus.decode(snapshot.fields);
+        return status?.address == snapshot.fields['address'] ? status : null;
+      });
+    });
+
+// Local UI dismissal never resets, cancels or replays native work.
+final _submittedFirmwareGenerationProvider = StateProvider<int?>((ref) => null);
+final _dismissedFirmwareProvider = StateProvider<String?>((ref) => null);
+final _acceptedFirmwareProvider = StateProvider<CompanionFirmwareAcceptance?>(
+  (ref) => null,
+);
+
+/// Metadata for display; retained native work remains busy after UI reattachment.
+final effectiveDfuOperationStateProvider = Provider<DfuOperationState>((ref) {
+  final local = ref.watch(dfuNotifierProvider);
+  if (!ref.watch(nativeCompanionRuntimeProvider)) return local;
+  return local.copyWith(
+    isUpdating: ref.watch(dfuStateProvider).status.isInProgress,
+  );
+});
+
+/// Resource flashing remains guarded until it has a native service owner.
+final firmwareFilesystemStateProvider = Provider<FilesystemUploadState>((ref) {
+  return ref.watch(nativeCompanionRuntimeProvider)
+      ? const FilesystemUploadState()
+      : ref.watch(filesystemUploadStateProvider);
+});
+
 /// Provider for current DFU state
 final dfuStateProvider = Provider<DfuState>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    final asyncStatus = ref.watch(companionFirmwareStatusProvider);
+    if (asyncStatus.hasError || asyncStatus.isLoading) {
+      return const DfuState(
+        status: DfuStatus.failed,
+        errorMessage:
+            'Firmware status is unavailable. Reopen the screen when companion status is available.',
+      );
+    }
+    final status = asyncStatus.valueOrNull;
+    final submitted = ref.watch(_submittedFirmwareGenerationProvider);
+    final receipt = ref.watch(_acceptedFirmwareProvider);
+    final local = ref.watch(dfuNotifierProvider);
+    if (status?.busy == true) {
+      if (ref.watch(companionSnapshotProvider).valueOrNull?.runtimeActive !=
+          true) {
+        return const DfuState(
+          status: DfuStatus.failed,
+          errorMessage:
+              'The background service is unavailable during a firmware operation. The installed firmware is unverified. Reconnect and check the watch.',
+        );
+      }
+      return status!.dfuState;
+    }
+    if (!local.isUpdating &&
+        submitted != null &&
+        status?.generation != submitted &&
+        receipt == null) {
+      return const DfuState(
+        status: DfuStatus.failed,
+        errorMessage:
+            'Firmware acceptance is unknown. Check companion status and the watch before selecting another update.',
+      );
+    }
+    if (local.isUpdating || (receipt != null && status?.id != receipt.id)) {
+      return const DfuState(status: DfuStatus.preparing);
+    }
+    if (status == null || status.id == ref.watch(_dismissedFirmwareProvider)) {
+      return DfuState.idle;
+    }
+    return status.dfuState;
+  }
   final asyncValue = ref.watch(dfuStateStreamProvider);
   return asyncValue.valueOrNull ?? DfuState.idle;
 });
@@ -121,18 +200,28 @@ final workflowRunsProvider =
 
 /// State notifier for DFU operations
 class DfuNotifier extends StateNotifier<DfuOperationState> {
-  final DfuService _dfuService;
+  final DfuService? _dfuService;
+  int _nativeAttempt = 0;
   final FirmwareManager _firmwareManager;
   final Ref _ref;
 
   DfuNotifier(this._dfuService, this._firmwareManager, this._ref)
     : super(const DfuOperationState());
 
+  bool get _nativeSelectionBlocked =>
+      _ref.read(nativeCompanionRuntimeProvider) &&
+      (state.isAnyInProgress ||
+          _ref.read(companionFirmwareStatusProvider).valueOrNull?.busy ==
+              true ||
+          _ref.read(_acceptedFirmwareProvider) != null ||
+          _ref.read(_submittedFirmwareGenerationProvider) != null);
+
   /// Download firmware from a GitHub release asset
   Future<void> downloadReleaseAsset(
     GitHubRelease release,
     ReleaseAsset asset,
   ) async {
+    if (_nativeSelectionBlocked) return;
     state = state.copyWith(
       selectedRelease: release,
       isDownloading: true,
@@ -159,6 +248,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     WorkflowRun run,
     WorkflowArtifact artifact,
   ) async {
+    if (_nativeSelectionBlocked) return;
     debugPrint('[DfuNotifier] downloadArtifact called');
     debugPrint(
       '[DfuNotifier] Run: ${run.id}, Branch: ${run.branch}, SHA: ${run.shortSha}',
@@ -194,6 +284,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 
   /// Load a local firmware file
   Future<void> loadLocalFile(String filePath) async {
+    if (_nativeSelectionBlocked) return;
     state = state.copyWith(isDownloading: true, error: null);
 
     try {
@@ -236,6 +327,10 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 
   /// Start the DFU process (firmware only)
   Future<void> startUpdate() async {
+    if (_ref.read(nativeCompanionRuntimeProvider)) {
+      await _startNativeFirmware();
+      return;
+    }
     final image = state.downloadedImage;
     if (image == null) {
       state = state.copyWith(error: 'No firmware selected');
@@ -269,7 +364,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       final bluetoothDevice = BluetoothDevice.fromId(deviceId);
 
       // Start the DFU
-      await _dfuService.startUpdate(
+      await _dfuService!.startUpdate(
         device: bluetoothDevice,
         firmwareImages: images,
       );
@@ -280,8 +375,119 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     }
   }
 
+  Future<void> _startNativeFirmware() async {
+    final nativeStatus = _ref.read(companionFirmwareStatusProvider);
+    if (state.isAnyInProgress ||
+        _ref.read(_submittedFirmwareGenerationProvider) != null ||
+        _ref.read(_acceptedFirmwareProvider) != null ||
+        (nativeStatus.valueOrNull != null &&
+            nativeStatus.valueOrNull!.id !=
+                _ref.read(_dismissedFirmwareProvider))) {
+      return;
+    }
+    if (nativeStatus.hasError || nativeStatus.isLoading) {
+      state = state.copyWith(error: 'Companion firmware status is unavailable');
+      return;
+    }
+    final image = state.downloadedImage;
+    if (image == null) {
+      state = state.copyWith(error: 'No firmware selected');
+      return;
+    }
+    final snapshot = _ref.read(companionSnapshotProvider).valueOrNull;
+    if (snapshot == null ||
+        !snapshot.runtimeActive ||
+        !snapshot.protocolReady) {
+      state = state.copyWith(
+        error: 'Connect the watch before updating firmware',
+      );
+      return;
+    }
+    final address = snapshot.fields['address'];
+    final attempt = ++_nativeAttempt;
+    state = state.copyWith(isUpdating: true, error: null);
+    try {
+      final images = await _firmwareManager.prepareFirmware(image);
+      if (!mounted || attempt != _nativeAttempt) return;
+      state = state.copyWith(preparedImages: images);
+      if (images.isEmpty || images.length > 3) {
+        throw const FormatException('Expected one to three firmware images');
+      }
+      final payloads = <CompanionFirmwareImage>[];
+      for (final prepared in images) {
+        // Preserve manifest image_index, including single external index 2.
+        // Multiple images without indices must not silently target image 0.
+        final index = prepared.slot ?? (images.length == 1 ? 0 : -1);
+        if (index < 0 ||
+            index > 2 ||
+            payloads.any((item) => item.index == index)) {
+          throw const FormatException(
+            'Firmware package needs distinct image indices',
+          );
+        }
+        final board = FirmwareManager.boardPrefixFromHardwareVersion(
+          prepared.board,
+        );
+        final selectedBoard = FirmwareManager.boardPrefixFromHardwareVersion(
+          snapshot.watch?.hardwareVersion,
+        );
+        if (board != null && selectedBoard != null && board != selectedBoard) {
+          throw const FormatException(
+            'Firmware package is for another watch board',
+          );
+        }
+        final file = File(prepared.filePath);
+        final size = await file.length();
+        if (size < 1 ||
+            size > CompanionFirmwareStatus.maxImageBytes ||
+            size != prepared.size) {
+          throw const FormatException(
+            'Unsupported or changed firmware image size',
+          );
+        }
+        final bytes = await file.readAsBytes();
+        if (bytes.length != size) {
+          throw const FormatException('Firmware image changed while reading');
+        }
+        payloads.add(CompanionFirmwareImage(index, bytes));
+      }
+      CompanionFirmwareImage.validate(payloads);
+      if (!mounted || attempt != _nativeAttempt) return;
+      final current = _ref.read(companionSnapshotProvider).valueOrNull;
+      if (current == null ||
+          !current.runtimeActive ||
+          !current.protocolReady ||
+          current.fields['address'] != address ||
+          current.generation != snapshot.generation) {
+        throw StateError('Watch connection changed while preparing firmware');
+      }
+      final client = _ref.read(companionClientProvider);
+      final preparedGeneration = await client.prepareShell(snapshot.generation);
+      if (!mounted || attempt != _nativeAttempt) return;
+      _ref.read(_acceptedFirmwareProvider.notifier).state = null;
+      _ref.read(_submittedFirmwareGenerationProvider.notifier).state =
+          preparedGeneration + 1;
+      final receipt = await client.startFirmware(preparedGeneration, payloads);
+      if (!mounted) return; // UI disposal never stops accepted native work.
+      _ref.read(_acceptedFirmwareProvider.notifier).state = receipt;
+      _ref.read(_dismissedFirmwareProvider.notifier).state = null;
+      state = state.copyWith(isUpdating: false);
+    } catch (error) {
+      if (mounted && attempt == _nativeAttempt) {
+        state = state.copyWith(isUpdating: false, error: error.toString());
+      }
+    }
+  }
+
   /// Start filesystem upload only
   Future<void> startFilesystemUpload() async {
+    if (_ref.read(nativeCompanionRuntimeProvider)) {
+      state = state.copyWith(
+        error:
+            'Resource updates are not available in this native prototype yet',
+      );
+      return;
+    }
     final fsImage = state.filesystemImage;
     if (fsImage == null) {
       state = state.copyWith(error: 'No filesystem image available');
@@ -336,6 +542,13 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 
   /// Start both filesystem upload and firmware update (filesystem first, then firmware)
   Future<void> startBothUpdates() async {
+    if (_ref.read(nativeCompanionRuntimeProvider)) {
+      state = state.copyWith(
+        error:
+            'Combined updates are not available in this native prototype yet',
+      );
+      return;
+    }
     final fsImage = state.filesystemImage;
     final fwImage = state.downloadedImage;
 
@@ -398,7 +611,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
         final bluetoothDevice = BluetoothDevice.fromId(deviceId);
 
         // Start the DFU
-        await _dfuService.startUpdate(
+        await _dfuService!.startUpdate(
           device: bluetoothDevice,
           firmwareImages: images,
         );
@@ -412,7 +625,23 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 
   /// Cancel the current operation
   Future<void> cancel() async {
-    if (_dfuService.isInProgress) {
+    if (_ref.read(nativeCompanionRuntimeProvider)) {
+      final status = _ref.read(companionFirmwareStatusProvider).valueOrNull;
+      if (status != null && status.busy) {
+        if (!status.canCancel) return;
+        try {
+          await _ref.read(companionClientProvider).cancelFirmware(status.id);
+        } catch (error) {
+          if (mounted) state = state.copyWith(error: error.toString());
+        }
+        return; // Wait for Nordic terminal status; do not invent cancellation.
+      }
+      if (state.isUpdating) return; // Start receipt may still be in flight.
+      _firmwareManager.cancelDownload();
+      state = state.copyWith(isDownloading: false);
+      return;
+    }
+    if (_dfuService!.isInProgress) {
       await _dfuService.cancel();
     }
 
@@ -432,7 +661,18 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 
   /// Reset state
   void reset() {
-    _dfuService.reset();
+    if (_ref.read(nativeCompanionRuntimeProvider)) {
+      final status = _ref.read(companionFirmwareStatusProvider).valueOrNull;
+      if (state.isUpdating || status?.busy == true) return;
+      _nativeAttempt++;
+      _ref.read(_dismissedFirmwareProvider.notifier).state = status?.id;
+      _ref.read(_acceptedFirmwareProvider.notifier).state = null;
+      _ref.read(_submittedFirmwareGenerationProvider.notifier).state = null;
+      _firmwareManager.resetProgress();
+      state = const DfuOperationState();
+      return;
+    }
+    _dfuService!.reset();
     _ref.read(filesystemUploadServiceProvider).reset();
     _firmwareManager.resetProgress();
     state = const DfuOperationState();
@@ -452,7 +692,9 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 /// Provider for DFU notifier
 final dfuNotifierProvider =
     StateNotifierProvider<DfuNotifier, DfuOperationState>((ref) {
-      final dfuService = ref.watch(dfuServiceProvider);
+      final dfuService = ref.watch(nativeCompanionRuntimeProvider)
+          ? null
+          : ref.watch(dfuServiceProvider);
       final firmwareManager = ref.watch(firmwareManagerProvider);
       return DfuNotifier(dfuService, firmwareManager, ref);
     });
@@ -533,8 +775,24 @@ abstract class DfuOperationState with _$DfuOperationState {
 
 /// Provider for DFU logs (combined from all services)
 final dfuLogsProvider = StreamProvider<String>((ref) {
-  final dfuService = ref.watch(dfuServiceProvider);
   final firmwareManager = ref.watch(firmwareManagerProvider);
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return Rx.merge([
+      firmwareManager.logStream,
+      companionValues(ref, (snapshot) {
+        CompanionFirmwareStatus? status;
+        try {
+          status = CompanionFirmwareStatus.decode(snapshot.fields);
+        } on FormatException {
+          return 'Firmware status unavailable';
+        }
+        return status == null
+            ? 'Companion firmware status available'
+            : 'Firmware: ${status.phase}${status.error == null ? '' : ' (${status.error})'}';
+      }).distinct(),
+    ]);
+  }
+  final dfuService = ref.watch(dfuServiceProvider);
   final fsService = ref.watch(filesystemUploadServiceProvider);
 
   return Rx.merge([
