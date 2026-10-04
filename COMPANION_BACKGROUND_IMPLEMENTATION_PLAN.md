@@ -1521,3 +1521,35 @@ unplugged operation. Retain remote HTTP network/deadline and watch error handlin
 as bounded follow-ups, and GPS/Weather's explicit location approval. The debug
 native boundary remains in place; no production owner switch occurred. Keep
 iOS/model execution and recording corruption separate from this core migration.
+
+
+### Checkpoint 2026-10-04: existing Flutter Files screen through native owner
+
+The existing log-file workflow now uses service-owned Nordic status/download
+operations through the existing Flutter File System screen. Fixed log paths,
+bounded deadlines, pre-download allocation limits, chunk/final-size checks and
+Stop/generation fencing are implemented. Shell, preparation, logs and recording
+transfers cannot run competing SDK operations; disabling recording sync does not
+release a lease held by another feature. UI disposal leaves accepted work owned
+by the service and ignores its stale UI completion.
+
+The initial Nokia trial exposed Nordic's missing-file error-callback variant;
+only the existing SDK NO_ENTRY and Zephyr fs FILE_NOT_FOUND outcomes are skipped.
+Transport/permission errors remain visible. Ordinary and native debug variants
+are built and their packaged owners verified. The runbook records exact tests,
+physical results and limits. General filesystem browsing/upload/delete,
+watchfaces/DFU, physical nonempty log downloads and multi-watch cache isolation
+remain separate acceptance/migration work. No production owner switch, custom
+SMP protocol, AI execution or iOS work is included in this checkpoint.
+
+
+Final Nokia checkpoint: one cold Files inspection from Ready 207 returned the
+existing empty Logs view, matching eight independent USB FileStatus checks.
+Post-idle SMP was disabled and the native owner reached live Ready 209 with
+fresh status/time. Explicit Stop 210 released it; all nine recordings and the
+existing crash file matched their original hashes. Final validation is 156
+native tests, 128 Flutter companion tests, clean focused analysis and both owner-
+verified debug APKs. Nonempty log download remains physical acceptance; no log
+fixture was created on the user's watch. Continue with watchface/DFU coordination
+and wider Android lifecycle acceptance, keeping the remaining HTTP requirements and pending
+location-transmission approval explicit and iOS/AI deferred.

@@ -931,3 +931,43 @@ report records real cold Power Status, CPU Frequency, a same-generation command
 burst/Home observation and idle/Stop cleanup. Physical Flutter engine destruction,
 SDK failure during idle cleanup, large monitor output and simultaneous transfer/
 DFU arbitration remain acceptance items. No AI ran and no recording was deleted.
+
+
+## Service-owned log files — 2026-10-04
+
+The existing Flutter File System screen is now available in the native debug
+router and the existing developer controls. Its Logs tab retains the eight known
+`/user/logs/log0000`…`log0007` probes and local log viewer. The existing Files tab
+remains empty; this does not add general filesystem browsing, upload, deletion,
+watchface or DFU support.
+
+SMP preparation uses the same existing Nordic connection/readiness path as
+Shell. A service-owned operation serializes the log probes/download with Shell,
+preparation and background recording downloads. Preparation may cross one
+bounded service-change recovery before accepting work. The accepted operation
+never replays after disconnect, Stop or process loss. UI disposal does not cancel
+an accepted service operation; a disposed notifier ignores its later result.
+
+Only the fixed log paths are accepted at both bridge boundaries. Listing has a
+60-second deadline. Download first checks actual size, rejects files above 4 MiB,
+then uses the existing Nordic FsManager/CheckedFsManager path to check offsets,
+chunk bounds and final length. Empty files complete without starting a transfer.
+A log changing size while being read fails; no partial bytes reach the viewer.
+The screen uses an indeterminate download spinner, with no progress event stream.
+Transient log bytes are not journaled; process loss requires explicit retry.
+No watch file is written or removed by this path.
+
+Nordic can report missing status through `McuMgrErrorException`, not just an
+unsuccessful status response. Only SMP v1 NO_ENTRY or Zephyr's existing fs group
+8/FILE_NOT_FOUND=3 is skipped. Other SDK, permission and connection failures
+surface as errors, rather than a misleading empty list. The first bounded Nokia
+trial retained the incorrect error-callback mapping; SDK-class regression tests
+cover the correction. Recording-sync disable now releases only an active
+recording transfer, preserving unrelated Shell/log SDK work.
+
+Deterministic tests cover fixed paths, metadata/byte validation, exclusive work,
+duplicate callbacks, Stop/reconnect, deadlines, empty/oversized/changed logs,
+actual SDK error variants, existing Files UI and UI disposal without legacy BLE.
+Physical nonempty log download, mutable log content, UI-engine destruction,
+multi-watch local-cache isolation, modern Android and concurrent DFU acceptance
+remain. See the Nokia report for bounded hardware observations and APK hashes.

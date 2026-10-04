@@ -9,6 +9,7 @@ import '../../data/models/companion_http_status.dart';
 import '../../data/models/companion_watch_selection.dart';
 import '../../data/models/companion_gps_status.dart';
 import '../../data/models/companion_shell_result.dart';
+import '../../data/models/companion_log_files.dart';
 
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
@@ -337,6 +338,22 @@ class CompanionPrototypeClient {
       throw const FormatException('Unsupported SMP preparation response');
     }
     return value['generation'] as int;
+  }
+
+  Future<CompanionLogFiles> inspectLogs(int generation, {String? path}) async {
+    if (generation < 0 ||
+        (path != null && !CompanionLogFiles.validPath(path))) {
+      throw const FormatException('Invalid log inspection request');
+    }
+    return CompanionLogFiles.decode(
+      await methods.invokeMethod<Object?>('inspectLogs', {
+        'version': 1,
+        'generation': generation,
+        'path': path,
+      }),
+      generation,
+      path: path,
+    );
   }
 
   Future<CompanionShellResult> executeShell(

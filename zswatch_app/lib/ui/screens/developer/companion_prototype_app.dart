@@ -11,6 +11,7 @@ import '../../../providers/watch_service_provider.dart';
 import '../voice_memos/voice_memos_screen.dart';
 import '../notifications/notification_settings_screen.dart';
 import 'shell_screen.dart';
+import 'file_system_screen.dart';
 
 /// An isolated prototype view. It does not create WatchService or any AI provider.
 class CompanionPrototypeApp extends ConsumerStatefulWidget {
@@ -106,6 +107,7 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
         '/voice-notes': (context) => const VoiceMemosScreen(),
         '/notifications': (context) => const NotificationSettingsScreen(),
         '/shell': (context) => const ShellScreen(),
+        '/files': (context) => const FileSystemScreen(),
       },
       home: Scaffold(
         appBar: AppBar(title: const Text('Companion prototype')),
@@ -134,6 +136,14 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
                     ? () => Navigator.of(context).pushNamed('/shell')
                     : null,
                 child: const Text('Shell'),
+              ),
+            ),
+            Builder(
+              builder: (context) => OutlinedButton(
+                onPressed: state?.protocolReady == true
+                    ? () => Navigator.of(context).pushNamed('/files')
+                    : null,
+                child: const Text('Files'),
               ),
             ),
             TextField(

@@ -9,6 +9,8 @@ import '../data/models/fs_file_entry.dart';
 import '../services/filesystem/file_system_service.dart';
 import '../services/watch_service.dart';
 import 'watch_service_provider.dart';
+import 'companion_runtime_providers.dart';
+import '../data/models/companion_log_files.dart';
 
 class FileSystemState {
   final List<FsFileEntry> logFiles;
@@ -60,13 +62,37 @@ const _sentinel = Object();
 
 class FileSystemNotifier extends StateNotifier<FileSystemState> {
   final FileSystemService _service;
-  final WatchService _watchService;
+  final WatchService? _watchService;
+  final Future<CompanionLogFiles> Function(String? path)? _nativeInspect;
 
-  FileSystemNotifier(this._service, this._watchService)
-    : super(const FileSystemState());
+  FileSystemNotifier(
+    this._service,
+    this._watchService, {
+    Future<CompanionLogFiles> Function(String? path)? nativeInspect,
+  }) : _nativeInspect = nativeInspect,
+       super(const FileSystemState());
 
   Future<void> refreshLogs() async {
-    final device = _watchService.device;
+    if (state.isLoadingLogs || state.downloadingPath != null) return;
+    final native = _nativeInspect;
+    if (native != null) {
+      state = state.copyWith(isLoadingLogs: true, loadError: null);
+      try {
+        final result = await native(null);
+        if (mounted) {
+          state = state.copyWith(isLoadingLogs: false, logFiles: result.files);
+        }
+      } catch (error) {
+        if (mounted) {
+          state = state.copyWith(
+            isLoadingLogs: false,
+            loadError: error.toString(),
+          );
+        }
+      }
+      return;
+    }
+    final device = _watchService!.device;
     if (device == null) {
       state = state.copyWith(loadError: 'No device connected');
       return;
@@ -106,9 +132,36 @@ class FileSystemNotifier extends StateNotifier<FileSystemState> {
   }
 
   Future<void> downloadFile(FsFileEntry entry) async {
-    if (state.downloadingPath != null) return;
+    if (state.downloadingPath != null || state.isLoadingLogs) return;
+    final native = _nativeInspect;
+    if (native != null) {
+      state = state.copyWith(
+        downloadingPath: entry.path,
+        downloadProgress: 0.0,
+      );
+      try {
+        final result = await native(entry.path);
+        final localPath = await _saveToLocalStorage(
+          result.files.single.name,
+          result.bytes!,
+        );
+        if (mounted) {
+          state = state.copyWith(
+            downloadingPath: null,
+            downloadProgress: 0.0,
+            downloadedPaths: {...state.downloadedPaths, entry.path: localPath},
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          state = state.copyWith(downloadingPath: null, downloadProgress: 0.0);
+        }
+        rethrow;
+      }
+      return;
+    }
 
-    final device = _watchService.device;
+    final device = _watchService!.device;
     if (device == null) {
       _log('No device connected');
       return;
@@ -182,6 +235,20 @@ final fileSystemServiceProvider = Provider<FileSystemService>((ref) {
 final fileSystemProvider =
     StateNotifierProvider<FileSystemNotifier, FileSystemState>((ref) {
       final service = ref.watch(fileSystemServiceProvider);
-      final watchService = ref.watch(watchServiceProvider);
-      return FileSystemNotifier(service, watchService);
+      if (ref.watch(nativeCompanionRuntimeProvider)) {
+        return FileSystemNotifier(
+          service,
+          null,
+          nativeInspect: (path) async {
+            final snapshot = ref.read(companionSnapshotProvider).requireValue;
+            if (!snapshot.protocolReady) {
+              throw StateError('Current Ready session required');
+            }
+            final client = ref.read(companionClientProvider);
+            final generation = await client.prepareShell(snapshot.generation);
+            return client.inspectLogs(generation, path: path);
+          },
+        );
+      }
+      return FileSystemNotifier(service, ref.watch(watchServiceProvider));
     });

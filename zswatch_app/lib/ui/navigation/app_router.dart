@@ -119,6 +119,10 @@ class AppRouter {
         path: AppRoutes.shell,
         builder: (context, state) => const ShellScreen(),
       ),
+      GoRoute(
+        path: AppRoutes.fileSystem,
+        builder: (context, state) => const FileSystemScreen(),
+      ),
     ],
     errorBuilder: (context, state) => const Scaffold(
       body: Center(child: Text('This feature is not available in this build')),

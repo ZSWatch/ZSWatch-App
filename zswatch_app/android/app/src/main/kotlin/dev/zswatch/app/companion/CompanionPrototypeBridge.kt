@@ -130,6 +130,25 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
+                "inspectLogs" -> PrototypeHub.worker.post {
+                    try {
+                        val args = call.arguments as? Map<*, *> ?: error("Arguments required")
+                        val generation = when (val value = args["generation"]) {
+                            is Int -> value.toLong()
+                            is Long -> value
+                            else -> error("Integer generation required")
+                        }
+                        require(generation >= 0)
+                        val path = args["path"]
+                        require(path == null || path is String)
+                        val link = CompanionPrototypeService.instance?.transport ?: error("Native owner required")
+                        link.inspectLogs(generation, path as String?) { outcome -> PrototypeHub.main.post {
+                            outcome.fold({ reply -> result.success(mapOf("version" to 1, "generation" to generation,
+                                "files" to reply.files.map { mapOf("path" to it.path, "size_bytes" to it.size) },
+                                "bytes" to reply.bytes)) }, { error -> result.error("LOG_FILES_FAILED", error.message, null) })
+                        } }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("LOG_FILES_FAILED", error.message, null) } }
+                }
                 "prepareShell", "executeShell" -> PrototypeHub.worker.post {
                     try {
                         val args = call.arguments as? Map<*, *> ?: error("Arguments required")

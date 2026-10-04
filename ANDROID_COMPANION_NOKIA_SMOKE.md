@@ -1177,3 +1177,54 @@ large monitor replies and simultaneous file/DFU operations remain acceptance wor
 The final cleanup guard prevents an expired lease from releasing an SDK connection
 while preparation is active. Real Weather still requires the separate location
 approval; AI/iOS and transfer-corruption investigation remain deferred.
+
+
+## 2026-10-04 — native-owned existing Flutter log-files workflow
+
+Private evidence: `.companion-hil-runs/20261004-native-log-files/`.
+The existing Flutter File System screen now uses native-owned Nordic log
+inspection/download. General file browsing/upload/delete and watchface/DFU are
+not implemented by this checkpoint. Recording downloads remained disabled;
+no AI or recording creation/deletion occurred.
+
+- Final ordinary APK `ordinary-final.apk` SHA-256
+  `66fdc51fb45b9e4ba7e729fcdc9f0664c26e35475bd6106744e8a420812a9ff1`;
+  packaged Flutter owner/absent native bridge verified. It was not installed.
+- Final native APK `native-final.apk` SHA-256
+  `c96db6e0218849fd6ef0b00ef827f7af4da91748899fad2897170c734f2643e4`;
+  native flag and MainActivity bridge verified, installed hash matched. Install
+  retained Stop 206 before explicitly starting the saved paired watch.
+- Initial APK `native.apk` SHA-256
+  `51d7068c199b41bd97ca8d17fb55cdb6d66a0fc4988cbad441751038eb06a40a`
+  reached Ready 203, then surfaced `McuMgrErrorException` for absent log status.
+  `files-settled.png` retains this failed adapter trial; it is not a listing pass.
+  Stop 206 released the owner before replacing it.
+- USB FileStatus independently verified all eight known log paths absent and
+  BLE FOTA/SMP disabled before the final cold run. The optional `fs ls` shell
+  command was unavailable on this firmware; its failed attempt established no
+  directory evidence. The subsequent direct FileStatus checks succeeded.
+- With the corrected APK, one Files tap from Ready 207 completed SMP preparation
+  and the log inspection without a manual retry. `final-files-result.png` shows
+  the existing empty Logs message, consistent with independent USB FileStatus.
+- After idle, USB again verified SMP disabled and nine recordings/no active
+  recording. Read-only Nokia observation found live Ready 209, PID 17664, fresh
+  watch status/time and recording sync still disabled. This is a bounded UI
+  listing/cleanup observation, not engine-destruction or background endurance.
+- Explicit Stop 210 was subsequently verified: desired-running false, native
+  service absent and native notification state cleared. The final installed APK
+  remains above; synthetic job/result state was retained.
+- `watch-preservation-final.json` confirms all nine original recordings and the
+  existing crash file exactly match their pre-HTTP firmware hashes.
+
+Validation: 156 native JVM tests, zero failures/errors; 128 Flutter companion
+regressions; focused analysis reports no issues; both final debug APKs build and
+pass packaged-owner verification. SDK tests cover missing-file response and
+error callback variants, preserving other errors. Lifecycle tests cover stale
+callbacks, Stop/reconnect, timeout, size limits and exclusive requests. Real
+Files-widget tests prove no legacy BLE owner is initialized.
+
+Physical nonempty log download, changing files, simultaneous competing SDK
+requests, UI-engine destruction, multi-watch cache isolation and modern Android
+remain unverified. This firmware has no existing log fixture to download. Do
+not count synthetic byte-validation tests or an empty listing as that acceptance.
+The Files tab itself retains the existing empty implementation.

@@ -8,6 +8,8 @@ import dev.zswatch.app.LifecycleLogger
 import io.runtime.mcumgr.ble.McuMgrBleTransport
 import io.runtime.mcumgr.McuMgrCallback
 import io.runtime.mcumgr.McuMgrTransport
+import io.runtime.mcumgr.managers.FsManager
+import io.runtime.mcumgr.response.fs.McuMgrFsStatusResponse
 import io.runtime.mcumgr.managers.ShellManager
 import io.runtime.mcumgr.response.shell.McuMgrExecResponse
 import io.runtime.mcumgr.exception.McuMgrException
@@ -65,7 +67,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         { delay, action -> handler.postDelayed(action, delay) },
         { generation ->
             if (!closing && generation == token && runtime.owns(generation) &&
-                store.control()["phase"] == "ready" && !smpPreparation.busy && !shellOperation.busy && !downloading) safely {
+                store.control()["phase"] == "ready" && !smpPreparation.busy && !shellOperation.busy && !logFiles.busy && !downloading) safely {
                 val previous = fileTransport; fileTransport = null
                 previous?.release()
                 command("GB({\"t\":\"smp\",\"status\":false})")
@@ -115,12 +117,13 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     internal fun executeShell(generation: Long, text: String, done: (Result<PrototypeShellReply>) -> Unit) {
         check(!smpPreparation.busy) { "SMP preparation is running" }
+        check(!logFiles.busy) { "Log operation is running" }
         check(!downloading) { "Recording transfer is running; retry afterward" }
         shellOperation.start(generation, text, done)
     }
 
     internal fun prepareShell(generation: Long, done: (Result<Long>) -> Unit) {
-        check(!downloading && !shellOperation.busy) { "SMP operation is running" }
+        check(!downloading && !shellOperation.busy && !logFiles.busy) { "SMP operation is running" }
         smpPreparation.start(generation) { result ->
             if (result.isFailure && runtime.owns(token) && store.control()["phase"] == "ready") {
                 val session = token
@@ -131,6 +134,53 @@ class NativePrototypeTransport(private val context: Context, private val handler
             done(result)
         }
     }
+    private var logTransfer: TransferController? = null
+    private val logFiles = PrototypeLogFiles(
+        owns = { generation -> runtime.owns(generation) && token == generation && store.control()["phase"] == "ready" },
+        later = { delay, action -> handler.postDelayed(action, delay) },
+        status = { path, done ->
+            FsManager(mcuTransport(store.control()["address"] as String, token)).status(path,
+                object : McuMgrCallback<McuMgrFsStatusResponse> {
+                    override fun onResponse(response: McuMgrFsStatusResponse) { handler.post {
+                        done(PrototypeLogStatus.response(response))
+                    } }
+                    override fun onError(error: McuMgrException) { handler.post {
+                        done(PrototypeLogStatus.failure(error))
+                    } }
+                })
+        },
+        download = { path, size, done ->
+            logTransfer = CheckedFsManager(mcuTransport(store.control()["address"] as String, token), size) { _, _, _ -> }
+                .fileDownload(path, object : DownloadCallback {
+                    override fun onDownloadProgressChanged(current: Int, total: Int, timestamp: Long) {}
+                    override fun onDownloadCompleted(bytes: ByteArray) { handler.post { done(Result.success(bytes)) } }
+                    override fun onDownloadFailed(error: McuMgrException) { handler.post {
+                        done(Result.failure(IllegalStateException(error.javaClass.simpleName)))
+                    } }
+                    override fun onDownloadCanceled() { handler.post { done(Result.failure(IllegalStateException("Log download cancelled"))) } }
+                })
+        },
+        release = { generation ->
+            val previous = logTransfer; logTransfer = null
+            runCatching { previous?.cancel() }
+            if (!closing && runtime.owns(generation) && token == generation && store.control()["phase"] == "ready") {
+                smpIdleLease.idle(generation)
+                handler.postDelayed({ if (runtime.owns(generation)) safely { downloadNext() } }, 100)
+            }
+        },
+    )
+
+    internal fun inspectLogs(generation: Long, path: String?, done: (Result<PrototypeLogReply>) -> Unit) {
+        check(!downloading && !smpPreparation.busy && !shellOperation.busy) { "SMP operation is running" }
+        check(fileTransport?.isReady == true && smpIdleLease.held(generation)) { "Prepare SMP first" }
+        // Validate before taking the lease so invalid requests cannot suppress cleanup.
+        require(path == null || path in PrototypeLogFiles.paths) { "Only known log paths are supported" }
+        check(!logFiles.busy) { "Log operation is running" }
+        check(runtime.owns(generation) && token == generation && store.control()["phase"] == "ready") { "Current Ready session required" }
+        smpIdleLease.hold(generation)
+        logFiles.start(generation, path, done)
+    }
+
     private val findWatch = PrototypeFindWatch(android.os.SystemClock::elapsedRealtime,
         { delay, action -> handler.postDelayed(action, delay) }, ::sendFindWatch,
         { generation, state ->
@@ -474,6 +524,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
     fun setRecordingSync(enabled: Boolean) {
         store.update("recording_sync_configuration", mapOf("recording_sync_enabled" to enabled))
         if (enabled) { downloadNext(); return }
+        // Disabling recording sync owns only an active recording transfer.
+        // It must not release an SDK lease used by Shell or log inspection.
+        if (!downloading) return
         // Fence the SDK callback before cancellation/release. Resume reconciles
         // retained pending entries and never deletes a watch recording.
         fileOperation++; downloading = false
@@ -554,7 +607,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     private fun downloadNext() {
-        if (downloading || shellOperation.busy || smpPreparation.busy || !runtime.owns(token) || store.control()["phase"] != "ready") return
+        if (downloading || shellOperation.busy || logFiles.busy || smpPreparation.busy || !runtime.owns(token) || store.control()["phase"] != "ready") return
         if (store.control()["recording_sync_enabled"] == false) return
         val address = store.control()["address"] as String
         val pending = records().entries.firstOrNull { it.value["address"] == address && it.value["state"] == "pending" } ?: return
@@ -653,6 +706,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         if (store.control()["desired_running"] != true) smpPreparation.close()
         smpIdleLease.close()
         shellOperation.close()
+        logFiles.close()
         mediaClosed()
         gpsClosed()
         findWatch.close()
