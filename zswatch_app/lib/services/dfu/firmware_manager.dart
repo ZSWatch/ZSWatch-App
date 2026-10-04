@@ -1042,6 +1042,15 @@ class FirmwareManager {
       );
     }
 
+    if (FilesystemConstants.isFilesystemImage(name)) {
+      return ReleaseExtractionResult(
+        filesystemImage: FilesystemImage.fromFile(
+          filePath: filePath,
+          size: size,
+        ),
+      );
+    }
+
     // For zip files, check if it's a release-style archive
     if (lower.endsWith('.zip')) {
       try {
@@ -1426,15 +1435,12 @@ class FirmwareDownloadException implements Exception {
 /// a filesystem image (lvgl_resources_raw.bin) if found in the archive.
 class ReleaseExtractionResult {
   /// The extracted firmware image (dfu_application.zip)
-  final FirmwareImage firmwareImage;
+  final FirmwareImage? firmwareImage;
 
   /// The extracted filesystem image (lvgl_resources_raw.bin), if found
   final FilesystemImage? filesystemImage;
 
-  const ReleaseExtractionResult({
-    required this.firmwareImage,
-    this.filesystemImage,
-  });
+  const ReleaseExtractionResult({this.firmwareImage, this.filesystemImage});
 
   /// Whether a filesystem image was found
   bool get hasFilesystemImage => filesystemImage != null;

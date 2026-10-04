@@ -344,15 +344,18 @@ class CompanionPrototypeClient {
 
   Future<CompanionFirmwareAcceptance> startFirmware(
     int generation,
-    List<CompanionFirmwareImage> images,
-  ) async {
+    List<CompanionFirmwareImage> images, {
+    Uint8List? resources,
+  }) async {
     if (generation < 0) {
       throw const FormatException('Invalid firmware generation');
     }
-    CompanionFirmwareImage.validate(images);
+    CompanionFirmwareImage.validate(images, allowEmpty: resources != null);
+    if (resources != null) CompanionResourceTarget.validatePayload(resources);
     final value = await methods.invokeMethod<Object?>('startFirmware', {
       'version': 1,
       'generation': generation,
+      if (resources != null) 'resources': resources,
       'images': images
           .map((image) => {'index': image.index, 'bytes': image.bytes})
           .toList(),

@@ -331,7 +331,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Firmware Update'), findsOneWidget);
       expect(find.text('Available Releases'), findsOneWidget);
-      expect(find.text('Select .zip firmware file'), findsOneWidget);
+      expect(find.text('Select .zip or .bin file'), findsOneWidget);
       expect(forbidden, isEmpty);
       expect(calls, isEmpty);
       await tester.pumpWidget(const SizedBox());

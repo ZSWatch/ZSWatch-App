@@ -10,6 +10,9 @@ import io.runtime.mcumgr.dfu.mcuboot.FirmwareUpgradeManager
 import io.runtime.mcumgr.dfu.mcuboot.model.ImageSet
 import io.runtime.mcumgr.exception.McuMgrException
 import io.runtime.mcumgr.McuMgrCallback
+import io.runtime.mcumgr.McuMgrTransport
+import io.runtime.mcumgr.managers.DefaultManager
+import io.runtime.mcumgr.response.dflt.McuMgrOsResponse
 import io.runtime.mcumgr.managers.ImageManager
 import io.runtime.mcumgr.response.img.McuMgrImageStateResponse
 import java.util.UUID
@@ -23,6 +26,11 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
     private var manager: FirmwareUpgradeManager? = null
     private var imageSet: ImageSet? = null
     private var preparationRecoveries = 0
+    private var preparedResources: PreparedResources? = null
+    private var resourceTransfer: NativeResourceTransfer? = null
+    private var resetObserver: McuMgrTransport.ConnectionObserver? = null
+    private var resourceResetAcknowledged = false
+    private var sdkResetObserved = false
     private var probe: Pair<String, Long>? = null
     val busy get() = probe != null || operation.busy
 
@@ -34,6 +42,7 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
         now = SystemClock::elapsedRealtime,
         later = { delay, action -> handler.postDelayed({ safely(action) }, delay) },
         launch = { state ->
+            resourceTransfer?.close(); resourceTransfer = null; preparedResources = null
             val transport = sdk ?: error("Prepared Nordic transport required")
             val callback = object : FirmwareUpgradeCallback<FirmwareUpgradeManager.State> {
                 private fun deliver(action: () -> Unit) { handler.post {
@@ -43,6 +52,7 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
                 } }
                 override fun onUpgradeStarted(controller: FirmwareUpgradeController?) {}
                 override fun onStateChanged(previous: FirmwareUpgradeManager.State?, next: FirmwareUpgradeManager.State?) = deliver {
+                    if (next == FirmwareUpgradeManager.State.RESET) sdkResetObserved = true
                     val phase = when (next) {
                         FirmwareUpgradeManager.State.VALIDATE -> "validating"
                         FirmwareUpgradeManager.State.UPLOAD -> "uploading"
@@ -53,7 +63,7 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
                     phase?.let { operation.sdkPhase(state.id, it) }
                 }
                 override fun onUploadProgressChanged(current: Int, total: Int, timestamp: Long) = deliver { operation.progress(state.id, current, total) }
-                override fun onUpgradeCompleted() = deliver { operation.sdkCompleted(state.id) }
+                override fun onUpgradeCompleted() = deliver { operation.sdkCompleted(state.id, sdkResetObserved) }
                 override fun onUpgradeFailed(phase: FirmwareUpgradeManager.State?, error: McuMgrException?) = deliver { operation.fail(state.id, "sdk_failed") }
                 override fun onUpgradeCanceled(phase: FirmwareUpgradeManager.State?) = deliver { operation.sdkCancelled(state.id) }
             }
@@ -69,36 +79,84 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
         },
         verify = { state, current, done ->
             preparationRecoveries = 0
-            link.verifyFirmwareTargets(state.targets, current) { result -> safely { done(result) } }
+            if (state.resourceResetRequested && !resourceResetAcknowledged) {
+                done(Result.failure(IllegalStateException("Resource reset was not acknowledged")))
+            } else link.verifyFirmwareTargets(state.targets, current, { result -> safely { done(result) } }, state.resource)
         },
         cancel = { manager?.cancel() ?: error("Active Nordic manager required") },
         observe = { state -> store.update("firmware_" + state.phase, mapOf("firmware_operation" to mapOf(
             "id" to state.id, "address" to state.address, "generation" to state.generation, "phase" to state.phase,
             "targets" to state.targets.map { mapOf("index" to it.index, "bytes" to it.bytes, "hash" to it.hash) },
             "current" to state.current, "total" to state.total, "error" to state.error,
-            "result_unknown" to state.resultUnknown, "cancel_requested" to state.cancelRequested))) },
+            "result_unknown" to state.resultUnknown, "cancel_requested" to state.cancelRequested,
+            "resource" to state.resource?.let { mapOf("bytes" to it.bytes, "hash" to it.hash) },
+            "resource_verified" to state.resourceVerified, "resource_reset_requested" to state.resourceResetRequested, "resource_reset_acknowledged" to resourceResetAcknowledged))) },
         release = { state ->
             try { releaseSdk() } finally {
                 link.finishFirmwareCheck()
                 runtime.resumeAfterFirmware(state.generation)
             }
         },
+        resources = { state, current, progress, uploaded, done ->
+            val transport = sdk ?: error("Prepared Nordic transport required")
+            val payload = preparedResources ?: error("Prepared resource payload required")
+            resourceTransfer = NativeResourceTransfer(handler, transport, state.resource!!,
+                { sdk === transport && current() }, { sent, total -> safely { progress(sent, total) } },
+                { uploaded() }, { result -> safely { done(result) } })
+            resourceTransfer!!.upload(payload.data)
+        },
+        resetResources = { state -> resetResourceWatch(state) },
     )
 
-    fun start(generation: Long, images: List<Pair<Int, ByteArray>>): Pair<String, Long> {
+    private fun resetResourceWatch(state: PrototypeFirmwareState) {
+        val transport = sdk ?: error("Prepared Nordic transport required")
+        resourceTransfer?.close(); resourceTransfer = null; preparedResources = null
+        resourceResetAcknowledged = false
+        val observer = object : McuMgrTransport.ConnectionObserver {
+            override fun onConnected() {}
+            override fun onDisconnected() { handler.post {
+                if (sdk === transport && operation.state?.id == state.id && operation.state?.phase == "rebooting") {
+                    safely { operation.sdkCompleted(state.id) }
+                }
+            } }
+        }
+        resetObserver = observer; transport.addObserver(observer)
+        handler.postDelayed({ if (sdk === transport && operation.state?.id == state.id && operation.state?.phase == "rebooting") {
+            safely { operation.fail(state.id, "resource_reset_timeout") }
+        } }, 15000)
+        DefaultManager(transport).reset(object : McuMgrCallback<McuMgrOsResponse> {
+            override fun onResponse(response: McuMgrOsResponse) { handler.post {
+                if (sdk !== transport || operation.state?.id != state.id || operation.state?.phase != "rebooting") return@post
+                safely {
+                    if (!response.isSuccess) operation.fail(state.id, "resource_reset_failed")
+                    else { resourceResetAcknowledged = true
+                        store.update("resource_reset_acknowledged", mapOf("resource_reset_acknowledged" to true)) }
+                }
+            } }
+            override fun onError(error: McuMgrException) { /* Wait for disconnect/deadline; never retry a reset. */ }
+        })
+    }
+
+    fun start(generation: Long, images: List<Pair<Int, ByteArray>>, resources: ByteArray? = null): Pair<String, Long> {
         check(!busy) { "Firmware operation is running" }
         // Nordic parses MCUboot structure before disturbing the normal companion.
         // The watch bootloader still owns signature/authenticity verification.
-        val parsed = FirmwareSdkContract.parse(images)
+        val parsed = if (images.isEmpty() && resources != null) emptyList() else FirmwareSdkContract.parse(images)
+        val info = store.control()["watch_info"] as? Map<*, *>
+        val resource = resources?.let {
+            check(info?.get("address") == store.control()["address"]) { "Current watch information required" }
+            ResourceSdkContract.prepare(it, info?.get("hardware_version") as? String ?: error("Known resource board required"))
+        }
         val targets = parsed.map { FirmwareTarget(it.imageIndex, it.image.data.size,
             it.image.hash.joinToString("") { byte -> "%02x".format(byte) }) }
-        PrototypeFirmware.validate(targets)
+        PrototypeFirmware.validateRequest(targets, resource?.target)
         val address = store.control()["address"] as? String ?: error("Selected watch required")
         val prepared = link.takeFirmwareTransport(generation)
-        sdk = prepared; imageSet = ImageSet(parsed)
+        sdk = prepared; imageSet = if (parsed.isEmpty()) null else ImageSet(parsed)
+        preparedResources = resource; resourceResetAcknowledged = false; sdkResetObserved = false
         try {
             val ownedGeneration = runtime.beginFirmware(generation)
-            return operation.start(address, ownedGeneration, targets) to ownedGeneration
+            return operation.start(address, ownedGeneration, targets, resource?.target) to ownedGeneration
         } catch (error: Exception) {
             try { releaseSdk() } finally { runtime.resumeAfterFirmware(runtime.generation) }
             throw error
@@ -160,6 +218,10 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
         }
     }
     private fun releaseSdk() {
+        val oldResource = resourceTransfer; resourceTransfer = null; preparedResources = null
+        oldResource?.close()
+        val observer = resetObserver; resetObserver = null
+        if (observer != null) sdk?.removeObserver(observer)
         val oldManager = manager; manager = null
         val oldSdk = sdk; sdk = null; imageSet = null
         try {

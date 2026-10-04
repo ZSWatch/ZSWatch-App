@@ -10,6 +10,7 @@ import 'package:rxdart/rxdart.dart';
 
 import '../data/models/dfu_state.dart';
 import '../data/models/companion_firmware_status.dart';
+import '../core/constants/filesystem_constants.dart';
 import 'companion_runtime_providers.dart';
 import '../data/models/filesystem_image.dart';
 import '../data/models/firmware_image.dart';
@@ -62,16 +63,40 @@ final _acceptedFirmwareProvider = StateProvider<CompanionFirmwareAcceptance?>(
 final effectiveDfuOperationStateProvider = Provider<DfuOperationState>((ref) {
   final local = ref.watch(dfuNotifierProvider);
   if (!ref.watch(nativeCompanionRuntimeProvider)) return local;
+  final status = ref.watch(companionFirmwareStatusProvider).valueOrNull;
+  final both =
+      status?.resource != null && status!.indices.isNotEmpty && status.busy;
   return local.copyWith(
     isUpdating: ref.watch(dfuStateProvider).status.isInProgress,
+    isBothUpdating: both,
+    currentStep: both ? (status.resourceStage ? 1 : 2) : 0,
+    totalSteps: both ? 2 : 0,
   );
 });
 
-/// Resource flashing remains guarded until it has a native service owner.
+/// Resource state comes from the same service-owned package, never watchface receipts.
 final firmwareFilesystemStateProvider = Provider<FilesystemUploadState>((ref) {
-  return ref.watch(nativeCompanionRuntimeProvider)
-      ? const FilesystemUploadState()
-      : ref.watch(filesystemUploadStateProvider);
+  if (!ref.watch(nativeCompanionRuntimeProvider)) {
+    return ref.watch(filesystemUploadStateProvider);
+  }
+  final status = ref.watch(companionFirmwareStatusProvider).valueOrNull;
+  if (status?.resource == null) return const FilesystemUploadState();
+  return FilesystemUploadState(
+    status: status!.resourceStage
+        ? FilesystemUploadStatus.uploading
+        : status.phase == 'completed'
+        ? FilesystemUploadStatus.completed
+        : status.busy
+        ? FilesystemUploadStatus.idle
+        : FilesystemUploadStatus.failed,
+    progress: status.total == 0 ? 0 : status.current / status.total,
+    bytesTransferred: status.current,
+    totalBytes: status.total,
+    imageName: status.phase == 'resource_verifying'
+        ? 'Verifying LVGL resources'
+        : 'LVGL resources',
+    errorMessage: status.errorMessage,
+  );
 });
 
 /// Provider for current DFU state
@@ -375,7 +400,10 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     }
   }
 
-  Future<void> _startNativeFirmware() async {
+  Future<void> _startNativeFirmware({
+    bool firmware = true,
+    bool resources = false,
+  }) async {
     final nativeStatus = _ref.read(companionFirmwareStatusProvider);
     if (state.isAnyInProgress ||
         _ref.read(_submittedFirmwareGenerationProvider) != null ||
@@ -389,9 +417,10 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       state = state.copyWith(error: 'Companion firmware status is unavailable');
       return;
     }
-    final image = state.downloadedImage;
-    if (image == null) {
-      state = state.copyWith(error: 'No firmware selected');
+    final image = firmware ? state.downloadedImage : null;
+    final resourceImage = resources ? state.filesystemImage : null;
+    if ((firmware && image == null) || (resources && resourceImage == null)) {
+      state = state.copyWith(error: 'No selected update image available');
       return;
     }
     final snapshot = _ref.read(companionSnapshotProvider).valueOrNull;
@@ -407,10 +436,12 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     final attempt = ++_nativeAttempt;
     state = state.copyWith(isUpdating: true, error: null);
     try {
-      final images = await _firmwareManager.prepareFirmware(image);
+      final images = image == null
+          ? <FirmwareImage>[]
+          : await _firmwareManager.prepareFirmware(image);
       if (!mounted || attempt != _nativeAttempt) return;
       state = state.copyWith(preparedImages: images);
-      if (images.isEmpty || images.length > 3) {
+      if ((firmware && images.isEmpty) || images.length > 3) {
         throw const FormatException('Expected one to three firmware images');
       }
       final payloads = <CompanionFirmwareImage>[];
@@ -451,7 +482,30 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
         }
         payloads.add(CompanionFirmwareImage(index, bytes));
       }
-      CompanionFirmwareImage.validate(payloads);
+      Uint8List? resourceBytes;
+      if (resourceImage != null) {
+        if (resourceImage.targetPath != FilesystemConstants.targetPath) {
+          throw const FormatException('Unexpected resource target path');
+        }
+        final file = File(resourceImage.filePath);
+        final size = await file.length();
+        if (size < 20 ||
+            size > CompanionFirmwareStatus.maxImageBytes ||
+            size != resourceImage.size) {
+          throw const FormatException(
+            'Unsupported or changed resource image size',
+          );
+        }
+        resourceBytes = await file.readAsBytes();
+        if (resourceBytes.length != size) {
+          throw const FormatException('Resource image changed while reading');
+        }
+        CompanionResourceTarget.validatePayload(resourceBytes);
+      }
+      CompanionFirmwareImage.validate(
+        payloads,
+        allowEmpty: resourceBytes != null,
+      );
       if (!mounted || attempt != _nativeAttempt) return;
       final current = _ref.read(companionSnapshotProvider).valueOrNull;
       if (current == null ||
@@ -467,7 +521,11 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       _ref.read(_acceptedFirmwareProvider.notifier).state = null;
       _ref.read(_submittedFirmwareGenerationProvider.notifier).state =
           preparedGeneration + 1;
-      final receipt = await client.startFirmware(preparedGeneration, payloads);
+      final receipt = await client.startFirmware(
+        preparedGeneration,
+        payloads,
+        resources: resourceBytes,
+      );
       if (!mounted) return; // UI disposal never stops accepted native work.
       _ref.read(_acceptedFirmwareProvider.notifier).state = receipt;
       _ref.read(_dismissedFirmwareProvider.notifier).state = null;
@@ -482,10 +540,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
   /// Start filesystem upload only
   Future<void> startFilesystemUpload() async {
     if (_ref.read(nativeCompanionRuntimeProvider)) {
-      state = state.copyWith(
-        error:
-            'Resource updates are not available in this native prototype yet',
-      );
+      await _startNativeFirmware(firmware: false, resources: true);
       return;
     }
     final fsImage = state.filesystemImage;
@@ -543,10 +598,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
   /// Start both filesystem upload and firmware update (filesystem first, then firmware)
   Future<void> startBothUpdates() async {
     if (_ref.read(nativeCompanionRuntimeProvider)) {
-      state = state.copyWith(
-        error:
-            'Combined updates are not available in this native prototype yet',
-      );
+      await _startNativeFirmware(firmware: true, resources: true);
       return;
     }
     final fsImage = state.filesystemImage;

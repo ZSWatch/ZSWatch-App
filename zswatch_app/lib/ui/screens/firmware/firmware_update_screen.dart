@@ -246,6 +246,24 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                               ref.read(dfuNotifierProvider.notifier).reset(),
                         ),
 
+                      if (!operationState.hasFirmware &&
+                          operationState.hasFilesystem)
+                        Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.storage),
+                            title: const Text('LVGL resources'),
+                            subtitle: Text(
+                              '${operationState.filesystemImage!.name} (${operationState.filesystemImage!.formattedSize})',
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.close),
+                              tooltip: 'Clear selection',
+                              onPressed: () => ref
+                                  .read(dfuNotifierProvider.notifier)
+                                  .reset(),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: AppTheme.spacingSm),
 
                       // Rotated firmware option (subtle)
@@ -457,6 +475,13 @@ class _ConnectionWarningCard extends StatelessWidget {
   }
 }
 
+String nativeResourceTitle(WidgetRef ref, FilesystemUploadState state) =>
+    ref.watch(nativeCompanionRuntimeProvider) &&
+        ref.watch(companionFirmwareStatusProvider).valueOrNull?.phase ==
+            'resource_verifying'
+    ? 'Verifying Resources...'
+    : 'Uploading Filesystem...';
+
 class _StatusCard extends ConsumerWidget {
   final DfuState dfuState;
   final DownloadProgress downloadProgress;
@@ -492,7 +517,7 @@ class _StatusCard extends ConsumerWidget {
           '${downloadProgress.formattedBytesReceived} / ${downloadProgress.formattedTotalBytes}';
       percentText = '${downloadProgress.progressPercent}%';
     } else if (isFsUploading) {
-      statusTitle = 'Uploading Filesystem...';
+      statusTitle = nativeResourceTitle(ref, fsUploadState);
       progress = fsUploadState.progress;
       bytesText =
           '${fsUploadState.formattedBytesTransferred} / ${fsUploadState.formattedTotalBytes}';
@@ -1703,7 +1728,7 @@ class _ActionButtons extends ConsumerWidget {
         // Start Both button (shown when both are available)
         if (operationState.hasBoth) ...[
           FilledButton.icon(
-            onPressed: !native && operationState.canStartBoth && isConnected
+            onPressed: operationState.canStartBoth && isConnected
                 ? onStartBoth
                 : null,
             icon: const Icon(Icons.playlist_play),
@@ -1751,9 +1776,7 @@ class _ActionButtons extends ConsumerWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed:
-                    !native &&
-                        operationState.canStartFilesystemUpload &&
-                        isConnected
+                    operationState.canStartFilesystemUpload && isConnected
                     ? onStartFilesystem
                     : null,
                 icon: const Icon(Icons.storage, size: 18),
@@ -1768,7 +1791,7 @@ class _ActionButtons extends ConsumerWidget {
           const Padding(
             padding: EdgeInsets.only(top: AppTheme.spacingSm),
             child: Text(
-              'Resource and combined updates are not available in this prototype yet.',
+              'Resource replacement cannot be cancelled once started. Keep the watch powered and Bluetooth enabled.',
             ),
           ),
         // Status messages

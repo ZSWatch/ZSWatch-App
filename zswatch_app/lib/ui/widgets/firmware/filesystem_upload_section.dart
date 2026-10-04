@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 
-/// Section for selecting a local firmware .zip file for upload.
+/// Section for selecting a local firmware package or raw resource file for upload.
 class FilesystemUploadSection extends StatelessWidget {
   final void Function(String) onFileSelected;
 
@@ -36,7 +36,7 @@ class FilesystemUploadSection extends StatelessWidget {
                   ),
                   const SizedBox(width: AppTheme.spacingSm),
                   Text(
-                    'Select .zip firmware file',
+                    'Select .zip or .bin file',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: AppTheme.primaryColor,
                     ),
@@ -48,7 +48,7 @@ class FilesystemUploadSection extends StatelessWidget {
         ),
         const SizedBox(height: AppTheme.spacingSm),
         Text(
-          'Select a firmware package .zip, e.g. watchdk@1_nrf5340_cpuapp_debug.zip.',
+          'Select a firmware package .zip or lvgl_resources_raw.bin.',
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
@@ -61,7 +61,7 @@ class FilesystemUploadSection extends StatelessWidget {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['zip'],
+        allowedExtensions: ['zip', 'bin'],
         allowMultiple: false,
       );
 

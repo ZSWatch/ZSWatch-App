@@ -145,13 +145,14 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                             }
                             require(generation >= 0)
                             val images = (args["images"] as? List<*>) ?: error("Images required")
-                            require(images.size in 1..3)
+                            val resources = args["resources"]?.let { it as? ByteArray ?: error("Resource bytes required") }
+                            require(images.size in 0..3 && (images.isNotEmpty() || resources != null))
                             val parsed = images.map { value ->
                                 val image = value as? Map<*, *> ?: error("Image map required")
                                 val index = image["index"] as? Int ?: error("Integer image index required")
                                 index to (image["bytes"] as? ByteArray ?: error("Firmware bytes required"))
                             }
-                            val (id, owned) = owner.start(generation, parsed)
+                            val (id, owned) = owner.start(generation, parsed, resources)
                             PrototypeHub.main.post { result.success(mapOf("version" to 1, "accepted" to true, "id" to id, "generation" to owned)) }
                         }
                     } catch (error: Exception) { PrototypeHub.main.post { result.error("FIRMWARE_FAILED", error.message, null) } }

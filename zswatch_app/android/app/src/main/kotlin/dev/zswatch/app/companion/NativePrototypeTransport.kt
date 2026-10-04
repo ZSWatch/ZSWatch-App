@@ -291,7 +291,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     /** After Nordic's reset, enable SMP through fresh NUS and read actual active image hashes. */
-    internal fun verifyFirmwareTargets(targets: List<FirmwareTarget>, current: () -> Boolean, done: (Result<Unit>) -> Unit) {
+    private var firmwareResourceCheck: NativeResourceTransfer? = null
+    internal fun verifyFirmwareTargets(targets: List<FirmwareTarget>, current: () -> Boolean, done: (Result<Unit>) -> Unit, resource: ResourceTarget? = null) {
         check(firmwareBusy() && current()) { "Current firmware verification required" }
         firmwareCheckPreparing = true
         try { prepareSmp(token) { prepared ->
@@ -300,15 +301,22 @@ class NativePrototypeTransport(private val context: Context, private val handler
             prepared.fold({ generation ->
                 try {
                     smpIdleLease.hold(generation)
-                    ImageManager(mcuTransport(store.control()["address"] as String, generation)).list(object : McuMgrCallback<McuMgrImageStateResponse> {
+                    val sdk = mcuTransport(store.control()["address"] as String, generation)
+                    fun resources(result: Result<Unit>) {
+                        if (!runtime.owns(generation) || !current()) return
+                        if (result.isFailure || resource == null) { done(result); return }
+                        firmwareResourceCheck = NativeResourceTransfer(handler, sdk, resource,
+                            { runtime.owns(generation) && fileTransport === sdk && current() }, { _, _ -> }, {}, done)
+                        firmwareResourceCheck!!.verify()
+                    }
+                    if (targets.isEmpty()) resources(Result.success(Unit))
+                    else ImageManager(sdk).list(object : McuMgrCallback<McuMgrImageStateResponse> {
                         override fun onResponse(response: McuMgrImageStateResponse) { handler.post {
                             if (!runtime.owns(generation) || !current()) return@post
-                            done(runCatching {
-                                FirmwareSdkContract.checkActive(targets, response)
-                            })
+                            safely { resources(runCatching { FirmwareSdkContract.checkActive(targets, response) }) }
                         } }
                         override fun onError(error: McuMgrException) { handler.post {
-                            if (runtime.owns(generation) && current()) done(Result.failure(error))
+                            if (runtime.owns(generation) && current()) safely { done(Result.failure(error)) }
                         } }
                     })
                 } catch (error: Exception) { done(Result.failure(error)) }
@@ -317,6 +325,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     internal fun finishFirmwareCheck() {
+        firmwareResourceCheck?.close(); firmwareResourceCheck = null
         firmwareCheckPreparing = false
         if (runtime.owns(token) && store.control()["phase"] == "ready") {
             if (smpIdleLease.held(token)) smpIdleLease.idle(token)

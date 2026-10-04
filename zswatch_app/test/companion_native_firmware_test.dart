@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,12 +21,15 @@ import 'package:zswatch_app/ui/screens/firmware/firmware_update_screen.dart';
 class FixtureFirmwareManager extends FirmwareManager {
   List<FirmwareImage> images;
   Completer<List<FirmwareImage>>? preparation;
+  FilesystemImage? resourceImage;
   FixtureFirmwareManager(this.images);
   @override
   Future<ReleaseExtractionResult> loadLocalFile(String filePath) async =>
       ReleaseExtractionResult(
         firmwareImage: images.first,
-        filesystemImage: FilesystemImage.fromFile(filePath: filePath, size: 3),
+        filesystemImage:
+            resourceImage ??
+            FilesystemImage.fromFile(filePath: filePath, size: 3),
       );
   @override
   Future<List<FirmwareImage>> prepareFirmware(FirmwareImage image) async =>
@@ -76,6 +80,21 @@ CompanionPrototypeSnapshot snapshot({
   },
   if (operation != null) 'firmware_operation': operation,
 });
+
+Uint8List resourceFixture() {
+  final bytes = Uint8List(64);
+  final b = ByteData.sublistView(bytes);
+  b.setUint32(0, 0x0a0a0a0a, Endian.little);
+  b.setUint32(4, 56, Endian.little);
+  b.setUint32(8, 64, Endian.little);
+  b.setUint32(12, 1, Endian.little);
+  bytes.setRange(16, 24, 'font.bin'.codeUnits);
+  b.setUint32(48, 0, Endian.little);
+  b.setUint32(52, 4, Endian.little);
+  b.setUint32(56, 0x12345678, Endian.little);
+  b.setUint32(60, 0x0a0a0a0a, Endian.little);
+  return bytes; // Never a physical resource flash artifact.
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -155,6 +174,25 @@ void main() {
     await pending;
     await Future<void>.delayed(Duration.zero);
   }
+
+  test(
+    'file manager distinguishes standalone resources from firmware without a device owner',
+    () async {
+      final file = File('${folder.path}/lvgl_resources_raw.bin');
+      await file.writeAsBytes(resourceFixture());
+      final realManager = FirmwareManager();
+      addTearDown(realManager.dispose);
+      final result = await realManager.loadLocalFile(file.path);
+      expect(result.firmwareImage, isNull);
+      expect(result.filesystemImage!.targetPath, '/S/full_fs');
+      expect(result.filesystemImage!.size, 64);
+      final firmware = await realManager.loadLocalFile(
+        manager.images.first.filePath,
+      );
+      expect(firmware.firmwareImage, isNotNull);
+      expect(firmware.filesystemImage, isNull);
+    },
+  );
 
   test(
     'image indices, byte limits and generation are checked before dispatch',
@@ -378,22 +416,181 @@ void main() {
     },
   );
   test(
-    'combined and resource actions remain guarded without creating legacy owners',
+    'resource-only and combined selections submit all payloads once to the native owner',
     () async {
+      final resource = resourceFixture();
+      final file = File('${folder.path}/lvgl_resources_raw.bin');
+      await file.writeAsBytes(resource);
+      manager.resourceImage = FilesystemImage.fromFile(
+        filePath: file.path,
+        size: resource.length,
+      );
+      for (final combined in [false, true]) {
+        calls.clear();
+        final c = container(Stream.value(snapshot()));
+        await c.read(companionSnapshotProvider.future);
+        final notifier = c.read(dfuNotifierProvider.notifier);
+        await notifier.loadLocalFile(manager.images.first.filePath);
+        if (combined) {
+          await notifier.startBothUpdates();
+        } else {
+          await notifier.startFilesystemUpload();
+        }
+        expect(calls.map((call) => call.method), [
+          'prepareShell',
+          'startFirmware',
+        ]);
+        final args = calls.last.arguments as Map;
+        expect(args['resources'], resource);
+        expect((args['images'] as List).length, combined ? 1 : 0);
+        expect(c.read(dfuStateProvider).status, DfuStatus.preparing);
+        c.dispose();
+        expect(
+          calls.length,
+          2,
+        ); // UI disposal cannot sequence or cancel stage two.
+      }
+    },
+  );
+  test(
+    'malformed resource envelope, changed size and target reject before native preparation',
+    () async {
+      final file = File('${folder.path}/lvgl_resources_raw.bin');
+      await file.writeAsBytes(resourceFixture());
+      final image = FilesystemImage.fromFile(filePath: file.path, size: 64);
       final c = container(Stream.value(snapshot()));
       addTearDown(c.dispose);
       await c.read(companionSnapshotProvider.future);
       final notifier = c.read(dfuNotifierProvider.notifier);
+      for (final invalid in [
+        image.copyWith(size: 65),
+        image.copyWith(targetPath: '/user/bg.bin'),
+      ]) {
+        manager.resourceImage = invalid;
+        await notifier.loadLocalFile(manager.images.first.filePath);
+        await notifier.startFilesystemUpload();
+        expect(c.read(dfuNotifierProvider).hasError, true);
+      }
+      manager.resourceImage = image;
+      await file.writeAsBytes(Uint8List(64));
       await notifier.loadLocalFile(manager.images.first.filePath);
-      await notifier.startFilesystemUpload();
-      expect(c.read(dfuNotifierProvider).error, contains('not available'));
       await notifier.startBothUpdates();
-      expect(c.read(dfuNotifierProvider).error, contains('not available'));
+      expect(c.read(dfuNotifierProvider).hasError, true);
+      expect(calls, isEmpty);
+    },
+  );
+  test(
+    'reattached combined progress names both native stages and waits for verified postflight',
+    () async {
+      final states = StreamController<CompanionPrototypeSnapshot>();
+      final c = container(states.stream);
+      addTearDown(() async {
+        c.dispose();
+        await states.close();
+      });
+      Map<String, Object?> update(String phase, {bool verified = false}) => {
+        ...firmware(phase),
+        'current': 32,
+        'total': 64,
+        'resource': {'bytes': 64, 'hash': 'b' * 64},
+        'resource_verified': verified,
+      };
+      await emit(
+        c,
+        states,
+        snapshot(operation: update('resource_uploading'), ready: false),
+      );
+      expect(c.read(effectiveDfuOperationStateProvider).isBothUpdating, true);
+      expect(c.read(effectiveDfuOperationStateProvider).currentStep, 1);
+      expect(
+        c.read(firmwareFilesystemStateProvider).status,
+        FilesystemUploadStatus.uploading,
+      );
+      expect(
+        c.read(companionFirmwareStatusProvider).valueOrNull!.canCancel,
+        false,
+      );
+      await c.read(dfuNotifierProvider.notifier).cancel();
+      await emit(
+        c,
+        states,
+        snapshot(operation: update('resource_verifying'), ready: false),
+      );
+      expect(c.read(dfuStateProvider).status, DfuStatus.validating);
+      expect(
+        c.read(dfuStateProvider).currentImageName,
+        'Verifying LVGL resources',
+      );
+      await emit(
+        c,
+        states,
+        snapshot(operation: update('uploading', verified: true), ready: false),
+      );
+      expect(c.read(effectiveDfuOperationStateProvider).currentStep, 2);
       expect(
         c.read(firmwareFilesystemStateProvider).status,
         FilesystemUploadStatus.idle,
       );
+      await c.read(dfuNotifierProvider.notifier).cancel();
       expect(calls, isEmpty);
+      await emit(
+        c,
+        states,
+        snapshot(operation: update('verifying', verified: true), ready: false),
+      );
+      expect(c.read(dfuStateProvider).status, DfuStatus.reconnecting);
+      await emit(
+        c,
+        states,
+        snapshot(operation: update('completed', verified: true)),
+      );
+      expect(c.read(dfuStateProvider).status, DfuStatus.completed);
+    },
+  );
+  test(
+    'resource-only terminal status and malformed verification cannot invent successful firmware',
+    () {
+      final resource = {'bytes': 64, 'hash': 'b' * 64};
+      final status = CompanionFirmwareStatus.decode({
+        'firmware_operation': {
+          ...firmware('resource_uploading'),
+          'targets': <Object?>[],
+          'resource': resource,
+          'resource_verified': false,
+        },
+      })!;
+      expect(status.busy, true);
+      expect(status.indices, isEmpty);
+      expect(status.canCancel, false);
+      for (final change in [
+        {
+          'resource': {'bytes': 63, 'hash': 'b' * 64},
+        },
+        {'resource_verified': 'yes'},
+        {'phase': 'completed', 'resource_verified': false},
+      ]) {
+        expect(
+          () => CompanionFirmwareStatus.decode({
+            'firmware_operation': {
+              ...firmware('resource_verifying'),
+              'resource': resource,
+              'resource_verified': false,
+              ...change,
+            },
+          }),
+          throwsFormatException,
+        );
+      }
+      for (final bytes in [
+        Uint8List(0),
+        Uint8List(64),
+        Uint8List(CompanionFirmwareStatus.maxImageBytes + 4),
+      ]) {
+        expect(
+          () => CompanionResourceTarget.validatePayload(bytes),
+          throwsFormatException,
+        );
+      }
     },
   );
   test(
