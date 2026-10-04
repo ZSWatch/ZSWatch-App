@@ -1107,3 +1107,37 @@ after true, verify the watch's disconnect/stop logs, reconnect and run a normal
 burst. Restore Stop afterward. Do not use transfer instrumentation or count a
 successful command/ATT write as the watch stop. Direct motor measurement remains
 a separate acceptance gate; broad background probes retain `NOT_RUN`.
+
+## Fixed HTTP active/idle comparison — 2026-10-04
+
+Private artifacts: `.companion-hil-runs/20261004-native-http-comparison/`.
+The installed native APK remained `f987b6fe…070977`; Ready 179/PID 31292.
+The pairing-enforced WatchDK build adds a default-off `ZSW_COMPANION_HTTP_PROBE`
+flag and fixed `http_probe loopback|remote` shell control using the existing
+HTTP relay. Only signed application ranges were programmed/verified on exact
+debugger 51022722. Bootloader/network/settings/storage were excluded; source,
+config/layout/images and the prior Find rollback artifact are archived.
+
+| Scenario | Result |
+| --- | --- |
+| Foreground and Flutter-removed active loopback | Both fixed 35-byte replies reached the watch callback; native `written`, zero pending. |
+| Initial remote request | Active and background errors occurred with Wi-Fi off and no default network. These are not evidence of background-service failure. |
+| Wi-Fi-enabled active remote | Watch callback status OK/220 bytes about 9.585 s after admission, while the native journal records `delivery_expired`. Retain both facts; this is not a native delivery pass. |
+| Initial forced deep idle loopback | Watch callback OK/35 bytes about 2.116 s; native `written`. |
+| Fifteen-minute idle window | 900.000 s, 31 read-only samples, same Ready/PID/generation, Flutter Activity absent, deep state IDLE. Watch status continued periodically; no process restart or fully silent link was exercised. |
+| Final idle loopback | Watch callback OK/35 bytes about 2.373 s; native `written`, zero pending. |
+| Final idle remote | Native `error_written`; watch received request-timeout error about 8.878 s after admission. No success callback is claimed. Owner stayed Ready, zero pending. |
+
+The fixture recorded four local responses and stopped cleanly. ADB reverse was
+removed; Wi-Fi was restored to its original disabled state, simulated battery
+unplug was reset and forced idle was released. Downloads stayed paused and
+location sharing off. Subsequent read-only observation at 07:09 UTC still found
+the same live Ready 179/PID 31292, but Flutter had been reopened: this later
+observation is not a continuously monitored seven-hour background soak. Explicit
+debug cleanup then verified Stop 180 before the next APK installation.
+
+This isolates working local relay/BLE in the bounded idle case from remote
+network/deadline failure. USB stayed attached, ADB reverse bypasses external
+network access and an active Wi-Fi reply was already late. The old idle timeout,
+modern Android/unplugged operation and firmware HTTP error/late-result consumers
+remain open. Do not extend HTTP microdiagnosis at the expense of feature migration.

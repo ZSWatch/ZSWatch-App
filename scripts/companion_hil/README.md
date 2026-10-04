@@ -485,3 +485,21 @@ can disappear later. Confirm `USB CDC ACM host detected` in UART before closing
 the client. UART logging is a separate FTDI port; leave its DTR/RTS false.
 This USB lab detail does not diagnose BLE service caching or justify replacing
 the existing SMP library.
+
+### Fixed HTTP comparison
+
+`http_fixture.py --output /tmp/new-http-fixture.jsonl` serves only the fixed
+35-byte `/companion-hil/ok` response on host loopback port 18879. It exclusively
+creates the log and records metadata only. An explicitly targeted temporary
+`adb -s "$ZSW_PHONE_SERIAL" reverse tcp:18879 tcp:18879` exposes that fixture
+to the phone; remove the reverse and stop the fixture in cleanup. This bypasses
+external networking and does not establish remote HTTP or background acceptance.
+
+The watch's default-off `CONFIG_ZSW_COMPANION_HTTP_PROBE=y` lab build exposes
+`http_probe loopback` and `http_probe remote` through the existing serial SMP
+client's shell API. Remote uses the existing Trivia endpoint. No custom SMP or new
+watch HTTP wire protocol is involved. Capture UART before triggering, compare
+fresh native admission/completion with the actual watch callback, and retain
+error/late outcomes. A shell admission return, fixture hit or ATT completion
+alone is not a watch consumer pass. See the Nokia report for the completed
+active/900-second forced-idle comparison and its external-network limitations.
