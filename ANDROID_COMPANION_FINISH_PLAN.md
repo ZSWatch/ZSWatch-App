@@ -170,7 +170,25 @@ next useful step. Do not ask again about accepting a clean phone database/setup.
   the full resource readback finishes before reboot. Final debug/release builds
   compile and 208 native tests pass. The physical combined postflight recovered
   within that bound.
-- Pending: final consolidated background/recovery and quiet-period pass.
+- Final normal-debug core pass with Flutter absent: real notification body reaches
+  the watch, HTTP completes exactly once beyond its timeout, watch Next/Play
+  controls affect a real Android MediaSession, current time is written and the
+  fresh recording inventory matches all nine watch files. All originals retain
+  their verified hashes. Radio recovery, injected Android app-crash recovery
+  (`adb am crash`, not OS memory reclamation), persisted Stop through radio
+  changes and explicit restart pass on the final APK. Evidence:
+  `.companion-hil-runs/20261004-final-core/`.
+- Final quiet/UI pass: the same native PID/session remains Ready for 20 minutes
+  in Android forced deep idle with Flutter absent, and a subsequent notification
+  is observed at the watch. The existing Flutter dashboard then reattaches to
+  that session and shows Connected / MTU 247. Phone and watch are USB connected;
+  forced idle is restored afterward. This is bounded lab acceptance, not a claim
+  of unplugged endurance or natural OS memory reclamation. The checkpoint is
+  `.companion-hil-runs/20261004-final-core/final-checkpoint.json` (tested debug APK
+  SHA-256 starts `db4bae16`; compiled release starts `6adf2495`).
+- The finish checklist is complete for the available Android rig. Remaining
+  hardware acceptance is separate below; do not reopen throughput or add legacy
+  compatibility machinery.
 - Separate hardware acceptance: real GPS/Weather transmission (approval still
   pending), newer-phone/unplugged endurance, iOS and AI execution. This rig
   reports image indices 0/2; selected network-core index 1 remains explicitly

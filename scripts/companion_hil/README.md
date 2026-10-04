@@ -1,5 +1,12 @@
 # Companion background test foundation
 
+Current Android ownership and acceptance follow
+[`ANDROID_COMPANION_FINISH_PLAN.md`](../../ANDROID_COMPANION_FINISH_PLAN.md).
+The native owner is now the normal path in all build modes; older sections below
+record historical prototype checkpoints. Do not reintroduce their selection flag,
+debug-only runtime declarations or rollout requirements. Lab fixtures remain debug
+only. Current physical results are linked from the finish plan.
+
 This is the first, Linux/Android part of stage 0 in
 [`COMPANION_BACKGROUND_IMPLEMENTATION_PLAN.md`](../../COMPANION_BACKGROUND_IMPLEMENTATION_PLAN.md).
 It provides inventory, build provenance and log collection. It does not install

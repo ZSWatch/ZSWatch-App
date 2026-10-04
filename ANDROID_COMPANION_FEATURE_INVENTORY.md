@@ -24,7 +24,7 @@ dormant provider does not establish end-to-end support.
 | Voice notes/jobs | Durable native receipts, explicit existing Flutter import/playback and separate recoverable job/outbox contracts exist. | Downloads/integrity and AI/model/backend acceptance remain separate. Downloads stay paused for current core tests; AI is deferred by the user. |
 | Log files | Existing Flutter Logs tab now has native-owned Nordic status/download operations, exclusive SDK access with Shell/recordings, fixed-path/size/deadline checks and UI-lifetime fencing. Nokia cold absent-log listing and SMP idle/Stop cleanup match independent USB metadata. | Physical nonempty download, changing files and multi-watch local cache isolation remain. General file browsing/upload/delete is not implemented by the existing screen. |
 | Watchface backgrounds | Existing Flutter gallery/crop UI now submits to the native owner. Nordic upload uses the user fork's window/alignment; full readback must match before existing NUS apply. Bounded Nokia upload/verify/apply completes on Home; native reset and exact original restoration are verified. | Physical process loss during transfer/apply, custom photo, current Android and endurance remain. Firmware result ambiguity requires reconnect before retry; no automatic replay. |
-| Firmware update | Existing Flutter selection/download/progress screen submits to the service-owned Nordic backend. Application update completes at 17.75 KB/s on the Nokia with reboot, active-image check and normal Ready. Resource-only upload, full hash readback and fresh mount/reboot also pass with Flutter destroyed; see the finish plan. | Combined physical validation is running. This rig reports active images 0/2 and omits network core 1; the unavailable outcome remains explicit for selections including index 1. Newer-phone/unplugged endurance remains separate. |
+| Firmware update | Existing Flutter selection/download/progress screen submits to the service-owned Nordic backend. Application update completes at 17.75 KB/s on the Nokia with reboot, active-image check and normal Ready. Resource-only upload, full hash readback and fresh mount/reboot also pass with Flutter destroyed; see the finish plan. | Combined resource-first/firmware-second validation passes with Flutter destroyed; all original files retain their hashes. This rig reports active images 0/2 and omits network core 1; the unavailable outcome remains explicit for selections including index 1. Newer-phone/unplugged endurance remains separate. |
 | SMP/debug | Existing Nordic wrapper/fork retained. Service-owned Shell integration uses Nordic ShellManager and the existing Flutter Shell screen; deterministic tests and both debug builds pass. Nokia cold Power Status, CPU Frequency, a same-generation command burst/Home observation and idle/Stop cleanup are verified on the SDK checkpoint. Other competing-owner routes remain withheld; the firmware route now uses the native owner. | Physical Shell engine destruction, failed SDK cleanup, monitor output and transfer/DFU arbitration remain. Continue native-backed controls with the user's Nordic fork; keep corruption diagnosis separate. |
 
 ## Source evidence
@@ -56,18 +56,10 @@ dormant provider does not establish end-to-end support.
   maps `findPhone` to START/STOP and sends reverse `find` commands. No
   Gadgetbridge implementation was copied into the app by this inventory.
 
-## Next work
+## Remaining acceptance
 
-1. Finish physical GPS/Weather acceptance after explicit approval for real
-   location transmission. Implementation and deterministic lifecycle/queue tests
-   are complete; real Nokia fix/network availability remains separate. Verify a
-   fresh position reaches the watch consumer and Weather completes with Flutter
-   absent. Do not treat acquisition, ATT completion or synthetic fixes as that pass.
-2. Retain watch-side Find Watch disconnect/maximum-duration protection and its
-   bounded physical software evidence. Motor effects still require independent
-   observation. Do not invent a watch→phone protocol to make a test pass.
-3. Retain the completed HTTP comparison in the Nokia runbook. Local relay works
-   in the bounded idle case; remote network/deadline and watch error handling
-   remain distinct follow-ups. Do not repeat idle trials without a new question.
-4. Continue remaining notification actions and ordinary feature migration from
-   actual initialized consumers. Preserve Flutter/Nordic and defer iOS/AI.
+The finish plan records the passed consolidated final checkpoint. The implementations
+and physical update workflows are complete; avoid treating legacy placeholders
+as new migration requirements. Real GPS/Weather transmission awaits approval.
+Newer-phone, unplugged endurance, third-party integration and selected network-core
+image 1 verification remain hardware acceptance. iOS and AI execution are deferred.
