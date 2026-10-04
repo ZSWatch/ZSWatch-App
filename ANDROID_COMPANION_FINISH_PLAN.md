@@ -126,5 +126,15 @@ next useful step. Do not ask again about accepting a clean phone database/setup.
   remains connected with launcher visible, reattaches the same generation, and
   Flutter Disconnect settles Stop with the service absent. Evidence:
   `.companion-hil-runs/20261004-direct-native-cutover/`.
-- Pending: firmware HTTP callback fix, measured firmware upload, physical resource/combined
-  updates, and the final consolidated background/recovery pass.
+- HTTP firmware callback fix committed as `d634b4cb`: sanitized host controller/parser
+  regression and WatchDK build pass. Normal native APK with Flutter absent passes
+  real success, empty and relay-error replies exactly once, observed beyond timeout.
+  All nine recordings, crash file and original background verified/restored exactly.
+  Evidence: `.companion-hil-runs/20261004-http-callback-contract/`.
+- Firmware upload: actual Nordic application upload is confirmed, but the first early
+  sample is only 2.1 KB/s over 10 seconds. Cancelled through Flutter at 90,548 bytes;
+  native Ready recovered and active application hashes stayed unchanged. Evidence:
+  `.companion-hil-runs/20261004-firmware-throughput/`. Compare actual SDK MTU, packet
+  size, connection parameters and upload window next; throughput is not accepted.
+- Pending: firmware performance/completed update, physical resource/combined updates,
+  and the final consolidated background/recovery pass.
