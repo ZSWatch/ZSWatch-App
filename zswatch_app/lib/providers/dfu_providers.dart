@@ -80,9 +80,13 @@ final firmwareFilesystemStateProvider = Provider<FilesystemUploadState>((ref) {
     return ref.watch(filesystemUploadStateProvider);
   }
   final status = ref.watch(companionFirmwareStatusProvider).valueOrNull;
-  if (status?.resource == null) return const FilesystemUploadState();
+  if (status == null ||
+      status.resource == null ||
+      (!status.busy && status.id == ref.watch(_dismissedFirmwareProvider))) {
+    return const FilesystemUploadState();
+  }
   return FilesystemUploadState(
-    status: status!.resourceStage
+    status: status.resourceStage
         ? FilesystemUploadStatus.uploading
         : status.phase == 'completed'
         ? FilesystemUploadStatus.completed

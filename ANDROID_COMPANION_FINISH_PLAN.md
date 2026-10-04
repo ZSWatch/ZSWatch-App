@@ -152,5 +152,13 @@ next useful step. Do not ask again about accepting a clean phone database/setup.
   following one complete SHA-256/layout readback before reboot. This avoids a
   second multi-megabyte download; native regressions still require full integrity
   verification before reset/firmware starts. Debug build and 208 native tests pass.
-- Pending: physical resource/combined updates and the final consolidated
-  background/recovery pass.
+- Physical resource-only update passes: all 5,932,208 bytes uploaded and fully
+  hash-verified (14.8 KB/s upload, 14.3 KB/s readback), then acknowledged reset,
+  fresh mount check and native Ready. Flutter's task was destroyed during upload;
+  all 11 original files still match. Evidence:
+  `.companion-hil-runs/20261004-resource-physical/`.
+- The next package selection exposed an undismissed filesystem result in Flutter.
+  Fixed the shared result dismissal; the focused firmware Flutter suite passes
+  19 tests, including terminal dismissal and visibility of subsequent active work.
+- Pending: physical combined update and the final consolidated background/recovery
+  pass.

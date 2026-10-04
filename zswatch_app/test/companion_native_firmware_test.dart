@@ -548,6 +548,76 @@ void main() {
     },
   );
   test(
+    'Done dismisses the whole resource result and a later package remains visible',
+    () async {
+      final states = StreamController<CompanionPrototypeSnapshot>();
+      final c = container(states.stream);
+      addTearDown(() async {
+        c.dispose();
+        await states.close();
+      });
+      for (final phase in ['completed', 'failed']) {
+        await emit(
+          c,
+          states,
+          snapshot(
+            operation: {
+              ...firmware(
+                phase,
+                id: 'resource-$phase',
+                unknown: phase == 'failed',
+              ),
+              'resource': {'bytes': 64, 'hash': 'b' * 64},
+              'resource_verified': true,
+            },
+          ),
+        );
+        expect(
+          c.read(firmwareFilesystemStateProvider).status,
+          phase == 'completed'
+              ? FilesystemUploadStatus.completed
+              : FilesystemUploadStatus.failed,
+        );
+        c.read(dfuNotifierProvider.notifier).reset();
+        await c
+            .read(dfuNotifierProvider.notifier)
+            .loadLocalFile(manager.images.first.filePath);
+        expect(c.read(dfuStateProvider).status, DfuStatus.idle);
+        expect(
+          c.read(firmwareFilesystemStateProvider).status,
+          FilesystemUploadStatus.idle,
+        );
+        expect(c.read(effectiveDfuOperationStateProvider).hasFirmware, true);
+        expect(
+          c.read(companionFirmwareStatusProvider).valueOrNull!.id,
+          'resource-$phase',
+        );
+      }
+      await emit(
+        c,
+        states,
+        snapshot(
+          ready: false,
+          operation: {
+            ...firmware('resource_uploading', id: 'next-package'),
+            'resource': {'bytes': 64, 'hash': 'b' * 64},
+            'resource_verified': false,
+          },
+        ),
+      );
+      c.read(dfuNotifierProvider.notifier).reset();
+      expect(
+        c.read(firmwareFilesystemStateProvider).status,
+        FilesystemUploadStatus.uploading,
+      );
+      expect(c.read(dfuStateProvider).status.isInProgress, true);
+      expect(
+        calls,
+        isEmpty,
+      ); // UI dismissal leaves the native journal/work alone.
+    },
+  );
+  test(
     'resource-only terminal status and malformed verification cannot invent successful firmware',
     () {
       final resource = {'bytes': 64, 'hash': 'b' * 64};
