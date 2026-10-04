@@ -1283,3 +1283,59 @@ concurrent competing requests, current Android and longer unplugged operation
 remain acceptance. A process-interruption JVM test or Home observation does not
 establish those passes. DFU remains guarded in the native router and requires
 its own coordinated Nordic upgrade lifecycle before exposure.
+
+
+## 2026-10-04 — native Nordic DFU backend/read-only handoff
+
+Private evidence: `.companion-hil-runs/20261004-native-firmware-backend/`.
+The service/bridge backend is implemented; the existing Flutter firmware route
+remains guarded until provider/UI and resource/combined workflows are connected.
+This hardware test only exercised the read-only connection handoff, not firmware
+upload, confirmation, erase or reset. No AI or recording creation/deletion ran.
+
+| Check | Observation and limit |
+| --- | --- |
+| Exact handoff APK | `native-handoff-tested.apk`, SHA-256 `02e206fb8b9e101cae173aaa7c6dd361fc799ea794d1690394c181c92cb88c09`, compiled native owner/bridge and installed hash verified. Replacement retained Stop 220 before explicit paired-watch Start. |
+| Cold preparation | Normal NUS reached Ready 221; existing Nordic SMP preparation recovered to Ready 222 before handing over the prepared SDK connection. Recording downloads stayed paused. |
+| Exclusive SDK read | Native owner acquired generation 223 and released old NUS while retaining the SDK transport. The actual ImageManager.list reply contained two entries. Diagnostic ID `55551ba1-6377-423b-852a-e1fc01f700f2` records read-only completion; accepted-read→reply publication took 1.543 seconds. No FirmwareUpgradeManager was started by this probe. |
+| Companion recovery | After releasing the SDK, normal NUS reached fresh Ready 224. A subsequent read-only observation verified live service/PID, fresh watch status/time, unchanged installed hash and paused recording downloads. Flutter remained an Activity observer; no engine-destruction/background-endurance claim is made. |
+| Independent image-state coverage | USB ImageStatesRead reports image 0/slot 0 and image 2/slot 0 active, both version 0.8.1. Network-core image 1 is absent. This establishes the actual response coverage, not an upgraded network core. |
+| Preservation/idle | USB verifies the background still equals original SHA-256 `979df7661e05c5a9caa4ac04c46c8147f1a909571c0b7b04370bcb594f547842`, staging absent, SMP disabled and UI Watchface. All nine recordings and the existing crash file match the pre-HTTP firmware hashes. |
+| Stop | Explicit shutdown settled at Stop 226 with desired intent false, native service/notifications absent and synthetic job/outbox state preserved. |
+
+Final source adds explicit unavailable-image classification and callback failure
+cleanup after the handoff-tested APK. `ordinary-final.apk` SHA-256 `e56400cb66fdb3582f9008aaf4bf4d9f32112abc059cd1109d9de6c91540d046`
+retains Flutter ownership/absent native bridge. `native-final.apk` SHA-256
+`b820428740a2056b38984ad00884fd867e58ccb7c657bc8b33b2b6b20eb4c1de` has the native owner/bridge; replacement retains Stop 226 and its
+installed hash matches. Both debug builds pass; the handoff above used their
+immediate native predecessor. No additional watch mutation was made for these
+classification/cleanup changes.
+
+Validation: 193 native JVM tests, zero failures/errors, and 29 focused Flutter
+router/client regressions. Native tests cover old-NUS fencing, saved intent,
+SDK-completion versus fresh verification, mismatches/unavailable image indices,
+per-image progress, stale/duplicate callbacks, cancellation stage/request/terminal
+semantics, Stop/radio/framework loss, deadlines, journal cleanup and process
+interruption without replay. Tests using actual Nordic types cover TargetImage
+parsing, single external image index, copied buffers, existing settings and image
+state responses. The tiny structurally valid test image is never sent to hardware
+and is not claimed to be signed firmware. Both owner APKs compile and are verified.
+
+To reproduce the read-only handoff, verify the installed/frozen native owner,
+explicitly connect the existing paired watch, keep recording downloads paused and
+observe current Ready. Start the nonexported debug service action
+`dev.zswatch.app.companion.INSPECT_FIRMWARE_HANDOFF` as the app UID. Capture a new
+diagnostic ID, exclusive generation and actual image-state receipt, then verify
+fresh live Ready after SDK release. Do not accept a stale diagnostic receipt or
+an Android startservice acceptance as the reply/recovery pass. Check independent
+USB background/recording preservation and actual SMP status, then settled Stop.
+This action only reads image state; use a separate planned scenario for a real
+firmware update.
+
+Actual firmware upload/reset/postflight, interruption during a real upgrade,
+SDK cancellation/reset failures, resource and combined package updates and
+all-target verification remain physical acceptance. This rig's unreported
+network-core state must remain an explicit unknown outcome when selected. The
+read-only handoff does not substitute for a successful complete update. Existing
+Flutter firmware UI wiring and wider Android/endurance remain implementation/
+acceptance work; iOS and AI stay deferred.

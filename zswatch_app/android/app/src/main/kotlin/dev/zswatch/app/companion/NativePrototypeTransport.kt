@@ -8,6 +8,8 @@ import dev.zswatch.app.LifecycleLogger
 import io.runtime.mcumgr.ble.McuMgrBleTransport
 import io.runtime.mcumgr.McuMgrCallback
 import io.runtime.mcumgr.McuMgrTransport
+import io.runtime.mcumgr.managers.ImageManager
+import io.runtime.mcumgr.response.img.McuMgrImageStateResponse
 import io.runtime.mcumgr.managers.FsManager
 import io.runtime.mcumgr.response.fs.McuMgrFsStatusResponse
 import io.runtime.mcumgr.managers.ShellManager
@@ -32,6 +34,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
     var gpsReady: (Long) -> Unit = {}
     var gpsClosed: () -> Unit = {}
     var gpsRequest: (JSONObject, Long) -> Unit = { _, _ -> }
+    internal var firmwareBusy: () -> Boolean = { false }
+    internal var firmwareReady: (String) -> Unit = {}
+    internal var firmwareCheckPreparing = false
+        private set
     private var closing = false
     private val smpPreparation: PrototypeSmpPreparation = PrototypeSmpPreparation(
         current = {
@@ -69,7 +75,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         { delay, action -> handler.postDelayed(action, delay) },
         { generation ->
             if (!closing && generation == token && runtime.owns(generation) &&
-                store.control()["phase"] == "ready" && !smpPreparation.busy && !shellOperation.busy && !logFiles.busy && !watchface.busy && !downloading) safely {
+                store.control()["phase"] == "ready" && !smpPreparation.busy && !shellOperation.busy && !logFiles.busy && !watchface.busy && !firmwareBusy() && !downloading) safely {
                 val previous = fileTransport; fileTransport = null
                 previous?.release()
                 command("GB({\"t\":\"smp\",\"status\":false})")
@@ -118,6 +124,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     )
 
     internal fun executeShell(generation: Long, text: String, done: (Result<PrototypeShellReply>) -> Unit) {
+        check(!firmwareBusy()) { "Firmware operation is running" }
         check(!smpPreparation.busy) { "SMP preparation is running" }
         check(!logFiles.busy && !watchface.busy) { "Another SMP operation is running" }
         check(!downloading) { "Recording transfer is running; retry afterward" }
@@ -125,6 +132,11 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     internal fun prepareShell(generation: Long, done: (Result<Long>) -> Unit) {
+        check(!firmwareBusy()) { "Firmware operation is running" }
+        prepareSmp(generation, done)
+    }
+
+    private fun prepareSmp(generation: Long, done: (Result<Long>) -> Unit) {
         check(!downloading && !shellOperation.busy && !logFiles.busy && !watchface.busy) { "SMP operation is running" }
         smpPreparation.start(generation) { result ->
             if (result.isFailure && runtime.owns(token) && store.control()["phase"] == "ready") {
@@ -173,6 +185,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     )
 
     internal fun inspectLogs(generation: Long, path: String?, done: (Result<PrototypeLogReply>) -> Unit) {
+        check(!firmwareBusy()) { "Firmware operation is running" }
         check(!downloading && !smpPreparation.busy && !shellOperation.busy && !watchface.busy) { "SMP operation is running" }
         check(fileTransport?.isReady == true && smpIdleLease.held(generation)) { "Prepare SMP first" }
         // Validate before taking the lease so invalid requests cannot suppress cleanup.
@@ -248,6 +261,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     )
 
     internal fun startWatchface(generation: Long, bytes: ByteArray, name: String): String {
+        check(!firmwareBusy()) { "Firmware operation is running" }
         PrototypeWatchface.validateImage(bytes)
         require(name.isNotBlank() && name.length <= 64 && name.none { it.isISOControl() })
         check(!downloading && !smpPreparation.busy && !shellOperation.busy && !logFiles.busy && !watchface.busy) { "Another SMP operation is running" }
@@ -258,10 +272,56 @@ class NativePrototypeTransport(private val context: Context, private val handler
         return watchface.startUpload(generation, bytes, name)
     }
     internal fun resetWatchface(generation: Long): String {
+        check(!firmwareBusy()) { "Firmware operation is running" }
         check(!downloading && !smpPreparation.busy && !shellOperation.busy && !logFiles.busy && !watchface.busy) { "Another operation is running" }
         watchface.requireStart(generation, "reset")
         if (smpIdleLease.held(generation)) smpIdleLease.hold(generation)
         return watchface.reset(generation)
+    }
+
+    /** Transfer the existing prepared SDK connection without a physical disconnect gap. */
+    internal fun takeFirmwareTransport(generation: Long): McuMgrBleTransport {
+        check(!firmwareBusy() && !downloading && !smpPreparation.busy && !shellOperation.busy && !logFiles.busy && !watchface.busy) { "Another SDK operation is running" }
+        check(runtime.owns(generation) && token == generation && store.control()["phase"] == "ready") { "Current Ready session required" }
+        check(fileTransport?.isReady == true && smpIdleLease.held(generation)) { "Prepare SMP first" }
+        val sdk = fileTransport!!
+        fileTransport = null
+        smpIdleLease.close()
+        return sdk
+    }
+
+    /** After Nordic's reset, enable SMP through fresh NUS and read actual active image hashes. */
+    internal fun verifyFirmwareTargets(targets: List<FirmwareTarget>, current: () -> Boolean, done: (Result<Unit>) -> Unit) {
+        check(firmwareBusy() && current()) { "Current firmware verification required" }
+        firmwareCheckPreparing = true
+        try { prepareSmp(token) { prepared ->
+            if (!current()) return@prepareSmp
+            firmwareCheckPreparing = false
+            prepared.fold({ generation ->
+                try {
+                    smpIdleLease.hold(generation)
+                    ImageManager(mcuTransport(store.control()["address"] as String, generation)).list(object : McuMgrCallback<McuMgrImageStateResponse> {
+                        override fun onResponse(response: McuMgrImageStateResponse) { handler.post {
+                            if (!runtime.owns(generation) || !current()) return@post
+                            done(runCatching {
+                                FirmwareSdkContract.checkActive(targets, response)
+                            })
+                        } }
+                        override fun onError(error: McuMgrException) { handler.post {
+                            if (runtime.owns(generation) && current()) done(Result.failure(error))
+                        } }
+                    })
+                } catch (error: Exception) { done(Result.failure(error)) }
+            }, { done(Result.failure(it)) })
+        } } catch (error: Exception) { firmwareCheckPreparing = false; throw error }
+    }
+
+    internal fun finishFirmwareCheck() {
+        firmwareCheckPreparing = false
+        if (runtime.owns(token) && store.control()["phase"] == "ready") {
+            if (smpIdleLease.held(token)) smpIdleLease.idle(token)
+            handler.postDelayed({ safely { downloadNext() } }, 100)
+        }
     }
 
     private val findWatch = PrototypeFindWatch(android.os.SystemClock::elapsedRealtime,
@@ -406,6 +466,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 downloadNext()
                 mediaReady(session)
                 gpsReady(session)
+                firmwareReady(address)
                 val previousFind = store.control()["last_find_watch"] as? Map<*, *>
                 findWatch.ready(session, previousFind?.get("address") == store.control()["address"] &&
                     previousFind?.get("state") in listOf("accepted", "start_written"))
@@ -693,7 +754,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     private fun downloadNext() {
-        if (downloading || shellOperation.busy || logFiles.busy || watchface.busy || smpPreparation.busy || !runtime.owns(token) || store.control()["phase"] != "ready") return
+        if (firmwareBusy() || downloading || shellOperation.busy || logFiles.busy || watchface.busy || smpPreparation.busy || !runtime.owns(token) || store.control()["phase"] != "ready") return
         if (store.control()["recording_sync_enabled"] == false) return
         val address = store.control()["address"] as String
         val pending = records().entries.firstOrNull { it.value["address"] == address && it.value["state"] == "pending" } ?: return

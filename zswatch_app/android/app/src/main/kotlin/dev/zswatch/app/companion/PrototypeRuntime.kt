@@ -6,7 +6,8 @@ interface PrototypeTransport {
 }
 
 /** Service owns this controller; UI attachment never acquires/releases transport. */
-class PrototypeRuntime(val store: PrototypeStore, private val transport: PrototypeTransport) {
+class PrototypeRuntime(val store: PrototypeStore, private val transport: PrototypeTransport,
+                       private val fenced: (String) -> Unit = {}) {
     var active = false
         private set
     val generation: Long get() = (store.control()["generation"] as Number).toLong()
@@ -68,7 +69,7 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
         if (!active) return
         store.update("transport_suspended", mapOf("generation" to generation + 1,
             "phase" to "disconnected", "last_error" to reason))
-        transport.close()
+        try { fenced("suspend") } finally { transport.close() }
     }
 
     fun recoverForSystem(): Boolean {
@@ -79,11 +80,29 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
     }
 
     fun reconnect() {
+        reconnect(false)
+    }
+
+    private fun reconnect(preserveUpgrade: Boolean) {
         if (!active) return
         val address = store.control()["address"] as String
         active = false
-        transport.close()
+        try { if (!preserveUpgrade) fenced("reconnect") } finally { transport.close() }
         start(address, restoring = true)
+    }
+
+    /** Nordic takes over the prepared SDK connection; old NUS callbacks lose their generation. */
+    fun beginFirmware(expectedGeneration: Long): Long {
+        check(owns(expectedGeneration) && store.control()["phase"] == "ready") { "Current Ready session required" }
+        val next = generation + 1
+        store.update("firmware_owner_acquired", mapOf("generation" to next, "phase" to "upgrading", "last_error" to null))
+        transport.close()
+        return next
+    }
+
+    /** The SDK has released its connection. Preserve the operation while acquiring fresh NUS. */
+    fun resumeAfterFirmware(upgradeGeneration: Long) {
+        if (owns(upgradeGeneration) && store.control()["phase"] == "upgrading") reconnect(true)
     }
 
     fun phase(token: Long, phase: String, error: String? = null): Boolean {
@@ -106,9 +125,9 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
         store.update("runtime_stopped", mapOf("desired_running" to false,
             "generation" to generation + 1, "phase" to "stopped", "notifications" to emptyMap<String, Any>()))
         active = false
-        transport.close()
+        try { fenced("stop") } finally { transport.close() }
     }
 
     /** Framework destruction releases handles but preserves the saved user intent. */
-    fun destroy() { active = false; transport.close() }
+    fun destroy() { active = false; try { fenced("destroy") } finally { transport.close() } }
 }

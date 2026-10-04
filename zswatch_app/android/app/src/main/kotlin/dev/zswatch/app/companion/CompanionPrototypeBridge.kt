@@ -130,6 +130,32 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
+                "startFirmware", "cancelFirmware" -> PrototypeHub.worker.post {
+                    try {
+                        val args = call.arguments as? Map<*, *> ?: error("Arguments required")
+                        val owner = CompanionPrototypeService.instance?.firmware ?: error("Native firmware owner required")
+                        if (call.method == "cancelFirmware") {
+                            owner.cancel(args["id"] as? String ?: error("Operation ID required"))
+                            PrototypeHub.main.post { result.success(mapOf("version" to 1, "accepted" to true)) }
+                        } else {
+                            val generation = when (val value = args["generation"]) {
+                                is Int -> value.toLong()
+                                is Long -> value
+                                else -> error("Integer generation required")
+                            }
+                            require(generation >= 0)
+                            val images = (args["images"] as? List<*>) ?: error("Images required")
+                            require(images.size in 1..3)
+                            val parsed = images.map { value ->
+                                val image = value as? Map<*, *> ?: error("Image map required")
+                                val index = image["index"] as? Int ?: error("Integer image index required")
+                                index to (image["bytes"] as? ByteArray ?: error("Firmware bytes required"))
+                            }
+                            val (id, owned) = owner.start(generation, parsed)
+                            PrototypeHub.main.post { result.success(mapOf("version" to 1, "accepted" to true, "id" to id, "generation" to owned)) }
+                        }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("FIRMWARE_FAILED", error.message, null) } }
+                }
                 "startWatchface", "resetWatchface" -> PrototypeHub.worker.post {
                     try {
                         val args = call.arguments as? Map<*, *> ?: error("Arguments required")

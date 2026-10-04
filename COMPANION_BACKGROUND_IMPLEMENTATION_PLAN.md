@@ -1627,3 +1627,38 @@ requirements before exposing the current Firmware Update screen in native mode:
 
 This is the next implementation contract, not an implemented DFU feature or a
 physical firmware-upgrade pass. The native firmware route remains guarded.
+
+
+### Checkpoint 2026-10-04: native Nordic DFU lifetime and read-only handoff
+
+The native service/bridge now implement the exclusive Nordic upgrade lifetime,
+input/manifest-index validation, retained prepared transport, old-NUS fencing,
+SDK stage/cancellation handling and fresh companion/post-boot image verification.
+Known SDK completion is distinct from verified boot. Firmware receipts contain
+metadata only; interrupted/unknown operations never automatically replay. Existing
+CONFIRM_ONLY/no-settings-erase/window-1/alignment-4 policy is preserved through
+one ImageSet path, including single images with a nonzero manifest index.
+
+Exact-version Nordic sources established CONFIRM_ONLY's reset/disconnect
+completion behavior. The bounded Nokia test exercised only a read-only handoff:
+cold preparation, SDK image-state reply after NUS release, then fresh native Ready.
+The watch's firmware was not uploaded/reset by this test. USB checks confirm the
+original background, nine recordings and crash file are unchanged. Both owner
+APKs build; 193 native and 29 focused Flutter boundary tests pass. Detailed
+artifacts and scope are retained in the Nokia report.
+
+USB image-state inspection introduces a concrete package requirement: this rig
+reports active image indices 0 and 2 but omits network-core image 1. The backend
+reports `boot_check_unavailable` if a selected target is absent; it does not
+claim full-package verification from SDK completion or another core's hash.
+Keep network-core verification/recovery explicit in the remaining package work.
+
+Next: wire typed native firmware status/control into the existing Flutter DFU
+providers and screen, preserving selection/download controls and
+never creating a legacy BLE/DFU owner. Coordinate the separate resource filesystem
+upload/verification/reset and combined-package sequence. Retain the router guard
+until the exposed controls are coordinated. Then perform a known board-matching
+firmware update with independent preservation/recovery access and before/after
+image/version evidence. Actual flash/reboot, process loss during DFU, all-target
+verification, current Android and endurance remain acceptance work. The read-only
+handoff is not a completed physical firmware upgrade.

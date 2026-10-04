@@ -28,6 +28,7 @@ class CompanionPrototypeService : Service() {
         const val RESTORE_SYSTEM = "dev.zswatch.app.companion.RESTORE_SYSTEM"
         const val START_REMOTE_FIXTURE = "dev.zswatch.app.companion.START_REMOTE_FIXTURE"
         const val START_LOCAL_FIXTURE = "dev.zswatch.app.companion.START_LOCAL_FIXTURE"
+        const val INSPECT_FIRMWARE_HANDOFF = "dev.zswatch.app.companion.INSPECT_FIRMWARE_HANDOFF"
         const val POST_TEST_NOTIFICATION = "dev.zswatch.app.companion.POST_TEST_NOTIFICATION"
         const val CHANNEL = "companion_prototype"
         const val NOTIFICATION = 1003
@@ -42,6 +43,8 @@ class CompanionPrototypeService : Service() {
     var remoteFixture: PrototypeRemoteFixture? = null
         private set
     var localFixture: PrototypeLocalFixture? = null
+        private set
+    internal var firmware: NativePrototypeFirmware? = null
         private set
     private var media: AndroidPrototypeMedia? = null
     internal var gps: AndroidPrototypeGps? = null
@@ -112,10 +115,14 @@ class CompanionPrototypeService : Service() {
                 val store = PrototypeHub.journal(applicationContext)
                 PrototypeHttpRelay.markProcessInterrupted(store, System.currentTimeMillis())
                 PrototypeWatchface.markInterrupted(store)
+                PrototypeFirmware.markInterrupted(store)
                 val files = ReceiptFiles(File(filesDir, "companion-prototype/recordings"))
                 val link = NativePrototypeTransport(applicationContext, PrototypeHub.worker, store, files)
                 transport = link
-                runtime = PrototypeRuntime(store, link).also { link.runtime = it }
+                runtime = PrototypeRuntime(store, link) { reason -> firmware?.fenced(reason) }.also { link.runtime = it }
+                firmware = NativePrototypeFirmware(PrototypeHub.worker, store, runtime!!, link)
+                link.firmwareBusy = { firmware?.busy == true }
+                link.firmwareReady = { address -> firmware?.ready(address) }
                 gps = AndroidPrototypeGps(applicationContext, store,
                     foreground = { enabled ->
                         if (instance === this) {
@@ -146,7 +153,7 @@ class CompanionPrototypeService : Service() {
             }
             return START_NOT_STICKY
         }
-        if (intent != null && intent.action !in listOf(START, START_DISCOVERED, RESTORE_PRESENCE, RESTORE_SYSTEM, START_REMOTE_FIXTURE, START_LOCAL_FIXTURE, POST_TEST_NOTIFICATION)) { stopSelf(); return START_NOT_STICKY }
+        if (intent != null && intent.action !in listOf(START, START_DISCOVERED, RESTORE_PRESENCE, RESTORE_SYSTEM, START_REMOTE_FIXTURE, START_LOCAL_FIXTURE, POST_TEST_NOTIFICATION, INSPECT_FIRMWARE_HANDOFF)) { stopSelf(); return START_NOT_STICKY }
         try {
             publishForeground(gpsForeground)
         } catch (error: Exception) {
@@ -158,6 +165,15 @@ class CompanionPrototypeService : Service() {
         PrototypeHub.worker.post {
             safely {
                 val owner = runtime ?: error("Prototype owner unavailable")
+                if (intent?.action == INSPECT_FIRMWARE_HANDOFF) {
+                    check(owner.active && owner.store.control()["phase"] == "ready") { "Connect before the read-only handoff probe" }
+                    transport?.prepareShell(owner.generation) { prepared -> safely {
+                        prepared.fold({ firmware?.inspectHandoff(it) }, { error ->
+                            owner.store.update("firmware_handoff_probe_rejected", detail = mapOf("error" to error.javaClass.simpleName))
+                        })
+                    } }
+                    return@safely
+                }
                 if (intent?.action == START_DISCOVERED) {
                     val started = address != null && owner.startDiscovered(address, intent.getLongExtra("generation", -1))
                     LifecycleLogger.log("CompanionPrototype", "discovered_start_accepted=$started")

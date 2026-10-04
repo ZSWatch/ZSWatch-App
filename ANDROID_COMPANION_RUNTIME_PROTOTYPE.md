@@ -1012,3 +1012,68 @@ Validation and bounded Nokia/watch results are in the smoke report. This is stil
 a debug prototype boundary. Physical process death during upload/apply, a custom
 photo upload, current Android hardware, DFU coordination and endurance remain
 acceptance work; Home completion does not prove Flutter-engine destruction.
+
+
+## Service-owned DFU backend — 2026-10-04
+
+A native firmware backend is implemented through the version-1 bridge
+`startFirmware`/`cancelFirmware` methods. This checkpoint does not yet expose the
+existing Flutter Firmware Update route: its provider/UI and separate resource
+filesystem/combined workflow still require coordinated wiring. Ordinary builds
+retain their Flutter owner. The user's local wrapper/fork is unchanged.
+
+Before acquiring any connection, the backend bounds one to three images at
+8 MiB each, requires unique manifest image indices 0…2 and uses the installed
+Nordic 2.7.2 TargetImage parser. Input buffers are copied; the image index is
+preserved even for a single external image. One ImageSet/settings path uses the
+existing CONFIRM_ONLY policy, erase-app-settings=false, window 1 and alignment 4.
+Nordic parses image structure; firmware authenticity/signature checks remain the
+watch bootloader's responsibility. There is no new SMP implementation.
+
+The service takes the already-prepared Nordic transport without releasing it,
+fences the old NUS generation and closes the normal companion connection. During
+that exclusive stage, ordinary SDK requests are rejected. Nordic's existing
+FirmwareUpgradeManager owns validation/upload/confirm/reset. Stop, radio loss,
+framework destruction and an unrelated reconnect fence/cancel that operation.
+Cleanup closes handles even if a journal callback fails. Cancellation is accepted
+only when both the projected stage and actual SDK state permit upload cancellation;
+a receipt merely means requested. The SDK terminal callback establishes its result.
+
+The exact SDK sources show that CONFIRM_ONLY completion may follow reset and
+its disconnect notification without a fresh boot check. SDK completion therefore
+leaves the operation busy in `reconnecting`, releases the upgrade SDK connection,
+and restores the saved companion intent through a fresh NUS generation. Once
+Ready, existing SMP preparation re-enables the service and permits one bounded
+service-change recovery. The existing ImageManager.list response must report
+every selected image active with its selected SDK hash before `completed`.
+An absent image index is `boot_check_unavailable`, distinct from a mismatching
+active image (`boot_check_failed`). Both remain explicitly unknown outcomes.
+
+Independent USB inspection on this rig reports active application image indices
+0 and 2, version 0.8.1; network-core index 1 is absent. Consequently this firmware
+cannot establish full-package post-boot verification for a selected network-core
+image through its current image-state response. Do not count SDK upload/reset
+completion as that missing proof or silently skip the selected network core.
+Retain this requirement while wiring the package workflow and choosing its
+network-core verification/recovery behavior.
+
+Operation identity/address, image indices/sizes/hashes, per-image SDK progress,
+stage and uncertainty are journaled without firmware payloads. Progress can reset
+when Nordic moves to another image; it is not an aggregate multi-image percentage.
+The whole operation has a twenty-minute deadline and postflight a ninety-second
+deadline. Startup marks an active operation interrupted/unknown. Firmware never
+automatically replays after process loss, and UI lifetime cannot own this worker.
+
+The existing nonexported debug service has an app-UID
+`INSPECT_FIRMWARE_HANDOFF` action. It prepares SMP, performs the same transport/
+NUS-generation handoff, issues only ImageManager.list, releases the SDK and
+reacquires normal NUS. It never constructs an upgrade manager or sends upload,
+confirm, erase or reset. Its separate diagnostic receipt is not a firmware-update
+result. A fifteen-second handoff read deadline and Stop fencing bound it. See the
+Nokia runbook for actual APKs, generations, preservation checks and limitations.
+
+Validation: 193 native JVM tests and 29 focused Flutter router/client regressions;
+both debug variants compile and pass owner verification. Actual firmware upload,
+reset, postflight and process-loss recovery on hardware remain unverified. UI
+wiring, filesystem/combined updates, network-core verification and modern Android/
+endurance remain goal work; no complete DFU feature or production switch is claimed.
