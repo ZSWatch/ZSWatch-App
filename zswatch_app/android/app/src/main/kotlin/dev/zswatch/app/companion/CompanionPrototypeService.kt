@@ -255,13 +255,13 @@ class CompanionPrototypeService : Service() {
     private fun publishForeground(location: Boolean) {
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Companion prototype", NotificationManager.IMPORTANCE_LOW))
+            NotificationChannel(CHANNEL, "ZSWatch companion", NotificationManager.IMPORTANCE_LOW))
         val open = packageManager.getLaunchIntentForPackage(packageName)
         val stop = Intent(this, CompanionPrototypeService::class.java).setAction(STOP)
         val notification = NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-            .setContentTitle("ZSWatch companion prototype")
-            .setContentText(if (location) "Sharing phone location with watch" else "Native watch companion runtime")
+            .setContentTitle("ZSWatch companion")
+            .setContentText(if (location) "Sharing phone location with watch" else "Keeping your watch connected")
             .setOngoing(true)
             .setContentIntent(PendingIntent.getActivity(this, 20, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             .addAction(0, "Stop", PendingIntent.getService(this, 21, stop, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
