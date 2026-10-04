@@ -73,8 +73,8 @@ status. Reconnect/observer failure removes the connected dashboard. Cancel and
 Disconnect go to native Stop without creating Dart auto-reconnect/foreground
 services. UI/container disposal never sends Stop.
 
-Only home/dashboard, Add Watch, settings, notification settings, recording status and the
-developer runtime controls are routable in this build. Unsupported deep links
+Only home/dashboard, Add Watch, settings, notification settings, recording status,
+the coordinated Shell screen and developer runtime controls are routable in this build. Unsupported deep links
 cannot enter AI/model, DB-backed recording detail, DFU, health, analytics,
 watchface or other legacy-service screens. Health stats and uncoordinated SMP
 actions are withheld. The normal router is unchanged. The developer controls
@@ -248,6 +248,8 @@ Every request/subscription includes `{version: 1}`.
 | `retryRecordings` | — | Snapshot after retry/list request; asynchronous receipts follow |
 | `setRecordingSync` | `enabled`: boolean | Persisted download policy; disabling cancels/releases the existing Nordic transfer |
 | `findWatch` | `generation`: integer for the current Ready owner | Explicit short burst acceptance receipt; service owns the stop timer |
+| `prepareShell` | `generation`: current Ready integer | No command executes. Returns a prepared generation after Nordic SDK readiness, allowing at most one native recovery generation; bounded to fifteen seconds. |
+| `executeShell` | `generation`: prepared Ready integer, `command`: nonblank string up to 512 characters, no NUL | Existing Nordic ShellManager response (`output`, signed `return_code`) for this transient command; bounded to thirty seconds and never replayed after reconnect. |
 | `configureGps` | `enabled`: Boolean; enabling requires foreground/background location access and phone location services | Persisted explicit sharing policy; does not Start BLE or request a fix |
 | `configureNotifications` | `enabled`, `packages`: explicit Android package list | Persisted policy; enabling requires actual notification access |
 | `requestNotificationAccess` | — | Opens Android notification-listener settings; accepted does not mean permission granted |
@@ -896,3 +898,36 @@ successful build or installed hash does not alone prove the native gate. This
 check is read-only and separately labels hardware/Dart acceptance NOT_RUN.
 The final Find artifact with verified native gate is SHA-256
 `f987b6fe4540ca4c5f2cee0f29325c2d2c2f080d06d71e8c1ecc2e724e070977`.
+
+## Service-owned Shell through the existing Flutter UI — 2026-10-04
+
+Native mode now enables the existing Shell screen through the developer runtime
+controls and the guarded native router. Its provider first prepares SMP through
+the native service, then accepts a command on the prepared generation. Preparation
+uses Nordic's `McuMgrBleTransport.connect`/readiness API. It does not query the
+NUS GATT service list for SMP readiness or implement another cache/protocol.
+The same existing native transport factory serves recordings and Nordic
+`ShellManager.exec`; the user's Flutter/Nordic fork remains unchanged.
+
+Preparation executes no command, allows one same-watch recovery generation and
+has a fifteen-second deadline. Stop/watch replacement/further generations reject
+it. Once accepted, one command runs at a time with a thirty-second watchdog;
+late callbacks are fenced and commands do not replay after reconnect. Actual
+recording transfers exclude Shell. A twenty-second idle lease keeps the SDK/SMP
+available for short bursts. Idle cleanup cannot release it during preparation,
+execution or recording work. An abandoned preparation releases its resources
+and lets queued background work proceed. UI teardown does not own these leases.
+
+Native Shell retains its tabs while disconnected so a Quick Action does not lose
+its pending reply during preparation. The connection banner updates independently;
+new commands still require current Ready. Terminal/Quick Actions/Remote/Monitor
+reuse their existing service API. Screen teardown stops UI polling; Native mode
+never invokes the legacy UI-owned ShellManager or SMP toggles. The ordinary
+Flutter implementation remains available in ordinary builds.
+
+145 native JVM and 123 companion Flutter tests pass; focused analysis is clean
+and both debug variants compile and pass their compiled-owner checks. The Nokia
+report records real cold Power Status, CPU Frequency, a same-generation command
+burst/Home observation and idle/Stop cleanup. Physical Flutter engine destruction,
+SDK failure during idle cleanup, large monitor output and simultaneous transfer/
+DFU arbitration remain acceptance items. No AI ran and no recording was deleted.

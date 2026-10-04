@@ -8,6 +8,7 @@ import '../../data/models/companion_notification_status.dart';
 import '../../data/models/companion_http_status.dart';
 import '../../data/models/companion_watch_selection.dart';
 import '../../data/models/companion_gps_status.dart';
+import '../../data/models/companion_shell_result.dart';
 
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
@@ -316,6 +317,46 @@ class CompanionPrototypeClient {
       throw const FormatException('Unsupported companion presence status');
     }
     return Map<String, Object?>.from(value);
+  }
+
+  /// Prepare handles before accepting a command. This stage executes no command
+  /// and may cross one service-change recovery; the command itself never replays.
+  Future<int> prepareShell(int generation) async {
+    if (generation < 0) throw const FormatException('Invalid shell generation');
+    final value = await methods.invokeMethod<Object?>('prepareShell', {
+      'version': 1,
+      'generation': generation,
+    });
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['prepared_from_generation'] is! int ||
+        value['prepared_from_generation'] != generation ||
+        value['generation'] is! int ||
+        (value['generation'] as int) < generation ||
+        (value['generation'] as int) > generation + 1) {
+      throw const FormatException('Unsupported SMP preparation response');
+    }
+    return value['generation'] as int;
+  }
+
+  Future<CompanionShellResult> executeShell(
+    int generation,
+    String command,
+  ) async {
+    if (generation < 0 ||
+        command.trim().isEmpty ||
+        command.length > 512 ||
+        command.contains('\u0000')) {
+      throw const FormatException('Invalid native shell request');
+    }
+    return CompanionShellResult.decode(
+      await methods.invokeMethod<Object?>('executeShell', {
+        'version': 1,
+        'generation': generation,
+        'command': command,
+      }),
+      generation,
+    );
   }
 
   Future<CompanionPrototypeSnapshot> command(String name, {int? cursor}) async {

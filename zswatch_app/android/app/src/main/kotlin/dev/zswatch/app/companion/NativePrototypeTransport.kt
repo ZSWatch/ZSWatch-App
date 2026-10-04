@@ -6,6 +6,10 @@ import android.content.Context
 import android.os.Handler
 import dev.zswatch.app.LifecycleLogger
 import io.runtime.mcumgr.ble.McuMgrBleTransport
+import io.runtime.mcumgr.McuMgrCallback
+import io.runtime.mcumgr.McuMgrTransport
+import io.runtime.mcumgr.managers.ShellManager
+import io.runtime.mcumgr.response.shell.McuMgrExecResponse
 import io.runtime.mcumgr.exception.McuMgrException
 import io.runtime.mcumgr.transfer.DownloadCallback
 import io.runtime.mcumgr.transfer.TransferController
@@ -24,6 +28,109 @@ class NativePrototypeTransport(private val context: Context, private val handler
     var gpsReady: (Long) -> Unit = {}
     var gpsClosed: () -> Unit = {}
     var gpsRequest: (JSONObject, Long) -> Unit = { _, _ -> }
+    private var closing = false
+    private val smpPreparation: PrototypeSmpPreparation = PrototypeSmpPreparation(
+        current = {
+            val state = store.control()
+            PrototypeSmpSession((state["generation"] as Number).toLong(), state["address"] as? String,
+                state["desired_running"] == true,
+                runtime.owns(token) && state["phase"] == "ready",
+                fileTransport?.isReady == true)
+        },
+        later = { delay, action -> handler.postDelayed(action, delay) },
+        enable = { command("GB({\"t\":\"smp\",\"status\":true})") },
+        connect = { generation, done ->
+            val transport = mcuTransport(store.control()["address"] as String, generation)
+            // Nordic owns SMP discovery/readiness. NUS's service list may be
+            // cached even after its own recovery; do not inspect it for SMP.
+            transport.connect(object : McuMgrTransport.ConnectionCallback {
+                override fun onConnected() { handler.post { done(Result.success(Unit)) } }
+                override fun onDeferred() { handler.post {
+                    done(Result.failure(IllegalStateException("Nordic connection deferred")))
+                } }
+                override fun onError(error: Throwable) { handler.post {
+                    done(Result.failure(IllegalStateException(error.javaClass.simpleName)))
+                } }
+            })
+        },
+        prepared = { generation ->
+            smpIdleLease.hold(generation)
+            smpIdleLease.idle(generation)
+            // If UI leaves after preparation, queued background recordings must
+            // not remain blocked waiting for an executeShell call that never arrives.
+            handler.postDelayed({ if (runtime.owns(generation)) safely { downloadNext() } }, 100)
+        },
+    )
+    private val smpIdleLease: PrototypeSmpIdleLease = PrototypeSmpIdleLease(
+        { delay, action -> handler.postDelayed(action, delay) },
+        { generation ->
+            if (!closing && generation == token && runtime.owns(generation) &&
+                store.control()["phase"] == "ready" && !smpPreparation.busy && !shellOperation.busy && !downloading) safely {
+                val previous = fileTransport; fileTransport = null
+                previous?.release()
+                command("GB({\"t\":\"smp\",\"status\":false})")
+            }
+        })
+    private val shellOperation: PrototypeShellOperation = PrototypeShellOperation(
+        owns = { generation -> runtime.owns(generation) && token == generation && store.control()["phase"] == "ready" },
+        later = { delay, action -> handler.postDelayed(action, delay) },
+        enable = { generation, enabled ->
+            val warm = smpIdleLease.held(generation)
+            smpIdleLease.hold(generation)
+            if (warm) enabled() else command("GB({\"t\":\"smp\",\"status\":true})", enabled)
+        },
+        execute = { text, done ->
+            val generation = token
+            val parts = text.trim().split(Regex("\\s+"))
+            val address = store.control()["address"] as String
+            // The same Nordic SDK transport/factory as native recording work.
+            // This matches the existing fork's ShellManagerPlugin exec contract.
+            ShellManager(mcuTransport(address, generation)).exec(parts.first(),
+                parts.drop(1).takeIf { it.isNotEmpty() }?.toTypedArray(),
+                object : McuMgrCallback<McuMgrExecResponse> {
+                    override fun onResponse(response: McuMgrExecResponse) { handler.post {
+                        done(runCatching {
+                            val output = response.o ?: ""
+                            check(response.isSuccess) { "Shell management request failed" }
+                            check(output.length <= 65536) { "Shell output too large" }
+                            PrototypeShellReply(output, response.ret.toLong())
+                        })
+                    } }
+                    override fun onError(error: McuMgrException) { handler.post {
+                        done(Result.failure(IllegalStateException(error.javaClass.simpleName)))
+                    } }
+                })
+        },
+        release = { generation ->
+            if (generation == token) {
+                if (!closing && runtime.owns(generation) && store.control()["phase"] == "ready") {
+                    // Screen attachment does not own this lease. The monitor can
+                    // reuse it; inactivity or owner Stop/disconnect releases it.
+                    smpIdleLease.idle(generation)
+                    handler.postDelayed({ if (runtime.owns(generation)) safely { downloadNext() } }, 100)
+                }
+            }
+        },
+    )
+
+    internal fun executeShell(generation: Long, text: String, done: (Result<PrototypeShellReply>) -> Unit) {
+        check(!smpPreparation.busy) { "SMP preparation is running" }
+        check(!downloading) { "Recording transfer is running; retry afterward" }
+        shellOperation.start(generation, text, done)
+    }
+
+    internal fun prepareShell(generation: Long, done: (Result<Long>) -> Unit) {
+        check(!downloading && !shellOperation.busy) { "SMP operation is running" }
+        smpPreparation.start(generation) { result ->
+            if (result.isFailure && runtime.owns(token) && store.control()["phase"] == "ready") {
+                val session = token
+                smpIdleLease.hold(session)
+                smpIdleLease.idle(session)
+                handler.postDelayed({ if (runtime.owns(session)) safely { downloadNext() } }, 100)
+            }
+            done(result)
+        }
+    }
     private val findWatch = PrototypeFindWatch(android.os.SystemClock::elapsedRealtime,
         { delay, action -> handler.postDelayed(action, delay) }, ::sendFindWatch,
         { generation, state ->
@@ -421,8 +528,33 @@ class NativePrototypeTransport(private val context: Context, private val handler
         }
     }
 
+    private fun mcuTransport(address: String, session: Long): McuMgrBleTransport {
+        fileTransport?.let { return it }
+        val adapter = context.getSystemService(BluetoothManager::class.java).adapter
+        return object : McuMgrBleTransport(context, adapter.getRemoteDevice(address), handler) {
+            private var packet = 0L
+            override fun getMinLogPriority() = if (traceMcuPackets) android.util.Log.INFO else android.util.Log.WARN
+            override fun log(priority: Int, message: String) {
+                if (!traceMcuPackets) return
+                if ((message.startsWith("Sending (") || message.startsWith("Received Header (")) && message.contains(" CBOR ")) {
+                    android.util.Log.d("ZSWPrototypePacket", "session=$session ${message.substringBefore(" CBOR ")}")
+                    return
+                }
+                // The SDK supplies a hex dump here. Never forward that dump to logcat.
+                // This opt-in diagnostic observes notifications before reassembly.
+                if (!message.startsWith("Notification received from ") || !message.contains(", value: (0x)")) return
+                val hex = message.substringAfter(", value: (0x)").trim().split('-')
+                val bytes = runCatching { hex.map { it.trim().toInt(16).toByte() }.toByteArray() }.getOrNull() ?: return
+                android.util.Log.d("ZSWPrototypePacket", "session=$session packet=${++packet} bytes=${bytes.size} sha256=${ReceiptFiles.sha(bytes)}")
+            }
+        }.also {
+            fileTransport = it
+            it.requestConnPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+        }
+    }
+
     private fun downloadNext() {
-        if (downloading || !runtime.owns(token) || store.control()["phase"] != "ready") return
+        if (downloading || shellOperation.busy || smpPreparation.busy || !runtime.owns(token) || store.control()["phase"] != "ready") return
         if (store.control()["recording_sync_enabled"] == false) return
         val address = store.control()["address"] as String
         val pending = records().entries.firstOrNull { it.value["address"] == address && it.value["state"] == "pending" } ?: return
@@ -430,33 +562,14 @@ class NativePrototypeTransport(private val context: Context, private val handler
         val metadata = pending.value
         files.recover(key, metadata)?.let { store.putRecord(key, it); downloadNext(); return }
         downloading = true
+        smpIdleLease.hold(token)
         val session = token
         val transferId = ++fileOperation
         store.putRecord(key, metadata + mapOf("state" to "downloading"))
         command("GB({\"t\":\"smp\",\"status\":true})") {
             handler.postDelayed({
                 if (runtime.owns(session) && downloading && fileOperation == transferId) safely {
-                    val adapter = context.getSystemService(BluetoothManager::class.java).adapter
-                    val transport = fileTransport ?: object : McuMgrBleTransport(context, adapter.getRemoteDevice(address), handler) {
-                        private var packet = 0L
-                        override fun getMinLogPriority() = if (traceMcuPackets) android.util.Log.INFO else android.util.Log.WARN
-                        override fun log(priority: Int, message: String) {
-                            if (!traceMcuPackets) return
-                            if ((message.startsWith("Sending (") || message.startsWith("Received Header (")) && message.contains(" CBOR ")) {
-                                android.util.Log.d("ZSWPrototypePacket", "session=$session ${message.substringBefore(" CBOR ")}")
-                                return
-                            }
-                            // The SDK supplies a hex dump here. Never forward that dump to logcat.
-                            // This opt-in diagnostic observes notifications before reassembly.
-                            if (!message.startsWith("Notification received from ") || !message.contains(", value: (0x)")) return
-                            val hex = message.substringAfter(", value: (0x)").trim().split('-')
-                            val bytes = runCatching { hex.map { it.trim().toInt(16).toByte() }.toByteArray() }.getOrNull() ?: return
-                            android.util.Log.d("ZSWPrototypePacket", "session=$session packet=${++packet} bytes=${bytes.size} sha256=${ReceiptFiles.sha(bytes)}")
-                        }
-                    }.also {
-                        fileTransport = it
-                        it.requestConnPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-                    }
+                    val transport = mcuTransport(address, session)
                     val manager = CheckedFsManager(transport, (metadata["size_bytes"] as Number).toInt()) { requested, returned, data ->
                         // Hashes/offsets allow independent USB comparison without logging audio.
                         android.util.Log.d("ZSWPrototypeTransfer", "session=$session transfer=$transferId file=${metadata["filename"]} requested=$requested returned=$returned bytes=${data.size} sha256=${ReceiptFiles.sha(data)}")
@@ -509,6 +622,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
             it["address"] == store.control()["address"] && it["state"] == "pending"
         }
         if (!more) {
+            smpIdleLease.close()
             fileTransport?.release(); fileTransport = null
             if (runtime.owns(token) && store.control()["phase"] == "ready") command("GB({\"t\":\"smp\",\"status\":false})")
         }
@@ -533,6 +647,12 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     override fun close() {
+        closing = true
+        // Preparation can wait for one service-change reconnect, but it never
+        // executes/replays a command. Persisted Stop cancels it immediately.
+        if (store.control()["desired_running"] != true) smpPreparation.close()
+        smpIdleLease.close()
+        shellOperation.close()
         mediaClosed()
         gpsClosed()
         findWatch.close()
@@ -548,9 +668,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
         val previous = gatt; gatt = null; tx = null
         runCatching { previous?.disconnect() }; runCatching { previous?.close() }
         framer.reset()
+        closing = false
     }
 
-    fun dispose() { close(); httpExecutor.close() }
+    fun dispose() { smpPreparation.close(); close(); httpExecutor.close() }
 
     companion object {
         @Volatile var traceMcuPackets = false

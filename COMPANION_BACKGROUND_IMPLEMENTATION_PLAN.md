@@ -1442,3 +1442,82 @@ modern-Android acceptance or unplugged endurance. The Find lifecycle software
 gate is closed; avoid further Find/SMP troubleshooting without new evidence.
 Continue the controlled HTTP network comparison and remaining real companion
 feature/owner coordination work. iOS and model execution stay deferred.
+
+### Progress 2026-10-04: controlled HTTP comparison and native Shell integration
+
+The fixed HTTP comparison is complete on the Nokia. A lab-only firmware flag
+adds `http_probe loopback|remote` using the existing HTTP request path. Its fixed
+destinations are a host loopback fixture via temporary ADB reverse and the
+existing Trivia endpoint; it sends no location or recording. The flag defaults
+off. The host fixture logs response counts/lengths, never request content.
+
+Loopback reached the actual watch callback in active state, with Flutter removed,
+immediately in forced deep idle and after a 900-second idle window. Thirty-one
+samples retained Ready 179/PID 31292 and no Flutter Activity throughout the
+window. Periodic watch status traffic continued: this is not silent BLE or
+unplugged endurance. Initial remote errors occurred with Wi-Fi disabled and no
+default network. With Wi-Fi temporarily enabled, one active reply reached the
+watch after about 9.585 seconds while native delivery had expired; the final idle
+remote request timed out and delivered an error. Preserve all these outcomes.
+Network availability, the native eight-second deadline, ATT completion and the
+watch's ten-second timeout are separate evidence. This comparison does not
+explain the earlier long-idle remote failure or establish remote-fetch acceptance.
+Cleanup restored Wi-Fi off, battery simulation/idle state and removed ADB reverse.
+
+The next ordinary feature is the existing Flutter Shell screen. Native-mode
+Shell commands now enter a generation-fenced bridge to the service's existing
+Nordic transport and Nordic ShellManager. Flutter does not toggle SMP or create
+a second SDK owner in this mode. One command runs at a time, a thirty-second
+watchdog bounds it, and a twenty-second idle lease retains SMP/SDK across short
+command bursts. Stop/disconnect cancel pending completion and stale timers;
+accepted commands are not replayed after reconnect. Closing the UI does not
+own or cancel the native operation. The ordinary Flutter/Nordic path is retained.
+
+145 native JVM and 123 companion Flutter tests pass; focused analysis is clean
+and both debug APKs build. Compiled-owner checks pass for both frozen variants.
+Bounded Nokia cold Shell, command burst/Home, idle and Stop evidence is
+recorded below; physical engine destruction and simultaneous SDK work remain. DFU/files/watchface coordination remains separate. Nokia model
+execution and iOS stay deferred; real Weather still awaits the separate approval.
+
+Shell preparation follow-up: a physical cold enable initially caused the existing
+service-change recovery to cancel the command. An explicit fresh-Ready retry
+returned real Power Status. The fix separates preparation from execution: the
+native owner enables SMP, waits for Nordic SDK readiness together with native Ready, and
+permits at most one recovery generation before returning the execution fence.
+Preparation executes no command; Stop/watch replacement/additional generations
+and a fifteen-second deadline reject it. The command remains transient and is
+never automatically replayed once accepted by Nordic. Preparation/idle leases
+remain service-owned. Bounded physical results are recorded in the checkpoint below.
+
+The first preparation trial exposed a UI lifetime issue: Shell removed its tabs
+while disconnected, discarding the Quick Action waiting for a reply. Native mode
+now retains those tabs through reconnect and displays connection status above
+them. A regression exercises the real Quick Action through disconnected → Ready
+and verifies its result appears without any legacy BLE provider. This extends
+the existing Dart UI; the ordinary disconnected screen behavior is retained.
+
+Readiness follow-up: querying SMP through the NUS GATT service list timed out
+on the rig despite watch-side SMP enable and native reconnect. The retained
+failed trial demonstrates that cached NUS discovery is not SDK readiness.
+Preparation now calls the existing Nordic McuMgrBleTransport connection API and
+uses its readiness, with SDK callbacks fenced across the same bounded native
+recovery. It executes no SMP command and adds no cache implementation. Failed
+preparation releases its SDK/SMP lease after a bounded idle period; queued
+background recordings are allowed to proceed if the UI leaves before execution.
+
+Shell checkpoint completed: the Nordic-readiness APK accepted one cold Power
+Status without a manual retry, returned actual CPU Frequency and preserved
+Ready 200 through an immediate command burst and Home observation. SDK idle
+cleanup disabled watch SMP; native recovery reached live Ready 201, then explicit
+Stop 202 released the service. All nine originals and the existing crash file
+exactly match their pre-HTTP firmware hashes. The final guard APK is compiled,
+owner-verified and installed with Stop retained; physical command runs used its
+immediate SDK predecessor. Detailed artifacts/limits are in the Nokia report.
+No physical Flutter-engine-destruction or exact reply-arrival timestamp is claimed.
+
+Next independent work is coordination of the remaining real SDK-backed controls
+(files/watchfaces/DFU), shared lifecycle acceptance on newer Android and longer
+unplugged operation. Retain remote HTTP network/deadline and watch error handling
+as bounded follow-ups, and GPS/Weather's explicit location approval. The debug
+native boundary remains in place; no production owner switch occurred. Keep
+iOS/model execution and recording corruption separate from this core migration.

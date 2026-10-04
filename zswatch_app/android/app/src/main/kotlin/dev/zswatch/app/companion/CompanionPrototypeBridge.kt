@@ -130,6 +130,32 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { result.error("START_FAILED", error.message, null) }
                 }
+                "prepareShell", "executeShell" -> PrototypeHub.worker.post {
+                    try {
+                        val args = call.arguments as? Map<*, *> ?: error("Arguments required")
+                        val generation = when (val value = args["generation"]) {
+                            is Int -> value.toLong()
+                            is Long -> value
+                            else -> error("Integer generation required")
+                        }
+                        require(generation >= 0)
+                        val link = CompanionPrototypeService.instance?.transport ?: error("Native owner required")
+                        if (call.method == "prepareShell") {
+                            link.prepareShell(generation) { outcome -> PrototypeHub.main.post {
+                                outcome.fold({ prepared -> result.success(mapOf("version" to 1,
+                                    "generation" to prepared, "prepared_from_generation" to generation)) },
+                                    { error -> result.error("SHELL_FAILED", error.message, null) })
+                            } }
+                        } else {
+                            val command = args["command"] as? String ?: error("Command required")
+                            link.executeShell(generation, command) { outcome -> PrototypeHub.main.post {
+                                outcome.fold({ reply -> result.success(mapOf("version" to 1,
+                                    "generation" to generation, "output" to reply.output, "return_code" to reply.returnCode)) },
+                                    { error -> result.error("SHELL_FAILED", error.message, null) })
+                            } }
+                        }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("SHELL_FAILED", error.message, null) } }
+                }
                 "stop", "forgetWatch", "findWatch", "syncTime", "requestDeviceInfo", "requestRecordingList", "retryRecordings", "ackEvents", "configureNotifications", "configureGps", "configureHttp", "setRecordingSync", "startRemoteFixture", "startLocalFixture" -> {
                     PrototypeHub.worker.post {
                         try {

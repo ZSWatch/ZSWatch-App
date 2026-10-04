@@ -316,7 +316,6 @@ void main() {
         AppRoutes.health,
         AppRoutes.voiceMemoDetail(12),
         AppRoutes.watchfaceBackground,
-        AppRoutes.shell,
       ]) {
         routes.go(path);
         await tester.pumpAndSettle();

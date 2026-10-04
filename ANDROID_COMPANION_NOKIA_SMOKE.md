@@ -1141,3 +1141,39 @@ network/deadline failure. USB stayed attached, ADB reverse bypasses external
 network access and an active Wi-Fi reply was already late. The old idle timeout,
 modern Android/unplugged operation and firmware HTTP error/late-result consumers
 remain open. Do not extend HTTP microdiagnosis at the expense of feature migration.
+
+## Existing Flutter Shell through the native Nordic owner — 2026-10-04
+
+Private artifacts: `.companion-hil-runs/20261004-native-shell/`.
+145 native JVM / 123 companion Flutter tests pass, focused analysis is clean,
+and both final debug APKs compile and pass compiled-owner checks. No source or
+working changes in the user's Flutter/Nordic fork were altered. Shell uses the
+same Nordic 2.7.2 transport factory as existing native recording work and the
+existing fork's ShellManager exec contract. No custom SMP protocol was added.
+
+| Check | Observation and limit |
+| --- | --- |
+| Initial cold enable | First APK `ee052aa2…24f2` reached Ready 181. Watch SMP enable changed services, existing native recovery cancelled the command and reached Ready 182. Explicit retry returned real Power Status. Retain this failed first-command behavior. |
+| Preparation/UI trials | Preparation permits one recovery before accepting a command. An earlier UI removed its Quick Action during disconnect; a real-widget regression now retains it. NUS-service-list readiness in `8814b6fa…c137` timed out despite watch SMP enable/Ready 192; it was replaced with Nordic SDK readiness. These trials are not overwritten by the final pass. |
+| Nordic cold command | APK `f11b77c3ab6fef1d9a7f4a205d112763dd3f5f6665496bce47e185ffbd12876c` starts Ready 195 with watch BLE FOTA/SMP independently verified disabled via USB. One Power Status tap completed preparation/recovery to Ready 196, then displayed actual Power Status/uptime 28219 seconds. No manual command retry. |
+| CPU after expiry | A subsequent CPU tap started after idle cleanup on Ready 197 and recovered to 198. The app was on Home during part of preparation, reopened while still loading, and later showed `CPU frequency profile: slow`. This does not prove execution completed with Flutter absent. |
+| Timed command burst/Home | Fresh Power Status returned uptime 28700 seconds. Immediate CPU reused the SDK lease; read-only state remained Ready 200 before/after. The launcher was resumed during the five-second Home window, and CPU output was visible after reopening. There is no native completion timestamp here: claim foreground absence and retained result, not physical engine destruction or precise reply-arrival time. |
+| Idle cleanup | Later USB `ble_fota status` independently verified disabled. Read-only state verified live Ready 201, same installed SDK APK, fresh watch status/time and paused downloads. Native recovery after dynamic service removal remained functional. The short UART lease capture contained only two bytes and provides no additional cleanup evidence. |
+| Stop/preservation | Explicit app-UID debug Stop verified generation 202, no service/native notifications and desired intent=false. All nine originals plus the existing crash file match the pre-HTTP firmware backup hashes. Jobs/outbox remain structurally consistent. |
+| Final installed build | `native-lease-final.apk`, SHA-256 `6c839a74a3fab378a1253560b58d49e1595ca2c9d130a92cea7043c4636d772f`, adds the idle guard for active preparation. Its native tests/build/owner check pass; replacement and UI opening preserve Stop 202 and installed hash. Cold/burst runs above used the immediately preceding SDK APK, not this final guard. Ordinary final APK `8dfcc613b35a0b8d31506dde6996608cab691778e53693e1d6ddb987b8feacf7` retains Flutter ownership. |
+
+To reproduce, verify the frozen APK's compiled/installed owner and current Ready.
+Keep downloads paused and sharing off. Open Developer → Shell → Quick Actions;
+verify watch BLE FOTA/SMP disabled through the separate USB control path before
+one read-only Power Status tap. Wait for the actual UI reply, not merely Ready.
+For the command-burst scenario, invoke CPU promptly after Power completion;
+record generations and foreground Activity. Source recordings remain untouched.
+Use a fresh exclusive UART collector for the whole scenario; absence of UART
+bytes is not a pass. After twenty seconds of inactivity, verify actual watch SMP
+status and live native recovery, then restore and independently verify Stop.
+
+Physical Flutter engine destruction, SDK failures during preparation/idle cleanup,
+large monitor replies and simultaneous file/DFU operations remain acceptance work.
+The final cleanup guard prevents an expired lease from releasing an SDK connection
+while preparation is active. Real Weather still requires the separate location
+approval; AI/iOS and transfer-corruption investigation remain deferred.

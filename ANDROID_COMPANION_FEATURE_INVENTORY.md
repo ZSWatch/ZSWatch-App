@@ -11,7 +11,7 @@ dormant provider does not establish end-to-end support.
 | --- | --- | --- |
 | BLE/status/time | Native session and shared queue feed existing Flutter providers; Nokia tests cover Ready, Stop, time, radio/process/boot/update/presence recovery. | Current Android hardware, recovery latency and longer unplugged acceptance. |
 | Notifications | Native listener/policy/queue forwards selected notifications and handles DISMISS/DISMISS_ALL independently of Flutter; existing settings configure the owner. | Legacy OPEN/MUTE/REPLY branches are placeholders, not working actions to port. Decide their required product behavior before adding them. ATT completion remains distinct from watch acceptance. |
-| HTTP | Native relay/policy/deadlines and shared BLE queue; active Trivia and disabled-policy Nokia checks pass. | Controlled active/deep-idle endpoint comparison for the retained long-idle remote timeout, plus watch error-callback handling. |
+| HTTP | Native relay/policy/deadlines and shared BLE queue; active Trivia and disabled-policy Nokia checks pass. | The completed loopback comparison passed after fifteen minutes of forced deep idle with Flutter absent. Remote network/deadline acceptance remains open: offline errors, a late watch callback with native delivery expiry, and an idle timeout were retained. Watch error-callback handling also remains. |
 | Media | Native service reuses MediaSessionBridge; real synthetic session verifies watch controls and metadata with Flutter absent. | Third-party players, volume and multiple-player selection. |
 | Discovery/saved watches/Forget | System picker and fenced native handoff; existing tiles/dashboard/rename. Native-first Forget removes the OS association before exact Drift-key/history deletion and fences late metadata saves. | Fresh bonding, physical destructive Forget/re-pair, newer-Android association behavior. Bluetooth-bond preservation is explicit. |
 | GPS → Weather | Native service now handles existing `gps_power`/`gps` with explicit Flutter opt-in, Android background access and location FGS acquisition. Nokia approximate/all-time permission flow, timeout cleanup and BLE/UI independence pass. | Real fresh fix → watch Weather → HTTP remains unverified. No location write occurred in the bounded Nokia observation; explicit location-transmission approval is pending. Current Android hardware and longer unplugged operation remain. |
@@ -19,7 +19,7 @@ dormant provider does not establish end-to-end support.
 | Find phone from watch | Dart parser recognizes `findPhone` but no consumer was found. Gadgetbridge maps it to START/STOP. The explicit firmware find-phone helper found belongs to the separate Chronos protocol. | Verify the actual watch→phone JSON emitter before implementing or claiming an existing feature migration. |
 | Calendar/call/activity/navigation | Some typed protocol definitions exist; native receive dispatch has no equivalent handlers. | Identify initialized provider/UI handlers and real firmware consumers per function before choosing migration order. |
 | Voice notes/jobs | Durable native receipts, explicit existing Flutter import/playback and separate recoverable job/outbox contracts exist. | Downloads/integrity and AI/model/backend acceptance remain separate. Downloads stay paused for current core tests; AI is deferred by the user. |
-| SMP/DFU/files/debug/watchfaces | Existing Nordic wrapper/fork retained; native-mode routes that would acquire another BLE owner are withheld. | Explicit owner coordination and native-backed controls. Keep using the user's Nordic fork and keep corruption diagnosis separate. |
+| SMP/DFU/files/debug/watchfaces | Existing Nordic wrapper/fork retained. Service-owned Shell integration uses Nordic ShellManager and the existing Flutter Shell screen; deterministic tests and both debug builds pass. Nokia cold Power Status, CPU Frequency, a same-generation command burst/Home observation and idle/Stop cleanup are verified on the SDK checkpoint. Other competing-owner routes remain withheld. | Physical Shell engine destruction, failed SDK cleanup, monitor output and transfer/DFU arbitration remain. Continue native-backed controls with the user's Nordic fork; keep corruption diagnosis separate. |
 
 ## Source evidence
 
@@ -60,7 +60,8 @@ dormant provider does not establish end-to-end support.
 2. Retain watch-side Find Watch disconnect/maximum-duration protection and its
    bounded physical software evidence. Motor effects still require independent
    observation. Do not invent a watch→phone protocol to make a test pass.
-3. Run the controlled HTTP active/idle network comparison in the Nokia runbook.
-   A later active-state Trivia pass does not explain the earlier idle timeout.
+3. Retain the completed HTTP comparison in the Nokia runbook. Local relay works
+   in the bounded idle case; remote network/deadline and watch error handling
+   remain distinct follow-ups. Do not repeat idle trials without a new question.
 4. Continue remaining notification actions and ordinary feature migration from
    actual initialized consumers. Preserve Flutter/Nordic and defer iOS/AI.

@@ -115,6 +115,10 @@ class AppRouter {
         path: AppRoutes.companionRuntime,
         builder: (context, state) => const CompanionPrototypeApp(),
       ),
+      GoRoute(
+        path: AppRoutes.shell,
+        builder: (context, state) => const ShellScreen(),
+      ),
     ],
     errorBuilder: (context, state) => const Scaffold(
       body: Center(child: Text('This feature is not available in this build')),
