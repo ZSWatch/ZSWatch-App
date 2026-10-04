@@ -198,10 +198,22 @@ next useful step. Do not ask again about accepting a clean phone database/setup.
   sanitized controller/parser tests and WatchDK build pass, and the application
   fix is flashed without increasing RAM. A new post-flash GPS fix did not arrive
   within the existing 10-second acquisition deadline in bounded Nokia retries.
-  Full post-fix Weather acceptance remains for the newer phone; do not call it
-  passed or request location-transmission approval again. Evidence:
+  The OnePlus follow-up below resolves full post-fix Weather acceptance. Evidence:
   `.companion-hil-runs/20261004-gps-weather-real/`.
-- Separate hardware acceptance: full post-fix GPS/Weather, newer-phone/unplugged
+- OnePlus NE2213 / Android 16 (API 36): the same normal debug APK (`db4bae16`)
+  reaches fresh native Ready, MTU 247 and current status/time. With Flutter's
+  task destroyed, opening Weather requests a fresh phone position; watch UART
+  confirms its receipt, the real HTTP reply completes, and the watch's parsed
+  weather structure reports 13°C / Overcast. Acquisition stops afterward;
+  the native PID and generation remain unchanged. No parser error recurs with
+  firmware `3c8ba743`. Coordinates are redacted from saved logs. This is a real
+  Internet/phone-location test, with phone/watch connected by USB, not unplugged
+  endurance. Initial phone handoff timed out repeatedly and the user reports
+  unpair/re-pair, reopening connection controls and resetting the watch before
+  pairing succeeded; clean onboarding/recovery from stale bonds is unresolved,
+  and the successful runtime test does not establish that onboarding passes.
+  Evidence: `.companion-hil-runs/20261004-oneplus-weather/`.
+- Separate hardware acceptance: clean modern-phone pairing/recovery, unplugged
   endurance, iOS and AI execution. This rig
   reports image indices 0/2; selected network-core index 1 remains explicitly
   unverified rather than being silently counted as a full-package pass.
