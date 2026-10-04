@@ -189,7 +189,19 @@ next useful step. Do not ask again about accepting a clean phone database/setup.
 - The finish checklist is complete for the available Android rig. Remaining
   hardware acceptance is separate below; do not reopen throughput or add legacy
   compatibility machinery.
-- Separate hardware acceptance: real GPS/Weather transmission (approval still
-  pending), newer-phone/unplugged endurance, iOS and AI execution. This rig
+- GPS/Weather follow-up: the user authorized real location transmission. Opening
+  Weather with Flutter absent produced a real Nokia position observed at the
+  watch, then stopped location acquisition. Wi-Fi was disabled; enabling it
+  restored Internet. The subsequent real forecast exposed a firmware JSON
+  allocation problem. `3c8ba743` releases the HTTP envelope before synchronous
+  consumer parsing; the bounded-memory regression fails before/passes after,
+  sanitized controller/parser tests and WatchDK build pass, and the application
+  fix is flashed without increasing RAM. A new post-flash GPS fix did not arrive
+  within the existing 10-second acquisition deadline in bounded Nokia retries.
+  Full post-fix Weather acceptance remains for the newer phone; do not call it
+  passed or request location-transmission approval again. Evidence:
+  `.companion-hil-runs/20261004-gps-weather-real/`.
+- Separate hardware acceptance: full post-fix GPS/Weather, newer-phone/unplugged
+  endurance, iOS and AI execution. This rig
   reports image indices 0/2; selected network-core index 1 remains explicitly
   unverified rather than being silently counted as a full-package pass.
