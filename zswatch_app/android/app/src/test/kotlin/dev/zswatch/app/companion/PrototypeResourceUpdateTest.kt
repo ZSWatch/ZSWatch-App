@@ -76,12 +76,12 @@ class PrototypeResourceUpdateTest {
         assertFalse(r.current!!());stale(Result.success(Unit));r.uploaded!!()
         assertTrue(r.launches.isEmpty());assertEquals(1,r.releases.size);assertEquals("interrupted",r.states.last().error)
     }
-    @Test fun resourceProgressAndLongerBoundedVerificationDeadlineRemainFenced() {
+    @Test fun resourceProgressAndBoundedPostflightDeadlineRemainFenced() {
         val r=Rig();val id=r.start();r.progress!!(1,63)
         assertEquals("invalid_progress",r.states.last().error);assertFalse(r.owner.busy)
         val boot=Rig();val bootId=boot.start();boot.verified();boot.owner.sdkCompleted(bootId)
-        boot.advance(90000);assertTrue(boot.owner.busy)
-        boot.advance(20*60*1000L);assertEquals("boot_check_timeout",boot.states.last().error);assertEquals(1,boot.releases.size)
+        boot.advance(89999);assertTrue(boot.owner.busy)
+        boot.advance(1);assertEquals("boot_check_timeout",boot.states.last().error);assertEquals(1,boot.releases.size)
         r.owner.sdkCompleted(id);assertTrue(r.reconnects.isEmpty())
     }
     @Test fun persistedPartialResourceStageRecoversAsUnknownWithoutPayloadOrReplay() {

@@ -160,5 +160,18 @@ next useful step. Do not ask again about accepting a clean phone database/setup.
 - The next package selection exposed an undismissed filesystem result in Flutter.
   Fixed the shared result dismissal; the focused firmware Flutter suite passes
   19 tests, including terminal dismissal and visibility of subsequent active work.
-- Pending: physical combined update and the final consolidated background/recovery
-  pass.
+- Combined resource-first/firmware-second update passes with Flutter destroyed:
+  5,932,208 resource bytes uploaded and fully hash-verified, then a distinct
+  836,352-byte application image uploaded, rebooted and verified active. Fresh
+  resource mount and normal Ready recover. Measured stages: 14.6 KB/s resource
+  upload, 14.4 KB/s readback, 16.2 KB/s firmware in this combined run. Evidence:
+  `.companion-hil-runs/20261004-combined-physical/`.
+- Postflight now has the same 90-second bound for firmware/resource packages;
+  the full resource readback finishes before reboot. Final debug/release builds
+  compile and 208 native tests pass. The physical combined postflight recovered
+  within that bound.
+- Pending: final consolidated background/recovery and quiet-period pass.
+- Separate hardware acceptance: real GPS/Weather transmission (approval still
+  pending), newer-phone/unplugged endurance, iOS and AI execution. This rig
+  reports image indices 0/2; selected network-core index 1 remains explicitly
+  unverified rather than being silently counted as a full-package pass.

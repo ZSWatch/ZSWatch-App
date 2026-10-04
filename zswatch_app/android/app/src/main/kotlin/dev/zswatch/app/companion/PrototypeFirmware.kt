@@ -120,7 +120,9 @@ internal class PrototypeFirmware(
         val next = old.copy(phase = "reconnecting")
         try {
             publish(next)
-            later(if (old.resource == null) 90000L else 20 * 60 * 1000L) { if (request?.id == id && request?.phase in setOf("reconnecting", "verifying")) fail(id, "boot_check_timeout") }
+            // Full resource readback is already done. Postflight only reconnects
+            // and checks active images/the fresh mount, so use the same bound.
+            later(90000L) { if (request?.id == id && request?.phase in setOf("reconnecting", "verifying")) fail(id, "boot_check_timeout") }
             reconnect(next)
         } catch (error: Exception) { fail(id, "reconnect_failed") }
     }
