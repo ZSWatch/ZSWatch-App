@@ -11,8 +11,9 @@ Finish the Android native companion refactor in the existing Flutter app. Make
 native ownership the normal Android path in all build modes and remove the
 legacy Android owner/selection flag. Choose the next work by actual dependencies
 and remaining functional gaps. When completing updates, first make real Nordic
-firmware uploads reliable and match the old app's reported 20 KB/s or better
-speed before attempting larger filesystem and combined updates. A one-time app database/settings reset and
+firmware uploads reliable and measure their active upload speed before attempting
+larger filesystem and combined updates. The user accepts 17.6 KB/s on the Nokia
+after the final 7.5 ms test; the old app's 20 KB/s+ remains a reference. A one-time app database/settings reset and
 fresh permission setup are allowed instead of compatibility migration. Finish
 the existing non-AI features and a practical consolidated background/recovery
 check. Preserve the user's library fixes, unrelated work and watch originals.
@@ -33,7 +34,10 @@ investigations.
 - Retain shared code still needed by Flutter UI or the deferred iOS path. Remove
   obsolete Android ownership paths; avoid unrelated mass renames or cleanup.
 - The user's old-app firmware upload baseline is about 20 KB/s or better. This
-  is an upload baseline, not a claimed filesystem download/readback speed.
+  is an upload baseline, not a claimed filesystem download/readback speed. The
+  user subsequently accepted 17.6 KB/s on the Nokia after one final 7.5 ms test.
+  Do not keep throughput as a blocker or repeat speed experiments once that
+  test is recorded.
 - Fix encountered watch-firmware bugs as normal implementation work. The user
   authorizes building, flashing and debugging the connected watch; the known HTTP
   callback bug should be fixed, not merely documented. Use the verified board and
@@ -74,7 +78,9 @@ tests, but firmware updates are not required to be the immediate next task.
    uploads it; an already-active-image shortcut is not a throughput result.
    Measure acknowledged payload bytes over the active upload interval, separately
    from preparation, reboot and reconnect. Check representative sustained speed
-   against 20 KB/s before attempting large resource updates. If slow, compare the
+   against the accepted Nokia rate of 17.6 KB/s before large resource updates.
+   The 20 KB/s old-app figure remains a reference, not a Nokia acceptance gate.
+   If below the accepted rate, compare the
    actual SDK MTU, upload window, connection priority, logging and handoff with
    the working old path. Reuse an existing baseline artifact or a separate old
    checkout if a same-phone comparison is necessary; do not retain a fallback
@@ -131,10 +137,20 @@ next useful step. Do not ask again about accepting a clean phone database/setup.
   real success, empty and relay-error replies exactly once, observed beyond timeout.
   All nine recordings, crash file and original background verified/restored exactly.
   Evidence: `.companion-hil-runs/20261004-http-callback-contract/`.
-- Firmware upload: actual Nordic application upload is confirmed, but the first early
-  sample is only 2.1 KB/s over 10 seconds. Cancelled through Flutter at 90,548 bytes;
-  native Ready recovered and active application hashes stayed unchanged. Evidence:
-  `.companion-hil-runs/20261004-firmware-throughput/`. Compare actual SDK MTU, packet
-  size, connection parameters and upload window next; throughput is not accepted.
-- Pending: firmware performance/completed update, physical resource/combined updates,
-  and the final consolidated background/recovery pass.
+- Firmware update passes on the Nokia: acknowledged active upload is 17.75 KB/s
+  (836,352 bytes uploaded), followed by reboot, fresh active-image verification and
+  normal native Ready recovery. The requested 7.5 ms settles at 11.25 ms during
+  the sustained transfer; it provides no meaningful gain over 17.6 KB/s. Accepted
+  by the user; stop investigating throughput and continue resource work. Fixed
+  the watch's idle downgrade during SMP (`f49acb08`), boot connection retry and
+  cold SMP discovery recovery (`fe61d1c`, `c4e22b2`). Nordic window 3, MTU 247,
+  merged packet 2,475; no competing Android HIGH request. Firmware `0517911f`
+  requests 7.5 ms with a 4-second supervision timeout. All 11 original files
+  match after targeted flashing and after the completed OTA update.
+  Evidence: `.companion-hil-runs/20261004-ble-7p5/`. Native tests: 208 pass.
+- Resource postflight now checks the freshly mounted image length after reboot,
+  following one complete SHA-256/layout readback before reboot. This avoids a
+  second multi-megabyte download; native regressions still require full integrity
+  verification before reset/firmware starts. Debug build and 208 native tests pass.
+- Pending: physical resource/combined updates and the final consolidated
+  background/recovery pass.

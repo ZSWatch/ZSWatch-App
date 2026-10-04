@@ -11,11 +11,11 @@ class PrototypeResourceUpdateTest {
         var current:(()->Boolean)?=null;var resourceDone:((Result<Unit>)->Unit)?=null
         val states=mutableListOf<PrototypeFirmwareState>();val launches=mutableListOf<PrototypeFirmwareState>()
         val resets=mutableListOf<PrototypeFirmwareState>();val reconnects=mutableListOf<PrototypeFirmwareState>()
-        val checks=mutableListOf<(Result<Unit>)->Unit>();val releases=mutableListOf<PrototypeFirmwareState>()
+        val checks=mutableListOf<(Result<Unit>)->Unit>();val checkedStates=mutableListOf<PrototypeFirmwareState>();val releases=mutableListOf<PrototypeFirmwareState>()
         val timers=mutableListOf<Pair<Long,()->Unit>>()
         val target=ResourceSdkContract.prepare(ResourceSdkContractTest.image(),"watchdk@1").target
         val owner=PrototypeFirmware({active},{now},{delay,action->timers.add(now+delay to action)},
-            {launches.add(it)},{reconnects.add(it)},{_,_,done->checks.add(done)}, {}, {states.add(it)},{releases.add(it)},
+            {launches.add(it)},{reconnects.add(it)},{state,_,done->checkedStates.add(state);checks.add(done)}, {}, {states.add(it)},{releases.add(it)},
             resources={_,stillCurrent,onProgress,onUploaded,done-> current=stillCurrent;progress=onProgress;uploaded=onUploaded;resourceDone=done},
             resetResources={resets.add(it)})
         fun start(combined:Boolean=false)=owner.start("AA:BB:CC:DD:EE:FF",7,
@@ -50,7 +50,9 @@ class PrototypeResourceUpdateTest {
         assertTrue(r.launches.isEmpty());assertEquals(1,r.resets.size);assertTrue(r.owner.busy)
         assertEquals("rebooting",r.states.last().phase);r.owner.ready("AA:BB:CC:DD:EE:FF");assertTrue(r.checks.isEmpty())
         r.owner.sdkCompleted(id);r.owner.ready("AA:BB:CC:DD:EE:FF");assertEquals(1,r.checks.size)
-        r.checks.single()(Result.failure(IllegalStateException("Changed resource hash after reset")))
+        assertTrue(r.checkedStates.single().resourceVerified)
+        assertEquals(r.target,r.checkedStates.single().resource)
+        r.checks.single()(Result.failure(IllegalStateException("Resource not mounted after reset")))
         assertEquals("boot_check_failed",r.states.last().error);assertTrue(r.states.last().resultUnknown)
     }
     @Test fun sizeOrHashFailureCannotAdvanceOrAutomaticallyRetryFirmware() {

@@ -34,6 +34,7 @@ internal class NativeResourceTransfer(private val handler: Handler, private val 
         sdk.setLoggingEnabled(false)
         val manager = FsManager(sdk)
         if (sdk.maxPacketLength > 0) manager.setUploadMtu(sdk.maxPacketLength)
+        android.util.Log.i("ZSWCompanionBle", "resource_upload max_packet=${sdk.maxPacketLength} window=3")
         // Existing resolved FsManagerPlugin uses window 3/alignment 4.
         transfer = FileUploader(manager, ResourceSdkContract.PATH, bytes, 3, 4).uploadAsync(object : UploadCallback {
             override fun onUploadProgressChanged(current: Int, total: Int, timestamp: Long) = deliver("upload") { progress(current, total) }

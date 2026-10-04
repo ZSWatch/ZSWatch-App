@@ -86,7 +86,9 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
         },
         verify = { state, current, done ->
             preparationRecoveries = 0
-            if (state.resourceResetRequested && !resourceResetAcknowledged) {
+            if (state.resource != null && !state.resourceVerified) {
+                done(Result.failure(IllegalStateException("Resource hash was not verified")))
+            } else if (state.resourceResetRequested && !resourceResetAcknowledged) {
                 done(Result.failure(IllegalStateException("Resource reset was not acknowledged")))
             } else link.verifyFirmwareTargets(state.targets, current, { result -> safely { done(result) } }, state.resource)
         },
