@@ -19,6 +19,7 @@ object PrototypeHub {
     fun jobJournal(context: Context): PrototypeStore {
         check(Looper.myLooper() == worker.looper)
         return jobStore ?: PrototypeStore(File(context.filesDir, "companion-prototype/jobs"), 64).also { created ->
+            PrototypeJobs(created).recoverLocalClaims()
             created.onChanged = { observers.forEach { main.post(it) } }
             jobStore = created
         }

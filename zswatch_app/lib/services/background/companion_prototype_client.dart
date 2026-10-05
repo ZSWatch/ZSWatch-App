@@ -191,6 +191,23 @@ class CompanionPrototypeClient {
     return Map<String, Object?>.from(result['job'] as Map);
   }
 
+  Future<CompanionPrototypeSnapshot> configureVoiceProcessing({
+    required String watchId,
+    required bool enabled,
+    required String transcriptionModel,
+    required String analysisModel,
+    required bool correctTranscription,
+  }) async => CompanionPrototypeSnapshot.decode(
+    await methods.invokeMethod<Object?>('configureVoiceProcessing', {
+      'version': 1,
+      'watch_id': watchId,
+      'enabled': enabled,
+      'transcription_model': transcriptionModel,
+      'analysis_model': analysisModel,
+      'correct_transcription': correctTranscription,
+    }),
+  );
+
   Future<CompanionPrototypeSnapshot> setRecordingSync(bool enabled) async =>
       CompanionPrototypeSnapshot.decode(
         await methods.invokeMethod<Object?>('setRecordingSync', {

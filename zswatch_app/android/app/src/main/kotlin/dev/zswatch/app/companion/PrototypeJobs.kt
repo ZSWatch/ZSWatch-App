@@ -40,11 +40,32 @@ class PrototypeJobs(private val store: PrototypeStore) {
 
     fun state(id: String): JSONObject = jobs().getJSONObject(id)
     fun identities(): List<String> = jobs().keys().asSequence().toList()
-    fun claim(id: String, now: Long, leaseSeconds: Long = 30): Claim? {
-        require(leaseSeconds > 0)
+
+    /** Called once in a new Android process. No local worker survived its predecessor. */
+    fun recoverLocalClaims() {
+        val jobs = jobs()
+        var changed = false
+        for (id in jobs.keys()) {
+            val item = jobs.getJSONObject(id)
+            if (item.getJSONObject("spec").getString("backend") != "local" || item.isNull("lease_until") ||
+                item.getString("state") != "ready") continue
+            item.put("fence", item.getLong("fence") + 1).put("lease_until", JSONObject.NULL)
+                .put("next_attempt", 0L).put("last_error", "execution_interrupted")
+            changed = true
+        }
+        if (changed) commit("local_process_recovered", jobs)
+    }
+
+    fun claim(id: String, now: Long, leaseSeconds: Long = 30, maxAttempts: Int? = null): Claim? {
+        require(leaseSeconds > 0 && (maxAttempts == null || maxAttempts > 0))
         val jobs = jobs(); val item = jobs.getJSONObject(id)
         if (item.getString("state") !in listOf("ready", "waiting_remote") || item.getLong("next_attempt") > now ||
             (!item.isNull("lease_until") && item.getLong("lease_until") > now)) return null
+        if (maxAttempts != null && item.getInt("attempts") >= maxAttempts) {
+            item.put("state", "failed").put("lease_until", JSONObject.NULL).put("last_error", "execution_attempt_limit")
+            commit("job_attempt_limit", jobs)
+            return null
+        }
         item.put("fence", item.getLong("fence") + 1).put("lease_until", now + leaseSeconds)
             .put("attempts", item.getInt("attempts") + 1)
         commit("job_claimed", jobs)

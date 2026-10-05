@@ -15,6 +15,33 @@ class PrototypeJobsTest {
     private fun spec() = fixture("job-v1.json")
     private fun rejected(action: () -> Unit) { try { action(); fail("Expected rejection") } catch (_: IllegalArgumentException) {} }
 
+    @Test fun abandonedComputationsHaveABoundedRetryCount() {
+        var jobs = PrototypeJobs(store())
+        val id = jobs.create(spec().put("backend", "local").put("upload_authorized", false))
+        repeat(3) { attempt ->
+            assertNotNull(jobs.claim(id, 100 + attempt * 30L, maxAttempts = 3))
+            jobs = PrototypeJobs(store()) // Recovery after a dead process.
+        }
+        assertNull(jobs.claim(id, 190, maxAttempts = 3))
+        assertEquals("failed", jobs.state(id).getString("state"))
+        assertEquals("execution_attempt_limit", jobs.state(id).getString("last_error"))
+    }
+
+    @Test fun newProcessRecoversLocalWorkImmediatelyAndRetainsCheckpoint() {
+        var jobs = PrototypeJobs(store())
+        val id = jobs.create(spec().put("backend", "local").put("upload_authorized", false)
+            .put("provider", "dart-voice-v1"))
+        val old = jobs.claim(id, 100, leaseSeconds = 900)!!
+        assertTrue(jobs.checkpointTranscript(old, 101, "Saved speech"))
+        jobs = PrototypeJobs(store())
+        jobs.recoverLocalClaims()
+        val current = jobs.claim(id, 102, leaseSeconds = 900)!!
+        assertEquals("Saved speech", jobs.state(id).getString("transcript"))
+        assertEquals(2, current.attempts)
+        assertFalse(jobs.checkpointTranscript(old, 103, "Saved speech"))
+        assertTrue(jobs.checkpointTranscript(current, 103, "Saved speech"))
+    }
+
     @Test fun transcriptCheckpointSurvivesReopenAndRejectsStaleWorker() {
         var jobs = PrototypeJobs(store())
         val input = spec().put("backend", "local").put("upload_authorized", false).put("provider", "dart-voice-v1")

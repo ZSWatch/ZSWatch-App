@@ -26,6 +26,21 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
             if ((call.arguments as? Map<*, *>)?.get("version") != 1) {
                 result.error("VERSION", "Unsupported companion bridge version", null)
             } else when (call.method) {
+                "configureVoiceProcessing" -> PrototypeHub.worker.post {
+                    try {
+                        val args = call.arguments as Map<*, *>
+                        val store = PrototypeHub.journal(context)
+                        val watch = args["watch_id"] as String
+                        require(watch == store.control()["address"] && Regex("[0-9A-F]{2}(:[0-9A-F]{2}){5}").matches(watch))
+                        val enabled = args["enabled"] as Boolean
+                        if (enabled) check(store.control()["desired_running"] == true) { "Connect the watch first" }
+                        val config = PrototypeVoicePolicy.configuration(args["transcription_model"] as String,
+                            args["analysis_model"] as String, args["correct_transcription"] as Boolean)
+                        store.update("voice_processing_policy_changed", mapOf("voice_processing_policy" to
+                            (config + mapOf("watch_id" to watch, "enabled" to enabled))))
+                        snapshot(result::success) { result.error("PROCESSING_POLICY_FAILED", it, null) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("PROCESSING_POLICY_FAILED", error.message, null) } }
+                }
                 "voiceJob", "cancelVoiceJob" -> PrototypeHub.worker.post {
                     try {
                         val id = call.argument<String>("job_id") ?: error("Job ID required")

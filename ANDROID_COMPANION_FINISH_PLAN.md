@@ -407,7 +407,8 @@ configuration, leases, transcript checkpoints and result/outbox commits. The
 existing Flutter Voice Notes view can queue local processing, observe state, open
 saved transcript/summary/action drafts, cancel publication and retry. The existing
 model selection/download/import screen is reachable again. Opening these screens
-does not schedule inference. Automatic policy and action creation are still pending.
+does not schedule inference. The automatic-policy checkpoint below supersedes its
+initial deferral; action creation remains pending.
 
 The watch advertises `result_ack_version=1` in its recording list. A bounded draft
 popup carries the committed result identity/digest/generation; the watch flushes
@@ -446,3 +447,87 @@ optional probe. Physical ACK/UART evidence and the receipt host tests are separa
 Checks: 47 focused Flutter tests, 12 native job/result tests, receipt host regression,
 focused Dart analysis and normal debug/WatchDK builds pass. Release inference and
 the full modern-phone acceptance matrix remain pending.
+
+
+### Automatic processing and firmware list checkpoint (2026-10-05)
+
+The existing Flutter model screen now has an explicit local automatic-processing
+switch for the selected watch. New recording metadata captures the selected STT,
+LLM and correction setting at discovery. Already known recordings are not enrolled
+retroactively; already accepted requests keep their configuration if preferences
+change or the switch is disabled. Failed/cancelled automatic jobs are not recreated
+on every maintenance tick. Manual retry can unblock OS admission failures. The
+legacy batch button reading the old voice database is withheld on Android; native
+receipt-backed manual processing remains available in Voice Notes.
+
+Android waits for foreground admission before dispatching Dart execution. Denied
+admission blocks the job instead of crashing the BLE owner. The media-processing
+OS timeout stops its service and notifies the native owner; stopping no longer
+starts an empty service. Expired local claims have a bounded retry count. These
+are implementation/host checks, not a physical OS-budget or prompt-cancellation
+pass. The existing LiteRT-LM bridge is registered in the headless engine and
+closed with it; actual LiteRT inference is still pending a model and physical test.
+
+The physical automatic test exposed a real firmware bug: new-recording events
+arrived, but a 14-recording list failed in cJSON_PrintUnformatted on the 6144-byte
+libc allocation arena. Recording lists now use a bounded transient kernel-heap
+buffer and a portable encoder, retaining the same JSON contract. Host tests cover
+all 50 ordinary maximum-length filenames with full uint32 values, escaping, empty
+lists and rejection of insufficient capacity/unterminated filenames. The matching
+WatchDK build and targeted debugger flash pass; all 16 pre-flash reference files
+match independent post-flash SHA-256/size checks. No filesystem or network-core
+image was programmed.
+
+| Requirement | New evidence / state |
+| --- | --- |
+| Explicit automatic local processing | Pass: Flutter switch durably saves KB-Whisper Base + Qwen3.5 2B Q4_K_M, correction off, scoped to the paired watch. |
+| Actual start with no recent Flutter Activity | Pass: the owned reminder speech fixture is discovered, verified and claimed about 21 minutes after task dismissal. The OnePlus already ignores battery optimization; CDM association remains absent, so this does not establish admission without that exemption. |
+| Complete automatic result roundtrip | Pass for the synthetic reminder fixture: one real STT/LLM attempt, result persisted, watch application ACK and Delivered, with Flutter absent throughout. Synthesized audio is not microphone-quality acceptance. |
+| Integrity and timing | Phone receipt matches independently generated/uploaded fixture SHA-256. Observed transcript checkpoint is 2.165 seconds after sampled claim; observed Delivered is 80.098 seconds after claim. Two-second polling gives approximate boundary times, not exact inference benchmarks. |
+| Model quality | Partial: reminder summary is köpa mjölk, while transcription still mangles tomorrow/milk. A different note fixture was mistranscribed and rejected by the existing AI no-speech/router policy; do not count it as a semantic success. |
+| BLE during automatic processing | Same native PID throughout. SMP preparation causes reconnects (generations 99–101); fresh status continues after Ready 101 during analysis. This does not establish uninterrupted transfer/inference latency for every feature. |
+| Original preservation | Pass: all 16 backed-up watch files match after the application-only flash. Later owned fixtures/short microphone triggers are retained and not used as meaningful speech-quality evidence. |
+| Checks | 49 focused Flutter/interaction tests, 17 native job/policy/result tests, three real-encoder host tests, focused Dart analysis, debug APK, release APK and WatchDK builds pass. |
+| Release / process recovery | Pass for real synthetic speech: non-debuggable release code resumes the same interrupted job, performs STT/LLM and receives watch application acceptance with Flutter absent. Mid-inference recovery remains pending. |
+| Remaining acceptance | Meaningful microphone/English audio, prompt CPU cancellation and mid-inference interruption/Stop, action confirmation/undo, physical lost ACK, LiteRT, real remote provider, full feature/OTA/resource matrix and quiet/endurance checks remain pending. |
+
+Evidence: `.companion-hil-runs/20261005-oneplus-auto-voice/`, including
+`automatic-flow-evidence.json`, `observation.json` (failed note quality),
+`reminder-observation.json` (successful execution/delivery), and `list-fw/`.
+Successful installed debug APK SHA-256:
+`9ba78dcee80b1c2cec8e07bdd6e570853b012f48ffc103516fc17515a4f19628`;
+flashed signed application HEX SHA-256:
+`950e012606e1816b744a2ed6c97e95b9bea837ce6b4820842189d3cbb8fcbb97`.
+Release testing exposed a real FFmpeg JNI initialization crash. The plugin's
+retention rules are library proguardFiles, not consumer rules; the application
+now explicitly retains com.antonkarpenko.ffmpegkit classes and members. The fixed
+release mapping preserves the JNI surface. Local leases from a dead process are
+fenced once when the new Android process opens its job journal, allowing immediate
+resume while retaining any saved transcript and the bounded attempt count.
+
+The fixed release-code smoke now creates a headless engine, runs actual processing,
+commits a result and receives a new durable watch receipt/ACK with Flutter absent.
+The foreground notification/service and wake lock are released afterward, and
+the observed native PID stays constant. The non-debuggable APK is a lab-signed
+copy used solely to preserve installed data; production release code is unchanged
+by that signing operation. After returning to debug, the persisted release job has the same job ID/spec/input
+as before the crash, attempt 2 instead of 1, a saved transcript/result and Delivered.
+Its phone receipt matches the independent USB speech fixture hash. New-process
+recovery thus runs the interrupted job without creating a new generation. This is
+a physical interruption before transcription; mid-inference/checkpoint interruption
+and prompt cancellation still require their own tests.
+The release test is not an OS-budget, unplugged or full modern-feature pass.
+
+Firmware fix commit: 698026e0. Fixed production release APK SHA-256:
+87d2a50f081da1b2d633d510b9da0a49b955fa05962938144b6dec9ea468bd84;
+physically tested non-debuggable lab copy SHA-256:
+53fcc575805f9af91ebb81490ad53bc44d3fa187584b61a620366c927002f828.
+Private release crash, recovery and acceptance evidence is retained under
+release/ and release-fixed/ in the same run directory. release-flow-evidence.json
+contains the post-debug cross-check. The final logcat buffer retained completion
+only; startup engine/ready lines were observed in tool output and are recorded
+with that provenance in startup-tool-observation.json. Final debug APK SHA-256:
+c5f1400dc85e0aa718c4427945f6e5b0c57fb0173221a8b825413f4d06533110.
+The phone returns to native Ready generation 108 after restoring debug. A Weather
+trigger was attempted during inference, but the retained HTTP success belongs to
+generation 108 after restoration; it does not establish HTTP latency during AI.

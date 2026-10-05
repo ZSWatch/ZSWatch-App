@@ -92,6 +92,7 @@ android {
 
     buildTypes {
         release {
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // If a release keystore is configured via android/key.properties, sign properly.
             // Otherwise fall back to debug signing (fine for local testing, not ideal for releases).
             signingConfig = if (hasReleaseKeystore) {

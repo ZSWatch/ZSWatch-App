@@ -92,6 +92,28 @@ void main() {
     expect(calls, isEmpty);
   });
 
+  test(
+    'automatic processing opt-in sends explicit local model choices',
+    () async {
+      await client.configureVoiceProcessing(
+        watchId: 'AA:BB:CC:DD:EE:FF',
+        enabled: true,
+        transcriptionModel: 'kbWhisperBase',
+        analysisModel: 'qwen',
+        correctTranscription: false,
+      );
+      expect(calls.single.method, 'configureVoiceProcessing');
+      expect(calls.single.arguments, {
+        'version': 1,
+        'watch_id': 'AA:BB:CC:DD:EE:FF',
+        'enabled': true,
+        'transcription_model': 'kbWhisperBase',
+        'analysis_model': 'qwen',
+        'correct_transcription': false,
+      });
+    },
+  );
+
   test('forget normalizes MAC and sends a native-first command', () async {
     final forgotten = Map<String, Object?>.from(saved)
       ..['runtime_active'] = false

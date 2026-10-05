@@ -13,6 +13,7 @@ class PrototypeDartWorker(private val context: Context) {
     class WorkerFailure(val code: String) : IllegalStateException(code)
     @Volatile private var closed = false
     private var engine: FlutterEngine? = null
+    private var liteRtBridge: dev.zswatch.app.LiteRtLmBridge? = null
     private var channel: MethodChannel? = null
     private var ready = false
     private var pending: (() -> Unit)? = null
@@ -51,6 +52,7 @@ class PrototypeDartWorker(private val context: Context) {
                     engine = created
                     created.plugins.add(PathProviderPlugin())
                     created.plugins.add(com.antonkarpenko.ffmpegkit.FFmpegKitFlutterPlugin())
+                    liteRtBridge = dev.zswatch.app.LiteRtLmBridge(context).also { it.setup(created) }
                     MethodChannel(created.dartExecutor.binaryMessenger, "dev.zswatch.app/productivity").setMethodCallHandler { call, result ->
                         val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
                         val memory = android.app.ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
@@ -108,6 +110,7 @@ class PrototypeDartWorker(private val context: Context) {
         PrototypeHub.main.post {
             pending = null; ready = false
             channel?.setMethodCallHandler(null); channel = null
+            liteRtBridge?.close(); liteRtBridge = null
             engine?.destroy(); engine = null
             LifecycleLogger.log("CompanionDartWorker", "engine_closed")
         }

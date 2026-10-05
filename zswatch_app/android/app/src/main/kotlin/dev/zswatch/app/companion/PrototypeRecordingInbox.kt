@@ -34,7 +34,9 @@ class PrototypeRecordingInbox(private val store: PrototypeStore, private val req
         val address = store.control()["address"] as String
         val key = "$address:$name:$timestamp:$size:$duration"
         if (store.record(key) != null) return
+        val request = PrototypeVoicePolicy.recordingRequest(store.control()["voice_processing_policy"], address)
         store.putRecord(key, mapOf("address" to address, "filename" to name, "timestamp" to timestamp,
-            "size_bytes" to size, "duration_ms" to duration, "state" to "pending"))
+            "size_bytes" to size, "duration_ms" to duration, "state" to "pending") +
+            (request?.let { mapOf("processing_request" to it) } ?: emptyMap()))
     }
 }

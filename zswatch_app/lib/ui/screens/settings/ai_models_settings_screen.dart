@@ -21,6 +21,7 @@ import '../../../services/ai/llm_service.dart';
 import '../../../services/ai/model_benchmark_service.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../widgets/ai_debug_widgets.dart';
+import '../../widgets/companion_voice_policy_tile.dart';
 
 // ---------------------------------------------------------------------------
 // Benchmark provider (screen-scoped singleton)
@@ -87,6 +88,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             ),
           const _AiModelSelector(),
           const _ImportModelTile(),
+          if (native) const CompanionVoicePolicyTile(),
 
           if (!native && ref.watch(localAiEnabledProvider)) ...[
             const SizedBox(height: 24),
@@ -1346,6 +1348,11 @@ class _ImportModelTile extends ConsumerWidget {
 class _ProcessAllButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Native recordings are scheduled from their verified receipt in Voice Notes.
+    // The legacy batch reads a different repository and cannot process these rows.
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      return const SizedBox.shrink();
+    }
     final localAiEnabled = ref.watch(localAiEnabledProvider);
     final aiActionsState = ref.watch(aiActionsProvider);
     final isBusy = aiActionsState.isLoading;

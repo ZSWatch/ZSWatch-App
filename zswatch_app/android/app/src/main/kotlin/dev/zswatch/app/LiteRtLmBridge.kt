@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -284,5 +285,12 @@ class LiteRtLmBridge(private val context: Context) {
         }
         conversation = null
         engine = null
+    }
+
+    /** Called when the owning headless engine ends, including interrupted work. */
+    fun close() {
+        dispose()
+        eventSink = null
+        scope.cancel()
     }
 }

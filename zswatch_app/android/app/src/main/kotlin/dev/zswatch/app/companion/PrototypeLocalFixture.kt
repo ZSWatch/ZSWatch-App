@@ -22,7 +22,7 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
             try { service.transport?.deliverVoiceResults() } catch (error: Exception) {
                 LifecycleLogger.log("CompanionLocalJobs", "delivery_deferred ${error.javaClass.simpleName}")
             }
-            try { advance() } catch (error: Exception) {
+            try { enqueueAutomatic(); advance() } catch (error: Exception) {
                 failedClosed = true
                 engine?.close(); engine = null
                 LifecycleLogger.log("CompanionLocalJobs", "fixture_disabled ${error.javaClass.simpleName}")
@@ -44,7 +44,7 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
     }
     fun startRecording(identity: String, stt: String, llm: String, correct: Boolean): String {
         check(running()) { "Running companion required" }
-        require(stt.matches(Regex("[a-zA-Z0-9_]+")) && llm.isNotBlank() && llm.length <= 256 && !llm.contains('|'))
+        PrototypeVoicePolicy.configuration(stt, llm, correct)
         val metadata = service.runtime!!.store.record(identity) ?: error("Unknown recording")
         val receipt = ReceiptFiles(File(context.filesDir, "companion-prototype/recordings")).recover(identity, metadata)
             ?: error("Verified recording receipt required")
@@ -54,12 +54,38 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         val existing = previous.firstOrNull { it.getJSONObject("spec").getString("model") == model &&
             it.getJSONObject("spec").getString("input_sha256") == receipt["sha256"] &&
             it.getString("state") !in listOf("failed", "cancelled") }
-        if (existing != null) return PrototypeJobs.key(existing.getJSONObject("spec"))
+        if (existing != null) {
+            val id = PrototypeJobs.key(existing.getJSONObject("spec"))
+            if (existing.getString("state") == "blocked") jobs.refreshCredentials(id)
+            advance()
+            return id
+        }
         val next = (previous.maxOfOrNull { it.getJSONObject("spec").getLong("generation") } ?: 0) + 1
         val spec = JSONObject().put("version", 1).put("watch_id", receipt["address"]).put("recording_id", identity)
             .put("input_sha256", receipt["sha256"]).put("backend", "local").put("provider", "dart-voice-v1")
             .put("model", model).put("pipeline_revision", "voice-v1").put("generation", next).put("upload_authorized", false)
         val id = jobs.create(spec); advance(); return id
+    }
+
+    private fun enqueueAutomatic() {
+        if (!running()) return
+        val store = service.runtime!!.store
+        val rows = store.control()["recordings"] as Map<*, *>
+        for ((identity, raw) in rows) {
+            val record = raw as Map<*, *>
+            val request = record["processing_request"] as? Map<*, *> ?: continue
+            if (record["state"] != "downloaded" || record["address"] != store.control()["address"]) continue
+            val model = PrototypeVoicePolicy.model(request)
+            // Failed/cancelled work also counts: automatic maintenance never
+            // invents new generations or repeatedly retranscribes a failure.
+            if (jobs.identities().any { id ->
+                val spec = jobs.state(id).getJSONObject("spec")
+                spec.getString("recording_id") == identity && spec.getString("model") == model &&
+                    spec.getString("input_sha256") == record["sha256"]
+            }) continue
+            startRecording(identity as String, request["transcription_model"] as String,
+                request["analysis_model"] as String, request["correct_transcription"] as Boolean)
+        }
     }
 
     private fun advance() {
@@ -72,60 +98,66 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
                 PrototypeHub.jobJournal(context).control()["local_fixture_enabled"] == true
             if (spec.getString("backend") != "local" || (!real && !fixture) || spec.getBoolean("upload_authorized") ||
                 spec.getString("watch_id") != (if (real) service.runtime!!.store.control()["address"] else "fixture-watch")) null
-            else jobs.claim(id, now, leaseSeconds = if (real) 900 else 60)
+            else jobs.claim(id, now, leaseSeconds = if (real) 900 else 60, maxAttempts = 5)
         }.firstOrNull() ?: return
         busy = true
         val operation = ++execution
         val currentEngine = engine ?: PrototypeDartWorker(context).also { engine = it }
         // No Dart-owned scheduler, BLE session or job DB. Native owns the claim.
         val real = claim.spec.getString("provider") == "dart-voice-v1"
-        if (real) {
-            try { dev.zswatch.app.LlmComputeService.start(context) }
-            catch (error: Exception) {
+        fun unavailable(label: String) {
+            if (!busy || execution != operation || !running()) return
+            busy = false; currentEngine.close(); engine = null
+            jobs.defer(claim, System.currentTimeMillis() / 1000, 10, label, blocked = true)
+        }
+        fun execute() {
+            if (!busy || execution != operation || !running()) return
+            val input = if (real) mapOf("recording" to service.runtime!!.store.record(claim.spec.getString("recording_id")),
+                "transcript" to jobs.state(claim.id).optString("transcript").takeIf { it.isNotEmpty() }) else emptyMap()
+            currentEngine.execute(claim, input, checkpoint = { text ->
+                running() && busy && execution == operation && jobs.checkpointTranscript(claim, System.currentTimeMillis() / 1000, text)
+            }) { response ->
+                if (!busy || execution != operation || engine !== currentEngine || !running()) return@execute
                 busy = false
-                jobs.defer(claim, now, 10, "execution_not_allowed", blocked = true)
-                return
-            }
-        }
-        val input = if (real) mapOf("recording" to service.runtime!!.store.record(claim.spec.getString("recording_id")),
-            "transcript" to jobs.state(claim.id).optString("transcript").takeIf { it.isNotEmpty() }) else emptyMap()
-        currentEngine.execute(claim, input, checkpoint = { text ->
-            running() && busy && execution == operation && jobs.checkpointTranscript(claim, System.currentTimeMillis() / 1000, text)
-        }) { response ->
-            if (!busy || execution != operation || engine !== currentEngine || !running()) return@execute
-            busy = false
-            if (real) dev.zswatch.app.LlmComputeService.stop(context)
-            try {
-                val received = System.currentTimeMillis() / 1000
-                val validated = response.mapCatching { value ->
-                    require(value["version"] == 1 && value["job_id"] == claim.id && value["plugin_ready"] == true) { "worker_envelope" }
-                    JSONObject(value["result"] as Map<*, *>).also(PrototypeJobs::validateResult)
-                }
-                validated.fold({ result ->
-                    if (jobs.complete(claim, received, result, null))
-                        LifecycleLogger.log("CompanionLocalJobs", "result_committed pluginReady=true activityRequired=false")
-                }, {
-                    val code = (response.exceptionOrNull() as? PrototypeDartWorker.WorkerFailure)?.code
-                    val permanent = code in listOf("NO_SPEECH", "MODEL_MISSING")
-                    val label = if (response.isSuccess) "invalid_dart_result" else when (code) {
-                        "NO_SPEECH" -> "no_speech"
-                        "MODEL_MISSING" -> "model_missing"
-                        else -> "dart_worker_failed"
+                if (real) dev.zswatch.app.LlmComputeService.stop(context)
+                try {
+                    val received = System.currentTimeMillis() / 1000
+                    val validated = response.mapCatching { value ->
+                        require(value["version"] == 1 && value["job_id"] == claim.id && value["plugin_ready"] == true) { "worker_envelope" }
+                        JSONObject(value["result"] as Map<*, *>).also(PrototypeJobs::validateResult)
                     }
-                    jobs.defer(claim, received, 10, label, maxAttempts = if (response.isSuccess || permanent) 1 else 5)
-                    LifecycleLogger.record(context, "CompanionLocalJobs", "result_rejected reason=$label validation=${it.message.takeIf { name -> name?.startsWith("result_") == true || name == "worker_envelope" } ?: it.javaClass.simpleName}")
-                })
-            } catch (error: Exception) {
-                LifecycleLogger.log("CompanionLocalJobs", "fixture_commit_failed ${error.javaClass.simpleName}")
+                    validated.fold({ result ->
+                        if (jobs.complete(claim, received, result, null))
+                            LifecycleLogger.log("CompanionLocalJobs", "result_committed pluginReady=true activityRequired=false")
+                    }, {
+                        val code = (response.exceptionOrNull() as? PrototypeDartWorker.WorkerFailure)?.code
+                        val permanent = code in listOf("NO_SPEECH", "MODEL_MISSING")
+                        val label = if (response.isSuccess) "invalid_dart_result" else when (code) {
+                            "NO_SPEECH" -> "no_speech"
+                            "MODEL_MISSING" -> "model_missing"
+                            else -> "dart_worker_failed"
+                        }
+                        jobs.defer(claim, received, 10, label, maxAttempts = if (response.isSuccess || permanent) 1 else 5)
+                        LifecycleLogger.record(context, "CompanionLocalJobs", "result_rejected reason=$label validation=${it.message.takeIf { name -> name?.startsWith("result_") == true || name == "worker_envelope" } ?: it.javaClass.simpleName}")
+                    })
+                } catch (error: Exception) {
+                    LifecycleLogger.log("CompanionLocalJobs", "fixture_commit_failed ${error.javaClass.simpleName}")
+                }
             }
+            PrototypeHub.worker.postDelayed({
+                if (busy && execution == operation && engine === currentEngine && !closed) {
+                    busy = false; currentEngine.close(); engine = null
+                    // Lease has expired; next claim fences this abandoned computation.
+                    LifecycleLogger.log("CompanionLocalJobs", "worker_timeout")
+                }
+            }, if (real) 900000 else 60000)
         }
-        PrototypeHub.worker.postDelayed({
-            if (busy && execution == operation && engine === currentEngine && !closed) {
-                busy = false; currentEngine.close(); engine = null
-                // Lease has expired; next claim fences this abandoned computation.
-                LifecycleLogger.log("CompanionLocalJobs", "worker_timeout")
-            }
-        }, if (real) 900000 else 60000)
+        if (real) dev.zswatch.app.LlmComputeService.startForJob(context,
+            ready = { allowed -> PrototypeHub.worker.post {
+                if (allowed) execute() else unavailable("execution_not_allowed")
+            } },
+            interrupted = { PrototypeHub.worker.post { unavailable("execution_interrupted") } })
+        else execute()
     }
     fun close() {
         closed = true; busy = false
