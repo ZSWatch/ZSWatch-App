@@ -787,3 +787,31 @@ Next: English/longer audio with an appropriate STT model, physical cancellation
 and action execution, concurrent BLE acceptance, remaining consolidated features
 and quiet/endurance. LiteRT model and real remote configuration remain separate
 pending inputs. The overall goal remains active.
+
+
+### 2026-10-05 ordinary voice UI and concurrent BLE acceptance
+
+The ordinary Flutter Voice Notes view displays the user's real recording as
+Processed / Accepted by watch, with its actual transcript, summary and Review &
+create action. Pressing the ordinary Process dialog again with the same models
+leaves the entire native jobs and outbox unchanged: no new generation or duplicate
+result. The UI was not replaced with a native screen.
+
+A uniquely named owned watch file, `hil_ble_user_170916.zsw_opus`, replays the
+byte-identical real microphone audio to produce a fresh real local STT/LLM run.
+The native service downloads it, saves the correct transcript and processes the
+actual 1,253-token prompt. Flutter's task is removed before prompt processing.
+
+| Area | Result and limits |
+| --- | --- |
+| BLE during real prompt processing | **Pass, debug OnePlus.** Marker `[CACHE] Processing full prompt` and a CPU-thread snapshot establish actual prompt processing. Watch UART receives one successful 35-byte HTTP callback and the owned notification body while the job retains its active lease. Host-observed receipt bounds are 1.511 s for HTTP and 1.363 s from notification posting, including admission/polling; these are not wire-level timings. Native PID 4839 and Ready generation 179 stay unchanged across both probes; Flutter is absent throughout the sampled prompt window. |
+| Completed replay | **Pass.** Phone bytes match the real original and native SHA; one processing attempt reaches Delivered/Acked. Watch UART independently logs `durable result new, ACK=0`. Transcript and milk/tomorrow 09:00 interpretation match the original run. |
+| Measured processing / resource snapshot | Actual prompt prefill: 1,253 tokens in 26.558 s, 47.18 tokens/s; this is not output-generation throughput. During prompt processing `top -H` shows approximately 1.7 GiB process RSS, including the whole app rather than only the model. Post-run Android thermal status is 2; no peak/continuous temperature or battery-drain claim. |
+| Time/status and endurance limits | Fresh status continues after completion, but no time write was measured during this prompt window. USB remains attached and the previously known battery optimization exemption is retained. This is a short functional workload, not unplugged/OEM/endurance acceptance. |
+
+Private evidence: `.companion-hil-runs/20261005-oneplus-ble-inference-real/`
+(`acceptance.json`, `ble-during-inference.json`, CPU/thermal snapshots, terminal
+job/outbox and passive watch UART) and the original microphone directory's
+`ordinary-ui-dedup.json`. No production transport or scheduling code was changed
+for this test. English/longer input, STT/LiteRT cancellation, lost ACK, remaining
+core features and release/quiet/endurance still require their stated coverage.
