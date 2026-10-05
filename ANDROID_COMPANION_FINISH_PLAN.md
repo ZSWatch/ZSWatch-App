@@ -588,3 +588,34 @@ was selected only for the explicit fixture retry. Prompt CPU cancellation/Stop,
 meaningful microphone and longer audio, timer/alarm semantics, LiteRT/remote,
 physical lost ACK and the full OnePlus feature/update/endurance matrix remain
 pending. The goal remains active.
+
+### 2026-10-05 cancellation, Stop and explicit resume checkpoint
+
+Cancel now fences the durable job first and signals the existing Dart Whisper/
+GGUF/LiteRT cancellation APIs. A per-execution check prevents another processing
+phase or publication after cancellation. Native teardown retains the headless
+engine until its FFI work returns, then allows the existing post-completion logger
+callbacks to finish before destroying it. Explicit companion Stop retains the
+transcript and releases the active lease; explicit restart can immediately claim
+the same job rather than waiting for the 15-minute lease.
+
+| Area | Result and limits |
+| --- | --- |
+| Cancel job | **Pass on OnePlus for real GGUF prompt processing.** Cancelled state, no result publication, unchanged 20 recording receipts and the same native PID/Ready generation. Native cancellation signal to compute-service destruction is 4.119 seconds. The current library finishes its active prompt batch before honoring cancellation; this is not instant prefill abort. |
+| Disconnect/Stop during analysis | **Pass, debug.** Both services are absent afterward, all model threads are idle, Stopped/desired-running=false persist during the observation, and the saved transcript/lease release are independently read. Signal to engine teardown is 10.664 seconds in this case, again including completion of the active prompt batch. |
+| Explicit restart | **Pass for recovery.** Flutter Connect starts attempt 2 of the same job/spec/input/transcript without waiting for lease expiry. The subsequent LLM router rejects this synthesized English fixture as no-speech; this is not timer semantics or successful delivery acceptance. |
+| HTTP while processing | **Partial.** The native owner writes the Weather HTTP reply in generation 120 about 2.767 seconds after launch while Flutter is absent and real LLM model initialization is active. The observer initially stopped at Pending; Written is verified from the persisted later observation before the Stop timestamp. UART watch receipt and HTTP latency during steady prompt/token generation are not established. Standalone OnePlus Weather evidence remains separate. |
+| Checks | Ten focused Flutter tests, 16 native job tests, focused Dart analysis and debug/release builds pass. Tests include cancellation before work, phase fencing, detached completion and Stop lease/checkpoint recovery with stale callback rejection. Latest physical Stop candidate has build coverage for release; these cancellation/Stop tests use debug. |
+
+Private evidence: `.companion-hil-runs/20261005-oneplus-cancellation-third/`
+and `.companion-hil-runs/20261005-oneplus-http-stop/acceptance-evidence.json`.
+The earlier two cancellation attempts did not tap the button because the test
+locator omitted Flutter accessibility descriptions; neither is counted as a pass.
+Tested cancellation APK SHA-256:
+`66f4ac8445672bf3cad04e5d17540ca8c9c65634f0080d4fc7299ee194a2d2fe`;
+tested final Stop/lease-recovery candidate:
+`47bd2d70aff0f181a6aa4184ca2685e941391cd1261dda73f9ec29fb6f47b07f`.
+The correction preference is restored to false, and the captured automatic
+Swedish processing policy is unchanged. STT/LiteRT and long-input cancellation,
+speech/action quality, real remote configuration, lost ACK, the full OnePlus
+feature/update/release matrix and controlled endurance remain pending.

@@ -9,12 +9,40 @@ import '../voice_memo/ogg_opus_writer.dart';
 import 'llm_service.dart';
 import 'voice_note_ai_pipeline.dart';
 
+/// Per-execution cancellation; durable job fencing stays in the native journal.
+class CompanionVoiceCancellation {
+  bool _cancelled = false;
+  Future<void> Function()? _abort;
+
+  bool get isCancelled => _cancelled;
+
+  void check() {
+    if (_cancelled) throw PlatformException(code: 'CANCELLED');
+  }
+
+  void bind(Future<void> Function() abort) {
+    check();
+    _abort = abort;
+  }
+
+  void unbind() => _abort = null;
+
+  Future<void> cancel() async {
+    if (_cancelled) return;
+    _cancelled = true;
+    await _abort?.call();
+  }
+}
+
 /// Shared Dart voice workflow. Platform adapters supply input and durable checkpoints.
 /// Never owns BLE, schedules OS work, uploads audio or creates external actions.
 Future<Map<String, Object?>> processCompanionVoiceRecording(
   Map<String, Object?> request, {
   required Future<void> Function(String transcript) saveTranscript,
+  CompanionVoiceCancellation? cancellation,
 }) async {
+  final control = cancellation ?? CompanionVoiceCancellation();
+  control.check();
   final spec = Map<String, Object?>.from(request['spec'] as Map);
   if (request['version'] != 1 ||
       spec['provider'] != 'dart-voice-v1' ||
@@ -36,18 +64,24 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
   }
   final sttType = TranscriptionEngineType.values.byName(models[0]);
   final engine = createTranscriptionEngine(sttType);
-  final llm = LlmService()..selectModel(models[1]);
+  final llm = LlmService(isCancelled: () => control.isCancelled)
+    ..selectModel(models[1]);
+  control.bind(() async {
+    await Future.wait([engine.cancel(), llm.cancelProcessing()]);
+  });
   Directory? scratch;
   try {
     final support = Directory(
       await (await getApplicationSupportDirectory()).resolveSymbolicLinks(),
     );
     final verified = await loadVerifiedCompanionRecording(recording, support);
+    control.check();
     var transcript = request['transcript'] as String?;
     if (transcript == null) {
       if (!await engine.isAvailable()) {
         throw PlatformException(code: 'MODEL_MISSING');
       }
+      control.check();
       scratch = await (await getTemporaryDirectory()).createTemp(
         'companion-voice-',
       );
@@ -56,15 +90,19 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
         OggOpusWriter.convert(verified.parsed),
         flush: true,
       );
+      control.check();
       transcript = (await engine.transcribe(audio.path)).trim();
+      control.check();
       requireCompanionSpeech(transcript);
       // Complete this platform persistence callback before starting analysis.
       await saveTranscript(transcript);
     }
+    control.check();
     requireCompanionSpeech(transcript);
     if (!await llm.isModelDownloaded()) {
       throw PlatformException(code: 'MODEL_MISSING');
     }
+    control.check();
     final result = llm.isBrainDump(transcript)
         ? await llm.processTranscriptBrainDump(
             transcript,
@@ -74,6 +112,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
             transcript,
             correctTranscription: models[2] == 'true',
           );
+    control.check();
     // The existing router can also identify non-speech after transcription.
     if (result.summary.trim().isEmpty && result.actions.isEmpty) {
       throw PlatformException(code: 'NO_SPEECH');
@@ -98,6 +137,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
       ],
     };
   } finally {
+    control.unbind();
     engine.dispose();
     llm.dispose();
     if (scratch != null && scratch.existsSync()) {

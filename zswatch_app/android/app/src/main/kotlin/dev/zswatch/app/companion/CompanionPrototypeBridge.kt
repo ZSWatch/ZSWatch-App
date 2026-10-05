@@ -50,7 +50,11 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         val spec = item.getJSONObject("spec")
                         require(spec.getString("provider") == "dart-voice-v1" &&
                             spec.getString("watch_id") == PrototypeHub.journal(context).control()["address"])
-                        if (call.method == "cancelVoiceJob") jobs.cancel(id)
+                        if (call.method == "cancelVoiceJob") {
+                            // Persist/fence first; a late result can never publish.
+                            jobs.cancel(id)
+                            CompanionPrototypeService.instance?.localFixture?.cancel(id)
+                        }
                         val current = jobs.state(id)
                         val detail = PrototypeStore.asMap(current) + mapOf("processing" to !current.isNull("lease_until"),
                             "transcript_saved" to current.has("transcript"))

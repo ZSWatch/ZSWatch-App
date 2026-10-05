@@ -84,6 +84,22 @@ class PrototypeJobsTest {
         assertEquals("execution_attempt_limit", jobs.state(id).getString("last_error"))
     }
 
+    @Test fun stoppedExecutionReleasesLeaseAndKeepsCheckpointForExplicitRestart() {
+        val jobs = PrototypeJobs(store())
+        val id = jobs.create(spec().put("backend", "local").put("upload_authorized", false)
+            .put("provider", "dart-voice-v1"))
+        val interrupted = jobs.claim(id, 100, leaseSeconds = 900)!!
+        assertTrue(jobs.checkpointTranscript(interrupted, 101, "Saved speech"))
+        assertTrue(jobs.defer(interrupted, 102, 0, "execution_interrupted"))
+        assertTrue(jobs.state(id).isNull("lease_until"))
+        assertFalse(jobs.complete(interrupted, 103, fixture("result-v1.json"), null))
+        val resumed = jobs.claim(id, 103, leaseSeconds = 900)!!
+        assertEquals(2, jobs.state(id).getInt("attempts"))
+        assertEquals("Saved speech", jobs.state(id).getString("transcript"))
+        assertTrue(resumed.fence > interrupted.fence)
+        assertFalse(jobs.checkpointTranscript(interrupted, 104, "Late callback"))
+    }
+
     @Test fun newProcessRecoversLocalWorkImmediatelyAndRetainsCheckpoint() {
         var jobs = PrototypeJobs(store())
         val id = jobs.create(spec().put("backend", "local").put("upload_authorized", false)

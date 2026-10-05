@@ -18,6 +18,7 @@ class PrototypeDartWorker(private val context: Context) {
     private var ready = false
     private var pending: (() -> Unit)? = null
     private var currentJob: String? = null
+    private var executing = false
     private var saveTranscript: ((String) -> Boolean)? = null
 
     // Caller serializes jobs on PrototypeHub.worker. Replies return there too.
@@ -26,12 +27,21 @@ class PrototypeDartWorker(private val context: Context) {
         PrototypeHub.main.post {
             if (closed) return@post
             fun reply(value: Result<Map<*, *>>) {
+                executing = false
+                currentJob = null; saveTranscript = null
+                if (closed) {
+                    // Native inference has returned. Retain the isolate briefly for
+                    // the existing libraries' post-completion logger callbacks.
+                    PrototypeHub.main.postDelayed({ destroy() }, 500)
+                    return
+                }
                 if (!closed) PrototypeHub.worker.post { if (!closed) done(value) }
             }
             try {
                 check(pending == null) { "Dart worker busy" }
                 currentJob = claim.id; saveTranscript = checkpoint
                 val dispatch = {
+                    executing = true
                     channel!!.invokeMethod(if (claim.spec.getString("provider") == "dart-voice-v1") "executeRecording" else "executeFixture",
                         mapOf("version" to 1, "job_id" to claim.id, "spec" to PrototypeStore.asMap(claim.spec)) + input, object : MethodChannel.Result {
                         override fun success(result: Any?) {
@@ -104,15 +114,39 @@ class PrototypeDartWorker(private val context: Context) {
     }
 
     fun close() {
+        if (closed) return
         closed = true // Fence posted replies before destroying the engine.
-        currentJob = null; saveTranscript = null
+        saveTranscript = null
         runCatching { dev.zswatch.app.LlmComputeService.stop(context) }
         PrototypeHub.main.post {
-            pending = null; ready = false
-            channel?.setMethodCallHandler(null); channel = null
-            liteRtBridge?.close(); liteRtBridge = null
-            engine?.destroy(); engine = null
-            LifecycleLogger.log("CompanionDartWorker", "engine_closed")
+            pending = null
+            if (executing) cancel(currentJob) else destroy()
         }
+    }
+
+    /** Keep the engine alive until its FFI computation and callbacks finish. */
+    fun cancel(jobId: String?) {
+        PrototypeHub.main.post {
+            if (!executing || jobId == null || jobId != currentJob) return@post
+            channel?.invokeMethod("cancel", mapOf("job_id" to jobId), object : MethodChannel.Result {
+                override fun success(result: Any?) {
+                    LifecycleLogger.log("CompanionDartWorker", "cancel_signalled accepted=${result == true}")
+                }
+                override fun error(code: String, message: String?, details: Any?) {
+                    LifecycleLogger.log("CompanionDartWorker", "cancel_signal_failed code=$code")
+                }
+                override fun notImplemented() {
+                    LifecycleLogger.log("CompanionDartWorker", "cancel_signal_unavailable")
+                }
+            })
+        }
+    }
+
+    private fun destroy() {
+        pending = null; ready = false; currentJob = null
+        channel?.setMethodCallHandler(null); channel = null
+        liteRtBridge?.close(); liteRtBridge = null
+        engine?.destroy(); engine = null
+        LifecycleLogger.log("CompanionDartWorker", "engine_closed")
     }
 }

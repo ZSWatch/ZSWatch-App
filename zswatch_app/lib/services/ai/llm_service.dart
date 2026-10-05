@@ -243,6 +243,16 @@ class TranscriptResult {
 ///
 /// The model loads lazily on first inference and stays cached in-process.
 class LlmService {
+  LlmService({bool Function()? isCancelled}) : _isCancelled = isCancelled;
+
+  final bool Function()? _isCancelled;
+
+  void _checkCancelled() {
+    if (_isCancelled?.call() == true) {
+      throw PlatformException(code: 'CANCELLED');
+    }
+  }
+
   static const int defaultTargetContextSize = 3072;
   static const int reducedContextSize = 2048;
   static const int minimumContextSize = 1024;
@@ -869,6 +879,7 @@ class LlmService {
     // Cancel any still-running inference (e.g. leftover from hot-restart or
     // a previous phase) before starting a new one.  This reduces the window
     // for the "Callback invoked after it has been deleted" crash.
+    _checkCancelled();
     cancelInference();
     debugPrint(
       '[LlmService] _generate: _selectedModelId=$_selectedModelId _modelPath=$_modelPath',
@@ -884,6 +895,7 @@ class LlmService {
     final stopwatch = Stopwatch()..start();
 
     final params = await _computeInferenceParams(modelInfo);
+    _checkCancelled();
 
     // Apply maxTokens cap from memory check. The cap is the hard ceiling;
     // the caller's overrideMaxTokens or default maxTokens is also respected
@@ -914,6 +926,7 @@ class LlmService {
       while (_liteRtLmLock != null) {
         debugPrint('[LlmService] LiteRT-LM busy, waiting for previous call...');
         await _liteRtLmLock!.future;
+        _checkCancelled();
       }
       _liteRtLmLock = Completer<void>();
       try {
@@ -975,13 +988,16 @@ class LlmService {
           completer.complete(response);
         }
       });
-
+      // Cancellation can arrive while the native request ID is being allocated.
+      if (_isCancelled?.call() == true) cancelInference();
       text = (await completer.future).trim();
+      _runningRequestId = -1;
     }
     stopwatch.stop();
 
     // Release the foreground service + wake lock.
     await LlmComputeService.instance.stop();
+    _checkCancelled();
 
     final wallTime = stopwatch.elapsed;
     final tokPerSec = wallTime.inMilliseconds > 0
@@ -1241,6 +1257,11 @@ Assistant:''';
   }
 
   /// Cancel a running inference (best-effort).
+  Future<void> cancelProcessing() async {
+    cancelInference();
+    if (_liteRtLmLock != null) await _liteRtLmService.cancel();
+  }
+
   void cancelInference() {
     if (_runningRequestId >= 0) {
       fllamaCancelInference(_runningRequestId);

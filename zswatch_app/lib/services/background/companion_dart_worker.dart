@@ -11,18 +11,29 @@ Future<void> startCompanionDartWorker() async {
   WidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel(companionWorkerChannel);
   var busy = false;
+  String? currentJob;
+  CompanionVoiceCancellation? cancellation;
   channel.setMethodCallHandler((call) async {
+    if (call.method == 'cancel') {
+      final args = Map<String, Object?>.from(call.arguments as Map);
+      if (args['job_id'] != currentJob || cancellation == null) return false;
+      await cancellation!.cancel();
+      return true;
+    }
     if (call.method != 'executeFixture' && call.method != 'executeRecording') {
       throw MissingPluginException();
     }
     if (busy) throw PlatformException(code: 'BUSY');
     final request = Map<String, Object?>.from(call.arguments as Map);
     busy = true;
+    currentJob = request['job_id'] as String;
+    cancellation = CompanionVoiceCancellation();
     try {
       final Map<String, Object?> result;
       if (call.method == 'executeRecording') {
         result = await processCompanionVoiceRecording(
           request,
+          cancellation: cancellation,
           saveTranscript: (transcript) async {
             await channel.invokeMethod<void>('checkpoint', {
               'job_id': request['job_id'],
@@ -42,6 +53,8 @@ Future<void> startCompanionDartWorker() async {
         'result': result,
       };
     } finally {
+      currentJob = null;
+      cancellation = null;
       busy = false;
     }
   });

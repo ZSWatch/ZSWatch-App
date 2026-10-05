@@ -4,6 +4,7 @@ import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_session.dart';
 import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
@@ -281,6 +282,9 @@ abstract class TranscriptionEngine {
   /// Throws on engine errors (model not loaded, file not found, etc.).
   Future<String> transcribe(String audioFilePath);
 
+  /// Signal native inference; the transcribe future still owns cleanup.
+  Future<void> cancel();
+
   /// Whether this engine is currently available (model downloaded, etc.)
   Future<bool> isAvailable();
 
@@ -361,6 +365,14 @@ class TranscriptionEngineState {
 /// transcriptions use the cached model. The WhisperController keeps
 /// the model in memory for fast back-to-back transcriptions.
 class WhisperEngine implements TranscriptionEngine {
+  bool _cancelled = false;
+
+  @override
+  Future<void> cancel() async {
+    _cancelled = true;
+    await const Whisper(model: WhisperModel.tinyEn).abort();
+  }
+
   static const WhisperModel _defaultModel = WhisperModel.tinyEn;
 
   final WhisperController _controller = WhisperController();
@@ -434,6 +446,7 @@ class WhisperEngine implements TranscriptionEngine {
 
   @override
   Future<String> transcribe(String audioFilePath) async {
+    _cancelled = false;
     if (!File(audioFilePath).existsSync()) {
       throw Exception('Audio file not found: $audioFilePath');
     }
@@ -454,6 +467,7 @@ class WhisperEngine implements TranscriptionEngine {
     try {
       final prepared = await _prepareAudioForWhisper(audioFilePath);
       if (prepared != audioFilePath) convertedAudioPath = prepared;
+      if (_cancelled) throw PlatformException(code: 'CANCELLED');
       debugPrint('[WhisperEngine] Transcribing: $prepared');
 
       final result = await _controller.transcribe(
@@ -589,6 +603,14 @@ class WhisperEngine implements TranscriptionEngine {
 ///
 /// Use [KbWhisperEngines] for pre-configured Swedish KB-Whisper variants.
 class CustomGgmlWhisperEngine implements TranscriptionEngine {
+  bool _cancelled = false;
+
+  @override
+  Future<void> cancel() async {
+    _cancelled = true;
+    await const Whisper(model: WhisperModel.base).abort();
+  }
+
   final String _modelUrl;
   final String _modelFileName;
   final String _languageCode;
@@ -741,6 +763,7 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
 
   @override
   Future<String> transcribe(String audioFilePath) async {
+    _cancelled = false;
     if (!File(audioFilePath).existsSync()) {
       throw Exception('Audio file not found: $audioFilePath');
     }
@@ -766,6 +789,7 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
       if (transcriptionAudioPath != audioFilePath) {
         convertedAudioPath = transcriptionAudioPath;
       }
+      if (_cancelled) throw PlatformException(code: 'CANCELLED');
 
       debugPrint(
         '[CustomGgmlWhisperEngine] Transcribing: $transcriptionAudioPath',

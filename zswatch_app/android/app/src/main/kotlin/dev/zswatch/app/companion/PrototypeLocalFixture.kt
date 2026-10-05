@@ -11,6 +11,7 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
     private val jobs get() = PrototypeJobs(PrototypeHub.jobJournal(context))
     private var engine: PrototypeDartWorker? = null
     private var busy = false
+    private var activeClaim: PrototypeJobs.Claim? = null
     private var execution = 0L
     private var closed = false
     private var failedClosed = false
@@ -101,6 +102,7 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
             else jobs.claim(id, now, leaseSeconds = if (real) 900 else 60, maxAttempts = 5)
         }.firstOrNull() ?: return
         busy = true
+        activeClaim = claim
         val operation = ++execution
         val currentEngine = engine ?: PrototypeDartWorker(context).also { engine = it }
         // No Dart-owned scheduler, BLE session or job DB. Native owns the claim.
@@ -109,9 +111,15 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
             if (!busy || execution != operation || !running()) return
             busy = false; currentEngine.close(); engine = null
             jobs.defer(claim, System.currentTimeMillis() / 1000, 10, label, blocked = true)
+            activeClaim = null
         }
         fun execute() {
             if (!busy || execution != operation || !running()) return
+            if (jobs.state(claim.id).getString("state") == "cancelled") {
+                busy = false; activeClaim = null
+                dev.zswatch.app.LlmComputeService.stop(context)
+                return
+            }
             val input = if (real) mapOf("recording" to service.runtime!!.store.record(claim.spec.getString("recording_id")),
                 "transcript" to jobs.state(claim.id).optString("transcript").takeIf { it.isNotEmpty() }) else emptyMap()
             currentEngine.execute(claim, input, checkpoint = { text ->
@@ -119,6 +127,7 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
             }) { response ->
                 if (!busy || execution != operation || engine !== currentEngine || !running()) return@execute
                 busy = false
+                activeClaim = null
                 if (real) dev.zswatch.app.LlmComputeService.stop(context)
                 try {
                     val received = System.currentTimeMillis() / 1000
@@ -131,6 +140,10 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
                             LifecycleLogger.log("CompanionLocalJobs", "result_committed pluginReady=true activityRequired=false")
                     }, {
                         val code = (response.exceptionOrNull() as? PrototypeDartWorker.WorkerFailure)?.code
+                        if (code == "CANCELLED" && jobs.state(claim.id).getString("state") == "cancelled") {
+                            LifecycleLogger.log("CompanionLocalJobs", "processing_cancelled")
+                            return@fold
+                        }
                         val permanent = code in listOf("NO_SPEECH", "MODEL_MISSING")
                         val label = if (response.isSuccess) "invalid_dart_result" else when (code) {
                             "NO_SPEECH" -> "no_speech"
@@ -162,6 +175,16 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
     fun close() {
         closed = true; busy = false
         PrototypeHub.worker.removeCallbacks(tick)
+        // Explicit Stop retains the checkpoint but releases this execution's
+        // lease. A later user-initiated start must not wait fifteen minutes.
+        activeClaim?.let { claim ->
+            jobs.defer(claim, System.currentTimeMillis() / 1000, 0, "execution_interrupted")
+        }
+        activeClaim = null
         engine?.close(); engine = null
+    }
+
+    fun cancel(id: String) {
+        if (busy && activeClaim?.id == id) engine?.cancel(id)
     }
 }
