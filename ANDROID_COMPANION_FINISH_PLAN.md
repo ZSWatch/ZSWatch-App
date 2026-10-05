@@ -45,12 +45,12 @@ artifact identities, measured scope and earlier failed attempts.
 | Existing Flutter UI / single native owner | Real transcript/summary/action review, ordinary Process dedup and actual audio playback pass. Original audio retained. Complete settings/model/retry feature coverage remains part of the consolidated pass. |
 | Action confirmation / side effects | Real release local-calendar Create/Undo passes for owned entry ZSWatch_HIL_release_20261005; Calendar independently shows tomorrow 09:00–09:30 and app confirms removal. Original transcript/audio retained. Timer/alarm OS dispatch and timezone coverage pending; existing model misclassification does not authorize AI-quality work. |
 | Durable result / dedup / interrupted work | Real watch application ACK, job reuse and process-loss recovery with saved transcript pass. Deliberately lost ACK/replay physical acceptance pending. |
-| Cancellation and invalid/unavailable inputs | Real GGUF cancel and Stop pass. LiteRT channel cancellation: four controlled-callback regressions pass, actual model unavailable. STT/long-input cancellation and remaining silence/malformed/missing-model/storage physical coverage pending. |
+| Cancellation and invalid/unavailable inputs | Real GGUF cancel and Stop pass. LiteRT channel cancellation: four controlled-callback regressions pass, actual model unavailable. Release real Whisper Base STT cancellation on the owned 37.8 s fixture passes before transcript/result persistence: native abort log, Cancelled UI, compute service gone at the first 2.425 s observation, same PID and 22 watch originals retained. Existing Retry processing control and missing-model case pass in release: selecting undownloaded Whisper Small English gives Processing failed / Reason: model_missing without a new transcript or result; 23 phone receipts remain. Remaining silence/malformed/storage physical coverage pending. |
 | BLE under AI load / resources | Actual prompt-time watch HTTP and notification pass (observed bounds 1.511/1.363 s); same process/generation and Flutter absent. New release English inference completes in about 72 s with same PID, Flutter absent and real remote HTTP callback during work. Prompt prefill and RSS/thermal snapshot recorded. Concurrent time-write and battery/endurance remain pending. |
 | Explicit local / hybrid / remote choices | Local-only flow passes. Real remote provider, credentials and upload consent remain external pending inputs; no automatic upload/fallback acceptance claimed. |
-| OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. Real Chrome MediaSession metadata and watch next/pause/play pass with both apps' UI in background, Flutter task absent and same PID; owned quiet tone/page, not commercial-player coverage. Previous-track remains unverified. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Release Shell command completes after Flutter task destruction (independent watch-state transition, same PID). Owned Android notification body replacement and phone-side removal pass with Flutter absent and same PID; independent UART shows remove/add with watch ID 1000004. Watch-originated dismissal, Shell/DFU arbitration, logs/cache isolation, watchface interruption/reattachment and complete ordinary connection/settings pass pending. |
+| OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. Real Chrome MediaSession metadata and watch next/pause/play pass with both apps' UI in background, Flutter task absent and same PID; owned quiet tone/page, not commercial-player coverage. Previous-track remains unverified. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Release Shell command completes after Flutter task destruction (independent watch-state transition, same PID). Owned Android notification body replacement and phone-side removal pass with Flutter absent and same PID; independent UART shows remove/add with watch ID 1000004. Watch-originated dismissal, Shell/DFU arbitration, logs/cache isolation and complete ordinary connection/settings pass pending. Accepted native watchface upload survives Flutter task removal: Verifying background observed before teardown, Fume Guilloche full hash matches afterward, same PID. Original Retro Sunburst restored with its exact prior hash. Early UI disposal during preparation correctly leaves the original image unchanged; disconnect/process-loss interruption remains separate pending coverage. |
 | Firmware/resource updates | New fixed application and combined operations pass, acknowledged firmware ~41 KB/s with Flutter removed; active image/resource/original checks pass. Earlier failed combined operation stays failed; SDK network-core index 1 remains unavailable. |
-| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Physical phone reboot performed; ADB returns in RUNNING_LOCKED, first credential unlock pending. Watch USB and UART both briefly disappear during the observer and subsequently return; the resumed observation awaits first unlock and watch reply. ~8 h endurance pending; USB-attached coverage does not prove unplugged behavior. |
+| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Physical phone reboot/first unlock passes: native foreground service and real watch HTTP (229 bytes) return with Flutter absent. Android broadcast queue records boot receiver delivery after 80.277 s; this is delayed system delivery, not immediate availability after unlock. Watch USB/UART transient disappearance and failed first observer remain recorded. ~8 h endurance pending; USB-attached coverage does not prove unplugged behavior. |
 | Final candidate / goal completion | 225 Android tests pass for LiteRT fix; 18 affected Flutter tests and release build pass for restored dashboard Watchface route. Non-debuggable release code is installed and physically exercised, lab re-signed only to retain existing data. Production SHA-256 2228b51bbc58ccbaeff7d3acc21d7fbbaf2080763db4f88bc1ad1b796d47e4da; installed lab SHA-256 ac84375e31bc70d21d74c573f74986994016a7df2d6c1e416d71c3cbdb3c8c1b. Pairing rough-edge cleanup follows remaining main feature pass. **Overall goal active.** |
 
 Release evidence: `.companion-hil-runs/20261005-oneplus-final-release/` and
@@ -81,10 +81,47 @@ active Android list; shade cancellation was not established.
 Phone-reboot observation records the real reboot and ADB returning while user 0
 is RUNNING_LOCKED. Watch USB and UART disappear together; no watch reset or
 second phone reboot was used to hide that observation failure. The ports subsequently return and the observer resumes without another reboot.
-First unlock and independent watch reply remain pending in `phone-reboot/` and
-`phone-reboot-resume/`.
+The resumed observer passes after first unlock: native PID 8525, foreground
+connected-device service, Flutter absent and watch-confirmed remote HTTP 229 bytes.
+Android broadcast queue independently marks BootReceiver DELIVERED at +80.277 s
+after enqueue. The service is absent during the delay; no immediate availability
+after unlock is claimed. Evidence: `phone-reboot/` and `phone-reboot-resume/`.
+STT-cancel-2 physically exercises the existing shared Whisper abort while
+Transcribing the owned 37.8 s replay using Base English. Its native log records
+transcription aborted by user; the existing Flutter result view observes Cancelled
+without a transcript/summary, native compute service is absent at 2.425 s after
+the host cancellation submission, PID 8525 is unchanged and the independent
+watch reports all 22 recordings retained. That bound includes UI/dumpsys overhead.
+The first observer used an incorrect expected UI label and missed the cancellation
+window; it remains failed separately, and no app bug is inferred from it.
+The ordinary Retry processing control opens the model choice dialog after
+cancellation. Choosing undownloaded Whisper Small English for the same owned
+fixture produces Processing failed / Reason: model_missing with Retry still
+available and no transcript/summary. No model download or audio upload was
+requested; phone list still contains 23 saved receipts. Evidence:
+`modelmissing-evidence.json` and its named UI observations.
+Watchface-accepted observes native Verifying background before removing Flutter,
+then keeps the task absent through independent full SHA-256 readback matching
+Fume Guilloche (115,212 bytes), with PID 8525 unchanged. The earlier watchface
+observer closed Flutter before image acceptance: preparation completed, but the
+provider correctly declined the unaccepted upload and the original hash remained.
+Its additional expectation of an unavailable DEBUG apply log stays a failed
+observer, not an app failure. Ordinary gallery restoration of Retro Sunburst
+matches original SHA-256 979df7661e05c5a9caa4ac04c46c8147f1a909571c0b7b04370bcb594f547842;
+all 22 watch recordings remain. Evidence: `watchface/`, `watchface-accepted/` and
+`watchface-restore-final.json`.
 
 
+Retrying with an already completed model exposed a refactor integration defect:
+the native owner correctly reused the saved job, but Flutter chose the highest
+generation and continued showing the newer model_missing failure. The journal
+now selects the requested job per watch/recording, and the existing Dart view
+prefers that selection. Selection changes neither computation, result delivery
+nor confirmed actions; journals without selection retain latest-job display.
+The native regression verifies selection across reopen, unchanged accepted
+outbox/result/action state and no repeated work. All 17 native job tests and
+8 affected Flutter recording tests pass. Physical baseline evidence is in
+`retry-existing-before/`; release verification follows installation.
 
 ### Shared Dart architecture clarification
 

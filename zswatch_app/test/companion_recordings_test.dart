@@ -52,6 +52,102 @@ CompanionPrototypeSnapshot snapshot(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets(
+    'reused saved result remains visible after a newer failed model; old journals show the latest job',
+    (tester) async {
+      const savedId =
+          'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+      const failedId =
+          'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+      final saved = {
+        ...record(state: 'downloaded'),
+        'local_path': '/private/raw.zsw_opus',
+        'sha256': hash,
+      };
+      for (final preferSaved in [true, false]) {
+        final requested = <String>[];
+        final state = CompanionPrototypeSnapshot.decode({
+          ...snapshot({identity(saved): saved}).fields,
+          'voice_jobs': [
+            {
+              'job_id': savedId,
+              'watch_id': watchId,
+              'recording_id': identity(saved),
+              'generation': 1,
+              'state': 'delivered',
+              if (preferSaved) 'selected': true,
+            },
+            {
+              'job_id': failedId,
+              'watch_id': watchId,
+              'recording_id': identity(saved),
+              'generation': 2,
+              'state': 'failed',
+              'last_error': 'model_missing',
+            },
+          ],
+        });
+        await tester.pumpWidget(
+          ProviderScope(
+            key: ValueKey(preferSaved),
+            overrides: [
+              nativeCompanionRuntimeProvider.overrideWithValue(true),
+              companionSnapshotProvider.overrideWith(
+                (ref) => Stream.value(state),
+              ),
+              companionRecordingImportsProvider.overrideWith(
+                (ref) => Stream.value([]),
+              ),
+              companionVoiceJobProvider.overrideWith((ref, id) async {
+                requested.add(id);
+                return id == savedId
+                    ? {
+                        'state': 'delivered',
+                        'result': {
+                          'transcript': 'Previously saved speech',
+                          'summary': 'Previously saved summary',
+                          'actions': <Object?>[],
+                        },
+                      }
+                    : {'state': 'failed', 'last_error': 'model_missing'};
+              }),
+              database.databaseProvider.overrideWith(
+                (ref) => throw StateError('Unexpected DB'),
+              ),
+              watchServiceProvider.overrideWith(
+                (ref) => throw StateError('Unexpected Dart BLE'),
+              ),
+              transcriptionEngineProvider.overrideWith(
+                (ref) => throw StateError('Unexpected inference'),
+              ),
+            ],
+            child: const MaterialApp(home: VoiceMemosScreen()),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining(
+            preferSaved ? 'Processed • Accepted by watch' : 'Processing failed',
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(find.byType(ListTile).first);
+        await tester.pumpAndSettle();
+        expect(requested, [preferSaved ? savedId : failedId]);
+        expect(
+          find.text('Previously saved speech'),
+          preferSaved ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.text('Reason: model_missing'),
+          preferSaved ? findsNothing : findsOneWidget,
+        );
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpAndSettle();
+      }
+    },
+  );
+
   test(
     'receipt identity retains watch and metadata; failed/pending hashes never mean a completed receipt',
     () {

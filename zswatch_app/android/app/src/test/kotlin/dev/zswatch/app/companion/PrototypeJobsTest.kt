@@ -25,6 +25,32 @@ class PrototypeJobsTest {
         return jobs to id
     }
 
+    @Test fun selectingSavedResultAfterFailedModelSurvivesReopenWithoutRepeatingWorkOrActions() {
+        val (jobs, saved) = finishedVoice()
+        val delivery = JSONObject(jobs.pending("fixture-watch").single().getString("payload"))
+        jobs.acknowledge("fixture-watch", delivery.getString("result_id"), "accepted")
+        jobs.beginAction(saved, 0, JSONObject().put("actionType", "reminder").put("title", "Owned"))
+        jobs.finishAction(saved, 0, JSONObject().put("platformId", "42"))
+        val original = jobs.state(saved).toString()
+        val outboxBefore = store().control()["outbox"]
+        val failed = jobs.create(JSONObject(jobs.state(saved).getJSONObject("spec").toString())
+            .put("generation", 2).put("model", "missing-model"))
+        assertEquals(failed, jobs.summary().single { it["selected"] == true }["job_id"])
+        assertTrue(jobs.defer(jobs.claim(failed, 100)!!, 101, 0, "model_missing", maxAttempts = 1))
+        jobs.select(saved)
+        val reopened = PrototypeJobs(store())
+        assertEquals(saved, reopened.summary().single { it["selected"] == true }["job_id"])
+        assertEquals(original, reopened.state(saved).toString())
+        assertEquals(outboxBefore, store().control()["outbox"])
+        assertEquals("failed", reopened.state(failed).getString("state"))
+        assertNull(reopened.claim(failed, 102))
+        assertTrue(reopened.pending("fixture-watch").isEmpty())
+        val another = reopened.create(JSONObject(reopened.state(saved).getJSONObject("spec").toString())
+            .put("recording_id", "another-recording"))
+        assertEquals(setOf(saved, another), reopened.summary().filter { it["selected"] == true }
+            .map { it["job_id"] }.toSet())
+    }
+
     @Test fun deliveryAckNeverConfirmsAnActionAndCalendarRecoveryUsesConfirmedInput() {
         val (jobs, id) = finishedVoice()
         val delivery = JSONObject(jobs.pending("fixture-watch").single().getString("payload"))

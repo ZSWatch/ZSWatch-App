@@ -34,12 +34,35 @@ class PrototypeJobs(private val store: PrototypeStore) {
         if (!jobs.has(id)) jobs.put(id, JSONObject().put("spec", JSONObject(spec.toString())).put("state", "ready")
             .put("remote_id", JSONObject.NULL).put("fence", 0L).put("lease_until", JSONObject.NULL)
             .put("attempts", 0).put("next_attempt", 0L).put("last_error", JSONObject.NULL))
+        if (spec.getString("provider") == "dart-voice-v1") selectItem(jobs, id)
         commit("job_created", jobs, outbox)
         return id
     }
 
     fun state(id: String): JSONObject = jobs().getJSONObject(id)
     fun identities(): List<String> = jobs().keys().asSequence().toList()
+
+    /** Choose the requested result for the UI without rerunning or republishing it. */
+    fun select(id: String) {
+        val jobs = jobs()
+        require(jobs.getJSONObject(id).getJSONObject("spec").getString("provider") == "dart-voice-v1")
+        if (selectItem(jobs, id)) commit("voice_job_selected", jobs)
+    }
+
+    private fun selectItem(jobs: JSONObject, id: String): Boolean {
+        val selected = jobs.getJSONObject(id).getJSONObject("spec")
+        var changed = false
+        for (otherId in jobs.keys()) {
+            val item = jobs.getJSONObject(otherId); val spec = item.getJSONObject("spec")
+            if (spec.getString("watch_id") != selected.getString("watch_id") ||
+                spec.getString("recording_id") != selected.getString("recording_id")) continue
+            val wanted = otherId == id
+            if (item.optBoolean("selected") != wanted) {
+                item.put("selected", wanted); changed = true
+            }
+        }
+        return changed
+    }
 
     private fun actionItem(jobs: JSONObject, id: String, index: Int): JSONObject {
         val item = jobs.getJSONObject(id)
@@ -244,6 +267,7 @@ class PrototypeJobs(private val store: PrototypeStore) {
         val item = state(id)
         val spec = item.getJSONObject("spec")
         mapOf("job_id" to id, "state" to item.getString("state"), "remote_id" to item.optString("remote_id", ""),
+            "selected" to item.optBoolean("selected"),
             "watch_id" to spec.getString("watch_id"), "recording_id" to spec.getString("recording_id"),
             "provider" to spec.getString("provider"), "model" to spec.getString("model"),
             "generation" to spec.getLong("generation"),

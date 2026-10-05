@@ -58,6 +58,7 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         if (existing != null) {
             val id = PrototypeJobs.key(existing.getJSONObject("spec"))
             if (existing.getString("state") == "blocked") jobs.refreshCredentials(id)
+            jobs.select(id)
             advance()
             return id
         }

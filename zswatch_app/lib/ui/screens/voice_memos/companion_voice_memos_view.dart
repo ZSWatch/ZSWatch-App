@@ -353,8 +353,13 @@ class _CompanionVoiceMemosViewState
             .whereType<Map<Object?, Object?>>()) {
       if (job['watch_id'] != watchId) continue;
       final identity = job['recording_id'] as String;
-      if ((job['generation'] as int) >
-          (jobs[identity]?['generation'] as int? ?? 0)) {
+      final current = jobs[identity];
+      final selected = job['selected'] == true;
+      final currentSelected = current?['selected'] == true;
+      if (current == null ||
+          (selected && !currentSelected) ||
+          (selected == currentSelected &&
+              (job['generation'] as int) > (current['generation'] as int))) {
         jobs[identity] = job;
       }
     }
