@@ -754,7 +754,36 @@ correcting that read-only helper allowed the complete checks above without
 restarting the update. Private evidence:
 `.companion-hil-runs/20261005-oneplus-combined-32/`.
 
-The user has offered a natural spoken watch recording. A passive observer is
-armed for the ordinary automatic local pipeline and watch receipt. That natural
-microphone/STT/AI result remains pending until the recording actually completes;
-no computer-speaker fixture is being played or substituted for it.
+The offered natural microphone recording completed successfully; see the
+acceptance checkpoint below. No computer-speaker fixture was substituted.
+
+
+### 2026-10-05 actual Swedish microphone roundtrip
+
+The user recorded the suggested sentence with their own voice on the watch,
+`20261005_170916` (7.56 seconds, 31,051 bytes). Ordinary automatic processing used
+shared Dart with `kbWhisperBase|qwen35_2b_q4_k_m|false`, local-only, upload disabled.
+No model-policy or application installation change was made for this recording.
+
+| Acceptance | Evidence / result |
+| --- | --- |
+| Original → phone integrity and decoding | **Pass.** Independent existing USB SMP SDK download exactly matches the native phone copy and journal SHA-256 `752adbf221bec1e7c7a1398b797993085325529bd2b40a19bab5dc99470de862`. Existing Dart parser accepts a clean container with 756 Opus frames; ffmpeg decodes mono 16 kHz audio. Original remains on the watch. |
+| Real local transcription and interpretation | **Pass for this Swedish sentence.** Transcript: “Påminn mig att köpa mjölk imorgon klockan nio.” Result category reminder, title “köpa mjölk”, due `2026-10-06T09:00:00.000` local time. One real processing attempt, no fixture transcript. |
+| Persistence and application ACK | **Pass.** Job `12e3de6f5a53ce3da4c5a8af997a87e1d5b0f12bc89bc0f22834254d279055de` is Delivered; matching result `4dc91023ba8e3b49844ec31f9fb1f863ab5c1d9678e2a400dce0b459f5e0dfdd` is Acked in the flushed native outbox. The receiver marks these only after matching version, IDs, generation, result hash and accepted application ACK. This is a draft, not confirmation of calendar/Clock creation. |
+| Headless execution observation | **Pass at observed boundaries.** Flutter activity absent before and after; same native PID 4839. USB ADB disappeared during capture and was restored by the user; continuous UI absence and mid-inference BLE latency were not observed. Native owner recovered to Ready generation 177. |
+| BLE during inference / performance | **Pending.** The concurrent observer stopped on ADB loss before measuring prompt-time notification/HTTP latency. This recording does not close that gate or provide elapsed-time/thermal numbers. |
+| Audio quality limits | Watch UART captured PCM overflow warnings. Correct Swedish transcription is established for this sentence; longer/English/silence tests and broader microphone fidelity remain pending. |
+
+Read-only independent receipt-file verification was attempted, but SMP rejected
+its long path and this firmware has no `fs` shell command. No new transport,
+firmware, reset or receipt mutation was introduced for that optional check;
+the matched persisted application ACK is the delivery evidence above.
+Private artifacts: `.companion-hil-runs/20261005-oneplus-real-microphone-user/`,
+including `verified-roundtrip.json`, independent original/phone bytes, decoded
+Ogg/WAV, terminal native job and Acked outbox. The interrupted observer artifacts
+remain interrupted and are not relabelled as passing continuous observations.
+
+Next: English/longer audio with an appropriate STT model, physical cancellation
+and action execution, concurrent BLE acceptance, remaining consolidated features
+and quiet/endurance. LiteRT model and real remote configuration remain separate
+pending inputs. The overall goal remains active.
