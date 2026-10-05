@@ -722,3 +722,39 @@ Find/Shell/log/watchface and the rest of the OnePlus matrix, meaningful speech a
 Clock semantics, LiteRT/remote configuration, physical lost ACK and release/quiet/
 endurance acceptance. The shared Flutter/Dart UI and AI backend remain unchanged;
 iOS remains deferred and the goal remains active.
+
+
+### 2026-10-05 fixed combined update acceptance
+
+A new, distinct fixed application (`0.8.1+4`, 838,392 bytes) plus the existing
+board-matching 5,932,208-byte resource image passes the ordinary Flutter updater
+and native owner. Operation `390e131c-a088-4424-8356-17172027fda3` uploads resources
+at 41.16 KB/s, verifies their complete SHA-256 by readback at 32.44 KB/s, then
+uploads firmware at 41.50 KB/s. Flutter is destroyed at 218,876 resource bytes;
+the same native PID 4839 completes the whole operation with Flutter absent.
+
+The package performs its own reset. Its first native reconnect attempt times out
+at 30 seconds, then the existing retries/service-change recovery reach Completed/
+Ready about 61.3 seconds after the Rebooting observation, within the bounded
+postflight. There is no lab reset or manual Bluetooth toggle. Independent USB
+checks on this boot verify application `0.8.1.4`, target hash
+`c0b841040f2921c79e1b356b9a16937bbc460825c178d808dd5c22ce50b9af1a`, unchanged
+external image, freshly mounted resource length and **all 22 existing file
+hashes**. Resource SHA-256 is
+`ed5878418ca4552eb7f0bcbd7b8934089301a68e95b62636ed1cc7cf6de0255c`.
+Network-core index 1 remains unavailable in the SDK response.
+
+This is a new passing operation; the earlier combined operation remains failed.
+The intermittent initial reconnect timeout remains an observed rough edge. This
+pass does not establish that the flash fix alone corrected native reconnect
+behavior. No new native transport workaround or custom SMP was added. Existing
+file copies were reused; no new backup work or filesystem format was performed.
+The first independent verification helper stopped on local variable shadowing;
+correcting that read-only helper allowed the complete checks above without
+restarting the update. Private evidence:
+`.companion-hil-runs/20261005-oneplus-combined-32/`.
+
+The user has offered a natural spoken watch recording. A passive observer is
+armed for the ordinary automatic local pipeline and watch receipt. That natural
+microphone/STT/AI result remains pending until the recording actually completes;
+no computer-speaker fixture is being played or substituted for it.
