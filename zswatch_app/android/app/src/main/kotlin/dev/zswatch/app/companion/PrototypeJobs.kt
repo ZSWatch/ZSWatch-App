@@ -41,6 +41,83 @@ class PrototypeJobs(private val store: PrototypeStore) {
     fun state(id: String): JSONObject = jobs().getJSONObject(id)
     fun identities(): List<String> = jobs().keys().asSequence().toList()
 
+    private fun actionItem(jobs: JSONObject, id: String, index: Int): JSONObject {
+        val item = jobs.getJSONObject(id)
+        require(item.getJSONObject("spec").getString("provider") == "dart-voice-v1")
+        require(index >= 0 && index < item.getJSONObject("result").getJSONArray("actions").length())
+        return item
+    }
+
+    private fun actionStates(item: JSONObject): JSONObject = item.optJSONObject("action_states")
+        ?: JSONObject().also { item.put("action_states", it) }
+
+    private fun commitAction(kind: String, jobs: JSONObject, item: JSONObject) {
+        item.put("action_revision", item.optLong("action_revision") + 1)
+        commit(kind, jobs)
+    }
+
+    /** Durable user confirmation, independent of watch delivery. Clock intents have no receipt. */
+    fun beginAction(id: String, index: Int, draft: JSONObject): JSONObject {
+        val jobs = jobs(); val item = actionItem(jobs, id, index)
+        require(item.getString("state") in listOf("result_ready", "delivered")) { "No accepted action draft" }
+        val type = item.getJSONObject("result").getJSONArray("actions").getJSONObject(index).getString("type")
+        require(draft.getString("actionType") == type) { "Action type changed" }
+        val states = actionStates(item)
+        val previous = states.optJSONObject(index.toString())
+        if (previous != null) {
+            require(previous.getString("state") == "creating" && type !in listOf("timer", "alarm")) {
+                "Action already handled; check Clock for an interrupted timer/alarm"
+            }
+            // A retry recovers the original confirmed input, never a changed draft.
+            return JSONObject(previous.toString())
+        }
+        val action = JSONObject().put("state", "creating").put("draft", JSONObject(draft.toString()))
+        states.put(index.toString(), action)
+        commitAction("action_confirmed", jobs, item)
+        return JSONObject(action.toString())
+    }
+
+    fun finishAction(id: String, index: Int, response: JSONObject) {
+        val jobs = jobs(); val item = actionItem(jobs, id, index)
+        val action = actionStates(item).getJSONObject(index.toString())
+        if (action.getString("state") == "created") return
+        require(action.getString("state") == "creating")
+        action.put("response", JSONObject(response.toString())).put("state",
+            if (action.getJSONObject("draft").getString("actionType") in listOf("timer", "alarm")) "dispatched" else "created")
+        commitAction("action_created", jobs, item)
+    }
+
+    /** Use only when failure proves no side effect occurred (e.g. missing permission/handler). */
+    fun releaseAction(id: String, index: Int) {
+        val jobs = jobs(); val item = actionItem(jobs, id, index)
+        val states = actionStates(item)
+        require(states.getJSONObject(index.toString()).getString("state") == "creating")
+        states.remove(index.toString()); commitAction("action_not_created", jobs, item)
+    }
+
+    fun dismissAction(id: String, index: Int) {
+        val jobs = jobs(); val item = actionItem(jobs, id, index); val states = actionStates(item)
+        require(item.getString("state") in listOf("result_ready", "delivered"))
+        require(!states.has(index.toString())) { "Action already handled" }
+        states.put(index.toString(), JSONObject().put("state", "dismissed"))
+        commitAction("action_dismissed", jobs, item)
+    }
+
+    fun beginUndoAction(id: String, index: Int): JSONObject {
+        val jobs = jobs(); val item = actionItem(jobs, id, index)
+        val action = actionStates(item).getJSONObject(index.toString())
+        require(action.getString("state") in listOf("created", "undoing")) { "Only calendar entries can be undone here" }
+        action.put("state", "undoing"); commitAction("action_undo_started", jobs, item)
+        return JSONObject(action.toString())
+    }
+
+    fun finishUndoAction(id: String, index: Int) {
+        val jobs = jobs(); val item = actionItem(jobs, id, index)
+        val action = actionStates(item).getJSONObject(index.toString())
+        require(action.getString("state") == "undoing")
+        action.put("state", "undone"); commitAction("action_undone", jobs, item)
+    }
+
     /** Called once in a new Android process. No local worker survived its predecessor. */
     fun recoverLocalClaims() {
         val jobs = jobs()
@@ -122,7 +199,7 @@ class PrototypeJobs(private val store: PrototypeStore) {
         require(!outbox.has(resultId)) { "Result identity already published" }
         outbox.put(resultId, JSONObject().put("job_id", claim.id).put("watch_id", spec.getString("watch_id"))
             .put("payload", canonical(envelope)).put("state", "pending"))
-        item.put("result", result).put("state", "result_ready").put("lease_until", JSONObject.NULL)
+        item.put("result", result).put("state", "result_ready").put("lease_until", JSONObject.NULL).put("last_error", JSONObject.NULL)
         // Result + outbox share one flushed rename. No watch delivery/action is implied.
         commit("job_result_committed", jobs, outbox); return true
     }
@@ -171,6 +248,7 @@ class PrototypeJobs(private val store: PrototypeStore) {
             "provider" to spec.getString("provider"), "model" to spec.getString("model"),
             "generation" to spec.getLong("generation"),
             "processing" to !item.isNull("lease_until"), "transcript_saved" to item.has("transcript"),
+            "action_revision" to item.optLong("action_revision"),
             "next_attempt" to item.getLong("next_attempt"), "attempts" to item.getInt("attempts"),
             "last_error" to if (item.isNull("last_error")) null else item.getString("last_error"))
     }

@@ -15,6 +15,63 @@ class PrototypeJobsTest {
     private fun spec() = fixture("job-v1.json")
     private fun rejected(action: () -> Unit) { try { action(); fail("Expected rejection") } catch (_: IllegalArgumentException) {} }
 
+    private fun finishedVoice(type: String = "reminder"): Pair<PrototypeJobs, String> {
+        val jobs = PrototypeJobs(store())
+        val id = jobs.create(spec().put("backend", "local").put("upload_authorized", false).put("provider", "dart-voice-v1"))
+        val claim = jobs.claim(id, 100)!!
+        val result = fixture("result-v1.json").put("actions", org.json.JSONArray().put(JSONObject()
+            .put("type", type).put("title", "Owned draft")))
+        assertTrue(jobs.complete(claim, 101, result, null))
+        return jobs to id
+    }
+
+    @Test fun deliveryAckNeverConfirmsAnActionAndCalendarRecoveryUsesConfirmedInput() {
+        val (jobs, id) = finishedVoice()
+        val delivery = JSONObject(jobs.pending("fixture-watch").single().getString("payload"))
+        assertTrue(jobs.acknowledge("fixture-watch", delivery.getString("result_id"), "accepted"))
+        assertFalse(jobs.state(id).has("action_states"))
+        val original = JSONObject().put("actionType", "reminder").put("title", "Edited title").put("scheduledAtMillis", 123L)
+        jobs.beginAction(id, 0, original)
+        original.put("title", "Mutated caller")
+        val reopened = PrototypeJobs(store())
+        val recovery = reopened.beginAction(id, 0, JSONObject().put("actionType", "reminder").put("title", "New title"))
+        assertEquals("Edited title", recovery.getJSONObject("draft").getString("title"))
+        reopened.finishAction(id, 0, JSONObject().put("platformId", "42").put("targetType", "calendar_reminder"))
+        rejected { reopened.beginAction(id, 0, original) }
+        rejected { reopened.dismissAction(id, 0) }
+        assertEquals(2L, reopened.state(id).getLong("action_revision"))
+        assertEquals("delivered", reopened.state(id).getString("state"))
+    }
+
+    @Test fun interruptedClockDispatchCannotBeRepeatedAndDismissalSurvivesReopen() {
+        val (jobs, id) = finishedVoice("timer")
+        val draft = JSONObject().put("actionType", "timer").put("title", "Tea").put("durationSeconds", 60)
+        jobs.beginAction(id, 0, draft)
+        val reopened = PrototypeJobs(store())
+        rejected { reopened.beginAction(id, 0, draft) }
+        // Only a known pre-effect failure can release the reservation.
+        reopened.releaseAction(id, 0)
+        reopened.dismissAction(id, 0)
+        rejected { PrototypeJobs(store()).beginAction(id, 0, draft) }
+        assertEquals("dismissed", PrototypeJobs(store()).state(id).getJSONObject("action_states").getJSONObject("0").getString("state"))
+    }
+
+    @Test fun undoRecoverySurvivesReprocessAndDoesNotAlterRecordingOrDelivery() {
+        val (jobs, id) = finishedVoice()
+        jobs.beginAction(id, 0, JSONObject().put("actionType", "reminder").put("title", "Owned"))
+        jobs.finishAction(id, 0, JSONObject().put("platformId", "42").put("targetType", "calendar_reminder"))
+        val original = jobs.state(id).getJSONObject("result").toString()
+        // Reprocessing cancels an older undelivered job, but its created item remains undoable.
+        jobs.create(JSONObject(jobs.state(id).getJSONObject("spec").toString()).put("generation", 2))
+        assertEquals("42", jobs.beginUndoAction(id, 0).getJSONObject("response").getString("platformId"))
+        val reopened = PrototypeJobs(store())
+        assertEquals("undoing", reopened.beginUndoAction(id, 0).getString("state"))
+        reopened.finishUndoAction(id, 0)
+        assertEquals(original, reopened.state(id).getJSONObject("result").toString())
+        assertEquals("cancelled", reopened.state(id).getString("state"))
+        rejected { reopened.beginAction(id, 0, JSONObject().put("actionType", "reminder")) }
+    }
+
     @Test fun abandonedComputationsHaveABoundedRetryCount() {
         var jobs = PrototypeJobs(store())
         val id = jobs.create(spec().put("backend", "local").put("upload_authorized", false))

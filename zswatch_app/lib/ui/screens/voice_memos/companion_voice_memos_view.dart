@@ -12,6 +12,7 @@ import '../../../services/ai/llm_service.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../../providers/companion_recording_import_providers.dart';
 import '../../widgets/voice_memos/audio_playback_bar.dart';
+import '../../widgets/voice_memos/companion_voice_action_card.dart';
 
 /// Native receipt view used by the existing Voice Notes screen during migration.
 /// It observes the core; opening this screen does not start sync or inference.
@@ -199,6 +200,7 @@ class _CompanionVoiceMemosViewState
               padding: const EdgeInsets.all(24),
               child: SingleChildScrollView(
                 child: detail.when(
+                  skipLoadingOnReload: true,
                   data: (job) {
                     final result = job['result'] as Map<Object?, Object?>?;
                     final text = result?['transcript'] ?? job['transcript'];
@@ -217,7 +219,13 @@ class _CompanionVoiceMemosViewState
                         ),
                         const SizedBox(height: 12),
                         Text(jobLabel(job)),
-                        if (job['last_error'] != null)
+                        if (job['last_error'] != null &&
+                            [
+                              'ready',
+                              'waiting_remote',
+                              'failed',
+                              'blocked',
+                            ].contains(job['state']))
                           Text('Reason: ${job['last_error']}'),
                         if (text is String) ...[
                           const SizedBox(height: 16),
@@ -229,24 +237,25 @@ class _CompanionVoiceMemosViewState
                           const Text('Summary'),
                           SelectableText(result['summary'] as String),
                           const SizedBox(height: 16),
-                          for (final action
+                          for (final (index, action)
                               in (result['actions'] as List)
-                                  .cast<Map<Object?, Object?>>())
-                            ListTile(
-                              title: Text(action['title'] as String),
-                              subtitle: Text(
-                                [
-                                  action['type'],
-                                  action['due_date'],
-                                  action['start_time'],
-                                  if (action['duration_seconds'] != null)
-                                    '${action['duration_seconds']} seconds',
-                                ].whereType<String>().join(' • '),
-                              ),
-                            ),
-                          if ((result['actions'] as List).isNotEmpty)
-                            const Text(
-                              'Suggested actions. No calendar item, timer or alarm has been created.',
+                                  .cast<Map<Object?, Object?>>()
+                                  .indexed)
+                            CompanionVoiceActionCard(
+                              key: ValueKey('$id:$index'),
+                              jobId: id,
+                              index: index,
+                              action: action,
+                              canCreate: [
+                                'result_ready',
+                                'delivered',
+                              ].contains(job['state']),
+                              state:
+                                  (job['action_states']
+                                          as Map<Object?, Object?>?)?['$index']
+                                      as Map<Object?, Object?>?,
+                              onChanged: () =>
+                                  ref.invalidate(companionVoiceJobProvider(id)),
                             ),
                         ],
                         if (pending)

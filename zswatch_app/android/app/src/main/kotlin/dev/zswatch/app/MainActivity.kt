@@ -5,6 +5,7 @@ import android.accounts.Account
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
+import android.content.ContentProviderOperation
 import android.content.Context
 import android.content.Intent
 import android.content.ActivityNotFoundException
@@ -20,6 +21,10 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.TimeZone
+import dev.zswatch.app.companion.PrototypeHub
+import dev.zswatch.app.companion.PrototypeJobs
+import dev.zswatch.app.companion.PrototypeStore
+import org.json.JSONObject
 
 /**
  * Main activity for ZSWatch companion app.
@@ -223,6 +228,7 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PRODUCTIVITY_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "createAction" -> handleCreateAction(call, result)
+                "companionAction" -> handleCompanionAction(call, result)
                 "listWritableCalendars" -> handleListWritableCalendars(result)
                 "openCalendarEntry" -> handleOpenCalendarEntry(call, result)
                 "checkCalendarSyncHealth" -> handleCheckCalendarSyncHealth(call, result)
@@ -347,8 +353,7 @@ class MainActivity : FlutterActivity() {
         result.success(calendars)
     }
 
-    private fun handleCreateAction(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
-        Log.d(TAG, "handleCreateAction called with args=${call.arguments}")
+    private fun handleCreateAction(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result, actionToken: String? = null) {
 
         val actionType = call.argument<String>("actionType") ?: "task"
         val title = call.argument<String>("title")?.trim().orEmpty()
@@ -450,7 +455,8 @@ class MainActivity : FlutterActivity() {
                     startMillis = scheduledAtMillis,
                     endMillis = endAtMillis,
                     reminderMinutes = reminderMinutes,
-                    targetType = "calendar_event"
+                    targetType = "calendar_event",
+                    actionToken = actionToken,
                 )
                 "reminder", "task" -> createReminderEntry(
                     calendarId = calendar.id,
@@ -458,7 +464,8 @@ class MainActivity : FlutterActivity() {
                     notes = notes,
                     scheduledAtMillis = scheduledAtMillis,
                     reminderMinutes = reminderMinutes,
-                    targetType = "calendar_reminder"
+                    targetType = "calendar_reminder",
+                    actionToken = actionToken,
                 )
                 else -> {
                     result.error("INVALID_ARGUMENT", "Unsupported action type: $actionType", null)
@@ -471,6 +478,99 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "createAction failed", e)
             result.error("CREATE_ACTION_FAILED", e.localizedMessage, null)
+        }
+    }
+
+    private fun handleCompanionAction(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
+        val id = call.argument<String>("jobId") ?: return result.error("INVALID_ARGUMENT", "Job required", null)
+        val index = call.argument<Number>("index")?.toInt() ?: return result.error("INVALID_ARGUMENT", "Action required", null)
+        val operation = call.argument<String>("operation")
+        val token = "zswatch://voice-action/$id/$index"
+        PrototypeHub.worker.post {
+            try {
+                require(Regex("[a-f0-9]{64}").matches(id))
+                val jobs = PrototypeJobs(PrototypeHub.jobJournal(applicationContext))
+                require(jobs.state(id).getJSONObject("spec").getString("watch_id") ==
+                    PrototypeHub.journal(applicationContext).control()["address"])
+                if (operation == "dismiss") {
+                    jobs.dismissAction(id, index)
+                    PrototypeHub.main.post { result.success(null) }
+                } else if (operation == "undo") {
+                    val action = jobs.beginUndoAction(id, index)
+                    PrototypeHub.main.post {
+                        try {
+                            check(hasCalendarPermission()) { "Calendar permission required" }
+                            val eventId = action.getJSONObject("response").getString("platformId").toLong()
+                            val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId)
+                            contentResolver.query(uri, arrayOf(CalendarContract.Events.CUSTOM_APP_URI,
+                                CalendarContract.Events.CUSTOM_APP_PACKAGE), null, null, null)?.use { cursor ->
+                                if (cursor.moveToFirst()) check(cursor.getString(0) == token && cursor.getString(1) == packageName) {
+                                    "Calendar entry is no longer owned by this action"
+                                }
+                            } ?: error("Calendar provider unavailable")
+                            // Item URIs reject a selection on Android's CalendarProvider.
+                            // Use the collection URI with both ID and ownership in one predicate.
+                            contentResolver.delete(CalendarContract.Events.CONTENT_URI,
+                                "${CalendarContract.Events._ID}=? AND ${CalendarContract.Events.CUSTOM_APP_URI}=? AND ${CalendarContract.Events.CUSTOM_APP_PACKAGE}=?",
+                                arrayOf(eventId.toString(), token, packageName))
+                            contentResolver.query(uri, arrayOf(CalendarContract.Events.DELETED), null, null, null)?.use { cursor ->
+                                if (cursor.moveToFirst()) check(cursor.getInt(0) == 1) { "Calendar entry was not removed" }
+                            } ?: error("Calendar provider unavailable")
+                            PrototypeHub.worker.post {
+                                try { jobs.finishUndoAction(id, index); PrototypeHub.main.post { result.success(null) } }
+                                catch (error: Exception) { PrototypeHub.main.post { result.error("ACTION_FAILED", error.message, null) } }
+                            }
+                        } catch (error: Exception) {
+                            Log.w(TAG, "Companion calendar removal failed", error)
+                            result.error("ACTION_FAILED", error.message, null)
+                        }
+                    }
+                } else {
+                    require(operation == "create")
+                    val input = JSONObject(call.argument<Map<String, Any?>>("draft") ?: error("Draft required"))
+                    val type = input.getString("actionType")
+                    require(input.getString("title").isNotBlank() && input.getString("title").length <= 1024)
+                    if (type == "timer") require(input.getLong("durationSeconds") in 1..Int.MAX_VALUE.toLong())
+                    else require(input.getLong("scheduledAtMillis") > 0)
+                    if (type == "alarm") {
+                        val zone = java.time.ZoneId.systemDefault()
+                        val target = java.time.Instant.ofEpochMilli(input.getLong("scheduledAtMillis")).atZone(zone)
+                        val now = java.time.ZonedDateTime.now(zone)
+                        var next = now.toLocalDate().atTime(target.hour, target.minute).atZone(zone)
+                        if (!next.isAfter(now)) next = next.toLocalDate().plusDays(1).atTime(target.hour, target.minute).atZone(zone)
+                        require(target.toLocalDate() == next.toLocalDate()) { "Clock only supports the next occurrence of this time" }
+                    }
+                    require(input.isNull("reminderMinutes") || input.getLong("reminderMinutes") in 0..Int.MAX_VALUE.toLong())
+                    if (type == "calendar_event" && !input.isNull("endAtMillis"))
+                        require(input.getLong("endAtMillis") > input.getLong("scheduledAtMillis"))
+                    val alreadyConfirmed = jobs.state(id).optJSONObject("action_states")?.has(index.toString()) == true
+                    val action = jobs.beginAction(id, index, input)
+                    PrototypeHub.main.post {
+                        handleCreateAction(io.flutter.plugin.common.MethodCall("createAction",
+                            PrototypeStore.asMap(action.getJSONObject("draft"))), object : MethodChannel.Result {
+                            override fun success(response: Any?) {
+                                PrototypeHub.worker.post {
+                                    try {
+                                        jobs.finishAction(id, index, JSONObject(response as Map<*, *>))
+                                        PrototypeHub.main.post { result.success(response) }
+                                    } catch (error: Exception) { PrototypeHub.main.post { result.error("ACTION_FAILED", error.message, null) } }
+                                }
+                            }
+                            override fun error(code: String, message: String?, details: Any?) {
+                                // Provider failures can follow insertion. Keep their confirmation for token-based recovery.
+                                PrototypeHub.worker.post {
+                                    try {
+                                        if (!alreadyConfirmed && (code in listOf("PERMISSION_DENIED", "NO_CALENDAR", "SELECTED_CALENDAR_UNAVAILABLE") ||
+                                            (type in listOf("timer", "alarm") && code == "CREATE_ACTION_FAILED"))) jobs.releaseAction(id, index)
+                                        PrototypeHub.main.post { result.error(code, message, details) }
+                                    } catch (error: Exception) { PrototypeHub.main.post { result.error("ACTION_FAILED", error.message, null) } }
+                                }
+                            }
+                            override fun notImplemented() = result.notImplemented()
+                        }, token)
+                    }
+                }
+            } catch (error: Exception) { PrototypeHub.main.post { result.error("ACTION_FAILED", error.message, null) } }
         }
     }
 
@@ -519,7 +619,9 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun hasCalendarPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALENDAR) == PackageManager.PERMISSION_GRANTED
+        return listOf(Manifest.permission.WRITE_CALENDAR, Manifest.permission.READ_CALENDAR).all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
     }
 
     private fun getWritableCalendars(): List<WritableCalendarInfo> {
@@ -656,10 +758,24 @@ class MainActivity : FlutterActivity() {
         endMillis: Long?,
         reminderMinutes: Int?,
         targetType: String,
+        actionToken: String? = null,
     ): Map<String, Any?> {
         val start = startMillis
             ?: throw IllegalArgumentException("A start time is required for calendar events.")
         val end = endMillis ?: (start + 30 * 60 * 1000L)
+        if (actionToken != null) {
+            contentResolver.query(CalendarContract.Events.CONTENT_URI,
+                arrayOf(CalendarContract.Events._ID, CalendarContract.Events.CALENDAR_ID),
+                "${CalendarContract.Events.CUSTOM_APP_PACKAGE}=? AND ${CalendarContract.Events.CUSTOM_APP_URI}=? AND ${CalendarContract.Events.DELETED}=0",
+                arrayOf(packageName, actionToken), null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val existing = findCalendarById(getWritableCalendars(), cursor.getLong(1))
+                    return mapOf("platformId" to cursor.getLong(0).toString(), "targetType" to targetType,
+                        "calendarDisplayName" to existing?.displayName, "calendarAccountName" to existing?.accountName,
+                        "syncDisabled" to !isCalendarSyncWorking(existing))
+                }
+            } ?: error("Calendar provider unavailable")
+        }
 
         Log.d(TAG, "createCalendarEntry calendarId=$calendarId title=$title reminderMinutes=$reminderMinutes")
 
@@ -681,6 +797,10 @@ class MainActivity : FlutterActivity() {
             put(CalendarContract.Events.ACCESS_LEVEL, CalendarContract.Events.ACCESS_DEFAULT)
             put(CalendarContract.Events.AVAILABILITY, CalendarContract.Events.AVAILABILITY_BUSY)
             put(CalendarContract.Events.HAS_ALARM, if (reminderMinutes != null) 1 else 0)
+            if (actionToken != null) {
+                put(CalendarContract.Events.CUSTOM_APP_PACKAGE, packageName)
+                put(CalendarContract.Events.CUSTOM_APP_URI, actionToken)
+            }
             if (!organizerEmail.isNullOrEmpty()) {
                 put(CalendarContract.Events.ORGANIZER, organizerEmail)
             }
@@ -701,14 +821,18 @@ class MainActivity : FlutterActivity() {
             CalendarContract.Events.CONTENT_URI
         }
 
-        val uri = contentResolver.insert(insertUri, values)
-            ?: throw IllegalStateException("Failed to insert calendar event.")
-        val eventId = ContentUris.parseId(uri)
+        val operations = arrayListOf(ContentProviderOperation.newInsert(insertUri).withValues(values).build())
+        if (reminderMinutes != null) {
+            val reminderUri = insertUri.buildUpon().path("reminders").build()
+            operations.add(ContentProviderOperation.newInsert(reminderUri)
+                .withValueBackReference(CalendarContract.Reminders.EVENT_ID, 0)
+                .withValue(CalendarContract.Reminders.MINUTES, reminderMinutes)
+                .withValue(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT).build())
+        }
+        val inserted = contentResolver.applyBatch(CalendarContract.AUTHORITY, operations)
+        val eventId = ContentUris.parseId(inserted[0].uri ?: error("Failed to insert calendar event"))
         Log.d(TAG, "Calendar event inserted eventId=$eventId syncAdapter=$isCloudAccount")
 
-        if (reminderMinutes != null) {
-            insertReminder(eventId, reminderMinutes, accountName = calendar?.accountName, accountType = calendar?.accountType)
-        }
 
         requestCalendarSync(calendar)
 
@@ -728,6 +852,7 @@ class MainActivity : FlutterActivity() {
         scheduledAtMillis: Long?,
         reminderMinutes: Int?,
         targetType: String,
+        actionToken: String? = null,
     ): Map<String, Any?> {
         val scheduledAt = scheduledAtMillis
             ?: throw IllegalArgumentException("A date/time is required to create reminders on Android.")
@@ -746,6 +871,7 @@ class MainActivity : FlutterActivity() {
             endMillis = scheduledAt + 30 * 60 * 1000L,
             reminderMinutes = reminderMinutes ?: 0,
             targetType = targetType,
+            actionToken = actionToken,
         )
 
         return event

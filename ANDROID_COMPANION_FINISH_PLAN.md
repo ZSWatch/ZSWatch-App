@@ -44,6 +44,10 @@ journal may serve as the Android durability adapter, not as a second copy of AI
 business logic. Add only required headless plugin/context bridges. Future iOS
 adapters may have different execution windows while calling the same Dart code.
 
+Action review/editing also stays in Dart. Explicitly confirmed OS side effects use
+the existing productivity channel, with the native journal recording their status.
+Watch result acceptance does not confirm or execute a calendar/Clock action.
+
 ### What the review found
 
 The findings below describe the starting point. The 2026-10-05 checkpoint closes
@@ -531,3 +535,32 @@ c5f1400dc85e0aa718c4427945f6e5b0c57fb0173221a8b825413f4d06533110.
 The phone returns to native Ready generation 108 after restoring debug. A Weather
 trigger was attempted during inference, but the retained HTTP success belongs to
 generation 108 after restoration; it does not establish HTTP latency during AI.
+
+### 2026-10-05 action review and calendar acceptance checkpoint
+
+The existing Flutter Voice Notes result view now offers shared Dart review/editing,
+calendar choice, explicit creation, dismissal and calendar Undo. It reuses
+`ActionCreationDraft` and `ExtractedActionCreationService`; no second AI backend
+or database was added. The native job journal stores confirmed drafts and action
+status separately from processing and watch delivery. Reopened calendar creation
+uses the original confirmed input and an event ownership token. Event/reminder
+insertion is one provider batch. Clock requests are marked Dispatched, with no
+claim of OS acceptance or app-controlled Undo; interrupted dispatch is not retried
+automatically. Alarms reject dates beyond the next occurrence supported by Clock.
+
+Physical OnePlus evidence is retained privately under
+`.companion-hil-runs/20261005-oneplus-actions/`. The result came from the prior
+actual local STT/LLM run of the watch fixture `hil_ai_f2c75842ee02`.
+
+| Area | Result and limits |
+| --- | --- |
+| Calendar creation | **Pass, local provider.** Edited title, October 6 at 09:00 local time, one event and one zero-minute reminder independently queried from Android. Cloud synchronization remains unverified. |
+| Process restart | **Pass after creation.** Force-stop followed by explicit app launch retains Created state and exactly one owned event; BLE recovers to Ready. This does not prove killing between insert and journal commit. |
+| Calendar Undo | **Pass.** An initial physical failure required using the collection URI with an ID/ownership predicate. Retrying the saved Undo operation removes both event and reminder; independent queries return no rows. The final view shows Removed. |
+| Preservation | **Pass for this action test.** All 18 recording receipts, job input/result/transcript/state and watch delivery outbox compare identically before and after; only action metadata changes. No audio deletion was requested. |
+| Checks | 11 focused Flutter tests, 15 native job tests, focused Dart analysis and debug/release builds pass. Tests cover confirmation cancellation, double taps, confirmed edits, dates/timezones, ambiguous Clock dispatch and journal reopen/reprocess recovery. |
+| Pending | Real timer/alarm dispatch and interpretation, additional microphone/English/longer audio, inference cancellation/Stop/interruption, LiteRT, real remote configuration, lost ACK, OnePlus feature/transfer matrix and controlled endurance. Latest action code has release build coverage; physical release action execution remains pending. |
+
+Android provider references: [event ownership columns](https://developer.android.com/reference/android/provider/CalendarContract.EventsColumns),
+[CalendarProvider deletion handling](https://android.googlesource.com/platform/packages/providers/CalendarProvider/+/master/src/com/android/providers/calendar/CalendarProvider2.java),
+and [Clock intent contract](https://developer.android.com/reference/android/provider/AlarmClock).

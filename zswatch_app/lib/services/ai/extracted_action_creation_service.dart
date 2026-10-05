@@ -69,8 +69,8 @@ class ActionCreationDraft {
   final int? reminderMinutes;
   final int? durationSeconds;
 
-  /// When true, the system clock app creates the timer/alarm silently
-  /// without opening its UI. Defaults to true for background use.
+  /// Requests that the system clock app skip its UI. The clock app decides
+  /// how to handle this request; dispatch alone is not a creation receipt.
   final bool skipUi;
   final int? platformCalendarId;
 
@@ -108,6 +108,82 @@ class ActionCreationDraft {
       durationSeconds: action.durationSeconds,
       platformCalendarId: null,
     );
+  }
+
+  /// Adapter for the shared processor's persisted draft; no legacy DB IDs needed.
+  factory ActionCreationDraft.fromVoiceResult(Map<Object?, Object?> action) {
+    final type = action['type'];
+    if (![
+      'task',
+      'calendar_event',
+      'reminder',
+      'timer',
+      'alarm',
+    ].contains(type)) {
+      throw const FormatException('Unsupported action type');
+    }
+    DateTime? date(Object? value) =>
+        value == null ? null : DateTime.parse(value as String).toLocal();
+    final scheduled = date(action['start_time'] ?? action['due_date']);
+    final actionType = ExtractedAction.typeFromString(type as String);
+    return ActionCreationDraft(
+      actionType: actionType,
+      title: action['title'] as String,
+      notes: action['notes'] as String?,
+      location: action['location'] as String?,
+      scheduledAt: scheduled,
+      endAt: actionType == ExtractedActionType.calendarEvent
+          ? scheduled?.add(const Duration(minutes: 30))
+          : null,
+      durationSeconds: (action['duration_seconds'] as num?)?.toInt(),
+      reminderMinutes: actionType == ExtractedActionType.reminder ? 0 : null,
+      skipUi: false,
+    );
+  }
+
+  void validateForCreation({DateTime? now}) {
+    if (title.trim().isEmpty) throw StateError('Enter a title.');
+    if (actionType == ExtractedActionType.timer) {
+      if (durationSeconds == null ||
+          durationSeconds! <= 0 ||
+          durationSeconds! > 2147483647) {
+        throw StateError('Enter a positive timer duration.');
+      }
+      return;
+    }
+    if (scheduledAt == null) throw StateError('Choose a date and time.');
+    if (actionType == ExtractedActionType.calendarEvent &&
+        endAt != null &&
+        !endAt!.isAfter(scheduledAt!)) {
+      throw StateError('End time must be after start time.');
+    }
+    if (actionType == ExtractedActionType.alarm) {
+      final current = now ?? DateTime.now();
+      var next = DateTime(
+        current.year,
+        current.month,
+        current.day,
+        scheduledAt!.hour,
+        scheduledAt!.minute,
+      );
+      if (!next.isAfter(current)) {
+        next = DateTime(
+          current.year,
+          current.month,
+          current.day + 1,
+          scheduledAt!.hour,
+          scheduledAt!.minute,
+        );
+      }
+      if (scheduledAt!.year != next.year ||
+          scheduledAt!.month != next.month ||
+          scheduledAt!.day != next.day) {
+        throw StateError(
+          'Clock alarms support the next occurrence of this time. '
+          'Use a calendar reminder for a later date.',
+        );
+      }
+    }
   }
 
   ActionCreationDraft copyWith({
@@ -185,9 +261,9 @@ class CreatedPlatformAction {
       case 'calendar_reminder':
         return 'Calendar reminder created$calendarSuffix';
       case 'timer':
-        return 'Timer started';
+        return 'Timer sent to Clock';
       case 'alarm':
-        return 'Alarm set';
+        return 'Alarm sent to Clock';
       default:
         return 'Action created$calendarSuffix';
     }
@@ -249,6 +325,72 @@ class ExtractedActionCreationService {
   );
 
   const ExtractedActionCreationService();
+
+  Future<List<PlatformCalendar>> prepareCompanionAction(
+    ActionCreationDraft draft,
+  ) async {
+    await _ensurePermissions(draft.actionType);
+    if (draft.actionType == ExtractedActionType.timer ||
+        draft.actionType == ExtractedActionType.alarm) {
+      return [];
+    }
+    return listWritableCalendars();
+  }
+
+  Future<void> createCompanionDraft(
+    String jobId,
+    int index,
+    ActionCreationDraft draft,
+  ) async {
+    draft.validateForCreation();
+    await _ensurePermissions(draft.actionType);
+    await _channel.invokeMethod<void>('companionAction', {
+      'jobId': jobId,
+      'index': index,
+      'operation': 'create',
+      'draft': draft.toPlatformMap(),
+    });
+  }
+
+  Future<void> dismissCompanionAction(String jobId, int index) async {
+    await _channel.invokeMethod<void>('companionAction', {
+      'jobId': jobId,
+      'index': index,
+      'operation': 'dismiss',
+    });
+  }
+
+  Future<void> recoverCompanionAction(
+    String jobId,
+    int index,
+    Map<Object?, Object?> confirmedDraft,
+  ) async {
+    await _ensurePermissions(
+      ExtractedAction.typeFromString(confirmedDraft['actionType'] as String),
+    );
+    await _channel.invokeMethod<void>('companionAction', {
+      'jobId': jobId,
+      'index': index,
+      'operation': 'create',
+      'draft': confirmedDraft,
+    });
+  }
+
+  Future<void> undoCompanionAction(String jobId, int index) async {
+    await _ensurePermissions(ExtractedActionType.calendarEvent);
+    await _channel.invokeMethod<void>('companionAction', {
+      'jobId': jobId,
+      'index': index,
+      'operation': 'undo',
+    });
+  }
+
+  Future<void> openCompanionCalendarEntry(String id, DateTime? scheduledAt) =>
+      _openCreatedCalendarEntryIfSupported(
+        platformId: id,
+        targetType: 'calendar_event',
+        scheduledAtMillis: scheduledAt?.millisecondsSinceEpoch,
+      );
 
   Future<List<PlatformCalendar>> listWritableCalendars() async {
     if (!Platform.isAndroid) {

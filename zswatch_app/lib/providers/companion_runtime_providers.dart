@@ -34,7 +34,7 @@ final companionVoiceJobProvider = FutureProvider.autoDispose
               .whereType<Map<Object?, Object?>>()
               .where((row) => row['job_id'] == id)
               .firstOrNull;
-          return '${job?['state']}:${job?['processing']}:${job?['transcript_saved']}';
+          return '${job?['state']}:${job?['processing']}:${job?['transcript_saved']}:${job?['action_revision']}';
         }),
       );
       return ref.watch(companionClientProvider).voiceJob(id);
