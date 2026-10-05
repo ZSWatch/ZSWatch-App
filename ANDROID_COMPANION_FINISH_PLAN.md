@@ -619,3 +619,55 @@ The correction preference is restored to false, and the captured automatic
 Swedish processing policy is unchanged. STT/LiteRT and long-input cancellation,
 speech/action quality, real remote configuration, lost ACK, the full OnePlus
 feature/update/release matrix and controlled endurance remain pending.
+
+### 2026-10-05 OnePlus updates and flash-addressing gate
+
+ADB on `ae49cb83` works. The current app remains the ordinary Flutter UI with
+native ownership; this checkpoint uses debug APK SHA-256
+`47bd2d70aff0f181a6aa4184ca2685e941391cd1261dda73f9ec29fb6f47b07f`.
+No AI provider or architecture change was introduced.
+
+| Area | Result and limits |
+| --- | --- |
+| Application-only OTA | **Pass.** A distinct 838,316-byte application image uploads at 39.43 KB/s acknowledged active rate, with Flutter's task destroyed at 24,436 bytes and the same native PID. Automatic reboot, active-image verification and Ready complete. A later independent USB check after a documented lab reset verifies the new active image, unchanged external image and all 22 backed-up files. |
+| Connection settings | **Pass for measured throughput.** MTU 247 / ATT payload 244, Nordic merged packet 2,475, window 3, latency zero and 4-second supervision timeout. The watch-requested interval settles at 11.25 ms. One temporary 30 ms interval during the combined resource upload returns to 11.25 ms. Both application rates exceed the accepted 17.6 KB/s floor; further throughput tuning is unnecessary. |
+| Combined transfer/integrity | **Transfer passes; overall acceptance fails.** Resources: 5,932,208 bytes, 37.88 KB/s upload and 32.12 KB/s full SHA-256 readback. Firmware: 838,316 bytes at 43.84 KB/s. Flutter is destroyed during resources and remains absent. Independent USB inspection after the package's own reset verifies application `0.8.1.2`, unchanged external image and freshly mounted resource length. It does not replace the failed native postflight. |
+| Combined automatic recovery | **Failed.** Native discovery repeatedly times out and the 90-second postflight correctly records `boot_check_timeout`, `result_unknown=true`. One manual Bluetooth off/on recovers fresh Ready generation 143 in about 2.24 seconds, with Flutter absent. This is manual recovery, not automatic OTA acceptance. The old Nokia is not the connected peer; the watch's observed address matches the OnePlus. |
+| Preservation after combined | **Failed for later lab files.** The original nine recordings, background and crash file independently match their backups. Five later short watch microphone triggers and six owned speech fixtures are absent; all eleven have verified independent byte backups. No intentional deletion was requested. Source-audio preservation remains a gate. |
+| Firmware addressing | **Confirmed configuration defect, source fix built.** The 64 MiB flash uses 24-bit addressing while user storage spans `0xe20000..0x1820000`. Runtime QSPI IFCONFIG0 is `0x0003001c` (32-bit bit clear); non-erased mapped windows 16 MiB apart match exactly. Wrapped high user addresses overlap resource/code partitions. This explains an actual cross-partition risk; do not attribute the observed loss to Flutter or the old phone. |
+| Addressing fix | **Build pass; physical acceptance pending.** Firmware commit `7d2a6b21` configures WatchDK/ZSWatch for 32-bit addressing and EN4B, aligns their nrfjprog initialization/size, and adds a user-partition addressing build guard. The guard rejects the old configuration. Corrected WatchDK sysbuild passes; generated application and MCUboot DTs both contain 32-bit/EN4B settings. The source fix has not been flashed. |
+| Recovery backups | **Verified.** Full currently addressable 16 MiB snapshot, plus a separate 1.875 MiB low user snapshot, match over their shared range. The reconstructed 10 MiB old logical user image preserves the observed wrapped layout, including its known damage; it is not a pristine filesystem. All 22 pre-update file backups remain available. The first oversized debugger read timed out and produced an empty file; only the completed second read is counted. |
+
+Immediate work order is now data-safe activation of the addressing fix, then
+automatic reconnect acceptance and the consolidated feature pass. This is an
+actual firmware gate within the existing goal, not a new backend or migration
+framework. Keep all unrelated work and original files intact:
+
+1. Preserve the completed physical/logical snapshots, the pre-update file backups
+   and the old matching application image. Before writing previously unreachable
+   physical high addresses, inspect/preserve them with a programmer configured for
+   32-bit addressing. Do not assume they are blank.
+2. Install matching fixed MCUboot and application/XIP images through the debugger,
+   retaining network-core firmware and avoiding whole-chip erase. An app-only OTA
+   is insufficient here: the bootloader and programmer must use the same flash
+   address mode. Restore the old logical user filesystem into its real partition
+   as needed to retain surviving metadata, then restore only confirmed-missing
+   files from their exact verified backups. Do not erase/format user data to make
+   the test pass or overwrite a changed surviving file.
+3. Independently verify runtime 32-bit addressing, distinct high/low flash access,
+   all 22 file hashes, recording inventory and fresh mounted resources. Repeat a
+   bounded reset/recovery check before another combined package. The native
+   postflight failure remains failed until a new operation actually passes.
+4. Resume notification/time/HTTP/media/Find/Shell/log/watchface and lifecycle
+   acceptance, remaining shared Dart speech/action/backend checks and endurance.
+   Meaningful microphone/English quality, LiteRT, real remote configuration,
+   physical lost ACK and full release/endurance acceptance remain pending.
+
+Private evidence: `.companion-hil-runs/20261005-oneplus-ota/`,
+`.companion-hil-runs/20261005-oneplus-combined/` and passive watch UART under
+`.companion-hil-runs/20261005-oneplus-core/`. This turn prepared the core/recovery
+helpers but did not run the consolidated consumers or claim that pass. Indices
+0/2 are reported; network-core index 1 remains unverified. Phone/watch are USB
+connected. EN4B behavior follows the
+[Macronix MX25U51245G datasheet](https://www.macronix.com/Lists/Datasheet/Attachments/9126/MX25U51245G%2C%201.8V%2C%20512Mb%2C%20v1.3.pdf)
+and the repository's Zephyr QSPI binding/driver. The goal remains active.
