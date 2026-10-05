@@ -48,19 +48,34 @@ artifact identities, measured scope and earlier failed attempts.
 | Cancellation and invalid/unavailable inputs | Real GGUF cancel and Stop pass. LiteRT channel cancellation: four controlled-callback regressions pass, actual model unavailable. STT/long-input cancellation and remaining silence/malformed/missing-model/storage physical coverage pending. |
 | BLE under AI load / resources | Actual prompt-time watch HTTP and notification pass (observed bounds 1.511/1.363 s); same process/generation and Flutter absent. New release English inference completes in about 72 s with same PID, Flutter absent and real remote HTTP callback during work. Prompt prefill and RSS/thermal snapshot recorded. Concurrent time-write and battery/endurance remain pending. |
 | Explicit local / hybrid / remote choices | Local-only flow passes. Real remote provider, credentials and upload consent remain external pending inputs; no automatic upload/fallback acceptance claimed. |
-| OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Synthetic media pass; real third-party media, notification update/dismiss, Shell/UI destruction/arbitration, logs/cache isolation, watchface interruption/reattachment and complete ordinary connection/settings pass pending. |
+| OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. Real Chrome MediaSession metadata and watch next/pause/play pass with both apps' UI in background, Flutter task absent and same PID; owned quiet tone/page, not commercial-player coverage. Previous-track remains unverified. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Release Shell command completes after Flutter task destruction (independent watch-state transition, same PID). Owned Android notification body replacement and phone-side removal pass with Flutter absent and same PID; independent UART shows remove/add with watch ID 1000004. Watch-originated dismissal, Shell/DFU arbitration, logs/cache isolation, watchface interruption/reattachment and complete ordinary connection/settings pass pending. |
 | Firmware/resource updates | New fixed application and combined operations pass, acknowledged firmware ~41 KB/s with Flutter removed; active image/resource/original checks pass. Earlier failed combined operation stays failed; SDK network-core index 1 remains unavailable. |
-| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Quiet observer ends when phone wakes at 64 s; this is not a five-minute or endurance pass. Phone reboot/unlock and ~8 h endurance pending; USB/forced idle does not prove unplugged behavior. |
+| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Phone reboot/unlock and ~8 h endurance pending; USB-attached coverage does not prove unplugged behavior. |
 | Final candidate / goal completion | 225 Android tests pass for LiteRT fix; 18 affected Flutter tests and release build pass for restored dashboard Watchface route. Non-debuggable release code is installed and physically exercised, lab re-signed only to retain existing data. Production SHA-256 2228b51bbc58ccbaeff7d3acc21d7fbbaf2080763db4f88bc1ad1b796d47e4da; installed lab SHA-256 ac84375e31bc70d21d74c573f74986994016a7df2d6c1e416d71c3cbdb3c8c1b. Pairing rough-edge cleanup follows remaining main feature pass. **Overall goal active.** |
 
 Release evidence: `.companion-hil-runs/20261005-oneplus-final-release/` and
 `.companion-hil-runs/20261005-oneplus-release-acceptance/` (calendar UI,
-release-route artifact identity, English inference/ACK and quiet-2 observations).
+release-route artifact identity, English inference/ACK, quiet-2 and quiet-3 observations).
 The longer input repeats the same 7.56 s real microphone recording five times;
 it proves longer workload handling, not naturally spoken longer-audio quality.
 Android exit-info attributes the earlier PID change to PACKAGE UPDATED, not an
 inference crash. Private audio/transcripts remain outside Git. User direction:
 leave pre-existing LLM semantic errors alone; prioritize refactor functionality.
+Chrome evidence is in `release-acceptance/chrome-media/` under the same run root:
+`control-observation-awake.json` proves next/pause/play; its overall script fails
+at previous-track and is not a complete media-controls pass. The earlier
+foreground-page play ambiguity and sleeping-watch launch failure remain recorded.
+Android independently reports com.android.chrome metadata for the owned track;
+the test tone was paused and localhost server/reverse port removed afterward.
+The quiet-3 observer proves 310.1 s noninteractive release operation with two
+watch-confirmed HTTP replies (remote 209 bytes, owned local 35 bytes), USB attached,
+no forced idle. Shell-detach-2 passes: watchface + absent Flutter task precede Music launch;
+PID remains 32006. The first observer failed because it required synchronous
+task removal, and remains recorded separately.
+Notifications-3 proves body revision v5 → v6 and phone removal for the same owned
+watch ID with Flutter absent and PID 32006. Earlier observers failed on unchanged
+content suppression and host shell quoting; those are not claimed app defects.
+
 
 ### Shared Dart architecture clarification
 
@@ -449,8 +464,15 @@ and atomically replaces a CRC-protected receipt before returning application
 acceptance. Identical retries do not republish the popup; conflicting/obsolete
 generations fail closed. The new draft popup closes without deleting the original
 recording. This receipt does not claim calendar, timer or alarm creation. Current
-receipt capacity is 50 recording identities with no silent eviction; capacity
-cleanup and rejected-delivery status need completion before final acceptance.
+receipt capacity is 50 recording identities. Firmware c050202a reclaims validated
+receipts only when their watch audio no longer exists, and only at capacity.
+Retained audio, corrupt receipts and uncertain I/O retain their deduplication
+record; explicit source deletion ends draft-receipt retention. Phone-side external
+actions keep their own deduplication. Host quota/I/O/corruption tests and WatchDK
+build pass. Application-only debugger flash and independent SHA-256 checks pass
+for 24 existing files (22 recordings, background and stored coredump); the same
+OnePlus process reconnects Ready generation 266. Physical cleanup-at-capacity
+remains pending. Evidence: `.companion-hil-runs/20261005-receipt-cleanup/`.
 
 | Requirement | Evidence / state |
 | --- | --- |
