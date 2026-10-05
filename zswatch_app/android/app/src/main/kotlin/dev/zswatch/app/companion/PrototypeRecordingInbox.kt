@@ -17,7 +17,8 @@ class PrototypeRecordingInbox(private val store: PrototypeStore, private val req
                 // does not alter receipts, retry failures or enable downloads.
                 store.update("recording_list_received", mapOf("recording_list" to mapOf(
                     "address" to state["address"], "generation" to state["generation"],
-                    "observed_ms" to System.currentTimeMillis(), "count" to list.length())))
+                    "observed_ms" to System.currentTimeMillis(), "count" to list.length(),
+                    "result_ack_version" to if (message.opt("result_ack_version") == 1) 1 else 0)))
             }
         }
     }

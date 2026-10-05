@@ -112,6 +112,10 @@ class AppRouter {
         builder: (context, state) => const VoiceMemosScreen(),
       ),
       GoRoute(
+        path: AppRoutes.aiModels,
+        builder: (context, state) => const AiModelsSettingsScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.companionRuntime,
         builder: (context, state) => const CompanionPrototypeApp(),
       ),

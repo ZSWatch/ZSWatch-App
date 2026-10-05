@@ -10,14 +10,18 @@ import io.flutter.plugins.pathprovider.PathProviderPlugin
 
 /** Owns a headless engine on Android's main thread. Never attaches an Activity. */
 class PrototypeDartWorker(private val context: Context) {
+    class WorkerFailure(val code: String) : IllegalStateException(code)
     @Volatile private var closed = false
     private var engine: FlutterEngine? = null
     private var channel: MethodChannel? = null
     private var ready = false
     private var pending: (() -> Unit)? = null
+    private var currentJob: String? = null
+    private var saveTranscript: ((String) -> Boolean)? = null
 
     // Caller serializes jobs on PrototypeHub.worker. Replies return there too.
-    fun execute(claim: PrototypeJobs.Claim, done: (Result<Map<*, *>>) -> Unit) {
+    fun execute(claim: PrototypeJobs.Claim, input: Map<String, Any?> = emptyMap(),
+                checkpoint: ((String) -> Boolean)? = null, done: (Result<Map<*, *>>) -> Unit) {
         PrototypeHub.main.post {
             if (closed) return@post
             fun reply(value: Result<Map<*, *>>) {
@@ -25,15 +29,16 @@ class PrototypeDartWorker(private val context: Context) {
             }
             try {
                 check(pending == null) { "Dart worker busy" }
+                currentJob = claim.id; saveTranscript = checkpoint
                 val dispatch = {
-                    channel!!.invokeMethod("executeFixture", mapOf("version" to 1, "job_id" to claim.id,
-                        "spec" to PrototypeStore.asMap(claim.spec)), object : MethodChannel.Result {
+                    channel!!.invokeMethod(if (claim.spec.getString("provider") == "dart-voice-v1") "executeRecording" else "executeFixture",
+                        mapOf("version" to 1, "job_id" to claim.id, "spec" to PrototypeStore.asMap(claim.spec)) + input, object : MethodChannel.Result {
                         override fun success(result: Any?) {
                             if (result is Map<*, *>) reply(Result.success(result))
                             else reply(Result.failure(IllegalArgumentException("Invalid worker response")))
                         }
                         override fun error(code: String, message: String?, details: Any?) =
-                            reply(Result.failure(IllegalStateException(code)))
+                            reply(Result.failure(WorkerFailure(code)))
                         override fun notImplemented() = reply(Result.failure(IllegalStateException("Worker method unavailable")))
                     })
                 }
@@ -41,10 +46,30 @@ class PrototypeDartWorker(private val context: Context) {
                     val loader = FlutterInjector.instance().flutterLoader()
                     loader.startInitialization(context)
                     loader.ensureInitializationComplete(context, null)
-                    // Explicit plugin subset: no BLE, Activity bridges or model initialization.
+                    // Processing plugins only. Never register BLE or attach an Activity.
                     val created = FlutterEngine(context, null, false)
                     engine = created
                     created.plugins.add(PathProviderPlugin())
+                    created.plugins.add(com.antonkarpenko.ffmpegkit.FFmpegKitFlutterPlugin())
+                    MethodChannel(created.dartExecutor.binaryMessenger, "dev.zswatch.app/productivity").setMethodCallHandler { call, result ->
+                        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                        val memory = android.app.ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
+                        when (call.method) {
+                            "getDeviceMemoryMB" -> result.success((memory.totalMem / (1024 * 1024)).toInt())
+                            "getAvailableMemoryMB" -> result.success((memory.availMem / (1024 * 1024)).toInt())
+                            else -> result.notImplemented()
+                        }
+                    }
+                    MethodChannel(created.dartExecutor.binaryMessenger, "dev.zswatch.app/llm_compute").setMethodCallHandler { call, result ->
+                        try {
+                            when (call.method) {
+                                // Native job owns the complete STT + analysis execution window.
+                                "start", "stop" -> result.success(true)
+                                "isRunning" -> result.success(dev.zswatch.app.LlmComputeService.isRunning())
+                                else -> result.notImplemented()
+                            }
+                        } catch (error: Exception) { result.error("COMPUTE_SERVICE", error.javaClass.simpleName, null) }
+                    }
                     channel = MethodChannel(created.dartExecutor.binaryMessenger, "dev.zswatch.app/companion_worker_v1").also {
                         it.setMethodCallHandler { call, result ->
                             if (call.method == "ready" && (call.arguments as? Map<*, *>)?.get("version") == 1 && !closed) {
@@ -52,6 +77,16 @@ class PrototypeDartWorker(private val context: Context) {
                                 result.success(null)
                                 LifecycleLogger.log("CompanionDartWorker", "ready activityAttached=false")
                                 val waiting = pending; pending = null; waiting?.invoke()
+                            } else if (call.method == "checkpoint") {
+                                val args = call.arguments as? Map<*, *>
+                                val job = args?.get("job_id") as? String
+                                val text = args?.get("transcript") as? String
+                                PrototypeHub.worker.post {
+                                    try {
+                                        check(!closed && job == currentJob && text != null && saveTranscript?.invoke(text) == true)
+                                        PrototypeHub.main.post { result.success(null) }
+                                    } catch (error: Exception) { PrototypeHub.main.post { result.error("CHECKPOINT_REJECTED", error.javaClass.simpleName, null) } }
+                                }
                             } else result.notImplemented()
                         }
                     }
@@ -68,6 +103,8 @@ class PrototypeDartWorker(private val context: Context) {
 
     fun close() {
         closed = true // Fence posted replies before destroying the engine.
+        currentJob = null; saveTranscript = null
+        runCatching { dev.zswatch.app.LlmComputeService.stop(context) }
         PrototypeHub.main.post {
             pending = null; ready = false
             channel?.setMethodCallHandler(null); channel = null

@@ -58,6 +58,16 @@ class PrototypeJobs(private val store: PrototypeStore) {
             it.getLong("lease_until") > now && it.getString("state") in listOf("ready", "waiting_remote") }
     }
 
+    /** Android durability adapter for a checkpoint produced by shared Dart logic. */
+    fun checkpointTranscript(claim: Claim, now: Long, transcript: String): Boolean {
+        require(transcript.isNotBlank() && transcript.toByteArray(Charsets.UTF_8).size <= 65536)
+        val jobs = jobs(); val item = owned(jobs, claim, now) ?: return false
+        require(item.getJSONObject("spec").getString("provider") == "dart-voice-v1")
+        if (item.has("transcript")) require(item.getString("transcript") == transcript)
+        item.put("transcript", transcript)
+        commit("job_transcript_committed", jobs); return true
+    }
+
     fun accepted(claim: Claim, now: Long, remoteId: String): Boolean {
         require(remoteId.isNotBlank() && remoteId.length <= 256)
         val jobs = jobs(); val item = owned(jobs, claim, now) ?: return false
@@ -134,7 +144,12 @@ class PrototypeJobs(private val store: PrototypeStore) {
 
     fun summary(): List<Map<String, Any?>> = identities().map { id ->
         val item = state(id)
+        val spec = item.getJSONObject("spec")
         mapOf("job_id" to id, "state" to item.getString("state"), "remote_id" to item.optString("remote_id", ""),
+            "watch_id" to spec.getString("watch_id"), "recording_id" to spec.getString("recording_id"),
+            "provider" to spec.getString("provider"), "model" to spec.getString("model"),
+            "generation" to spec.getLong("generation"),
+            "processing" to !item.isNull("lease_until"), "transcript_saved" to item.has("transcript"),
             "next_attempt" to item.getLong("next_attempt"), "attempts" to item.getInt("attempts"),
             "last_error" to if (item.isNull("last_error")) null else item.getString("last_error"))
     }
@@ -156,16 +171,19 @@ class PrototypeJobs(private val store: PrototypeStore) {
             return sha(canonical(spec))
         }
         fun validateResult(result: JSONObject) {
-            require(result.keys().asSequence().toSet() == setOf("version", "transcript", "summary", "category", "actions"))
-            require(integer(result.get("version")) && result.getLong("version") == 1L)
-            for (name in listOf("transcript", "summary", "category")) require(result.get(name) is String)
-            require(result.getString("summary").isNotBlank() && result.get("actions") is JSONArray)
+            require(result.keys().asSequence().toSet() == setOf("version", "transcript", "summary", "category", "actions")) { "result_fields" }
+            require(integer(result.get("version")) && result.getLong("version") == 1L) { "result_version" }
+            for (name in listOf("transcript", "summary", "category")) require(result.get(name) is String) { "result_text_type" }
+            require(result.getString("summary").isNotBlank()) { "result_summary_empty" }
+            require(result.get("actions") is JSONArray) { "result_actions_type" }
             for (i in 0 until result.getJSONArray("actions").length()) {
                 val action = result.getJSONArray("actions").getJSONObject(i)
                 require(action.get("type") in listOf("task", "calendar_event", "reminder", "timer", "alarm"))
                 require(action.get("title") is String && action.getString("title").isNotBlank())
-                require(action.keys().asSequence().toSet().all { it in setOf("type", "title", "due_date") })
-                require(!action.has("due_date") || action.get("due_date") is String)
+                require(action.keys().asSequence().toSet().all { it in setOf("type", "title", "due_date", "start_time", "notes", "location", "duration_seconds") })
+                for (field in listOf("due_date", "start_time", "notes", "location"))
+                    require(!action.has(field) || action.get(field) is String)
+                require(!action.has("duration_seconds") || (integer(action.get("duration_seconds")) && action.getLong("duration_seconds") > 0))
             }
             require(canonical(result).toByteArray(Charsets.UTF_8).size <= 65536) { "Result exceeds prototype bound" }
         }

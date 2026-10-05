@@ -23,6 +23,23 @@ final companionClientProvider = Provider<CompanionPrototypeClient>((ref) {
   return const CompanionPrototypeClient();
 });
 
+/// Only an opened result view reads private transcript/result content.
+final companionVoiceJobProvider = FutureProvider.autoDispose
+    .family<Map<String, Object?>, String>((ref, id) {
+      ref.watch(
+        companionSnapshotProvider.select((snapshot) {
+          final rows = snapshot.asData?.value.fields['voice_jobs'];
+          if (rows is! List) return '';
+          final job = rows
+              .whereType<Map<Object?, Object?>>()
+              .where((row) => row['job_id'] == id)
+              .firstOrNull;
+          return '${job?['state']}:${job?['processing']}:${job?['transcript_saved']}';
+        }),
+      );
+      return ref.watch(companionClientProvider).voiceJob(id);
+    });
+
 final companionWatchfaceStatusProvider =
     Provider<AsyncValue<CompanionWatchfaceStatus?>>((ref) {
       return ref

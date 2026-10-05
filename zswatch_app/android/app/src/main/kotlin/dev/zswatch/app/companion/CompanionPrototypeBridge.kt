@@ -26,6 +26,32 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
             if ((call.arguments as? Map<*, *>)?.get("version") != 1) {
                 result.error("VERSION", "Unsupported companion bridge version", null)
             } else when (call.method) {
+                "voiceJob", "cancelVoiceJob" -> PrototypeHub.worker.post {
+                    try {
+                        val id = call.argument<String>("job_id") ?: error("Job ID required")
+                        require(Regex("[a-f0-9]{64}").matches(id))
+                        val jobs = PrototypeJobs(PrototypeHub.jobJournal(context))
+                        val item = jobs.state(id)
+                        val spec = item.getJSONObject("spec")
+                        require(spec.getString("provider") == "dart-voice-v1" &&
+                            spec.getString("watch_id") == PrototypeHub.journal(context).control()["address"])
+                        if (call.method == "cancelVoiceJob") jobs.cancel(id)
+                        val current = jobs.state(id)
+                        val detail = PrototypeStore.asMap(current) + mapOf("processing" to !current.isNull("lease_until"),
+                            "transcript_saved" to current.has("transcript"))
+                        PrototypeHub.main.post { result.success(mapOf("version" to 1, "job_id" to id,
+                            "job" to detail)) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("JOB_FAILED", error.message, null) } }
+                }
+                "processRecording" -> PrototypeHub.worker.post {
+                    try {
+                        val input = call.arguments as Map<*, *>
+                        val id = (CompanionPrototypeService.instance?.localFixture ?: error("Running companion required"))
+                            .startRecording(input["identity"] as String, input["transcription_model"] as String,
+                                input["analysis_model"] as String, input["correct_transcription"] as Boolean)
+                        PrototypeHub.main.post { result.success(mapOf("version" to 1, "job_id" to id)) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("PROCESSING_FAILED", error.message, null) } }
+                }
                 "snapshot" -> snapshot(result::success) { message -> result.error("SNAPSHOT_FAILED", message, null) }
                 "discoverWatch" -> PrototypeHub.worker.post {
                     try {

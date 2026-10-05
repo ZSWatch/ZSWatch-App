@@ -8,7 +8,7 @@ import '../../data/database/companion_recording_database.dart';
 import '../../data/models/companion_recording.dart';
 import 'ogg_opus_writer.dart';
 import 'voice_memo_file_store.dart';
-import 'zsw_opus_parser.dart';
+import 'verified_companion_recording.dart';
 
 /// UI-owned local projection. No BLE, native journal edits, inference or deletion.
 /// Published playback precedes its immutable ledger entry; retry can adopt that
@@ -34,46 +34,10 @@ class CompanionRecordingImporter {
     final support = Directory(
       await (await supportDirectory()).resolveSymbolicLinks(),
     );
-    final native = Directory(
-      p.join(support.path, 'companion-prototype', 'recordings'),
-    );
-    if (await native.resolveSymbolicLinks() != native.path) {
-      throw StateError('Native receipt directory is not canonical');
-    }
+    final verified = await loadVerifiedCompanionRecording(recording, support);
+    final parsed = verified.parsed;
+    final expectedSource = verified.sourcePath;
     final keyHash = sha256.convert(utf8.encode(recording.identity)).toString();
-    final expectedSource = p.join(native.path, '$keyHash.zsw_opus');
-    final source = File(recording.localPath!);
-    if (FileSystemEntity.typeSync(source.path, followLinks: false) !=
-            FileSystemEntityType.file ||
-        await source.resolveSymbolicLinks() != expectedSource ||
-        await source.length() != recording.sizeBytes) {
-      throw StateError('Native receipt file/path/size mismatch');
-    }
-    final raw = await source.readAsBytes();
-    if (raw.length != recording.sizeBytes ||
-        sha256.convert(raw).toString() != recording.sha256) {
-      throw StateError('Native receipt hash mismatch');
-    }
-    final parsed = ZswOpusParser.parse(raw);
-    // The existing Ogg writer uses 10 ms mono frames. Other profiles need a
-    // separate converter contract instead of silently changing their timing.
-    if (parsed == null ||
-        !parsed.isValid ||
-        parsed.header.version != 1 ||
-        parsed.header.isDirtyStop ||
-        parsed.header.sampleRate != 16000 ||
-        parsed.header.frameSize != 160 ||
-        parsed.header.timestamp !=
-            recording.timestampUtc.millisecondsSinceEpoch ~/ 1000 ||
-        parsed.header.totalFrames != parsed.frames.length ||
-        parsed.header.durationMs != parsed.computedDurationMs ||
-        recording.durationMs != parsed.computedDurationMs ||
-        parsed.frames.last.fileOffset + 2 + parsed.frames.last.data.length !=
-            raw.length) {
-      throw StateError(
-        'Native receipt container/metadata mismatch or unsupported audio profile',
-      );
-    }
     final existing = await database.byIdentity(recording.identity);
     if (existing != null &&
         (existing.sourceSha256 != recording.sha256 ||

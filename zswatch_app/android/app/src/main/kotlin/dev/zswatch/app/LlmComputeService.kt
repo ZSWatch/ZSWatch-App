@@ -79,6 +79,7 @@ class LlmComputeService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        createNotificationChannel(this)
         instance = this
         Log.d(TAG, "Service created")
     }
@@ -129,7 +130,8 @@ class LlmComputeService : Service() {
             startForeground(
                 NOTIFICATION_ID,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE
+                if (Build.VERSION.SDK_INT >= 35) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING
+                else ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, 0)
@@ -147,7 +149,7 @@ class LlmComputeService : Service() {
                 "ZSWatch::LlmCompute"
             ).apply {
                 // Safety timeout: release after 10 minutes max
-                acquire(10 * 60 * 1000L)
+                acquire(15 * 60 * 1000L)
             }
             Log.d(TAG, "Wake lock acquired")
         }

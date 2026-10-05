@@ -33,7 +33,21 @@ Avoid a new native UI, legacy fallback, custom SMP, broad model benchmarks or iO
 work. Finish with one evidence-backed pass/fail/pending matrix and clear limits
 for externally blocked or physically unavailable tests.
 
+### Shared Dart architecture clarification
+
+User clarification, 2026-10-04: do not build separate Android and iOS AI backends.
+Keep transcription, local/remote inference, prompts, interpretation and the
+voice-assistant workflow in shared Dart code, reusing the existing services.
+Native BLE may start a headless Flutter engine and invoke that shared pipeline.
+Platform code owns BLE and OS execution/lifecycle hooks; the existing native job
+journal may serve as the Android durability adapter, not as a second copy of AI
+business logic. Add only required headless plugin/context bridges. Future iOS
+adapters may have different execution windows while calling the same Dart code.
+
 ### What the review found
+
+The findings below describe the starting point. The 2026-10-05 checkpoint closes
+the first local execution/delivery seam; the remaining goal stays active.
 
 - The service-owned headless Dart worker is implemented as a deterministic
   fixture. Real Whisper/LLM plugin execution was deliberately never run on Nokia.
@@ -384,3 +398,51 @@ next useful step. Do not ask again about accepting a clean phone database/setup.
   endurance, iOS and AI execution. This rig
   reports image indices 0/2; selected network-core index 1 remains explicitly
   unverified rather than being silently counted as a full-package pass.
+
+### OnePlus local voice checkpoint (2026-10-05)
+
+Shared Dart processing now calls the existing transcription engines and LlmService
+from a service-owned Flutter engine. Android supplies verified receipts, model
+configuration, leases, transcript checkpoints and result/outbox commits. The
+existing Flutter Voice Notes view can queue local processing, observe state, open
+saved transcript/summary/action drafts, cancel publication and retry. The existing
+model selection/download/import screen is reachable again. Opening these screens
+does not schedule inference. Automatic policy and action creation are still pending.
+
+The watch advertises `result_ack_version=1` in its recording list. A bounded draft
+popup carries the committed result identity/digest/generation; the watch flushes
+and atomically replaces a CRC-protected receipt before returning application
+acceptance. Identical retries do not republish the popup; conflicting/obsolete
+generations fail closed. The new draft popup closes without deleting the original
+recording. This receipt does not claim calendar, timer or alarm creation. Current
+receipt capacity is 50 recording identities with no silent eviction; capacity
+cleanup and rejected-delivery status need completion before final acceptance.
+
+| Requirement | Evidence / state |
+| --- | --- |
+| Existing audio integrity on OnePlus | Pass: all nine downloaded originals match independent preserved USB SHA-256/size references. |
+| Real local inference without Flutter UI | Pass for execution: synthesized Swedish speech uploaded to the watch, downloaded by the native owner, processed by KB-Whisper Base and Qwen3.5 2B Q4_K_M, with transcript/result committed while Flutter's task is absent. |
+| Speech quality / real microphone sample | Partial: synthetic speech has milk/tomorrow transcription errors. English sent through the Swedish-only model is not an English acceptance result. Known-content English with an appropriate model and a meaningful microphone recording remain pending. |
+| BLE during that inference | Pass for fresh status: same native PID/generation 38, status responses throughout processing. Notification/time/HTTP latency, memory/thermal and longer audio remain pending. |
+| Processing time | That 3.88-second synthetic recording commits STT after 4.837 seconds (RTF 1.25); analysis/result commit takes another 71.794 seconds. No tokens/sec or broader model benchmark claim. |
+| Watch delivery without Flutter UI | Pass: result survives APK replacement/watch restart; native recovers Ready generation 41 and commits Delivered only after the watch's application ACK. UART records a new durable receipt with successful ACK transmission. |
+| Receipt recovery / bounds | Host tests compile the real receipt implementation with Zephyr CRC and POSIX fault injection: partial writes, failed rename, duplicate/reopen, conflict, stale generation, corruption and full capacity. Physical dropped-ACK/reset duplicate test remains pending. |
+| Original preservation | Pass: all original 11 files plus both owned speech fixtures match before and after application-only flashing. |
+| Product UI | Voice Notes list reattaches and shows Accepted by watch. Detail, model download/import, retry/cancel and action controls need the consolidated UI pass. Cancellation currently fences publication; prompt CPU cancellation is not yet established. |
+| Foreground execution | Media-processing service on API 35+, data-sync/local-file processing on API 34; covers STT and LLM. Background admission, OS timeout, Stop/cancel and interrupted inference require further implementation/physical checks. |
+| Remaining goal | Automatic watch-triggered processing, action confirmation/undo, other selected inference backends, real remote configuration, release execution, modern feature/recovery pass, transfers and bounded endurance remain pending. |
+
+Evidence: `.companion-hil-runs/20261004-oneplus-voice/`, especially
+`local-flow-evidence.json`, `swedish-real-job-observation.json`,
+`swedish-delivery-observation.json` and `receipt-fw/`. Private audio/transcript/result
+artifacts stay outside Git. Tested normal debug APK SHA-256:
+`8f709b75c68aa24a9443cbbd84698d2e9c00328348599e7dfa8ee6fb932976f5`;
+flashed signed application HEX SHA-256:
+`e73c3fdcab719bfbb2ce148f7f9ef104ec4ebea87bdf0c3c3dd011ded04e8d84`.
+This was debugger flashing, not a OnePlus OTA throughput test. Direct USB receipt
+file inspection was not completed: its private path exceeds the mcumgr FS path
+bound and the filesystem shell is disabled. Do not reopen SMP diagnosis for that
+optional probe. Physical ACK/UART evidence and the receipt host tests are separate.
+Checks: 47 focused Flutter tests, 12 native job/result tests, receipt host regression,
+focused Dart analysis and normal debug/WatchDK builds pass. Release inference and
+the full modern-phone acceptance matrix remain pending.

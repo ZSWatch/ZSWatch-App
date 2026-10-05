@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/ai_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/voice_memo_providers.dart';
 import '../../../services/ai/ai_debug_info.dart';
@@ -52,6 +53,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final native = ref.watch(nativeCompanionRuntimeProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Voice Memo AI')),
       body: ListView(
@@ -63,7 +65,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             subtitle: 'Speech-to-text engine used for voice memos',
           ),
           const _TranscriptionModelSelector(),
-          const _RetranscribeButton(),
+          if (!native) const _RetranscribeButton(),
 
           const SizedBox(height: 24),
           const Divider(height: 1),
@@ -74,11 +76,19 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             title: 'AI Processing Model',
             subtitle: 'Local LLM for summarisation & classification',
           ),
-          const _AiTogglesTile(),
+          if (!native) const _AiTogglesTile(),
+          if (native)
+            SwitchListTile(
+              title: const Text('Correct transcription before analysis'),
+              value: ref.watch(aiCorrectionEnabledProvider),
+              onChanged: (value) => ref
+                  .read(aiCorrectionEnabledProvider.notifier)
+                  .setEnabled(value),
+            ),
           const _AiModelSelector(),
           const _ImportModelTile(),
 
-          if (ref.watch(localAiEnabledProvider)) ...[
+          if (!native && ref.watch(localAiEnabledProvider)) ...[
             const SizedBox(height: 24),
             const Divider(height: 1),
             const SizedBox(height: 8),
@@ -96,42 +106,44 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             if (Platform.isAndroid) const _CalendarPickerTile(),
           ],
 
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
+          if (!native) ...[
+            const SizedBox(height: 24),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
 
-          // ---- Voice Chat section ----
-          const _SectionHeader(
-            title: 'Voice Chat',
-            subtitle:
-                'Configure the watch voice chat feature: '
-                'answer style, conversation memory, and history depth.',
-          ),
-          const _VoiceChatSettings(),
+            // ---- Voice Chat section ----
+            const _SectionHeader(
+              title: 'Voice Chat',
+              subtitle:
+                  'Configure the watch voice chat feature: '
+                  'answer style, conversation memory, and history depth.',
+            ),
+            const _VoiceChatSettings(),
 
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
+            const SizedBox(height: 24),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
 
-          // ---- Benchmark section ----
-          const _SectionHeader(
-            title: 'Model Benchmark',
-            subtitle: 'Test model performance on your device',
-          ),
-          const _BenchmarkSection(),
+            // ---- Benchmark section ----
+            const _SectionHeader(
+              title: 'Model Benchmark',
+              subtitle: 'Test model performance on your device',
+            ),
+            const _BenchmarkSection(),
 
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
+            const SizedBox(height: 24),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
 
-          // ---- Timer / Alarm test section ----
-          const _SectionHeader(
-            title: 'Timer & Alarm Test',
-            subtitle:
-                'Test creating timers and alarms via the system clock app '
-                'without connecting a watch.',
-          ),
-          const _TimerAlarmTestSection(),
+            // ---- Timer / Alarm test section ----
+            const _SectionHeader(
+              title: 'Timer & Alarm Test',
+              subtitle:
+                  'Test creating timers and alarms via the system clock app '
+                  'without connecting a watch.',
+            ),
+            const _TimerAlarmTestSection(),
+          ],
         ],
       ),
     );

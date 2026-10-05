@@ -344,7 +344,6 @@ class VoiceNoteAiPipeline {
 
   /// Detects common Whisper no-speech / hallucination patterns so we can skip
   /// LLM inference entirely.
-  @visibleForTesting
   static bool isNoSpeechTranscript(String transcript) {
     final t = transcript.trim();
 

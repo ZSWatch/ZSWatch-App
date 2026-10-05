@@ -580,6 +580,53 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     fun requestRecordings() { command("GB({\"t\":\"voice_memo\",\"action\":\"list\"})") }
+    private val resultSentAt = mutableMapOf<String, Long>()
+
+    private fun voiceResultsNegotiated(): Boolean {
+        val list = store.control()["recording_list"] as? Map<*, *> ?: return false
+        return runtime.owns(token) && store.control()["phase"] == "ready" &&
+            (list["generation"] as? Number)?.toLong() == token && list["address"] == store.control()["address"] &&
+            list["result_ack_version"] == 1
+    }
+
+    fun deliverVoiceResults() {
+        if (!voiceResultsNegotiated() || firmwareBusy() || writes.size >= 14) return
+        val jobs = PrototypeJobs(PrototypeHub.jobJournal(context))
+        val watch = store.control()["address"] as String
+        val now = android.os.SystemClock.elapsedRealtime()
+        for (pending in jobs.pending(watch)) {
+            val envelope = JSONObject(pending.getString("payload"))
+            // Metadata fixtures never leave the test harness.
+            if (jobs.state(envelope.getString("job_id")).getJSONObject("spec").getString("provider") != "dart-voice-v1") continue
+            val id = envelope.getString("result_id")
+            if (now - (resultSentAt[id] ?: -10000L) < 10000) continue
+            val recording = store.record(envelope.getString("recording_id")) ?: continue
+            val packet = PrototypeVoiceResult.packet(envelope, recording["filename"] as String)
+            val generation = token
+            writes.add(NusWrite("GB($packet)".toByteArray(Charsets.UTF_8), {}, payloadSize) {
+                runtime.owns(generation) && jobs.pending(watch).any { JSONObject(it.getString("payload")).getString("result_id") == id }
+            })
+            resultSentAt[id] = now
+            pump()
+            break
+        }
+    }
+
+    private fun receiveVoiceResultAck(message: JSONObject) {
+        if (!voiceResultsNegotiated() || message.optString("action") != "result_ack") return
+        val watch = store.control()["address"] as String
+        val jobs = PrototypeJobs(PrototypeHub.jobJournal(context))
+        for (pending in jobs.pending(watch)) {
+            val envelope = JSONObject(pending.getString("payload"))
+            val recording = store.record(envelope.getString("recording_id")) ?: continue
+            val packet = PrototypeVoiceResult.packet(envelope, recording["filename"] as String)
+            if (PrototypeVoiceResult.matches(packet, message)) {
+                jobs.acknowledge(watch, envelope.getString("result_id"), "accepted")
+                store.update("voice_result_accepted")
+                break
+            }
+        }
+    }
     fun requestDeviceInfo() { command("GB({\"t\":\"ver\"})") }
 
     fun configureHttp(enabled: Boolean) {
@@ -728,6 +775,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 watchface.receive(token, message.optString("action"), message.getBoolean("ok"))
             }
             recordingInbox.receive(message)
+            receiveVoiceResultAck(message)
         }
         downloadNext()
     }

@@ -6,6 +6,10 @@ import '../../../data/database/companion_recording_database.dart'
     show ImportedRecording;
 import '../../../data/models/companion_recording.dart';
 import '../../../providers/companion_runtime_providers.dart';
+import '../../../providers/settings_providers.dart';
+import '../../../providers/ai_providers.dart';
+import '../../../services/ai/llm_service.dart';
+import '../../../services/voice_memo/transcription_engine.dart';
 import '../../../providers/companion_recording_import_providers.dart';
 import '../../widgets/voice_memos/audio_playback_bar.dart';
 
@@ -77,6 +81,233 @@ class _CompanionVoiceMemosViewState
     }
   }
 
+  Future<void> processRecording(CompanionRecording recording) async {
+    try {
+      final prefs = await ref.read(sharedPreferencesProvider.future);
+      final llmModels = await ref.read(llmAvailableModelsProvider.future);
+      var selectedStt =
+          prefs.getString(SettingsKeys.transcriptionEngineType) ??
+          TranscriptionEngineType.whisperTinyEn.name;
+      var selectedLlm =
+          prefs.getString(SettingsKeys.selectedAiModelId) ??
+          LlmService.defaultModelId;
+      if (!llmModels.any((model) => model.id == selectedLlm)) {
+        selectedLlm = LlmService.defaultModelId;
+      }
+      if (!mounted) return;
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Process recording locally'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Uses models already downloaded on this phone. Audio stays on the phone.',
+                ),
+                DropdownButton<String>(
+                  isExpanded: true,
+                  value: selectedStt,
+                  items: [
+                    for (final model in TranscriptionModelCatalog.all)
+                      DropdownMenuItem(
+                        value: model.type.name,
+                        child: Text(
+                          model.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => selectedStt = value);
+                    }
+                  },
+                ),
+                DropdownButton<String>(
+                  isExpanded: true,
+                  value: selectedLlm,
+                  items: [
+                    for (final model in llmModels)
+                      DropdownMenuItem(
+                        value: model.id,
+                        child: Text(
+                          model.displayName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => selectedLlm = value);
+                    }
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Process'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (accepted != true) return;
+      await ref.read(companionClientProvider).processRecording({
+        'identity': recording.identity,
+        'transcription_model': selectedStt,
+        'analysis_model': selectedLlm,
+        'correct_transcription':
+            prefs.getBool(SettingsKeys.aiCorrectionEnabled) ?? false,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Local processing queued. You can close the app.'),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not queue processing. The original recording is retained.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> showJob(String id, CompanionRecording recording) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Consumer(
+        builder: (context, ref, child) {
+          final detail = ref.watch(companionVoiceJobProvider(id));
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: detail.when(
+                  data: (job) {
+                    final result = job['result'] as Map<Object?, Object?>?;
+                    final text = result?['transcript'] ?? job['transcript'];
+                    final pending = [
+                      'ready',
+                      'waiting_remote',
+                      'result_ready',
+                    ].contains(job['state']);
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          recording.filename,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(jobLabel(job)),
+                        if (job['last_error'] != null)
+                          Text('Reason: ${job['last_error']}'),
+                        if (text is String) ...[
+                          const SizedBox(height: 16),
+                          const Text('Transcript'),
+                          SelectableText(text),
+                        ],
+                        if (result != null) ...[
+                          const SizedBox(height: 16),
+                          const Text('Summary'),
+                          SelectableText(result['summary'] as String),
+                          const SizedBox(height: 16),
+                          for (final action
+                              in (result['actions'] as List)
+                                  .cast<Map<Object?, Object?>>())
+                            ListTile(
+                              title: Text(action['title'] as String),
+                              subtitle: Text(
+                                [
+                                  action['type'],
+                                  action['due_date'],
+                                  action['start_time'],
+                                  if (action['duration_seconds'] != null)
+                                    '${action['duration_seconds']} seconds',
+                                ].whereType<String>().join(' • '),
+                              ),
+                            ),
+                          if ((result['actions'] as List).isNotEmpty)
+                            const Text(
+                              'Suggested actions. No calendar item, timer or alarm has been created.',
+                            ),
+                        ],
+                        if (pending)
+                          TextButton(
+                            onPressed: () async {
+                              await ref
+                                  .read(companionClientProvider)
+                                  .voiceJob(id, cancel: true);
+                              ref.invalidate(companionVoiceJobProvider(id));
+                            },
+                            child: const Text('Cancel job'),
+                          ),
+                        if ([
+                          'failed',
+                          'cancelled',
+                          'blocked',
+                        ].contains(job['state']))
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              processRecording(recording);
+                            },
+                            child: const Text('Retry processing'),
+                          ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    );
+                  },
+                  loading: () => const CircularProgressIndicator(),
+                  error: (error, stack) =>
+                      const Text('Processing status is unavailable'),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  static String jobLabel(Map<Object?, Object?> job) => switch (job['state']) {
+    'ready' =>
+      job['processing'] == true
+          ? job['transcript_saved'] == true
+                ? 'Analyzing'
+                : 'Transcribing'
+          : 'Queued',
+    'result_ready' => 'Processed • Waiting for watch acceptance',
+    'delivered' => 'Processed • Accepted by watch',
+    'cancelled' => 'Cancelled',
+    'failed' =>
+      job['last_error'] == 'no_speech'
+          ? 'No speech detected'
+          : 'Processing failed',
+    'blocked' => 'Waiting for processing permission',
+    _ => 'Processing',
+  };
+
   Future<void> refreshList() async {
     setState(() => refreshing = true);
     try {
@@ -107,6 +338,17 @@ class _CompanionVoiceMemosViewState
     final paused = snapshot?.fields['recording_sync_enabled'] == false;
     final watchId = snapshot?.fields['address'];
     final observed = snapshot?.fields['recording_list'];
+    final jobs = <String, Map<Object?, Object?>>{};
+    for (final job
+        in (snapshot?.fields['voice_jobs'] as List? ?? [])
+            .whereType<Map<Object?, Object?>>()) {
+      if (job['watch_id'] != watchId) continue;
+      final identity = job['recording_id'] as String;
+      if ((job['generation'] as int) >
+          (jobs[identity]?['generation'] as int? ?? 0)) {
+        jobs[identity] = job;
+      }
+    }
     final liveListCount =
         ready &&
             observed is Map &&
@@ -171,35 +413,54 @@ class _CompanionVoiceMemosViewState
                         : Icons.mic,
                   ),
                   title: Text(item.filename),
+                  onTap: jobs[item.identity] == null
+                      ? null
+                      : () => showJob(
+                          jobs[item.identity]!['job_id'] as String,
+                          item,
+                        ),
                   subtitle: Text(
                     '${DateFormat.yMMMd().add_Hm().format(item.timestampUtc.toLocal())} • '
                     '${(item.durationMs / 1000).toStringAsFixed(1)} s\n'
                     '${status(item, ready, paused)}'
+                    '${jobs[item.identity] == null ? '' : ' • ${jobLabel(jobs[item.identity]!)}'}'
                     '${imported[item.identity]?.sourceSha256 == item.sha256 && item.hasCommittedReceipt ? ' • Playback prepared' : ''}',
                   ),
                   isThreeLine: true,
                   trailing: item.hasCommittedReceipt
-                      ? IconButton(
-                          tooltip:
-                              imported[item.identity]?.sourceSha256 ==
-                                  item.sha256
-                              ? 'Play recording'
-                              : 'Prepare playback',
-                          onPressed: preparing == null
-                              ? () => preparePlayback(item)
-                              : null,
-                          icon: preparing == item.identity
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(),
-                                )
-                              : Icon(
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'Process recording locally',
+                              onPressed: ready
+                                  ? () => processRecording(item)
+                                  : null,
+                              icon: const Icon(Icons.auto_awesome),
+                            ),
+                            IconButton(
+                              tooltip:
                                   imported[item.identity]?.sourceSha256 ==
-                                          item.sha256
-                                      ? Icons.play_arrow
-                                      : Icons.audio_file_outlined,
-                                ),
+                                      item.sha256
+                                  ? 'Play recording'
+                                  : 'Prepare playback',
+                              onPressed: preparing == null
+                                  ? () => preparePlayback(item)
+                                  : null,
+                              icon: preparing == item.identity
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : Icon(
+                                      imported[item.identity]?.sourceSha256 ==
+                                              item.sha256
+                                          ? Icons.play_arrow
+                                          : Icons.audio_file_outlined,
+                                    ),
+                            ),
+                          ],
                         )
                       : null,
                 ),

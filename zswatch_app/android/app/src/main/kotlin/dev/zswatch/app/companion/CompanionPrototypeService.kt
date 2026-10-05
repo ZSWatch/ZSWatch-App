@@ -137,8 +137,8 @@ class CompanionPrototypeService : Service() {
                 link.gpsRequest = { message, generation -> gps?.receive(message, generation) }
                 if (BuildConfig.DEBUG) {
                     remoteFixture = PrototypeRemoteFixture(applicationContext, this).also { it.startMaintenance() }
-                    localFixture = PrototypeLocalFixture(applicationContext, this).also { it.startMaintenance() }
                 }
+                localFixture = PrototypeLocalFixture(applicationContext, this).also { it.startMaintenance() }
                 PrototypeHub.worker.post(notificationMaintenance)
             }
         }

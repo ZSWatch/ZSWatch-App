@@ -26,7 +26,10 @@ object PrototypeHub {
 
     fun snapshot(context: Context, active: Boolean): Map<String, Any?> {
         val state = journal(context).snapshot(active) + mapOf("gps_permissions" to AndroidPrototypeGps.permissions(context))
-        return try { state + mapOf("remote_jobs" to PrototypeJobs(jobJournal(context)).summary()) }
+        return try {
+            val jobs = PrototypeJobs(jobJournal(context)).summary()
+            state + mapOf("remote_jobs" to jobs, "voice_jobs" to jobs.filter { it["provider"] == "dart-voice-v1" })
+        }
         catch (error: Exception) { state + mapOf("remote_jobs_error" to error.javaClass.simpleName) }
     }
 

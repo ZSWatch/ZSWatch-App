@@ -158,6 +158,39 @@ class CompanionPrototypeClient {
         }),
       );
 
+  Future<String> processRecording(Map<String, Object?> configuration) async {
+    final result = await methods.invokeMethod<Object?>('processRecording', {
+      ...configuration,
+      'version': 1,
+    });
+    if (result is! Map ||
+        result['version'] != 1 ||
+        result['job_id'] is! String) {
+      throw const FormatException('Processing job was not accepted');
+    }
+    return result['job_id'] as String;
+  }
+
+  Future<Map<String, Object?>> voiceJob(
+    String id, {
+    bool cancel = false,
+  }) async {
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(id)) {
+      throw const FormatException('Invalid processing job');
+    }
+    final result = await methods.invokeMethod<Object?>(
+      cancel ? 'cancelVoiceJob' : 'voiceJob',
+      {'version': 1, 'job_id': id},
+    );
+    if (result is! Map ||
+        result['version'] != 1 ||
+        result['job_id'] != id ||
+        result['job'] is! Map) {
+      throw const FormatException('Invalid processing status');
+    }
+    return Map<String, Object?>.from(result['job'] as Map);
+  }
+
   Future<CompanionPrototypeSnapshot> setRecordingSync(bool enabled) async =>
       CompanionPrototypeSnapshot.decode(
         await methods.invokeMethod<Object?>('setRecordingSync', {

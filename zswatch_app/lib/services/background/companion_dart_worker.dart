@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import '../ai/companion_voice_processor.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -11,15 +12,29 @@ Future<void> startCompanionDartWorker() async {
   const channel = MethodChannel(companionWorkerChannel);
   var busy = false;
   channel.setMethodCallHandler((call) async {
-    if (call.method != 'executeFixture') throw MissingPluginException();
+    if (call.method != 'executeFixture' && call.method != 'executeRecording') {
+      throw MissingPluginException();
+    }
     if (busy) throw PlatformException(code: 'BUSY');
     final request = Map<String, Object?>.from(call.arguments as Map);
     busy = true;
     try {
-      final result = companionLocalFixtureResult(request);
-      // Verify an existing application-context plugin in the headless engine.
-      await getTemporaryDirectory();
-      await Future<void>.delayed(const Duration(seconds: 15));
+      final Map<String, Object?> result;
+      if (call.method == 'executeRecording') {
+        result = await processCompanionVoiceRecording(
+          request,
+          saveTranscript: (transcript) async {
+            await channel.invokeMethod<void>('checkpoint', {
+              'job_id': request['job_id'],
+              'transcript': transcript,
+            });
+          },
+        );
+      } else {
+        result = companionLocalFixtureResult(request);
+        await getTemporaryDirectory();
+        await Future<void>.delayed(const Duration(seconds: 15));
+      }
       return {
         'version': 1,
         'job_id': request['job_id'],

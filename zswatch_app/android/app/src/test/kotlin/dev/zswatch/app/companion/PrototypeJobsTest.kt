@@ -15,6 +15,32 @@ class PrototypeJobsTest {
     private fun spec() = fixture("job-v1.json")
     private fun rejected(action: () -> Unit) { try { action(); fail("Expected rejection") } catch (_: IllegalArgumentException) {} }
 
+    @Test fun transcriptCheckpointSurvivesReopenAndRejectsStaleWorker() {
+        var jobs = PrototypeJobs(store())
+        val input = spec().put("backend", "local").put("upload_authorized", false).put("provider", "dart-voice-v1")
+        val id = jobs.create(input); val first = jobs.claim(id, 100)!!
+        assertTrue(jobs.checkpointTranscript(first, 101, "Påminn mig i morgon"))
+        jobs = PrototypeJobs(store())
+        assertEquals("Påminn mig i morgon", jobs.state(id).getString("transcript"))
+        val reclaimed = jobs.claim(id, 130)!!
+        assertFalse(jobs.checkpointTranscript(first, 131, "stale"))
+        rejected { jobs.checkpointTranscript(reclaimed, 131, "changed") }
+        assertTrue(jobs.checkpointTranscript(reclaimed, 131, "Påminn mig i morgon"))
+        assertTrue(jobs.cancel(id))
+        assertFalse(jobs.checkpointTranscript(reclaimed, 132, "Påminn mig i morgon"))
+    }
+
+    @Test fun localResultRetainsExistingTimerAndCalendarFields() {
+        val result = fixture("result-v1.json")
+        result.put("actions", org.json.JSONArray().put(JSONObject().put("type", "timer").put("title", "Tea")
+            .put("duration_seconds", 180).put("notes", "Test"))
+            .put(JSONObject().put("type", "calendar_event").put("title", "Meeting")
+                .put("start_time", "2026-10-05T09:00:00Z").put("location", "Home")))
+        PrototypeJobs.validateResult(result)
+        rejected { PrototypeJobs.validateResult(JSONObject(result.toString()).put("actions", org.json.JSONArray()
+            .put(JSONObject().put("type", "timer").put("title", "Tea").put("duration_seconds", -1)))) }
+    }
+
     @Test fun goldenRecoveryTraceSurvivesReopensAndDroppedAck() {
         val trace = fixture("recovery-v1.json"); val spec = spec(); val result = fixture("result-v1.json")
         var jobs = PrototypeJobs(store()); val id = jobs.create(spec)

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,7 +9,7 @@ import 'services/background/companion_dart_worker.dart';
 
 @pragma('vm:entry-point')
 void companionWorkerMain() {
-  if (kDebugMode && useNativeCompanionRuntime) {
+  if (useNativeCompanionRuntime) {
     startCompanionDartWorker();
   }
 }

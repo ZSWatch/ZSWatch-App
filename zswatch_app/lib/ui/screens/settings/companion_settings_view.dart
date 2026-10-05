@@ -47,6 +47,12 @@ class CompanionSettingsView extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoutes.voiceMemos),
           ),
+          ListTile(
+            leading: const Icon(Icons.auto_awesome),
+            title: const Text('Voice memo models'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.aiModels),
+          ),
           const CompanionHttpSettingsTile(),
           const CompanionGpsSettingsTile(),
         ],
