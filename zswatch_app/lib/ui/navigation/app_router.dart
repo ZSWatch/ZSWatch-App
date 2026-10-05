@@ -82,7 +82,7 @@ class AppRouter {
   AppRouter._();
 
   /// Only migrated routes can enter the native-owned app. In particular, deep
-  /// links cannot instantiate legacy BLE, DB detail views or model services.
+  /// links cannot instantiate legacy BLE owners or DB detail views.
   /// Each app instance owns/disposes this router; neither operation owns BLE.
   static GoRouter createNativeRouter() => GoRouter(
     initialLocation: AppRoutes.home,

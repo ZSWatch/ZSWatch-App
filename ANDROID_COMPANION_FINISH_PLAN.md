@@ -41,17 +41,26 @@ artifact identities, measured scope and earlier failed attempts.
 | Requirement | Current authoritative status |
 | --- | --- |
 | Real microphone → verified bytes → shared Dart local STT/AI → persistent result → watch ACK | **Pass for natural Swedish milk/reminder recording**, plus byte-identical replay. Headless boundaries and matched application ACK verified. |
-| Short Swedish/English and longer input | Swedish pass; English timer semantics previously failed with Tiny English; appropriate English/longer input acceptance pending. |
+| Short Swedish/English and longer input | Swedish pass. English Whisper Base + Qwen and a 37.8 s replay of real microphone audio complete real headless processing/persistence/watch ACK in release. English duration is transcribed correctly; brand name and longer Swedish transcript have errors. Timer classification remains an existing AI-quality limitation, explicitly deferred by the user on 2026-10-05; do not tune prompts/models for this refactor. |
 | Existing Flutter UI / single native owner | Real transcript/summary/action review, ordinary Process dedup and actual audio playback pass. Original audio retained. Complete settings/model/retry feature coverage remains part of the consolidated pass. |
-| Action confirmation / side effects | Local calendar Create/Undo pass in prior owned test. Natural recording currently only a draft. Real timer/alarm dispatch, timezone coverage and physical release action pass pending. |
+| Action confirmation / side effects | Real release local-calendar Create/Undo passes for owned entry ZSWatch_HIL_release_20261005; Calendar independently shows tomorrow 09:00–09:30 and app confirms removal. Original transcript/audio retained. Timer/alarm OS dispatch and timezone coverage pending; existing model misclassification does not authorize AI-quality work. |
 | Durable result / dedup / interrupted work | Real watch application ACK, job reuse and process-loss recovery with saved transcript pass. Deliberately lost ACK/replay physical acceptance pending. |
 | Cancellation and invalid/unavailable inputs | Real GGUF cancel and Stop pass. LiteRT channel cancellation: four controlled-callback regressions pass, actual model unavailable. STT/long-input cancellation and remaining silence/malformed/missing-model/storage physical coverage pending. |
-| BLE under AI load / resources | Actual prompt-time watch HTTP and notification pass (observed bounds 1.511/1.363 s); same process/generation and Flutter absent. Prompt prefill and RSS/thermal snapshot recorded. Concurrent time-write, longer workload and battery/endurance remain pending. |
+| BLE under AI load / resources | Actual prompt-time watch HTTP and notification pass (observed bounds 1.511/1.363 s); same process/generation and Flutter absent. New release English inference completes in about 72 s with same PID, Flutter absent and real remote HTTP callback during work. Prompt prefill and RSS/thermal snapshot recorded. Concurrent time-write and battery/endurance remain pending. |
 | Explicit local / hybrid / remote choices | Local-only flow passes. Real remote provider, credentials and upload consent remain external pending inputs; no automatic upload/fallback acceptance claimed. |
-| OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Synthetic media pass; real third-party media, notification update/dismiss, Shell/UI destruction/arbitration, independently verified nonempty logs/cache isolation, watchface interruption/reattachment and complete ordinary connection/settings pass pending. |
+| OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Synthetic media pass; real third-party media, notification update/dismiss, Shell/UI destruction/arbitration, logs/cache isolation, watchface interruption/reattachment and complete ordinary connection/settings pass pending. |
 | Firmware/resource updates | New fixed application and combined operations pass, acknowledged firmware ~41 KB/s with Flutter removed; active image/resource/original checks pass. Earlier failed combined operation stays failed; SDK network-core index 1 remains unavailable. |
-| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Final-candidate release execution, phone reboot/unlock, screen-off quiet and ~8 h endurance remain pending; USB/forced idle does not prove unplugged behavior. |
-| Final candidate / goal completion | 225 Android tests and debug/release builds pass for latest LiteRT fix. That candidate is compiled, not installed/physically accepted. Pairing rough-edge cleanup follows the remaining main feature pass. **Overall goal active.** |
+| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Quiet observer ends when phone wakes at 64 s; this is not a five-minute or endurance pass. Phone reboot/unlock and ~8 h endurance pending; USB/forced idle does not prove unplugged behavior. |
+| Final candidate / goal completion | 225 Android tests pass for LiteRT fix; 18 affected Flutter tests and release build pass for restored dashboard Watchface route. Non-debuggable release code is installed and physically exercised, lab re-signed only to retain existing data. Production SHA-256 2228b51bbc58ccbaeff7d3acc21d7fbbaf2080763db4f88bc1ad1b796d47e4da; installed lab SHA-256 ac84375e31bc70d21d74c573f74986994016a7df2d6c1e416d71c3cbdb3c8c1b. Pairing rough-edge cleanup follows remaining main feature pass. **Overall goal active.** |
+
+Release evidence: `.companion-hil-runs/20261005-oneplus-final-release/` and
+`.companion-hil-runs/20261005-oneplus-release-acceptance/` (calendar UI,
+release-route artifact identity, English inference/ACK and quiet-2 observations).
+The longer input repeats the same 7.56 s real microphone recording five times;
+it proves longer workload handling, not naturally spoken longer-audio quality.
+Android exit-info attributes the earlier PID change to PACKAGE UPDATED, not an
+inference crash. Private audio/transcripts remain outside Git. User direction:
+leave pre-existing LLM semantic errors alone; prioritize refactor functionality.
 
 ### Shared Dart architecture clarification
 

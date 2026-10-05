@@ -571,12 +571,11 @@ class _FeatureShortcuts extends StatelessWidget {
                 label: 'Analytics',
                 onTap: () => context.push(AppRoutes.analytics),
               ),
-            if (!native)
-              _FeatureTile(
-                icon: Icons.watch,
-                label: 'Watchface',
-                onTap: () => context.push(AppRoutes.watchfaceBackground),
-              ),
+            _FeatureTile(
+              icon: Icons.watch,
+              label: 'Watchface',
+              onTap: () => context.push(AppRoutes.watchfaceBackground),
+            ),
             _FeatureTile(
               icon: Icons.code,
               label: 'Developer',

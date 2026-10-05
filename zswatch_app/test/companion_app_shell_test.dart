@@ -312,10 +312,11 @@ void main() {
   );
 
   testWidgets(
-    'native watchface route retains existing gallery without a legacy owner',
+    'native dashboard opens the existing watchface gallery without a legacy owner',
     (tester) async {
       await mount(tester, snapshot(active: true, ready: true));
-      router(tester).go(AppRoutes.watchfaceBackground);
+      await tester.ensureVisible(find.text('Watchface'));
+      await tester.tap(find.text('Watchface'));
       await tester.pumpAndSettle();
       expect(find.text('Watchface Background'), findsOneWidget);
       expect(find.text('Fume Guilloche'), findsOneWidget);
@@ -340,12 +341,11 @@ void main() {
   );
 
   testWidgets(
-    'deep links to unmigrated features cannot start AI, health or DB detail services',
+    'deep links to unmigrated health and DB detail features stay unavailable',
     (tester) async {
       await mount(tester, snapshot(active: true, ready: true));
       final routes = router(tester);
       for (final path in [
-        AppRoutes.aiModels,
         AppRoutes.health,
         AppRoutes.voiceMemoDetail(12),
       ]) {
