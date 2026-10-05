@@ -643,10 +643,10 @@ automatic reconnect acceptance and the consolidated feature pass. This is an
 actual firmware gate within the existing goal, not a new backend or migration
 framework. Keep all unrelated work and original files intact:
 
-1. Preserve the completed physical/logical snapshots, the pre-update file backups
-   and the old matching application image. Before writing previously unreachable
-   physical high addresses, inspect/preserve them with a programmer configured for
-   32-bit addressing. Do not assume they are blank.
+1. Use the snapshots and exact file copies already available; the user explicitly
+   requested no further backup work. The physical high range has now been checked
+   with 32-bit programmer addressing and is entirely erased. Continue directly
+   with activation and functional verification.
 2. Install matching fixed MCUboot and application/XIP images through the debugger,
    retaining network-core firmware and avoiding whole-chip erase. An app-only OTA
    is insufficient here: the bootloader and programmer must use the same flash
@@ -671,3 +671,54 @@ helpers but did not run the consolidated consumers or claim that pass. Indices
 connected. EN4B behavior follows the
 [Macronix MX25U51245G datasheet](https://www.macronix.com/Lists/Datasheet/Attachments/9126/MX25U51245G%2C%201.8V%2C%20512Mb%2C%20v1.3.pdf)
 and the repository's Zephyr QSPI binding/driver. The goal remains active.
+
+
+### 2026-10-05 physical addressing activation and OnePlus core acceptance
+
+The user requested no further backups. Existing images/file copies were reused.
+The corrected matching MCUboot/application/XIP images and logical user partition
+were programmed with targeted sector erase and verified successfully before reset;
+network-core firmware and settings were not selected. Running firmware QSPI
+IFCONFIG0 is `0x0003005c`, with the 32-bit address-mode bit set. Eleven missing lab
+files were restored, and all 22 source-file hashes match both before and after a
+subsequent reset. The watch and native inventory both contain 20 recordings;
+freshly mounted resources report 5,932,208 bytes. No filesystem format was used.
+
+| Area | Result and limits |
+| --- | --- |
+| Fixed firmware boot/recovery | **Pass.** A bounded debugger reset recovers fresh native Ready/status/inventory in 13.08 seconds with the same PID, Flutter absent and no Bluetooth toggle. This is a reset test, separate from OTA acceptance. |
+| Addressing activation | **Pass for programmer verification, runtime mode and filesystem round trips.** MCUboot and app use the fixed build. Small memory-mapped debug reads alone did not establish distinct physical high/low access and are not counted as that proof. |
+| Notification | **Pass for a newly posted owned debug notification.** Actual body is observed at the watch, with a new native write in the current generation and Flutter absent. Forwarding and the app's own source were enabled in the existing Flutter UI; other phone sources remain unselected. Update/dismiss behavior and real third-party sources remain pending on OnePlus. |
+| HTTP/time/inventory | **Pass within this scope.** One actual loopback consumer receives exactly one successful 35-byte callback; native records Written. Time is written for the fresh Ready session, and both inventories report 20 recordings. Earlier real GPS/Weather acceptance is separate; timezone changes and broader HTTP error policy remain pending. |
+| Media | **Pass for synthetic MediaSession with actual watch BLE next/play controls.** The fixture advances to track 2 and playing=true, native accepts controls, PID/generation remain stable. Real third-party player acceptance remains pending. |
+| Native lifecycle | **Pass.** Bluetooth off/on recovers automatically with the same PID. Injected SIGKILL recovers with a new PID and fresh watch status/time without Flutter. Stop removes the service and remains stopped through radio changes; explicit native restart reaches Ready without Flutter. This is injected death and USB-connected behavior, not natural reclamation or unplugged endurance. |
+
+Private evidence: `.companion-hil-runs/20261005-address-activation/` and
+`.companion-hil-runs/20261005-oneplus-core-32/`. The restoration's first two USB
+attempts dropped UART fragments; the final smaller paced library transfers pass.
+The interrupted file's exact prefix was checked before replacing the owned
+partial upload. No custom SMP implementation or production transport workaround
+was introduced. Initial core observers failed on unset optional metadata and
+host/phone clock skew; only the final new watch receipt plus phone-clock journal
+comparison is counted. Passive UART capture ended at its bounded deadline.
+
+The fixed application-only OTA also **passes**, using the identical fixed code
+payload with a distinct MCUboot version `0.8.1+3`. Operation
+`1901cd44-24e5-45d5-a4f8-4f1f715e2ff2` uploads 838,392 bytes at 41.50 KB/s
+acknowledged active rate (early sample 43.47 KB/s). Flutter's task is destroyed at
+29,332 acknowledged bytes, and native PID 4839 remains unchanged. The initial
+30-second reconnect attempt times out; the existing retry and SMP service-change
+recovery then reach Completed/Ready within the bounded postflight. Independent
+USB inspection on the package's actual boot, without a lab reset or radio toggle,
+verifies active application `0.8.1.3` with hash
+`30dd342ef9cee6aa91ccc17c2b4f4bb3dc15a0198d97aae2555f215021391d5f`, unchanged
+external image and all 22 file hashes. Network-core index 1 is not reported by this
+SDK response and is not claimed verified. Evidence:
+`.companion-hil-runs/20261005-oneplus-ota-32/`.
+
+The earlier combined update remains **failed**. No result here silently changes
+that operation. Remaining work includes a new fixed-firmware combined result,
+Find/Shell/log/watchface and the rest of the OnePlus matrix, meaningful speech and
+Clock semantics, LiteRT/remote configuration, physical lost ACK and release/quiet/
+endurance acceptance. The shared Flutter/Dart UI and AI backend remain unchanged;
+iOS remains deferred and the goal remains active.
