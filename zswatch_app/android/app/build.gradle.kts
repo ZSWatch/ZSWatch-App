@@ -108,6 +108,7 @@ dependencies {
     implementation("no.nordicsemi.android:mcumgr-ble:2.7.2")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
+    testImplementation("org.mockito:mockito-core:5.19.0")
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")
 }
 

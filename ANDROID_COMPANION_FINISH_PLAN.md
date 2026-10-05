@@ -812,6 +812,41 @@ actual 1,253-token prompt. Flutter's task is removed before prompt processing.
 Private evidence: `.companion-hil-runs/20261005-oneplus-ble-inference-real/`
 (`acceptance.json`, `ble-during-inference.json`, CPU/thermal snapshots, terminal
 job/outbox and passive watch UART) and the original microphone directory's
-`ordinary-ui-dedup.json`. No production transport or scheduling code was changed
+`ordinary-ui-dedup.json`. The owned replay file was deleted afterward; the actual
+original remains on the watch at 31,051 bytes (`cleanup.json`). No production
+transport or scheduling code was changed
 for this test. English/longer input, STT/LiteRT cancellation, lost ACK, remaining
 core features and release/quiet/endurance still require their stated coverage.
+
+
+### 2026-10-05 LiteRT MethodChannel cancellation contract
+
+The existing LiteRT bridge had an unresolved Dart-future path: cancelling its IO
+coroutine prevented the normal Main dispatcher switch in its exception handler.
+Cancellation before IO dispatch or while waiting for the generation mutex could
+also bypass that handler. The bridge now enters its handler on early cancellation,
+returns cancellation through a non-cancellable Main reply and suppresses a second
+reply if cancellation arrives after success. It retains the SDK conversation's
+pending terminal callback after cancellation, so the existing headless owner's
+FFI-return wait is not mistaken for native completion. No native AI business
+logic or second job owner was added.
+
+Four tests exercise the actual bridge and real coroutine dispatch queues with
+controlled SDK callbacks: cancellation before dispatch, active cancellation with
+delayed native completion, queued generation cancellation and cancellation after
+successful reply. These are channel/lifetime-contract regressions, **not actual
+LiteRT model execution**. The full Android suite passes 225 tests (zero failures,
+errors or skips); debug and release APK builds pass. Default production dispatchers
+remain IO and Main; the optional constructor dispatchers only make those races
+controllable in tests. Mockito is a test-only dependency.
+
+No `.litertlm` file is installed on OnePlus. Actual LiteRT load/inference/cancel
+therefore remains pending. The installed phone APK was left unchanged during the
+real microphone and concurrent BLE tests. Compiled candidates:
+
+- Debug SHA-256: `677dac9abb322a208eb3260905c2a65b1a10eaaac26484d09ff59c491f7ce41d`.
+- Release SHA-256: `f7c95671a40c699cdff89d866b6c514aed32dbbf82e3489f1eb9bf50a794fc73`.
+
+Evidence: `.companion-hil-runs/20261005-litert-cancellation-contract/` and
+`LiteRtLmBridgeTest.kt`. Release physical acceptance still requires execution of
+the compiled final candidate; a successful build does not close that gate.
