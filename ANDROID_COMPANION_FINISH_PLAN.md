@@ -50,7 +50,7 @@ artifact identities, measured scope and earlier failed attempts.
 | Explicit local / hybrid / remote choices | Local-only flow passes. Real remote provider, credentials and upload consent remain external pending inputs; no automatic upload/fallback acceptance claimed. |
 | OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. Real Chrome MediaSession metadata and watch next/pause/play pass with both apps' UI in background, Flutter task absent and same PID; owned quiet tone/page, not commercial-player coverage. Previous-track remains unverified. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Release Shell command completes after Flutter task destruction (independent watch-state transition, same PID). Owned Android notification body replacement and phone-side removal pass with Flutter absent and same PID; independent UART shows remove/add with watch ID 1000004. Watch-originated dismissal, Shell/DFU arbitration, logs/cache isolation, watchface interruption/reattachment and complete ordinary connection/settings pass pending. |
 | Firmware/resource updates | New fixed application and combined operations pass, acknowledged firmware ~41 KB/s with Flutter removed; active image/resource/original checks pass. Earlier failed combined operation stays failed; SDK network-core index 1 remains unavailable. |
-| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Phone reboot/unlock and ~8 h endurance pending; USB-attached coverage does not prove unplugged behavior. |
+| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Physical phone reboot performed; ADB returns in RUNNING_LOCKED, first credential unlock pending. Watch USB and UART both briefly disappear during the observer and subsequently return; the resumed observation awaits first unlock and watch reply. ~8 h endurance pending; USB-attached coverage does not prove unplugged behavior. |
 | Final candidate / goal completion | 225 Android tests pass for LiteRT fix; 18 affected Flutter tests and release build pass for restored dashboard Watchface route. Non-debuggable release code is installed and physically exercised, lab re-signed only to retain existing data. Production SHA-256 2228b51bbc58ccbaeff7d3acc21d7fbbaf2080763db4f88bc1ad1b796d47e4da; installed lab SHA-256 ac84375e31bc70d21d74c573f74986994016a7df2d6c1e416d71c3cbdb3c8c1b. Pairing rough-edge cleanup follows remaining main feature pass. **Overall goal active.** |
 
 Release evidence: `.companion-hil-runs/20261005-oneplus-final-release/` and
@@ -75,6 +75,15 @@ task removal, and remains recorded separately.
 Notifications-3 proves body revision v5 → v6 and phone removal for the same owned
 watch ID with Flutter absent and PID 32006. Earlier observers failed on unchanged
 content suppression and host shell quoting; those are not claimed app defects.
+The temporary Shell forwarding selection was restored through ordinary settings
+to the original 1/64 selected apps. The owned notification is absent from the
+active Android list; shade cancellation was not established.
+Phone-reboot observation records the real reboot and ADB returning while user 0
+is RUNNING_LOCKED. Watch USB and UART disappear together; no watch reset or
+second phone reboot was used to hide that observation failure. The ports subsequently return and the observer resumes without another reboot.
+First unlock and independent watch reply remain pending in `phone-reboot/` and
+`phone-reboot-resume/`.
+
 
 
 ### Shared Dart architecture clarification
