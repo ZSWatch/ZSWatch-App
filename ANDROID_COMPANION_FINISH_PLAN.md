@@ -33,6 +33,26 @@ Avoid a new native UI, legacy fallback, custom SMP, broad model benchmarks or iO
 work. Finish with one evidence-backed pass/fail/pending matrix and clear limits
 for externally blocked or physically unavailable tests.
 
+### Current OnePlus acceptance matrix (2026-10-05)
+
+Use this matrix to select remaining work. The detailed checkpoints below retain
+artifact identities, measured scope and earlier failed attempts.
+
+| Requirement | Current authoritative status |
+| --- | --- |
+| Real microphone → verified bytes → shared Dart local STT/AI → persistent result → watch ACK | **Pass for natural Swedish milk/reminder recording**, plus byte-identical replay. Headless boundaries and matched application ACK verified. |
+| Short Swedish/English and longer input | Swedish pass; English timer semantics previously failed with Tiny English; appropriate English/longer input acceptance pending. |
+| Existing Flutter UI / single native owner | Real transcript/summary/action review, ordinary Process dedup and actual audio playback pass. Original audio retained. Complete settings/model/retry feature coverage remains part of the consolidated pass. |
+| Action confirmation / side effects | Local calendar Create/Undo pass in prior owned test. Natural recording currently only a draft. Real timer/alarm dispatch, timezone coverage and physical release action pass pending. |
+| Durable result / dedup / interrupted work | Real watch application ACK, job reuse and process-loss recovery with saved transcript pass. Deliberately lost ACK/replay physical acceptance pending. |
+| Cancellation and invalid/unavailable inputs | Real GGUF cancel and Stop pass. LiteRT channel cancellation: four controlled-callback regressions pass, actual model unavailable. STT/long-input cancellation and remaining silence/malformed/missing-model/storage physical coverage pending. |
+| BLE under AI load / resources | Actual prompt-time watch HTTP and notification pass (observed bounds 1.511/1.363 s); same process/generation and Flutter absent. Prompt prefill and RSS/thermal snapshot recorded. Concurrent time-write, longer workload and battery/endurance remain pending. |
+| Explicit local / hybrid / remote choices | Local-only flow passes. Real remote provider, credentials and upload consent remain external pending inputs; no automatic upload/fallback acceptance claimed. |
+| OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Synthetic media pass; real third-party media, notification update/dismiss, Shell/UI destruction/arbitration, independently verified nonempty logs/cache isolation, watchface interruption/reattachment and complete ordinary connection/settings pass pending. |
+| Firmware/resource updates | New fixed application and combined operations pass, acknowledged firmware ~41 KB/s with Flutter removed; active image/resource/original checks pass. Earlier failed combined operation stays failed; SDK network-core index 1 remains unavailable. |
+| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Final-candidate release execution, phone reboot/unlock, screen-off quiet and ~8 h endurance remain pending; USB/forced idle does not prove unplugged behavior. |
+| Final candidate / goal completion | 225 Android tests and debug/release builds pass for latest LiteRT fix. That candidate is compiled, not installed/physically accepted. Pairing rough-edge cleanup follows the remaining main feature pass. **Overall goal active.** |
+
 ### Shared Dart architecture clarification
 
 User clarification, 2026-10-04: do not build separate Android and iOS AI backends.
@@ -850,3 +870,11 @@ real microphone and concurrent BLE tests. Compiled candidates:
 Evidence: `.companion-hil-runs/20261005-litert-cancellation-contract/` and
 `LiteRtLmBridgeTest.kt`. Release physical acceptance still requires execution of
 the compiled final candidate; a successful build does not close that gate.
+
+
+Ordinary playback follow-up: the real recording is prepared by the existing
+Flutter control. A Play → pause check advances the player to `0:01 / 0:07`
+(20%), then closes the player. The first observation only captured Play/0:00
+and did not prove active playback; it is not counted as a pass. The controlled
+pause provides actual player execution evidence in
+`ordinary-playback-paused-private.json` under the microphone run directory.
