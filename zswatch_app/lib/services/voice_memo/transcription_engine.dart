@@ -450,12 +450,15 @@ class WhisperEngine implements TranscriptionEngine {
       ),
     );
 
+    String? convertedAudioPath;
     try {
-      debugPrint('[WhisperEngine] Transcribing: $audioFilePath');
+      final prepared = await _prepareAudioForWhisper(audioFilePath);
+      if (prepared != audioFilePath) convertedAudioPath = prepared;
+      debugPrint('[WhisperEngine] Transcribing: $prepared');
 
       final result = await _controller.transcribe(
         model: _defaultModel,
-        audioPath: audioFilePath,
+        audioPath: prepared,
         lang: 'en',
       );
 
@@ -464,8 +467,7 @@ class WhisperEngine implements TranscriptionEngine {
       );
 
       if (result == null) {
-        debugPrint('[WhisperEngine] Transcription returned null');
-        return '';
+        throw StateError('Whisper failed to transcribe the prepared audio.');
       }
 
       final text = result.transcription.text.trim();
@@ -480,6 +482,8 @@ class WhisperEngine implements TranscriptionEngine {
         ),
       );
       rethrow;
+    } finally {
+      _deletePreparedWhisperAudio(convertedAudioPath);
     }
   }
 
@@ -797,60 +801,8 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
       );
       rethrow;
     } finally {
-      if (convertedAudioPath != null) {
-        try {
-          final convertedFile = File(convertedAudioPath);
-          if (convertedFile.existsSync()) {
-            convertedFile.deleteSync();
-          }
-        } catch (e) {
-          debugPrint('[CustomGgmlWhisperEngine] Failed to delete temp WAV: $e');
-        }
-      }
+      _deletePreparedWhisperAudio(convertedAudioPath);
     }
-  }
-
-  Future<String> _prepareAudioForWhisper(String audioFilePath) async {
-    if (audioFilePath.toLowerCase().endsWith('.wav')) {
-      return audioFilePath;
-    }
-
-    final input = File(audioFilePath);
-    final outputPath = '${input.path}.wav';
-    final output = File(outputPath);
-
-    if (output.existsSync()) {
-      output.deleteSync();
-    }
-
-    final arguments = <String>[
-      '-y',
-      '-i',
-      '"${input.path}"',
-      '-ar',
-      '16000',
-      '-ac',
-      '1',
-      '-c:a',
-      'pcm_s16le',
-      '"$outputPath"',
-    ];
-
-    debugPrint(
-      '[CustomGgmlWhisperEngine] Converting audio for Whisper: ${input.path} -> $outputPath',
-    );
-
-    final FFmpegSession session = await FFmpegKit.execute(arguments.join(' '));
-    final ReturnCode? returnCode = await session.getReturnCode();
-
-    if (ReturnCode.isSuccess(returnCode) && output.existsSync()) {
-      return outputPath;
-    }
-
-    final logs = await session.getOutput();
-    throw Exception(
-      'Audio conversion failed (returnCode=${returnCode?.getValue()}): ${logs ?? 'no FFmpeg logs'}',
-    );
   }
 
   Future<String> _modelFilePath() async {
@@ -936,4 +888,46 @@ abstract final class KbWhisperEngines {
     languageCode: 'auto',
     displayName: 'Whisper Large-v3-Turbo · Q5_0',
   );
+}
+
+// Both built-in and custom Whisper require mono 16 kHz PCM WAV.
+// Originals are never overwritten; only this helper's unique cache directory is removed.
+Future<String> _prepareAudioForWhisper(String audioFilePath) async {
+  if (audioFilePath.toLowerCase().endsWith('.wav')) return audioFilePath;
+  final cache = await getTemporaryDirectory();
+  final scratch = await Directory(cache.path).createTemp('whisper-wav-');
+  final output = File('${scratch.path}/audio.wav');
+  try {
+    final FFmpegSession session = await FFmpegKit.executeWithArguments([
+      '-y',
+      '-i',
+      audioFilePath,
+      '-ar',
+      '16000',
+      '-ac',
+      '1',
+      '-c:a',
+      'pcm_s16le',
+      output.path,
+    ]);
+    final code = await session.getReturnCode();
+    if (ReturnCode.isSuccess(code) && output.existsSync()) return output.path;
+    throw StateError(
+      'Audio conversion failed (returnCode=${code?.getValue()}): ${await session.getOutput()}',
+    );
+  } catch (_) {
+    if (scratch.existsSync()) scratch.deleteSync(recursive: true);
+    rethrow;
+  }
+}
+
+void _deletePreparedWhisperAudio(String? prepared) {
+  if (prepared == null) return;
+  try {
+    final audio = File(prepared);
+    if (audio.existsSync()) audio.deleteSync();
+    if (audio.parent.existsSync()) audio.parent.deleteSync();
+  } catch (error) {
+    debugPrint('[WhisperEngine] Failed to remove temporary WAV: $error');
+  }
 }

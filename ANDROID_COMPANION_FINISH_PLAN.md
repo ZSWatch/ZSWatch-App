@@ -564,3 +564,27 @@ actual local STT/LLM run of the watch fixture `hil_ai_f2c75842ee02`.
 Android provider references: [event ownership columns](https://developer.android.com/reference/android/provider/CalendarContract.EventsColumns),
 [CalendarProvider deletion handling](https://android.googlesource.com/platform/packages/providers/CalendarProvider/+/master/src/com/android/providers/calendar/CalendarProvider2.java),
 and [Clock intent contract](https://developer.android.com/reference/android/provider/AlarmClock).
+
+### 2026-10-05 inference recovery and English engine checkpoint
+
+| Area | Result and limits |
+| --- | --- |
+| Mid-analysis process loss | **Pass, debug OnePlus.** SIGKILL during real local analysis (Dart worker observed using CPU) restarts the native service without launching Flutter. The same job/spec/input and saved transcript resume as attempt 2, reaching Delivered with application ACK. Observed restart/resume is about 11.5 seconds; Ready generation 116 remains stable during resumed analysis. This is injected process death, not natural OS reclamation or package force-stop. |
+| English transcription engine | **Format fix passes.** Built-in Tiny English previously passed Ogg to a WAV-only API, which returned null and was mislabeled no-speech. Both existing Dart Whisper engines now prepare isolated mono 16 kHz PCM WAV files and clean only their own scratch files. Null engine responses raise an execution error. Real Tiny English inference now saves a nonempty transcript after Flutter closes. |
+| English semantic acceptance | **Still failed.** The 4.14-second synthesized timer fixture is mistranscribed (including the duration); the existing LLM router returns none. No timer is created. This is not an English timer, microphone-quality or silence-policy acceptance pass. Its 9,759 phone bytes independently match the uploaded fixture SHA-256. |
+| Model status UI | **Fixed and physically checked.** Selected-model changes invalidate downloaded/size metadata; the existing Flutter model view now reports the installed Qwen model correctly. A regression test changes selection while retaining the same service instance. |
+| HTTP during inference | **Not run successfully.** One attempt missed the inference window; another reached the watch before its asynchronous app-close returned to the watchface. Neither establishes concurrent HTTP latency. Earlier standalone OnePlus Weather evidence remains valid. |
+| Checks | Eight focused Flutter tests, focused Dart analysis and debug/release builds pass for the WAV/model-status changes. The corrected English flow is physically tested on debug; release engine execution remains covered only by the earlier Swedish release run. |
+
+Private evidence: `.companion-hil-runs/20261005-oneplus-timer-recovery/`,
+including `recovery-evidence.json`, `phone-copy-evidence.json`, `english/`
+(WAV-format failure) and `english-fixed/` (saved transcript, model rejection).
+Corrected debug APK SHA-256:
+`539b576b9fecd81c47460d9c96e074152415dddde4d8aa51d5ee3aebb2441a76`;
+compiled release SHA-256:
+`c12a1bd872a18d1f5f6690df247eb3c55da23a698bc301d671f67a5b672e434e`.
+The automatic policy still selects KB-Whisper Base for Swedish; the English model
+was selected only for the explicit fixture retry. Prompt CPU cancellation/Stop,
+meaningful microphone and longer audio, timer/alarm semantics, LiteRT/remote,
+physical lost ACK and the full OnePlus feature/update/endurance matrix remain
+pending. The goal remains active.
