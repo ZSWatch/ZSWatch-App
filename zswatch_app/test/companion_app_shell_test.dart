@@ -243,6 +243,40 @@ void main() {
   );
 
   testWidgets(
+    'Settings manages saved watches with the existing connection view and observes without changing ownership',
+    (tester) async {
+      await mount(tester, snapshot(active: true, ready: true));
+      final routes = router(tester);
+      routes.push(AppRoutes.settings);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Watch connection'));
+      await tester.pumpAndSettle();
+      expect(find.text('Saved watches'), findsOneWidget);
+      expect(find.text('Disconnect'), findsOneWidget);
+      expect(find.text('Cancel connection'), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.text('Companion prototype'), findsNothing);
+      expect(find.text('Connection setup'), findsNothing);
+      expect(calls, isEmpty);
+      expect(permissionRequests, 0);
+
+      routes.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Settings'), findsOneWidget);
+      expect(calls, isEmpty);
+      await tester.tap(find.text('Watch connection'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Disconnect'));
+      await tester.pumpAndSettle();
+      expect(calls.map((call) => call.method), ['stop']);
+      await emit(tester, snapshot());
+      await tester.pumpAndSettle();
+      expect(find.text('Connect'), findsOneWidget);
+      expect(permissionRequests, 0);
+    },
+  );
+
+  testWidgets(
     'explicit Connect acceptance stays on connection view until Ready; Disconnect persists native Stop',
     (tester) async {
       await mount(tester, snapshot());
@@ -345,10 +379,7 @@ void main() {
     (tester) async {
       await mount(tester, snapshot(active: true, ready: true));
       final routes = router(tester);
-      for (final path in [
-        AppRoutes.health,
-        AppRoutes.voiceMemoDetail(12),
-      ]) {
+      for (final path in [AppRoutes.health, AppRoutes.voiceMemoDetail(12)]) {
         routes.go(path);
         await tester.pumpAndSettle();
         expect(

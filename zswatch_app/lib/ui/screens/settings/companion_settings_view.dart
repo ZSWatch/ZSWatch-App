@@ -9,8 +9,7 @@ import '../../navigation/app_router.dart';
 import 'companion_http_settings_tile.dart';
 import 'companion_gps_settings_tile.dart';
 
-/// Legacy background preferences and model settings are withheld until their
-/// contracts migrate. The native owner retains persistent connection intent.
+/// Existing settings use the native owner's persistent connection intent.
 class CompanionSettingsView extends ConsumerWidget {
   const CompanionSettingsView({super.key});
 
@@ -26,7 +25,7 @@ class CompanionSettingsView extends ConsumerWidget {
             leading: const Icon(Icons.bluetooth),
             title: const Text('Watch connection'),
             subtitle: Text(connection.state.statusText),
-            onTap: () => context.push(AppRoutes.companionRuntime),
+            onTap: () => context.push(AppRoutes.savedWatches),
           ),
           if (snapshot?.runtimeActive == true)
             const Padding(

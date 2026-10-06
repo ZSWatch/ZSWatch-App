@@ -72,6 +72,7 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
     final saved = ref.watch(database.allWatchesProvider);
     final persistence = ref.watch(companionWatchPersistenceStateProvider);
     final active = snapshot?.runtimeActive == true;
+    final ready = snapshot?.protocolReady == true;
     final busy =
         changingConnection || ref.watch(watchNotifierProvider).isLoading;
     return Scaffold(
@@ -95,15 +96,23 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
           if (watch != null) Text(watch.id),
           const SizedBox(height: 16),
           if (active) ...[
-            const LinearProgressIndicator(),
-            const SizedBox(height: 16),
+            if (!ready) ...[
+              const LinearProgressIndicator(),
+              const SizedBox(height: 16),
+            ],
             Text(snapshot!.connection.state.statusText),
           ] else
             const Text('Watch disconnected'),
           const SizedBox(height: 16),
           FilledButton.icon(
             icon: Icon(active ? Icons.close : Icons.bluetooth),
-            label: Text(active ? 'Cancel connection' : 'Connect'),
+            label: Text(
+              active
+                  ? ready
+                        ? 'Disconnect'
+                        : 'Cancel connection'
+                  : 'Connect',
+            ),
             onPressed: busy || snapshot == null || (!active && watch == null)
                 ? null
                 : () => changeConnection(active ? null : watch!.id),
@@ -158,10 +167,6 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
                 ? null
                 : () => context.push(AppRoutes.scan),
             child: const Text('Add watch'),
-          ),
-          OutlinedButton(
-            onPressed: () => context.push(AppRoutes.companionRuntime),
-            child: const Text('Connection setup'),
           ),
           const SizedBox(height: 24),
           ListTile(

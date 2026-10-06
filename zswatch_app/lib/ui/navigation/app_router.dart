@@ -120,6 +120,10 @@ class AppRouter {
         builder: (context, state) => const CompanionPrototypeApp(),
       ),
       GoRoute(
+        path: AppRoutes.savedWatches,
+        builder: (context, state) => const StartPageScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.shell,
         builder: (context, state) => const ShellScreen(),
       ),

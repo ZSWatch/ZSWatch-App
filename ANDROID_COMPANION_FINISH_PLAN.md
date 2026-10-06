@@ -50,7 +50,7 @@ artifact identities, measured scope and earlier failed attempts.
 | Explicit local / hybrid / remote choices | Local-only flow passes. Real remote provider, credentials and upload consent remain external pending inputs; no automatic upload/fallback acceptance claimed. |
 | OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. Real Chrome MediaSession metadata and watch next/pause/play pass with both apps' UI in background, Flutter task absent and same PID; owned quiet tone/page, not commercial-player coverage. Previous-track remains unverified. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Release Shell command completes after Flutter task destruction (independent watch-state transition, same PID). Owned Android notification body replacement and phone-side removal pass with Flutter absent and same PID; independent UART shows remove/add with watch ID 1000004. Watch-originated dismissal, Shell/DFU arbitration, logs/cache isolation and complete ordinary connection/settings pass pending. Accepted native watchface upload survives Flutter task removal: Verifying background observed before teardown, Fume Guilloche full hash matches afterward, same PID. Original Retro Sunburst restored with its exact prior hash. Early UI disposal during preparation correctly leaves the original image unchanged; disconnect/process-loss interruption remains separate pending coverage. |
 | Firmware/resource updates | New fixed application and combined operations pass, acknowledged firmware ~41 KB/s with Flutter removed; active image/resource/original checks pass. Earlier failed combined operation stays failed; SDK network-core index 1 remains unavailable. |
-| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Physical phone reboot/first unlock passes: native foreground service and real watch HTTP (229 bytes) return with Flutter absent. Android broadcast queue records boot receiver delivery after 80.277 s; this is delayed system delivery, not immediate availability after unlock. Watch USB/UART transient disappearance and failed first observer remain recorded. ~8 h endurance pending; USB-attached coverage does not prove unplugged behavior. |
+| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Physical phone reboot/first unlock passes: native foreground service and real watch HTTP (229 bytes) return with Flutter absent. Android broadcast queue records boot receiver delivery after 80.277 s; this is delayed system delivery, not immediate availability after unlock. Watch USB/UART transient disappearance and failed first observer remain recorded. First eight-hour observer stops on ADB disappearance after 46.3 minutes of good sampled operation. October 6 same native PID is present, but Flutter/screen are active; the gap is unverified. ~8 h endurance pending; USB-attached coverage does not prove unplugged behavior. |
 | Final candidate / goal completion | 225 Android tests pass for LiteRT fix; 18 affected Flutter tests and release build pass for restored dashboard Watchface route. Latest retry-selection fix passes 17 native job tests, 8 Flutter recording tests, release build and physical reuse/reattachment. Non-debuggable release code is installed and physically exercised, lab re-signed only to retain existing data. Latest production SHA-256 ab9865ed5dc80c6b08c0beae9663bc04e8c26b71e7d62a8703abe427dc578ce6; installed lab SHA-256 0ac0047f8073434c2fda63703251fbbb6b2a70b79ee0887756bd742b1f777b9c; runtime source commit 75559c1. Pairing rough-edge cleanup follows remaining main feature pass. **Overall goal active.** |
 
 Release evidence: `.companion-hil-runs/20261005-oneplus-final-release/` and
@@ -128,8 +128,29 @@ retains identical transcript/summary and the same native PID 30812. The actual
 compute service class was independently checked as dev.zswatch.app.LlmComputeService;
 the first observer's generic class name alone was insufficient evidence.
 Evidence: `retry-existing-after/`, especially `reopen-observation.json`, and
-`retry-selection-release/artifact.json`. The bounded eight-hour screen-off
-observer has started on this artifact; acceptance remains pending until it ends.
+`retry-selection-release/artifact.json`. The first bounded eight-hour observer stopped after the ADB device disappeared.
+47 sampled observations through 2,777.8 s (46.3 minutes) all show the same PID,
+Flutter absent, screen off and the foreground connected-device service; both
+remote and loopback watch HTTP succeeded. The eight-hour acceptance remains
+unproven. On October 6 ADB is available again and PID 30812 still exists, but
+Flutter is now present and the screen is on. This later point cannot fill the
+unobserved interval. Evidence: `endurance-8h/quiet-result.json` and
+`.companion-hil-runs/20261006-oneplus-current/observation.json`.
+
+The watch's CDC port was inactive at the next setup. The documented, explicitly
+authorized lab reset/DTR sequence captured it at 5.743 s, received a real SMP
+app-state reply at 5.845 s and again at 30.876 s, and left the port enumerated
+after close. No firmware change was needed to keep USB enabled. This is setup,
+not a seamless lifecycle pass. Evidence: `.companion-hil-runs/20261006-usb-bootstrap/`.
+
+October 6 ordinary connection UI completion: Settings → Watch connection still
+opened CompanionPrototypeApp, exposing development controls in the normal flow.
+It now opens the existing start/saved-watch view through the existing saved-watches route. The ordinary Connection setup link into the prototype is removed too.
+An already Ready connection shows Disconnect without a connecting indicator;
+connecting states retain Cancel connection. The regression covers actual Settings
+navigation, passive open/back/reopen, explicit native Stop and its stopped view,
+with no legacy BLE/AI/DB startup. All 15 affected app-shell/saved-watch tests pass;
+release build and physical ordinary-flow verification are next.
 
 ### Shared Dart architecture clarification
 
