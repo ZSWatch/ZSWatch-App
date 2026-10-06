@@ -14,6 +14,19 @@ HTTP_OUTCOMES = {'pending', 'written', 'error_written', 'delivery_expired', 'del
                  'connection_closed', 'process_interrupted', 'invalid_id', 'busy'}
 
 
+def connected_device_foreground(services, component=COMPONENT):
+    """Check the actual owner's record, allowing additional foreground types."""
+    records = list(re.finditer(r'^\s*\* ServiceRecord\{[^\r\n]*\}', services, re.MULTILINE))
+    for index, record in enumerate(records):
+        if component not in record.group():
+            continue
+        end = records[index + 1].start() if index + 1 < len(records) else len(services)
+        block = services[record.end():end]
+        foreground = re.search(r'\bisForeground=(true|false)\b[^\r\n]*\btypes=(0x[0-9a-fA-F]+)\b', block)
+        return bool(foreground and foreground[1] == 'true' and int(foreground[2], 16) & 0x10)
+    return False
+
+
 def summarize_jobs(state):
     jobs, outbox = state.get('jobs', {}), state.get('outbox', {})
     if state.get('version') != 1 or not isinstance(jobs, dict) or not isinstance(outbox, dict):

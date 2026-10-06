@@ -435,6 +435,20 @@ Secure wireless ADB has not been activated: automatic approval review rejected
 that security-setting change pending explicit user authorization. Continue via
 USB while that optional request is unanswered.
 
+The above attempt stops after 787.7 s on its foreground-type assertion. Its
+observer incorrectly requires exactly `0x10`; the service legitimately adds the
+location bit during GPS work. The failing sample has no saved raw service dump,
+so that explanation is possible rather than proven. A subsequent independent
+dump shows PID 19620 unchanged, Flutter absent, screen off and the actual
+companion foreground record with connected-device type. Preserve the original
+failed outcome; it establishes neither an app crash nor uninterrupted endurance.
+`native_runtime_probe.connected_device_foreground` now checks the actual owner's
+record and the connected-device bit, allowing additional types. Three regression
+tests cover combined types, unhealthy owners and misleading other-service records.
+The corrected observation runs in `20261006-oneplus-comm-release-endurance-8h-2/`
+with raw service dumps saved per sample, on the same unchanged installed release.
+It remains **running, not passed**; USB reattachment sees the same PID.
+
 Physical dropped-ACK preparation: `scripts/companion_hil/prepare_lost_voice_ack.py`
 generates, but never runs, a temporary hardware breakpoint at the real durable
 result ACK send. The breakpoint checks the owned key/exact generation and
