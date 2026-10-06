@@ -421,6 +421,20 @@ firmware, SMP-library or model change was needed.
 Evidence: `20261006-oneplus-comm-log/artifact.json` and `physical-2/` under
 `.companion-hil-runs/`; `physical/` retains the original failed observer.
 
+October 6 longer release observation has started in
+`20261006-oneplus-comm-release-endurance-8h/` under `.companion-hil-runs/`, against
+the physically accepted `354c806` runtime above. Initial samples through 124.6 s
+show PID 19620 unchanged, Flutter absent, screen off and the foreground
+connected-device owner; real remote HTTP returns status 0 / 194 bytes at 3.852 s.
+This is setup/early evidence, **not an eight-hour pass**. The observer records
+ADB gaps explicitly and does not submit reverse-dependent loopback requests
+while ADB is absent. Remote endpoint errors remain explicit separately from
+native-owner continuity; real local-probe failures stop the observer. No forced
+idle or battery/permission reset is used, and USB remains physically attached.
+Secure wireless ADB has not been activated: automatic approval review rejected
+that security-setting change pending explicit user authorization. Continue via
+USB while that optional request is unanswered.
+
 Physical dropped-ACK preparation: `scripts/companion_hil/prepare_lost_voice_ack.py`
 generates, but never runs, a temporary hardware breakpoint at the real durable
 result ACK send. The breakpoint checks the owned key/exact generation and
