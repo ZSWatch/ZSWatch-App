@@ -51,7 +51,7 @@ artifact identities, measured scope and earlier failed attempts.
 | OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. Real Chrome MediaSession metadata and watch next/pause/play pass with both apps' UI in background, Flutter task absent and same PID; owned quiet tone/page, not commercial-player coverage. Previous-track remains unverified. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Release Shell command completes after Flutter task destruction (independent watch-state transition, same PID). Owned Android notification body replacement and phone-side removal pass with Flutter absent and same PID; independent UART shows remove/add with watch ID 1000004. Watch-originated dismissal, Shell/DFU arbitration, logs/cache isolation and complete ordinary connection/settings pass pending. Accepted native watchface upload survives Flutter task removal: Verifying background observed before teardown, Fume Guilloche full hash matches afterward, same PID. Original Retro Sunburst restored with its exact prior hash. Early UI disposal during preparation correctly leaves the original image unchanged; disconnect/process-loss interruption remains separate pending coverage. |
 | Firmware/resource updates | New fixed application and combined operations pass, acknowledged firmware ~41 KB/s with Flutter removed; active image/resource/original checks pass. Earlier failed combined operation stays failed; SDK network-core index 1 remains unavailable. |
 | Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Physical phone reboot/first unlock passes: native foreground service and real watch HTTP (229 bytes) return with Flutter absent. Android broadcast queue records boot receiver delivery after 80.277 s; this is delayed system delivery, not immediate availability after unlock. Watch USB/UART transient disappearance and failed first observer remain recorded. First eight-hour observer stops on ADB disappearance after 46.3 minutes of good sampled operation. October 6 same native PID is present, but Flutter/screen are active; the gap is unverified. ~8 h endurance pending; USB-attached coverage does not prove unplugged behavior. |
-| Final candidate / goal completion | 225 Android tests pass for LiteRT fix; 18 affected Flutter tests and release build pass for restored dashboard Watchface route. Latest retry-selection fix passes 17 native job tests, 8 Flutter recording tests, release build and physical reuse/reattachment. Non-debuggable release code is installed and physically exercised, lab re-signed only to retain existing data. Latest production SHA-256 ab9865ed5dc80c6b08c0beae9663bc04e8c26b71e7d62a8703abe427dc578ce6; installed lab SHA-256 0ac0047f8073434c2fda63703251fbbb6b2a70b79ee0887756bd742b1f777b9c; runtime source commit 75559c1. Pairing rough-edge cleanup follows remaining main feature pass. **Overall goal active.** |
+| Final candidate / goal completion | 225 Android tests pass for LiteRT fix; 18 affected Flutter tests and release build pass for restored dashboard Watchface route. Retry-selection fix passes 17 native job tests, 8 Flutter recording tests, release build and physical reuse/reattachment. Latest ordinary connection/Developer wiring passes 16 affected Flutter tests, release build and the stated physical UI/Shell pass. Non-debuggable release code is installed and physically exercised, lab re-signed only to retain existing data. Latest production SHA-256 f1b6f4a68be89d5deb321898c39387574b57de909b949d08451481c87be8b19f; installed lab SHA-256 79d4a59fe16e53ef2a2b7be498520acdc05c73656a4a393791affe1593dcd925; runtime source commit e5ccaa9. Pairing rough-edge cleanup follows remaining main feature pass. **Overall goal active.** |
 
 Release evidence: `.companion-hil-runs/20261005-oneplus-final-release/` and
 `.companion-hil-runs/20261005-oneplus-release-acceptance/` (calendar UI,
@@ -167,7 +167,19 @@ synthetic debug panels remain unavailable rather than starting a second BLE
 owner; their parity is not claimed. These diagnostics remain separate incomplete
 coverage, not evidence that all pre-refactor developer features are restored.
 The regression exercises the actual existing route/actions with legacy BLE
-providers set to throw. All 16 affected app-shell/saved-watch tests pass.
+providers set to throw. All 16 affected app-shell/saved-watch tests and release
+build pass. Physical release opens ordinary Developer Tools; Find/time/info
+controls are exercised, and its ordinary Shell receives a real watchface app-state
+reply, same PID 30345 and foreground native service. This proves the UI/native
+command path, not independent haptic or RTC measurement. A one-second time-sync
+snackbar expired before the first observer captured it; the observer remains
+failed, and verification resumed without a reset or repeated Find/Sync.
+Evidence: `.companion-hil-runs/20261006-oneplus-developer-ui/`, particularly
+`ui-flow/resume-observation.json`. A second bounded eight-hour observer is
+running on this latest artifact in `.companion-hil-runs/20261006-oneplus-endurance-8h/`.
+Temporary ADB failures are recorded without restarting the app; any missing
+screen/owner observations remain gaps and prevent a clean screen-off pass.
+A host observation failure is distinct from an observed native service failure.
 
 ### Shared Dart architecture clarification
 
