@@ -449,6 +449,34 @@ The corrected observation runs in `20261006-oneplus-comm-release-endurance-8h-2/
 with raw service dumps saved per sample, on the same unchanged installed release.
 It remains **running, not passed**; USB reattachment sees the same PID.
 
+October 6 Crash Reports implementation/build checkpoint: the existing Developer
+tile, Current/History view, summary persistence, analysis and export now use the
+native Android owner. Opening or explicitly refreshing the view queries the
+existing Nordic SMP shell `coredump summary`; erase uses `coredump erase 0` and
+then verifies absence. Download uses the existing SDK file manager and fixed
+`/user/coredump.txt` path, with the shared diagnostic reader's bounds, generation
+fences and firmware/SMP arbitration. No additional connection or custom protocol
+is introduced. Current firmware returns `-ENOENT` with `Failed to read summary
+(-2)` when no file exists, including after erase; only that exact error/output
+pair counts as absence. Other errors cannot clear a cached report. The existing
+optional version field is `dbg: 0/1`, rather than a new boolean field. This
+firmware's version response currently omits SHA/debug metadata; missing SHA stays
+empty and raw export uses `unknown` rather than throwing on substring. Automatic
+background crash discovery is not claimed: current firmware does not send the
+Gadgetbridge crash-summary message, and normal dashboard observation does not
+poll SMP. Existing shared Dart analysis and SQLite history remain; controlled
+tests use a fake backend, and no real crash payload is uploaded automatically.
+
+Validation: 38 affected Flutter tests and 56 affected native tests pass; targeted
+analysis has no errors/warnings and one pre-existing unawaited route-push info.
+Host widget SQLite uses the temporary test-only library symlink, without changing
+project dependencies. Release builds in 50.3 s, production APK SHA-256
+`38b368c783ce1b4cd80866bc5d1920b17068d792d243ae338dfb45ac3ba2f59e`.
+This APK is **not installed or physically accepted yet** because the independent
+endurance observer owns the watch and phone session. Physical Current/Refresh,
+download and erase acceptance remain pending; analysis upload requires the
+existing explicit user action. Sensors remain separate incomplete parity.
+
 Physical dropped-ACK preparation: `scripts/companion_hil/prepare_lost_voice_ack.py`
 generates, but never runs, a temporary hardware breakpoint at the real durable
 result ACK send. The breakpoint checks the owned key/exact generation and

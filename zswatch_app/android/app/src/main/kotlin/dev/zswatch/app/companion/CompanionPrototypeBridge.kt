@@ -246,6 +246,28 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         PrototypeHub.main.post { result.success(mapOf("version" to 1, "generation" to generation, "id" to id, "accepted" to true)) }
                     } catch (error: Exception) { PrototypeHub.main.post { result.error("WATCHFACE_FAILED", error.message, null) } }
                 }
+                "inspectCoredump", "downloadCoredump" -> PrototypeHub.worker.post {
+                    try {
+                        val generation = when (val value = call.argument<Any>("generation")) {
+                            is Int -> value.toLong()
+                            is Long -> value
+                            else -> error("Integer generation required")
+                        }
+                        require(generation >= 0)
+                        val link = CompanionPrototypeService.instance?.transport ?: error("Native owner required")
+                        if (call.method == "downloadCoredump") link.downloadCoredump(generation) { outcome ->
+                            PrototypeHub.main.post { outcome.fold({ reply -> result.success(mapOf(
+                                "version" to 1, "bytes" to reply.bytes)) },
+                                { error -> result.error("COREDUMP_FAILED", error.message, null) }) }
+                        } else {
+                            val erase = call.argument<Boolean>("erase") ?: false
+                            link.inspectCoredump(generation, erase) { outcome -> PrototypeHub.main.post {
+                                outcome.fold({ result.success(mapOf("version" to 1, "completed" to true)) },
+                                    { error -> result.error("COREDUMP_FAILED", error.message, null) })
+                            } }
+                        }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("COREDUMP_FAILED", error.message, null) } }
+                }
                 "inspectLogs" -> PrototypeHub.worker.post {
                     try {
                         val args = call.arguments as? Map<*, *> ?: error("Arguments required")

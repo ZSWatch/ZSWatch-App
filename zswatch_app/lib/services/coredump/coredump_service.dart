@@ -63,7 +63,8 @@ class CoredumpAnalysisState {
 class CoredumpService {
   static const String _coredumpPath = '/user/coredump.txt';
 
-  final WatchService _watchService;
+  final WatchService? _watchService;
+  final Future<Uint8List> Function()? _nativeDownload;
   final CoredumpApiService _apiService;
   final FirmwareManager _firmwareManager;
 
@@ -78,7 +79,14 @@ class CoredumpService {
   /// The raw coredump text from the last analysis (for export).
   String? lastCoredumpTxt;
 
-  CoredumpService(this._watchService, this._apiService, this._firmwareManager);
+  CoredumpService(this._watchService, this._apiService, this._firmwareManager)
+    : _nativeDownload = null;
+
+  CoredumpService.native(
+    this._nativeDownload,
+    this._apiService,
+    this._firmwareManager,
+  ) : _watchService = null;
 
   Stream<CoredumpAnalysisState> get stateStream => _state.stream;
   CoredumpAnalysisState get currentState => _state.value;
@@ -94,15 +102,17 @@ class CoredumpService {
       return null;
     }
 
-    final smpGen = _watchService.connectionGeneration;
+    final smpGen = _watchService?.connectionGeneration;
     try {
       // Step 1: Enable SMP
       _state.add(
         const CoredumpAnalysisState(phase: CoredumpAnalysisPhase.enablingSmp),
       );
-      await _watchService.enableSmp();
+      if (_watchService != null) await _watchService.enableSmp();
       // Give the watch time to enable SMP service
-      await Future<void>.delayed(const Duration(seconds: 2));
+      if (_watchService != null) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
 
       // Step 2: Download coredump.txt
       _state.add(
@@ -187,7 +197,9 @@ class CoredumpService {
 
       // Disable SMP after we're done
       try {
-        await _watchService.disableSmpIfConnectionUnchanged(smpGen);
+        if (_watchService != null && smpGen != null) {
+          await _watchService.disableSmpIfConnectionUnchanged(smpGen);
+        }
       } catch (_) {}
 
       return result;
@@ -201,14 +213,17 @@ class CoredumpService {
       );
       // Try to disable SMP even on failure
       try {
-        await _watchService.disableSmpIfConnectionUnchanged(smpGen);
+        if (_watchService != null && smpGen != null) {
+          await _watchService.disableSmpIfConnectionUnchanged(smpGen);
+        }
       } catch (_) {}
       return null;
     }
   }
 
   Future<Uint8List?> _downloadCoredump() async {
-    final device = _watchService.device;
+    if (_nativeDownload != null) return _nativeDownload();
+    final device = _watchService!.device;
     if (device == null) {
       debugPrint('[CoredumpService] No device connected');
       return null;

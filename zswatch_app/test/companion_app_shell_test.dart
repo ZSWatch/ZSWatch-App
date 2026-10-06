@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zswatch_app/app.dart';
+import 'package:zswatch_app/data/database/app_database.dart';
 import 'package:zswatch_app/providers/ai_providers.dart';
 import 'package:zswatch_app/providers/auto_reconnect_provider.dart';
 import 'package:zswatch_app/providers/chat_providers.dart';
@@ -90,7 +92,11 @@ void main() {
     await tester.pump();
   }
 
-  Future<void> mount(WidgetTester tester, Map<String, Object?> state) async {
+  Future<void> mount(
+    WidgetTester tester,
+    Map<String, Object?> state, {
+    AppDatabase? crashDb,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -112,7 +118,9 @@ void main() {
           filesystemUploadServiceProvider.overrideWith(
             (ref) => legacy('legacy FS'),
           ),
-          database.databaseProvider.overrideWith((ref) => legacy('Drift')),
+          database.databaseProvider.overrideWith(
+            (ref) => crashDb ?? legacy('Drift'),
+          ),
           watchServiceProvider.overrideWith(
             (ref) => legacy('Dart WatchService'),
           ),
@@ -185,6 +193,9 @@ void main() {
     messenger.setMockMethodCallHandler(methods, (call) async {
       calls.add(call);
       if (call.method == 'start') return {'version': 1, 'accepted': true};
+      if (call.method == 'inspectCoredump') {
+        return {'version': 1, 'completed': true};
+      }
       if (call.method == 'notificationStatus') {
         return {
           'version': 1,
@@ -205,6 +216,65 @@ void main() {
     messenger.setMockMethodCallHandler(traffic, null);
     expect(forbidden, isEmpty);
   });
+
+  testWidgets(
+    'existing Crash Reports uses native summary and keeps UI history after absence',
+    (tester) async {
+      final db = AppDatabase.forTesting(
+        NativeDatabase.memory(),
+        recoverLegacyProcessing: false,
+      );
+      addTearDown(db.close);
+      await tester.runAsync(
+        () => db.upsertWatch(
+          WatchesCompanion.insert(
+            id: 'AA:BB:CC:DD:EE:FF',
+            name: 'Owned watch',
+            createdAt: DateTime.now(),
+          ),
+        ),
+      );
+      final state = snapshot(active: true, ready: true);
+      state['watch_info'] =
+          Map<String, Object?>.from(state['watch_info'] as Map)..addAll({
+            'firmware_sha': 'owned-sha',
+            'firmware_debug': true,
+            'coredump': {
+              'file': 'owned.c',
+              'line': 123,
+              'time': '2026-10-06 22:00:00',
+            },
+          });
+      await mount(tester, state, crashDb: db);
+      router(tester).go(AppRoutes.developer);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Crash Reports'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Crash Reports'));
+      await tester.pumpAndSettle();
+      expect(find.text('owned.c'), findsOneWidget);
+      expect(
+        calls.where((call) => call.method == 'inspectCoredump'),
+        hasLength(1),
+      );
+      expect(subscriptions.where((kind) => kind == 'listen'), hasLength(1));
+      final rows = await tester.runAsync(
+        () => db.getCrashReports(watchId: 'AA:BB:CC:DD:EE:FF'),
+      );
+      expect(rows, hasLength(1));
+      expect(rows!.single.file, 'owned.c');
+      final absent = snapshot(active: true, ready: true);
+      await emit(tester, absent);
+      await tester.pumpAndSettle();
+      expect(find.text('No active crash'), findsOneWidget);
+      await tester.tap(find.text('History'));
+      await tester.pumpAndSettle();
+      expect(find.text('owned.c:123'), findsOneWidget);
+      expect(calls.where((call) => call.method == 'downloadCoredump'), isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets(
     'existing Comm Log observes native protocol traffic and detaches',

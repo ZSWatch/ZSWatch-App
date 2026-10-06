@@ -14,6 +14,7 @@ internal class PrototypeLogFiles(
     companion object {
         val paths = (0 until 8).map { "/user/logs/log" + it.toString().padStart(4, '0') }
         const val MAX_BYTES = 4 * 1024 * 1024
+        const val COREDUMP_PATH = "/user/coredump.txt"
     }
     private class Request(val generation: Long, val path: String?, val done: (Result<PrototypeLogReply>) -> Unit) {
         val files = mutableListOf<PrototypeLogFile>()
@@ -23,7 +24,7 @@ internal class PrototypeLogFiles(
     val busy get() = request != null
 
     fun start(generation: Long, path: String?, done: (Result<PrototypeLogReply>) -> Unit) {
-        require(path == null || path in paths) { "Only known log paths are supported" }
+        require(path == null || path in paths || path == COREDUMP_PATH) { "Only known diagnostic paths are supported" }
         check(owns(generation)) { "Current Ready session required" }
         check(!busy) { "Log operation is running" }
         val entry = Request(generation, path, done)

@@ -8,6 +8,20 @@ import 'dfu_providers.dart';
 import 'settings_providers.dart';
 import 'watch_providers.dart';
 import 'watch_service_provider.dart';
+import 'companion_runtime_providers.dart';
+
+/// Query the existing watch shell only when the Crash Reports view is opened or
+/// refreshed. Dashboard observation never opens an additional SMP operation.
+final nativeCoredumpInspectionProvider = FutureProvider.autoDispose<void>((
+  ref,
+) async {
+  final client = ref.read(companionClientProvider);
+  final snapshot = await client.snapshot();
+  if (!snapshot.protocolReady) {
+    throw StateError('Connect the watch to inspect crashes');
+  }
+  await client.inspectCoredump(snapshot.generation);
+});
 
 /// Provider for the backend API service.
 final coredumpApiServiceProvider = Provider<CoredumpApiService>((ref) {
@@ -17,10 +31,26 @@ final coredumpApiServiceProvider = Provider<CoredumpApiService>((ref) {
 
 /// Provider for the coredump analysis orchestration service.
 final coredumpServiceProvider = Provider<CoredumpService>((ref) {
-  final watchService = ref.watch(watchServiceProvider);
   final apiService = ref.watch(coredumpApiServiceProvider);
   final firmwareManager = ref.watch(firmwareManagerProvider);
-  final service = CoredumpService(watchService, apiService, firmwareManager);
+  final service = ref.watch(nativeCompanionRuntimeProvider)
+      ? CoredumpService.native(
+          () async {
+            final client = ref.read(companionClientProvider);
+            final snapshot = await client.snapshot();
+            if (!snapshot.protocolReady) {
+              throw StateError('Connect the watch first');
+            }
+            return client.downloadCoredump(snapshot.generation);
+          },
+          apiService,
+          firmwareManager,
+        )
+      : CoredumpService(
+          ref.watch(watchServiceProvider),
+          apiService,
+          firmwareManager,
+        );
   ref.onDispose(() => service.dispose());
   return service;
 });
@@ -57,7 +87,6 @@ final crashFileStatsProvider = FutureProvider<List<CrashFileStats>>((ref) {
 /// Must be watched from a top-level widget to stay active.
 final crashReportPersistenceProvider = Provider<void>((ref) {
   final repo = ref.watch(crashReportRepositoryProvider);
-  final watchService = ref.watch(watchServiceProvider);
   final coredumpService = ref.watch(coredumpServiceProvider);
 
   // Persist crash summaries when received from watch
@@ -74,14 +103,14 @@ final crashReportPersistenceProvider = Provider<void>((ref) {
     }
     lastCrashKey = crashKey;
 
-    final watchId = watchService.device?.remoteId.str;
+    final watchId = ref.read(currentWatchProvider)?.id;
     if (watchId == null) return;
 
     lastSavedReportId = await repo.saveCrashSummary(
       watchId: watchId,
       summary: summary,
     );
-  });
+  }, fireImmediately: true);
 
   // Persist analysis results when analysis completes
   ref.listen(coredumpAnalysisStateProvider, (previous, next) async {

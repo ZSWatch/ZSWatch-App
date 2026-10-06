@@ -77,7 +77,7 @@ class _DeveloperToolsBody extends ConsumerWidget {
         title: 'Crash Reports',
         subtitle: 'History & stats',
         accent: Colors.redAccent.shade200,
-        onTap: native ? null : () => context.push(AppRoutes.crashReport),
+        onTap: () => context.push(AppRoutes.crashReport),
       ),
       _BlendToolTile(
         icon: Icons.sensors,

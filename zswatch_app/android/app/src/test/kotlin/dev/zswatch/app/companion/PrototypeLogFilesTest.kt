@@ -16,6 +16,20 @@ class PrototypeLogFilesTest {
         fun start(path: String? = null) = operation.start(generation, path) { results.add(it) }
         fun status(size: Int?) = probes.last().second(Result.success(size))
     }
+    @Test fun coredumpUsesSameReadOnlyBoundedFencedReaderButIsNotEnumeratedAsALog() {
+        val r = Rig(); r.start(PrototypeLogFiles.COREDUMP_PATH)
+        assertEquals(PrototypeLogFiles.COREDUMP_PATH, r.probes.single().first)
+        r.status(3); r.downloads.single()(Result.success(byteArrayOf(1, 2, 3)))
+        assertArrayEquals(byteArrayOf(1, 2, 3), r.results.single().getOrThrow().bytes)
+        assertFalse(PrototypeLogFiles.COREDUMP_PATH in PrototypeLogFiles.paths)
+        assertThrows(IllegalArgumentException::class.java) { Rig().start("/user/coredump.txt/../recordings/x") }
+        val oversized = Rig(); oversized.start(PrototypeLogFiles.COREDUMP_PATH)
+        oversized.status(PrototypeLogFiles.MAX_BYTES + 1)
+        assertTrue(oversized.results.single().isFailure); assertTrue(oversized.downloads.isEmpty())
+        val interrupted = Rig(); interrupted.start(PrototypeLogFiles.COREDUMP_PATH); interrupted.status(3)
+        interrupted.generation++; interrupted.downloads.single()(Result.success(byteArrayOf(1, 2, 3)))
+        assertTrue(interrupted.results.single().isFailure)
+    }
     @Test fun fixedPathsAndSessionAreRequiredBeforeSdkAccess() {
         val r = Rig()
         for (path in listOf("/user/logs/log0008", "/user/logs/../recordings/a", "/user/logs/log0000/"))

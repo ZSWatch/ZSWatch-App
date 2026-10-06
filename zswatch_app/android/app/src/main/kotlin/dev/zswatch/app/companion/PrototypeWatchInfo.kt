@@ -19,6 +19,7 @@ class PrototypeWatchInfo(private val store: PrototypeStore) {
                     if (value is String && value.isNotBlank() && value.toByteArray(Charsets.UTF_8).size <= 160)
                         fields[field] = value
                 }
+                (message.opt("dbg") as? Int)?.takeIf { it in 0..1 }?.let { fields["firmware_debug"] = it == 1 }
                 if (fields.isEmpty()) return false
                 fields["version_generation"] = generation
                 fields["version_observed_ms"] = now
@@ -36,6 +37,19 @@ class PrototypeWatchInfo(private val store: PrototypeStore) {
                 if (fields.isEmpty()) return false
                 fields["status_generation"] = generation
                 fields["status_observed_ms"] = now
+            }
+            "coredump" -> {
+                val available = message.opt("available") as? Boolean ?: return false
+                if (available) {
+                    val file = message.opt("file") as? String ?: return false
+                    val time = message.opt("time") as? String ?: return false
+                    val line = message.opt("line")
+                    if (line !is Int || line < 0 || file.toByteArray(Charsets.UTF_8).size !in 1..512 ||
+                        time.length !in 1..80) return false
+                    fields["coredump"] = JSONObject().put("file", file).put("line", line).put("time", time)
+                } else fields["coredump"] = JSONObject.NULL
+                fields["coredump_generation"] = generation
+                fields["coredump_observed_ms"] = now
             }
             else -> return false
         }

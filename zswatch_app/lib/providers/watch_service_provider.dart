@@ -203,7 +203,31 @@ final hasSmpServiceProvider = Provider<bool>((ref) {
 
 /// Provider for crash summary stream (null if no crash available).
 final crashSummaryStreamProvider = StreamProvider<CrashSummary?>((ref) {
-  if (ref.watch(nativeCompanionRuntimeProvider)) return Stream.value(null);
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    // Reuse the app's one snapshot subscription. Only crash/identity changes
+    // restart this projection; battery/status traffic must not resave history.
+    ref.watch(
+      companionSnapshotProvider.select((snapshot) {
+        final value = snapshot.valueOrNull;
+        final crash = value?.crashSummary;
+        return crash == null
+            ? null
+            : (
+                value?.fields['address'],
+                crash.file,
+                crash.line,
+                crash.time,
+                crash.fwVersion,
+                crash.fwCommitSha,
+                crash.board,
+                crash.buildType,
+              );
+      }),
+    );
+    return Stream.value(
+      ref.read(companionSnapshotProvider).valueOrNull?.crashSummary,
+    );
+  }
   final service = ref.watch(watchServiceProvider);
   return service.crashSummaryStream;
 });

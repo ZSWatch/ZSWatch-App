@@ -187,15 +187,51 @@ class NativePrototypeTransport(private val context: Context, private val handler
     )
 
     internal fun inspectLogs(generation: Long, path: String?, done: (Result<PrototypeLogReply>) -> Unit) {
+        require(path == null || path in PrototypeLogFiles.paths) { "Only known log paths are supported" }
+        readDiagnosticFile(generation, path, done)
+    }
+
+    private fun readDiagnosticFile(generation: Long, path: String?, done: (Result<PrototypeLogReply>) -> Unit) {
         check(!firmwareBusy()) { "Firmware operation is running" }
         check(!downloading && !smpPreparation.busy && !shellOperation.busy && !watchface.busy) { "SMP operation is running" }
         check(fileTransport?.isReady == true && smpIdleLease.held(generation)) { "Prepare SMP first" }
         // Validate before taking the lease so invalid requests cannot suppress cleanup.
-        require(path == null || path in PrototypeLogFiles.paths) { "Only known log paths are supported" }
+        require(path == null || path in PrototypeLogFiles.paths || path == PrototypeLogFiles.COREDUMP_PATH)
         check(!logFiles.busy && !watchface.busy) { "Another SMP operation is running" }
         check(runtime.owns(generation) && token == generation && store.control()["phase"] == "ready") { "Current Ready session required" }
         smpIdleLease.hold(generation)
         logFiles.start(generation, path, done)
+    }
+
+    internal fun downloadCoredump(generation: Long, done: (Result<PrototypeLogReply>) -> Unit) {
+        prepareShell(generation) { prepared -> prepared.fold({ current ->
+            try { readDiagnosticFile(current, PrototypeLogFiles.COREDUMP_PATH, done) }
+            catch (error: Exception) { done(Result.failure(error)) }
+        }, { done(Result.failure(it)) }) }
+    }
+
+    internal fun inspectCoredump(generation: Long, erase: Boolean, done: (Result<Unit>) -> Unit) {
+        fun summary(current: Long) {
+            try { executeShell(current, "coredump summary") { reply ->
+                done(reply.mapCatching {
+                    val packet = PrototypeCoredumpSummary.packet(it.output, it.returnCode)
+                    if (erase) check(!packet.getBoolean("available")) { "Watch still has a coredump" }
+                    check(PrototypeWatchInfo(store).receive(packet, current, System.currentTimeMillis())) {
+                        "Watch connection changed"
+                    }
+                    Unit
+                })
+            } } catch (error: Exception) { done(Result.failure(error)) }
+        }
+        prepareShell(generation) { prepared -> prepared.fold({ current ->
+            if (!erase) summary(current)
+            else try { executeShell(current, "coredump erase 0") { reply ->
+                reply.fold({
+                    if (it.returnCode != 0L) done(Result.failure(IllegalStateException("Coredump erase command failed")))
+                    else summary(current)
+                }, { done(Result.failure(it)) })
+            } } catch (error: Exception) { done(Result.failure(error)) }
+        }, { done(Result.failure(it)) }) }
     }
 
     private var watchfaceTransfer: TransferController? = null

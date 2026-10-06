@@ -12,6 +12,7 @@ import '../../data/models/companion_shell_result.dart';
 import '../../data/models/companion_log_files.dart';
 import '../../data/models/companion_watchface_status.dart';
 import '../../data/models/companion_firmware_status.dart';
+import '../../data/models/crash_summary.dart';
 
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
@@ -71,6 +72,26 @@ class CompanionPrototypeSnapshot {
   Map<Object?, Object?>? get _watchInfo {
     final info = fields['watch_info'];
     return info is Map && info['address'] == fields['address'] ? info : null;
+  }
+
+  CrashSummary? get crashSummary {
+    final info = _watchInfo;
+    final crash = info?['coredump'];
+    if (crash is! Map ||
+        crash['file'] is! String ||
+        crash['line'] is! int ||
+        crash['time'] is! String) {
+      return null;
+    }
+    return CrashSummary(
+      file: crash['file'] as String,
+      line: crash['line'] as int,
+      time: crash['time'] as String,
+      fwVersion: info?['firmware_version'] as String? ?? '',
+      fwCommitSha: info?['firmware_sha'] as String? ?? '',
+      board: info?['hardware_version'] as String? ?? 'watchdk',
+      buildType: info?['firmware_debug'] == true ? 'debug' : 'release',
+    );
   }
 
   bool get hasLiveStatus =>
@@ -143,6 +164,31 @@ class CompanionPrototypeClient {
       'version': 1,
       'enabled': enabled,
     });
+  }
+
+  Future<void> inspectCoredump(int generation, {bool erase = false}) async {
+    final reply = await methods.invokeMethod<Object?>('inspectCoredump', {
+      'version': 1,
+      'generation': generation,
+      'erase': erase,
+    });
+    if (reply is! Map || reply['version'] != 1 || reply['completed'] != true) {
+      throw const FormatException('Unsupported coredump inspection reply');
+    }
+  }
+
+  Future<Uint8List> downloadCoredump(int generation) async {
+    final reply = await methods.invokeMethod<Object?>('downloadCoredump', {
+      'version': 1,
+      'generation': generation,
+    });
+    if (reply is! Map ||
+        reply['version'] != 1 ||
+        reply['bytes'] is! Uint8List ||
+        (reply['bytes'] as Uint8List).length > 4 * 1024 * 1024) {
+      throw const FormatException('Unsupported coredump download reply');
+    }
+    return reply['bytes'] as Uint8List;
   }
 
   /// Ephemeral completed NUS writes and reassembled protocol messages. Opening

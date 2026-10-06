@@ -136,6 +136,10 @@ class AppRouter {
         builder: (context, state) => const CommLogScreen(),
       ),
       GoRoute(
+        path: AppRoutes.crashReport,
+        builder: (context, state) => const CrashReportScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.shell,
         builder: (context, state) => const ShellScreen(),
       ),
