@@ -277,6 +277,43 @@ void main() {
   );
 
   testWidgets(
+    'existing Developer actions use the single native owner without legacy BLE',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await mount(tester, snapshot(active: true, ready: true));
+      router(tester).go(AppRoutes.developer);
+      await tester.pumpAndSettle();
+      expect(find.text('Developer Tools'), findsOneWidget);
+      for (final label in ['Find watch', 'Sync Time', 'Device Info']) {
+        await tester.tap(find.text(label));
+        await tester.pumpAndSettle();
+      }
+      expect(
+        calls
+            .where(
+              (call) => [
+                'findWatch',
+                'syncTime',
+                'requestDeviceInfo',
+              ].contains(call.method),
+            )
+            .map((call) => call.method),
+        ['findWatch', 'syncTime', 'requestDeviceInfo'],
+      );
+      expect(
+        calls.singleWhere((call) => call.method == 'findWatch').arguments,
+        {'version': 1, 'generation': 10},
+      );
+      expect(
+        calls.where((call) => call.method == 'start' || call.method == 'stop'),
+        isEmpty,
+      );
+      expect(permissionRequests, 0);
+    },
+  );
+
+  testWidgets(
     'explicit Connect acceptance stays on connection view until Ready; Disconnect persists native Stop',
     (tester) async {
       await mount(tester, snapshot());

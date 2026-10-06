@@ -579,9 +579,7 @@ class _FeatureShortcuts extends StatelessWidget {
             _FeatureTile(
               icon: Icons.code,
               label: 'Developer',
-              onTap: () => context.push(
-                native ? AppRoutes.companionRuntime : AppRoutes.developer,
-              ),
+              onTap: () => context.push(AppRoutes.developer),
             ),
             _FeatureTile(
               icon: Icons.mic,

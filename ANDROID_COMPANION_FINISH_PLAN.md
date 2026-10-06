@@ -150,7 +150,24 @@ An already Ready connection shows Disconnect without a connecting indicator;
 connecting states retain Cancel connection. The regression covers actual Settings
 navigation, passive open/back/reopen, explicit native Stop and its stopped view,
 with no legacy BLE/AI/DB startup. All 15 affected app-shell/saved-watch tests pass;
-release build and physical ordinary-flow verification are next.
+release build passes. Installed release physically passes Settings/back/reopen,
+Disconnect (native service disappears), Connect (Ready observed at 2.956 s)
+and return to Connected dashboard, same PID 24082. This is an observation bound,
+not wire latency. The first observer required an exact accessibility label;
+Flutter actually merges Watch connection with Connected. No reset/install was
+used to retry that UI observation. Evidence:
+`.companion-hil-runs/20261006-oneplus-connection-ui/connection-flow-2/`.
+
+Ordinary Developer entry also still targeted the prototype. The existing Flutter
+Developer Tools view is now registered for the native app and the dashboard
+opens it. Find reuses the existing native timed button; Sync Time and Device Info
+use already implemented native commands. Shell and File System retain their
+migrated routes. Legacy live Log Viewer/Comm Log, Crash Reports, sensor GATT and
+synthetic debug panels remain unavailable rather than starting a second BLE
+owner; their parity is not claimed. These diagnostics remain separate incomplete
+coverage, not evidence that all pre-refactor developer features are restored.
+The regression exercises the actual existing route/actions with legacy BLE
+providers set to throw. All 16 affected app-shell/saved-watch tests pass.
 
 ### Shared Dart architecture clarification
 

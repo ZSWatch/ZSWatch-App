@@ -124,6 +124,10 @@ class AppRouter {
         builder: (context, state) => const StartPageScreen(),
       ),
       GoRoute(
+        path: AppRoutes.developer,
+        builder: (context, state) => const DeveloperScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.shell,
         builder: (context, state) => const ShellScreen(),
       ),
