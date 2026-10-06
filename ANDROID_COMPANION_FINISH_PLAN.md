@@ -44,7 +44,7 @@ artifact identities, measured scope and earlier failed attempts.
 | Short Swedish/English and longer input | Swedish pass. English Whisper Base + Qwen and a 37.8 s replay of real microphone audio complete real headless processing/persistence/watch ACK in release. English duration is transcribed correctly; brand name and longer Swedish transcript have errors. Timer classification remains an existing AI-quality limitation, explicitly deferred by the user on 2026-10-05; do not tune prompts/models for this refactor. |
 | Existing Flutter UI / single native owner | Real transcript/summary/action review, ordinary Process dedup and actual audio playback pass. Original audio retained. Release missing-model retry and reuse of an older successful result after a newer failed model pass; selected transcript/summary persist across Flutter task removal/reopen without compute service. Complete settings/model coverage remains part of the consolidated pass. |
 | Action confirmation / side effects | Real release local-calendar Create/Undo passes for owned entry ZSWatch_HIL_release_20261005; Calendar independently shows tomorrow 09:00–09:30 and app confirms removal. Original transcript/audio retained. Timer/alarm OS dispatch and timezone coverage pending; existing model misclassification does not authorize AI-quality work. |
-| Durable result / dedup / interrupted work | Real watch application ACK, job reuse and process-loss recovery with saved transcript pass. Deliberately lost ACK/replay physical acceptance pending. |
+| Durable result / dedup / interrupted work | Real watch application ACK, job reuse and process-loss recovery with saved transcript pass. A fresh result exposed a firmware sysworkq stack overflow; c8f05d09 fixes it. The already committed phone result then delivers with Flutter absent and the same PID, without rerunning AI. Deliberately lost ACK physical acceptance remains pending; the first debugger attempt did not omit an ACK. |
 | Cancellation and invalid/unavailable inputs | Real GGUF cancel and Stop pass. LiteRT channel cancellation: four controlled-callback regressions pass, actual model unavailable. Release real Whisper Base STT cancellation on the owned 37.8 s fixture passes before transcript/result persistence: native abort log, Cancelled UI, compute service gone at the first 2.425 s observation, same PID and 22 watch originals retained. Existing Retry processing control and missing-model case pass in release: selecting undownloaded Whisper Small English gives Processing failed / Reason: model_missing without a new transcript or result; 23 phone receipts remain. Remaining silence/malformed/storage physical coverage pending. |
 | BLE under AI load / resources | Actual prompt-time watch HTTP and notification pass (observed bounds 1.511/1.363 s); same process/generation and Flutter absent. New release English inference completes in about 72 s with same PID, Flutter absent and real remote HTTP callback during work. Prompt prefill and RSS/thermal snapshot recorded. Concurrent time-write and battery/endurance remain pending. |
 | Explicit local / hybrid / remote choices | Local-only flow is implemented and passes. Real remote audio/STT and hybrid local-STT/remote-text voice adapters are not implemented yet; the native remote fixtures prove job contracts only. Implementation and real acceptance await selected provider, credentials and upload consent. Existing ordinary policy explicitly uses local models; unsupported remote/hybrid or upload-authorized requests reject before local processing, so no automatic upload/fallback is claimed. |
@@ -256,6 +256,48 @@ logging-through-disconnect and simultaneous voice-result receipt remain pending.
 Evidence: `20261006-oneplus-live-logs/physical/` under `.companion-hil-runs/`,
 including private XML/UART, `phone-return.json` and `observation.json`. No product
 or firmware change was needed for this physical pass.
+
+October 6 fresh-result firmware blocker and recovery: the owned 7.56 s
+byte-identical microphone replay `hil_ack_1006_191241` is fully read back and
+verified over USB (31,051 bytes, original SHA-256
+752adbf221bec1e7c7a1398b797993085325529bd2b40a19bab5dc99470de862).
+Several USB upload timeouts are preserved; the bounded SDK retry completes the
+same owned upload. Ordinary Refresh queues automatic local processing. The
+first UI observer incorrectly expected a manual Process dialog after automatic
+processing had already entered Transcribing; no duplicate submission was made.
+Flutter is removed, and the real pipeline persists a result waiting for watch
+acceptance. The watch then repeatedly faults in sysworkq while accepting the
+fresh receipt: Usage Fault / Stack overflow, not an established phone crash.
+The debugger reports invalid registers as the target resets; no owned ACK file
+is emitted and no ACK is omitted. Treat that attempt as failed, not a lost-ACK
+pass. Stop the boot loop by temporarily disabling phone Bluetooth.
+
+Firmware `c8f05d09` moves the 2,000-byte legacy encoding conversion scratch off
+the NUS workqueue stack, allocating/freeing it only when conversion is needed.
+Already valid UTF-8 goes straight to the dispatcher. No system stack increase,
+new protocol, model/prompt change or new service. The previous compiled common
+parser frame is 6,312 bytes; the rebuilt dispatcher is 32 bytes and voice parser
+2,488 bytes. Receipt/CRC/fault/capacity host regression and full WatchDK build
+pass. Only signed application internal flash and low-QSPI XIP spans are flashed:
+0x10000–0xdcd58 and 0x10120000–0x101959e8; userdata is absent from the HEX.
+Active app image hash is
+118bbaf56141bc7890b453e2fb7e29ed43790b21108214988edc3cbc3ac138a9.
+The external image hash also changes with this application/XIP deployment;
+no claim of a byte-identical whole resource image is made.
+
+Physical fixed-firmware acceptance passes: restore Bluetooth, keep Flutter
+absent, and the existing committed result receives a real durable-new / ACK=0
+at the first 10.504 s observation after radio enable, same phone PID 4832.
+Real watch HTTP subsequently returns status 0 / 231 bytes at an observed
+3.557 s. Independent USB verifies all 22 prior watch recordings plus original
+Retro Sunburst background and this owned replay (24 full file hashes); 23 watch
+recordings remain. No further fatal/reset appears throughout that verification.
+This proves outbox recovery after the actual watch failure and application fix,
+not deliberate ACK loss, full endurance or naturally spoken new audio.
+Evidence: `20261006-oneplus-lost-ack-2/` and `20261006-receipt-stack-fix/` under
+`.companion-hil-runs/`. The debugger preparation script now removes its pending
+breakpoint, detaches and exits with failure if the target stops without a matched
+owned ACK; all four existing safety/identity regressions pass.
 
 Physical dropped-ACK preparation: `scripts/companion_hil/prepare_lost_voice_ack.py`
 generates, but never runs, a temporary hardware breakpoint at the real durable

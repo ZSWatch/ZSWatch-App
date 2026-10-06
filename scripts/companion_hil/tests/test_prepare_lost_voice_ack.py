@@ -64,6 +64,7 @@ class PrepareLostVoiceAckTest(unittest.TestCase):
         self.assertIn('set $r0 = -5', value)
         self.assertLess(value.index('dump binary memory'), value.index('set $pc'))
         self.assertIn('set $r0 = -5\n  detach\n  quit', value)
+        self.assertTrue(value.endswith('delete breakpoints\ndetach\nquit 2\n'))
         self.assertNotRegex(value, r'(?m)^\s*(load|restore|call|monitor reset)\b')
         for forbidden in ('strcmp(', 'memcmp('):
             self.assertNotIn(forbidden, value)

@@ -85,6 +85,10 @@ commands
 end
 echo Owned ACK omission armed; trigger the recording's normal processing now.\\n
 continue
+echo Watch stopped without a matched owned ACK; removing the pending breakpoint.\\n
+delete breakpoints
+detach
+quit 2
 '''
 
 
