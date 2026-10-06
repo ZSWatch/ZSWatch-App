@@ -84,7 +84,7 @@ class _DeveloperToolsBody extends ConsumerWidget {
         title: 'Sensors',
         subtitle: 'Real-time data',
         accent: Colors.tealAccent.shade400,
-        onTap: !native && connection.isConnected
+        onTap: connection.isConnected
             ? () => context.push(AppRoutes.sensors)
             : null,
       ),

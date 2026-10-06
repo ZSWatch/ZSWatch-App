@@ -147,6 +147,36 @@ class CompanionPrototypeClient {
         await methods.invokeMethod<Object?>('snapshot', {'version': 1}),
       );
 
+  Stream<Map<String, Object?>> sensors() => const EventChannel(
+    'dev.zswatch.app/companion_sensors_v1',
+  ).receiveBroadcastStream({'version': 1}).map(_sensorEvent);
+
+  static Map<String, Object?> _sensorEvent(Object? value) {
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['generation'] is! int ||
+        !const ['state', 'sample'].contains(value['kind'])) {
+      throw const FormatException('Unsupported sensor event');
+    }
+    return Map<String, Object?>.from(value);
+  }
+
+  Future<Map<String, Object?>> sensorState() async => _sensorEvent(
+    await methods.invokeMethod<Object?>('sensorState', {'version': 1}),
+  );
+
+  Future<void> setSensor(int generation, String sensor, bool enabled) async {
+    final reply = await methods.invokeMethod<Object?>('setSensor', {
+      'version': 1,
+      'generation': generation,
+      'sensor': sensor,
+      'enabled': enabled,
+    });
+    if (reply is! Map || reply['version'] != 1 || reply['completed'] != true) {
+      throw const FormatException('Unsupported sensor subscription reply');
+    }
+  }
+
   Stream<Map<String, Object?>> liveLogs() =>
       const EventChannel(
         'dev.zswatch.app/companion_logs_v1',

@@ -16,6 +16,8 @@ object PrototypeHub {
     val logObservers = CopyOnWriteArraySet<(Map<String, Any?>) -> Unit>()
     fun publishLiveLog(event: Map<String, Any?>) { logObservers.forEach { it(event) } }
     val trafficObservers = CopyOnWriteArraySet<(Map<String, Any?>) -> Unit>()
+    val sensorObservers = CopyOnWriteArraySet<(Map<String, Any?>) -> Unit>()
+    fun publishSensor(event: Map<String, Any?>) { sensorObservers.forEach { it(event) } }
     fun publishTraffic(direction: String, text: String, bytes: Int, chunks: Int, generation: Long) {
         if (trafficObservers.isEmpty() || bytes > 65536) return
         val event = mapOf("version" to 1, "direction" to direction, "data" to text,

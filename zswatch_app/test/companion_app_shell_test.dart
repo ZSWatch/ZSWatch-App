@@ -65,6 +65,7 @@ void main() {
   const events = MethodChannel('dev.zswatch.app/companion_events_v1');
   const logs = MethodChannel('dev.zswatch.app/companion_logs_v1');
   const traffic = MethodChannel('dev.zswatch.app/companion_traffic_v1');
+  const sensors = MethodChannel('dev.zswatch.app/companion_sensors_v1');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   final calls = <MethodCall>[];
@@ -72,6 +73,7 @@ void main() {
   final subscriptions = <String>[];
   final logSubscriptions = <String>[];
   final trafficSubscriptions = <String>[];
+  final sensorSubscriptions = <String>[];
   final forbidden = <String>[];
   late Map<String, Object?> saved;
   var permissionRequests = 0;
@@ -174,6 +176,7 @@ void main() {
     subscriptions.clear();
     logSubscriptions.clear();
     trafficSubscriptions.clear();
+    sensorSubscriptions.clear();
     forbidden.clear();
     permissionRequests = 0;
     denyPermission = false;
@@ -190,8 +193,22 @@ void main() {
       trafficSubscriptions.add(call.method);
       return null;
     });
+    messenger.setMockMethodCallHandler(sensors, (call) async {
+      sensorSubscriptions.add(call.method);
+      return null;
+    });
     messenger.setMockMethodCallHandler(methods, (call) async {
       calls.add(call);
+      if (call.method == 'sensorState') {
+        return {
+          'version': 1,
+          'kind': 'state',
+          'generation': 10,
+          'available': ['temperature', 'fusion'],
+          'enabled': <String>[],
+        };
+      }
+      if (call.method == 'setSensor') return {'version': 1, 'completed': true};
       if (call.method == 'start') return {'version': 1, 'accepted': true};
       if (call.method == 'inspectCoredump') {
         return {'version': 1, 'completed': true};
@@ -214,6 +231,7 @@ void main() {
     messenger.setMockMethodCallHandler(events, null);
     messenger.setMockMethodCallHandler(logs, null);
     messenger.setMockMethodCallHandler(traffic, null);
+    messenger.setMockMethodCallHandler(sensors, null);
     expect(forbidden, isEmpty);
   });
 
@@ -275,6 +293,61 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  testWidgets('existing Sensors route observes native owner and detaches', (
+    tester,
+  ) async {
+    await mount(tester, snapshot(active: true, ready: true));
+    router(tester).go(AppRoutes.developer);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Sensors'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sensors'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sensor Debug'), findsOneWidget);
+    expect(sensorSubscriptions, ['listen']);
+    expect(
+      tester.widget<Switch>(find.byType(Switch).first).onChanged,
+      isNotNull,
+    );
+    expect(subscriptions.where((kind) => kind == 'listen'), hasLength(1));
+    await tester.scrollUntilVisible(
+      find.text('Temperature'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    final card = find
+        .ancestor(of: find.text('Temperature'), matching: find.byType(Card))
+        .first;
+    final toggle = find.descendant(of: card, matching: find.byType(Switch));
+    await tester.ensureVisible(toggle);
+    await tester.pumpAndSettle();
+    await tester.tap(toggle);
+    await tester.pump(const Duration(milliseconds: 300));
+    await messenger.handlePlatformMessage(
+      sensors.name,
+      const StandardMethodCodec().encodeSuccessEnvelope({
+        'version': 1,
+        'kind': 'sample',
+        'generation': 10,
+        'sensor': 'temperature',
+        'bytes': Uint8List.fromList([0, 0, 176, 65]),
+      }),
+      (_) {},
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('1 samples'), findsOneWidget);
+    final commands = calls.where((call) => call.method == 'setSensor').toList();
+    expect(commands, hasLength(1));
+    final args = commands.single.arguments as Map;
+    expect(args['sensor'], 'temperature');
+    expect(args['generation'], 10);
+    expect(args['enabled'], true);
+    router(tester).pop();
+    await tester.pumpAndSettle();
+    expect(sensorSubscriptions, ['listen', 'cancel']);
+    expect(calls.where((call) => call.method == 'stop'), isEmpty);
+  });
 
   testWidgets(
     'existing Comm Log observes native protocol traffic and detaches',

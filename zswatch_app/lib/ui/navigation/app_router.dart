@@ -140,6 +140,10 @@ class AppRouter {
         builder: (context, state) => const CrashReportScreen(),
       ),
       GoRoute(
+        path: AppRoutes.sensors,
+        builder: (context, state) => const SensorDebugScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.shell,
         builder: (context, state) => const ShellScreen(),
       ),

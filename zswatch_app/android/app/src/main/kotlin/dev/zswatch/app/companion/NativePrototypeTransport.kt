@@ -414,6 +414,15 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var operation = 0L
     private var retryDelay = 5000L
     val liveLogs = CompanionLiveLogs(PrototypeHub::publishLiveLog)
+    internal val sensors = PrototypeSensors(PrototypeHub::publishSensor)
+    private var sensorDescriptor: BluetoothGattDescriptor? = null
+    internal fun setSensor(generation: Long, name: String, enabled: Boolean, done: (Result<Unit>) -> Unit) {
+        check(generation == token && runtime.owns(generation) && store.control()["phase"] == "ready") { "Current Ready session required" }
+        if (enabled) check(PrototypeHub.sensorObservers.isNotEmpty()) { "Open the sensor view first" }
+        sensors.request(name, enabled, done)
+        pump()
+    }
+    internal fun stopSensors() { sensors.stopAll(); safely { pump() } }
     private val framer = NusJsonFramer(log = liveLogs::receive)
     private val writes = ArrayDeque<NusWrite>()
     private var payloadSize = 20
@@ -509,9 +518,23 @@ class NativePrototypeTransport(private val context: Context, private val handler
             }
             override fun onDescriptorWrite(client: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) = accept(client) {
                 if (descriptor.uuid != CCCD) return@accept
+                if (descriptor === sensorDescriptor) {
+                    sensorDescriptor = null
+                    val change = sensors.current ?: return@accept
+                    if (status != BluetoothGatt.GATT_SUCCESS) client.setCharacteristicNotification(descriptor.characteristic, !change.enabled)
+                    sensors.complete(change, status == BluetoothGatt.GATT_SUCCESS)
+                    pump()
+                    return@accept
+                }
+                if (descriptor.characteristic.uuid != RX || store.control()["phase"] != "subscribing") return@accept
                 check(status == BluetoothGatt.GATT_SUCCESS) { "CCCD write failed: $status" }
                 operation++
                 runtime.phase(session, "ready")
+                sensors.reset(session, PrototypeSensors.specs.filter { spec ->
+                    client.getService(spec.service)?.getCharacteristic(spec.characteristic)?.let {
+                        it.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 && it.getDescriptor(CCCD) != null
+                    } == true
+                }.map { it.name }.toSet())
                 retryDelay = 5000
                 readInitialBattery(client, session)
                 command("GB({\"t\":\"log\",\"status\":false})")
@@ -530,11 +553,11 @@ class NativePrototypeTransport(private val context: Context, private val handler
             }
             override fun onCharacteristicChanged(client: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
                 val copy = characteristic.value?.clone() ?: return
-                if (characteristic.uuid == RX) accept(client) { incoming(copy) }
+                accept(client) { if (characteristic.uuid == RX) incoming(copy) else incomingSensor(characteristic.uuid, copy) }
             }
             override fun onCharacteristicChanged(client: BluetoothGatt, characteristic: BluetoothGattCharacteristic, value: ByteArray) {
                 val copy = value.clone()
-                if (characteristic.uuid == RX) accept(client) { incoming(copy) }
+                accept(client) { if (characteristic.uuid == RX) incoming(copy) else incomingSensor(characteristic.uuid, copy) }
             }
             override fun onCharacteristicWrite(client: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) = accept(client) {
                 if (characteristic.uuid != TX || noResponse || !writing) return@accept
@@ -725,8 +748,11 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     private fun pump() {
-        if (writing || readingBattery || writes.isEmpty()) return
+        if (writing || readingBattery || sensors.busy) return
         val client = gatt ?: return
+        if (store.control()["phase"] != "ready") return
+        if (pumpSensor(client)) return
+        if (writes.isEmpty()) return
         val characteristic = tx ?: return
         val item = writes.first
         if (!item.mayStart()) { writes.remove(); pump(); return }
@@ -744,6 +770,35 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 if (runtime.owns(session) && operation == expected && writing) safely { writeFinished() }
             }, 40)
         }
+    }
+
+    private fun incomingSensor(uuid: UUID, value: ByteArray) {
+        if (PrototypeHub.sensorObservers.isEmpty()) return
+        PrototypeSensors.specs.firstOrNull { it.characteristic == uuid }?.let { sensors.receive(it.name, value) }
+    }
+
+    private fun pumpSensor(client: BluetoothGatt): Boolean {
+        val change = sensors.next() ?: return false
+        val spec = PrototypeSensors.specs.first { it.name == change.name }
+        val characteristic = client.getService(spec.service)?.getCharacteristic(spec.characteristic)
+        val descriptor = characteristic?.getDescriptor(CCCD)
+        if (descriptor == null || !client.setCharacteristicNotification(characteristic, change.enabled)) {
+            sensors.complete(change, false); pump(); return true
+        }
+        sensorDescriptor = descriptor
+        descriptor.value = if (change.enabled) BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            else BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+        if (!client.writeDescriptor(descriptor)) {
+            sensorDescriptor = null
+            client.setCharacteristicNotification(characteristic, !change.enabled)
+            sensors.complete(change, false); pump(); return true
+        }
+        val session = token
+        handler.postDelayed({
+            if (runtime.owns(session) && gatt === client && sensors.current === change)
+                safely { lost(session, "Sensor CCCD write timed out") }
+        }, 5000)
+        return true
     }
 
     private fun writeFinished() {
@@ -992,6 +1047,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
         writing = false; writes.clear(); downloading = false
         notificationWriting = false
         readingBattery = false
+        sensorDescriptor = null
+        sensors.reset(token, emptySet())
         awaitingMtu = false; payloadSize = 20
         linkConnected = false; servicesHandled = false
         runCatching { transfer?.cancel() }; transfer = null

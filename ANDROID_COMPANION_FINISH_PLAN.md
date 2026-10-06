@@ -477,6 +477,34 @@ endurance observer owns the watch and phone session. Physical Current/Refresh,
 download and erase acceptance remain pending; analysis upload requires the
 existing explicit user action. Sensors remain separate incomplete parity.
 
+October 6 Sensors implementation/build checkpoint restores the existing Developer
+tile, Sensor Debug cards/charts, individual toggles and quaternion/orientation
+controls. All eight existing sensor UUIDs and float decoders are reused. Android
+subscribes through the existing companion GATT connection; sensor CCCD writes,
+initial battery reads and NUS writes are serialized by that owner's pump. Only
+the NUS CCCD can establish protocol Ready; a sensor CCCD completion cannot rerun
+connection setup. Failed sensor operations return an error; an uncertain timed-out
+ATT operation fences/reconnects the owner. The sensor request queue and UI event
+queue are bounded. Samples are ephemeral, size-checked and generation-fenced, with
+no durable journal writes, extra BLE connection, UI or SMP implementation. Closing
+or destroying the view cancels observation and queues subscription cleanup;
+closing during enable waits for that actual CCCD transaction before disable.
+Disconnect clears availability/enabled state; reconnect exposes current
+capabilities with sensors off, requiring explicit user toggles again.
+
+Validation: all 240 native unit tests pass, including three new serialization,
+cleanup and reconnect tests. All 39 affected Flutter tests pass, including real
+route/toggle/value/disposal coverage and controlled samples through all eight
+existing Dart decoders. Targeted analysis has no errors/warnings and the same
+pre-existing route-push info. The first view observers incorrectly counted
+offscreen lazy children and waited for an indeterminate first-sample spinner;
+corrected tests scroll to the actual control and supply the first controlled
+sample. Release builds in 50.5 s, production APK SHA-256
+`ba07196cbd2384ebf7f3651d99bfdcd27b9e2776f8419ce3eb7053b5200fc408`.
+It includes the Crash Reports restoration but remains **uninstalled and physically
+unaccepted** while the independent endurance session owns the hardware. Real
+sensor values, toggles/disposal/reconnect and HTTP during streaming remain pending.
+
 Physical dropped-ACK preparation: `scripts/companion_hil/prepare_lost_voice_ack.py`
 generates, but never runs, a temporary hardware breakpoint at the real durable
 result ACK send. The breakpoint checks the owned key/exact generation and

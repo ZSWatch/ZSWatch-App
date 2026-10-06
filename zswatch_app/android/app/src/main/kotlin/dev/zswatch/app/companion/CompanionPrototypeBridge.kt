@@ -21,6 +21,18 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
     private val events = EventChannel(messenger, "dev.zswatch.app/companion_events_v1")
     private val logs = EventChannel(messenger, "dev.zswatch.app/companion_logs_v1")
     private val traffic = EventChannel(messenger, "dev.zswatch.app/companion_traffic_v1")
+    private val sensors = EventChannel(messenger, "dev.zswatch.app/companion_sensors_v1")
+    @Volatile private var sensorSink: EventChannel.EventSink? = null
+    private val pendingSensors = AtomicInteger()
+    private val sensorChanged: (Map<String, Any?>) -> Unit = { event ->
+        val expected = sensorSink
+        if (expected != null) {
+            if (pendingSensors.incrementAndGet() <= 64) PrototypeHub.main.post {
+                try { if (sensorSink === expected) expected.success(event) }
+                finally { pendingSensors.decrementAndGet() }
+            } else pendingSensors.decrementAndGet()
+        }
+    }
     @Volatile private var trafficSink: EventChannel.EventSink? = null
     private val pendingTraffic = AtomicInteger()
     private val trafficChanged: (Map<String, Any?>) -> Unit = { event ->
@@ -46,6 +58,24 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
             if ((call.arguments as? Map<*, *>)?.get("version") != 1) {
                 result.error("VERSION", "Unsupported companion bridge version", null)
             } else when (call.method) {
+                "sensorState", "setSensor" -> PrototypeHub.worker.post {
+                    try {
+                        val link = CompanionPrototypeService.instance?.transport ?: error("Native owner required")
+                        if (call.method == "sensorState") {
+                            val state = link.sensors.state()
+                            PrototypeHub.main.post { result.success(state) }
+                        } else {
+                            val value = call.argument<Any>("generation")
+                            require(value is Int || value is Long) { "Integer generation required" }
+                            val name = call.argument<String>("sensor") ?: error("Sensor required")
+                            val enabled = call.argument<Boolean>("enabled") ?: error("Boolean enabled required")
+                            link.setSensor((value as Number).toLong(), name, enabled) { outcome ->
+                                PrototypeHub.main.post { outcome.fold({ result.success(mapOf("version" to 1, "completed" to true)) },
+                                    { result.error("SENSOR_FAILED", it.message, null) }) }
+                            }
+                        }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("SENSOR_FAILED", error.message, null) } }
+                }
                 "setLogStreaming" -> PrototypeHub.worker.post {
                     try {
                         val enabled = call.argument<Boolean>("enabled") ?: error("Boolean enabled required")
@@ -445,6 +475,18 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
             }
             override fun onCancel(arguments: Any?) { detachTraffic() }
         })
+        sensors.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, eventSink: EventChannel.EventSink) {
+                sensorSink = eventSink
+                PrototypeHub.worker.post {
+                    if (sensorSink === eventSink) {
+                        PrototypeHub.sensorObservers.add(sensorChanged)
+                        CompanionPrototypeService.instance?.transport?.sensors?.state()?.let(sensorChanged)
+                    }
+                }
+            }
+            override fun onCancel(arguments: Any?) { detachSensors() }
+        })
     }
 
     private fun snapshot(deliver: (Any?) -> Unit, failed: (String?) -> Unit = { sink?.error("SNAPSHOT_FAILED", it, null) }) {
@@ -484,9 +526,18 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
         PrototypeHub.worker.post { PrototypeHub.trafficObservers.remove(trafficChanged) }
     }
 
+    private fun detachSensors() {
+        sensorSink = null
+        PrototypeHub.worker.post {
+            PrototypeHub.sensorObservers.remove(sensorChanged)
+            if (PrototypeHub.sensorObservers.isEmpty()) CompanionPrototypeService.instance?.transport?.stopSensors()
+        }
+    }
+
     fun dispose() {
-        association.dispose(); detach(); detachLogs(); detachTraffic()
+        association.dispose(); detach(); detachLogs(); detachTraffic(); detachSensors()
         methods.setMethodCallHandler(null); events.setStreamHandler(null); logs.setStreamHandler(null)
         traffic.setStreamHandler(null)
+        sensors.setStreamHandler(null)
     }
 }
