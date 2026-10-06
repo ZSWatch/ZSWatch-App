@@ -505,6 +505,17 @@ It includes the Crash Reports restoration but remains **uninstalled and physical
 unaccepted** while the independent endurance session owns the hardware. Real
 sensor values, toggles/disposal/reconnect and HTTP during streaming remain pending.
 
+Prepared installation artifact: `20261006-oneplus-crash-sensors/artifact.json`
+records runtime source `2c99ecd`, the production hash above and lab APK hash
+`721de9f4a3c0187258563d0fcaa077f76ade7379ddede8ff3edea96bd8aa9a56`.
+Existing lab certificate matches; the APK remains non-debuggable and every
+nonsignature ZIP entry is byte-identical to the production release. No install,
+data reset or phone restart occurred. The older compiled-owner helper cannot
+inspect this minified release because it requires the removed BuildConfig class;
+its failed/unsupported result is retained rather than marked passed. Native
+source/unit/build evidence and physical acceptance remain distinct. The active
+endurance observer still exercises the installed `354c806` runtime, not this APK.
+
 Physical dropped-ACK preparation: `scripts/companion_hil/prepare_lost_voice_ack.py`
 generates, but never runs, a temporary hardware breakpoint at the real durable
 result ACK send. The breakpoint checks the owned key/exact generation and
