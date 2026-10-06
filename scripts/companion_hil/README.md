@@ -510,3 +510,51 @@ fresh native admission/completion with the actual watch callback, and retain
 error/late outcomes. A shell admission return, fixture hit or ATT completion
 alone is not a watch consumer pass. See the Nokia report for the completed
 active/900-second forced-idle comparison and its external-network limitations.
+
+### Physical lost voice-result ACK using the existing debugger
+
+`prepare_lost_voice_ack.py` prepares a GDB command file without connecting to a
+device. It locates the ACK send in the current firmware ELF, checks that the
+durable acceptance return is available in debug symbols, and records the ELF,
+source, generator and command-file identities. Use the Nordic toolchain's ARM
+GDB. It does not require Python support inside GDB.
+
+```bash
+python3 scripts/companion_hil/prepare_lost_voice_ack.py \
+  --gdb "$ZSW_ARM_GDB" --elf "$ZSW_WATCH_ELF" \
+  --source /home/jakkra/Documents/ZSWatch/app/src/ble/gadgetbridge/ble_gadgetbridge.c \
+  --recording-key "$ZSW_OWNED_RECORDING_KEY" \
+  --generation "$ZSW_RESULT_GENERATION" \
+  --output "$ZSW_NEW_ACK_RUN"
+```
+
+Run the physical phase after the endurance observer releases the watch, UART
+and phone. First verify the active watch ImageState against the signed image
+matching this ELF. Select an owned recording and a genuinely new native result
+generation; reselecting a completed job deliberately performs no new delivery.
+Keep original audio and any confirmed external actions. Capture the original
+recording hashes/count, job result/outbox/action state and UART before the test.
+Use an existing J-Link GDB server targeting debugger 51022722's application core
+on localhost port 2331. Do not reset or flash the watch just to arm the test.
+
+Then run `"$ZSW_ARM_GDB" --batch -x "$ZSW_NEW_ACK_RUN/omit-one-ack.gdb"`.
+The command file verifies the live ACK-call instruction bytes, arms a temporary
+hardware breakpoint scoped to the exact recording key/generation and a **new**
+durable receipt (`accepted == 1`), and resumes. Trigger ordinary app processing
+for that recording, then remove Flutter once the native owner accepts it. At
+the matching send, the script rechecks the guard, saves only the ACK envelope,
+skips the single `ble_comm_send` instruction and sets its return to `-EIO`.
+It immediately detaches, resuming unchanged firmware. No SMP protocol, draft
+payload or calendar/Clock action is injected. A mismatching target is left
+unchanged. If the breakpoint never matches, interrupt GDB, delete breakpoints,
+detach and quit; a missing omission file is **not** test success.
+
+Physical acceptance needs all of: the captured matching omitted ACK; UART
+`durable result new, ACK=-5` followed by `durable result duplicate, ACK=0`;
+native retry of the same committed result and eventual matched application ACK;
+one retained watch receipt and no second draft publication; unchanged original
+audio, committed result and confirmed external-action state; Flutter absent and
+the native owner still running during recovery. Inspect the real journal/outbox
+and receipt bytes through the existing tooling. Command-file generation or a
+debugger exit alone proves none of these. Record radio/process/reset recovery
+separately: this test deliberately omits one ACK on an otherwise live link.
