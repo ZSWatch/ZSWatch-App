@@ -418,6 +418,7 @@ class PrototypeContractsTest {
             packets.addAll(packet.toList())
         } while (!write.advance())
         assertArrayEquals(bytes, packets.toByteArray())
+        assertEquals((bytes.size + 19) / 20, write.chunkCount)
     }
 
     @Test fun closedContainerMatchesUsbFixtureAndRejectsBrokenBoundaries() {

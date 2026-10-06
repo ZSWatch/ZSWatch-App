@@ -15,6 +15,14 @@ object PrototypeHub {
     val observers = CopyOnWriteArraySet<() -> Unit>()
     val logObservers = CopyOnWriteArraySet<(Map<String, Any?>) -> Unit>()
     fun publishLiveLog(event: Map<String, Any?>) { logObservers.forEach { it(event) } }
+    val trafficObservers = CopyOnWriteArraySet<(Map<String, Any?>) -> Unit>()
+    fun publishTraffic(direction: String, text: String, bytes: Int, chunks: Int, generation: Long) {
+        if (trafficObservers.isEmpty() || bytes > 65536) return
+        val event = mapOf("version" to 1, "direction" to direction, "data" to text,
+            "size_bytes" to bytes, "chunk_count" to chunks,
+            "utc_ms" to System.currentTimeMillis(), "generation" to generation)
+        trafficObservers.forEach { it(event) }
+    }
     private var store: PrototypeStore? = null
     private var jobStore: PrototypeStore? = null
 

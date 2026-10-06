@@ -61,7 +61,7 @@ class _DeveloperToolsBody extends ConsumerWidget {
         title: 'Comm Log',
         subtitle: 'BLE traffic',
         accent: Colors.amberAccent.shade400,
-        onTap: native ? null : () => context.push(AppRoutes.commLog),
+        onTap: () => context.push(AppRoutes.commLog),
       ),
       _BlendToolTile(
         icon: Icons.terminal,

@@ -28,6 +28,7 @@ internal class NusWrite(val bytes: ByteArray, val done: () -> Unit = {}, private
                         private val canStart: () -> Boolean = { true }) {
     private var offset = 0
     init { require(bytes.isNotEmpty() && packetSize > 0) }
+    val chunkCount: Int get() = (bytes.size - 1) / packetSize + 1
     fun mayStart(): Boolean = offset > 0 || canStart()
     fun packet(): ByteArray = bytes.copyOfRange(offset, minOf(offset + packetSize, bytes.size))
     fun advance(): Boolean {

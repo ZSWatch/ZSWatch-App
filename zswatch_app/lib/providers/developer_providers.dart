@@ -304,7 +304,15 @@ final filteredLogEntriesProvider = Provider<List<LogEntry>>((ref) {
 /// Provider for the communication log repository
 /// Wired to watch service streams to automatically capture TX/RX traffic
 final commLogRepositoryProvider =
-    StateNotifierProvider<CommLogNotifier, List<CommLogEntry>>((ref) {
+    StateNotifierProvider.autoDispose<CommLogNotifier, List<CommLogEntry>>((
+      ref,
+    ) {
+      if (ref.watch(nativeCompanionRuntimeProvider)) {
+        return CommLogNotifier.native(
+          ref.watch(companionClientProvider).communicationTraffic(),
+        );
+      }
+      ref.keepAlive(); // Preserve the deferred iOS diagnostic lifetime.
       final watchService = ref.watch(watchServiceProvider);
       return CommLogNotifier(watchService);
     });
@@ -314,14 +322,40 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
   static const String _bleLogPrefix = '<BLELOG>';
   static const String _bleLogSuffix = '</BLELOG>';
 
-  final WatchService _watchService;
+  final WatchService? _watchService;
   final CommLogRepository _repo = CommLogRepository();
   StreamSubscription<String>? _rxSubscription;
   StreamSubscription<String>? _txSubscription;
+  StreamSubscription<Map<String, Object?>>? _nativeSubscription;
+  int _nativeId = 1;
   bool _discardingBleLog = false;
 
   CommLogNotifier(this._watchService) : super([]) {
     _subscribeToStreams();
+  }
+
+  CommLogNotifier.native(Stream<Map<String, Object?>> events)
+    : _watchService = null,
+      super([]) {
+    _nativeSubscription = events.listen((event) {
+      final chunks = event['chunk_count']! as int;
+      _repo.add(
+        CommLogEntry(
+          id: _nativeId++,
+          timestamp: DateTime.fromMillisecondsSinceEpoch(
+            event['utc_ms']! as int,
+          ),
+          data: event['data']! as String,
+          direction: event['direction'] == 'tx'
+              ? CommDirection.tx
+              : CommDirection.rx,
+          sizeBytes: event['size_bytes']! as int,
+          wasChunked: event['direction'] == 'tx' && chunks > 1,
+          chunkCount: event['direction'] == 'tx' ? chunks : null,
+        ),
+      );
+      state = _repo.entries;
+    });
   }
 
   CommLogRepository get repository => _repo;
@@ -370,7 +404,7 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
   }
 
   void _subscribeToStreams() {
-    _rxSubscription = _watchService.rawIncomingData.listen((data) {
+    _rxSubscription = _watchService!.rawIncomingData.listen((data) {
       final sanitized = _stripDebugLogs(data);
       if (sanitized == null) return;
 
@@ -395,12 +429,13 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
   void dispose() {
     _rxSubscription?.cancel();
     _txSubscription?.cancel();
+    _nativeSubscription?.cancel();
     super.dispose();
   }
 }
 
 /// Provider for communication log entries (refreshes on change)
-final commLogEntriesProvider = Provider<List<CommLogEntry>>((ref) {
+final commLogEntriesProvider = Provider.autoDispose<List<CommLogEntry>>((ref) {
   final entries = ref.watch(commLogRepositoryProvider);
   // Return in chronological order (oldest first, newest last)
   // This matches the auto-scroll to bottom behavior in the UI
@@ -408,7 +443,7 @@ final commLogEntriesProvider = Provider<List<CommLogEntry>>((ref) {
 });
 
 /// Provider for communication log statistics
-final commLogStatsProvider = Provider<CommLogStats>((ref) {
+final commLogStatsProvider = Provider.autoDispose<CommLogStats>((ref) {
   // Watch the state to trigger rebuild when entries change
   final entries = ref.watch(commLogRepositoryProvider);
 

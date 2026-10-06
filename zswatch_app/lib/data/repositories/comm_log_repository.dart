@@ -110,6 +110,9 @@ class CommLogRepository {
     _totalBytes += entry.sizeBytes;
   }
 
+  /// A native event retains its actual byte count and completion timestamp.
+  void add(CommLogEntry entry) => _addEntry(entry);
+
   bool _shouldRotate(int newEntrySize) {
     if (_entries.isEmpty) return false;
 

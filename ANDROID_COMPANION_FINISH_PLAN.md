@@ -381,6 +381,25 @@ Evidence: `20261006-oneplus-concurrent-recovery/` (original failed observer and
 the earlier malformed test's remote timeout; that remote timeout remains failed.
 No model, prompt, app-library or firmware change is introduced for this pass.
 
+October 6 Comm Log implementation restores the existing Flutter tile/view through
+a dedicated ephemeral event channel from the same native NUS owner. TX entries
+are emitted only after the complete queued write finishes; RX entries are
+reassembled protocol JSON from the existing framer, with firmware log bodies
+excluded. It observes NUS protocol traffic, not the Nordic SDK's SMP byte stream.
+Entries retain completion/receive timestamps, UTF-8 byte counts and actual TX
+chunk counts. Capture is attached only while the view observes it, never written
+to the durable journal, and uses the existing 5,000-entry/5 MiB UI rotation plus
+a 64-event native-to-main-thread queue bound. Detach drops late callbacks without
+changing the companion lifetime, BLE connection or firmware-log toggle. Native
+capture does no payload conversion when no observer is attached. The route test
+keeps legacy BLE/WatchService/DB providers set to throw and verifies traffic,
+byte counts, timestamps, clear, actual cancellation and empty reopen without BLE
+commands. All 35 affected Flutter app-shell/client tests and 59 native NUS/HTTP/
+live-log tests pass. Static analysis has no errors or warnings (one existing
+test-only unawaited route-push info). Release build and physical acceptance are
+pending at this implementation checkpoint. Crash Reports and sensor diagnostics
+remain separate incomplete parity.
+
 Physical dropped-ACK preparation: `scripts/companion_hil/prepare_lost_voice_ack.py`
 generates, but never runs, a temporary hardware breakpoint at the real durable
 result ACK send. The breakpoint checks the owned key/exact generation and

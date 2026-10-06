@@ -714,7 +714,13 @@ class NativePrototypeTransport(private val context: Context, private val handler
         operation++
         writing = false
         val item = writes.peek() ?: return
-        if (item.advance()) { writes.remove(); item.done() }
+        if (item.advance()) {
+            writes.remove()
+            // Observe completed NUS writes, never queued or failed attempts.
+            if (PrototypeHub.trafficObservers.isNotEmpty()) PrototypeHub.publishTraffic("tx",
+                item.bytes.toString(Charsets.UTF_8), item.bytes.size, item.chunkCount, token)
+            item.done()
+        }
         pump()
         flushNotifications()
     }
@@ -758,6 +764,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
         if (framer.droppedFrames > droppedBefore)
             store.update("nus_incomplete_frame_discarded", detail = mapOf("count" to framer.droppedFrames - droppedBefore))
         for (text in frames) {
+            // The existing framer has already removed firmware logs and joined
+            // split UTF-8/JSON. Diagnostic capture does not participate in parsing.
+            if (PrototypeHub.trafficObservers.isNotEmpty()) PrototypeHub.publishTraffic("rx",
+                text, text.toByteArray(Charsets.UTF_8).size, 1, token)
             val message = JSONObject(text)
             // A notification may precede the CCCD completion callback. Readiness
             // sends time anyway; do not disconnect a valid subscribing link.

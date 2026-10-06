@@ -145,6 +145,28 @@ class CompanionPrototypeClient {
     });
   }
 
+  /// Ephemeral completed NUS writes and reassembled protocol messages. Opening
+  /// this stream observes the existing owner; it neither enables logs nor BLE.
+  Stream<Map<String, Object?>> communicationTraffic() =>
+      const EventChannel(
+        'dev.zswatch.app/companion_traffic_v1',
+      ).receiveBroadcastStream({'version': 1}).map((event) {
+        if (event is! Map ||
+            event['version'] != 1 ||
+            !const ['rx', 'tx'].contains(event['direction']) ||
+            event['data'] is! String ||
+            event['size_bytes'] is! int ||
+            (event['size_bytes'] as int) < 1 ||
+            (event['size_bytes'] as int) > 65536 ||
+            event['chunk_count'] is! int ||
+            (event['chunk_count'] as int) < 1 ||
+            event['utc_ms'] is! int ||
+            event['generation'] is! int) {
+          throw const FormatException('Unsupported companion traffic event');
+        }
+        return Map<String, Object?>.from(event);
+      });
+
   Future<CompanionWatchSelection> discoverWatch() async =>
       CompanionWatchSelection.decode(
         await methods.invokeMethod<Object?>('discoverWatch', {'version': 1}),

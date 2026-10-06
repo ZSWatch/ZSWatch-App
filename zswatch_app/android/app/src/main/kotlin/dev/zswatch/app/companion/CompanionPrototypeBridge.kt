@@ -11,6 +11,7 @@ import dev.zswatch.app.LifecycleLogger
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.atomic.AtomicInteger
 
 /** UI is an observer/controller, never a lifetime owner or a BLE transport. */
 class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
@@ -19,6 +20,19 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
     private val methods = MethodChannel(messenger, "dev.zswatch.app/companion_v1")
     private val events = EventChannel(messenger, "dev.zswatch.app/companion_events_v1")
     private val logs = EventChannel(messenger, "dev.zswatch.app/companion_logs_v1")
+    private val traffic = EventChannel(messenger, "dev.zswatch.app/companion_traffic_v1")
+    @Volatile private var trafficSink: EventChannel.EventSink? = null
+    private val pendingTraffic = AtomicInteger()
+    private val trafficChanged: (Map<String, Any?>) -> Unit = { event ->
+        val expected = trafficSink
+        if (expected != null) {
+            // A slow/closing UI must never grow the main queue or stall BLE.
+            if (pendingTraffic.incrementAndGet() <= 64) PrototypeHub.main.post {
+                try { if (trafficSink === expected) expected.success(event) }
+                finally { pendingTraffic.decrementAndGet() }
+            } else pendingTraffic.decrementAndGet()
+        }
+    }
     @Volatile private var logSink: EventChannel.EventSink? = null
     private val logChanged: (Map<String, Any?>) -> Unit = { event ->
         val expected = logSink
@@ -397,6 +411,18 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
             }
             override fun onCancel(arguments: Any?) { detachLogs() }
         })
+        traffic.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, eventSink: EventChannel.EventSink) {
+                if ((arguments as? Map<*, *>)?.get("version") != 1) {
+                    eventSink.error("VERSION", "Unsupported traffic subscription", null); return
+                }
+                trafficSink = eventSink
+                PrototypeHub.worker.post {
+                    if (trafficSink === eventSink) PrototypeHub.trafficObservers.add(trafficChanged)
+                }
+            }
+            override fun onCancel(arguments: Any?) { detachTraffic() }
+        })
     }
 
     private fun snapshot(deliver: (Any?) -> Unit, failed: (String?) -> Unit = { sink?.error("SNAPSHOT_FAILED", it, null) }) {
@@ -431,8 +457,14 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
         }
     }
 
+    private fun detachTraffic() {
+        trafficSink = null
+        PrototypeHub.worker.post { PrototypeHub.trafficObservers.remove(trafficChanged) }
+    }
+
     fun dispose() {
-        association.dispose(); detach(); detachLogs()
+        association.dispose(); detach(); detachLogs(); detachTraffic()
         methods.setMethodCallHandler(null); events.setStreamHandler(null); logs.setStreamHandler(null)
+        traffic.setStreamHandler(null)
     }
 }

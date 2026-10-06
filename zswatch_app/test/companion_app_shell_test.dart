@@ -62,12 +62,14 @@ void main() {
   const methods = MethodChannel('dev.zswatch.app/companion_v1');
   const events = MethodChannel('dev.zswatch.app/companion_events_v1');
   const logs = MethodChannel('dev.zswatch.app/companion_logs_v1');
+  const traffic = MethodChannel('dev.zswatch.app/companion_traffic_v1');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   final calls = <MethodCall>[];
   final metadataWrites = <CompanionWatchMetadata>[];
   final subscriptions = <String>[];
   final logSubscriptions = <String>[];
+  final trafficSubscriptions = <String>[];
   final forbidden = <String>[];
   late Map<String, Object?> saved;
   var permissionRequests = 0;
@@ -163,6 +165,7 @@ void main() {
     metadataWrites.clear();
     subscriptions.clear();
     logSubscriptions.clear();
+    trafficSubscriptions.clear();
     forbidden.clear();
     permissionRequests = 0;
     denyPermission = false;
@@ -173,6 +176,10 @@ void main() {
     });
     messenger.setMockMethodCallHandler(logs, (call) async {
       logSubscriptions.add(call.method);
+      return null;
+    });
+    messenger.setMockMethodCallHandler(traffic, (call) async {
+      trafficSubscriptions.add(call.method);
       return null;
     });
     messenger.setMockMethodCallHandler(methods, (call) async {
@@ -195,8 +202,62 @@ void main() {
     messenger.setMockMethodCallHandler(methods, null);
     messenger.setMockMethodCallHandler(events, null);
     messenger.setMockMethodCallHandler(logs, null);
+    messenger.setMockMethodCallHandler(traffic, null);
     expect(forbidden, isEmpty);
   });
+
+  testWidgets(
+    'existing Comm Log observes native protocol traffic and detaches',
+    (tester) async {
+      await mount(tester, snapshot(active: true, ready: true));
+      router(tester).go(AppRoutes.developer);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Comm Log'));
+      await tester.pumpAndSettle();
+      expect(find.text('Communication Log'), findsOneWidget);
+      expect(trafficSubscriptions, ['listen']);
+      final scope = ProviderScope.containerOf(
+        tester.element(find.text('Communication Log')),
+      );
+      final before = calls.length;
+      for (final direction in ['rx', 'tx']) {
+        await messenger.handlePlatformMessage(
+          traffic.name,
+          const StandardMethodCodec().encodeSuccessEnvelope({
+            'version': 1,
+            'direction': direction,
+            'data': 'räven 🦊',
+            'size_bytes': 11,
+            'chunk_count': direction == 'tx' ? 2 : 1,
+            'utc_ms': 1700000000123,
+            'generation': 10,
+          }),
+          (_) {},
+        );
+        await tester.pump();
+      }
+      final entries = scope.read(commLogEntriesProvider);
+      expect(entries, hasLength(2));
+      expect(entries.map((entry) => entry.sizeBytes), [11, 11]);
+      expect(entries.last.wasChunked, isTrue);
+      expect(entries.last.chunkCount, 2);
+      expect(entries.last.timestamp.millisecondsSinceEpoch, 1700000000123);
+      expect(scope.read(commLogStatsProvider).totalTxBytes, 11);
+      scope.read(commLogRepositoryProvider.notifier).clear();
+      expect(scope.read(commLogEntriesProvider), isEmpty);
+      router(tester).pop();
+      await tester.pumpAndSettle();
+      expect(trafficSubscriptions, ['listen', 'cancel']);
+      expect(
+        calls.length,
+        before,
+      ); // Observing/closing neither commands nor stops BLE.
+      await tester.tap(find.text('Comm Log'));
+      await tester.pumpAndSettle();
+      expect(scope.read(commLogEntriesProvider), isEmpty);
+      expect(trafficSubscriptions, ['listen', 'cancel', 'listen']);
+    },
+  );
 
   testWidgets(
     'existing log view observes native logs and detaches without stopping BLE',
