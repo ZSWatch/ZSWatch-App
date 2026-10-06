@@ -126,6 +126,25 @@ class CompanionPrototypeClient {
         await methods.invokeMethod<Object?>('snapshot', {'version': 1}),
       );
 
+  Stream<Map<String, Object?>> liveLogs() =>
+      const EventChannel(
+        'dev.zswatch.app/companion_logs_v1',
+      ).receiveBroadcastStream({'version': 1}).map((event) {
+        if (event is! Map ||
+            event['version'] != 1 ||
+            (event['kind'] != 'state' && event['kind'] != 'log')) {
+          throw const FormatException('Unsupported companion log event');
+        }
+        return Map<String, Object?>.from(event);
+      });
+
+  Future<void> setLogStreaming(bool enabled) async {
+    await methods.invokeMethod<Object?>('setLogStreaming', {
+      'version': 1,
+      'enabled': enabled,
+    });
+  }
+
   Future<CompanionWatchSelection> discoverWatch() async =>
       CompanionWatchSelection.decode(
         await methods.invokeMethod<Object?>('discoverWatch', {'version': 1}),

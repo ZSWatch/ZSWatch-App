@@ -54,7 +54,7 @@ class _DeveloperToolsBody extends ConsumerWidget {
         title: 'Log Viewer',
         subtitle: 'Firmware logs',
         accent: AppTheme.primaryColor,
-        onTap: native ? null : () => context.push(AppRoutes.logViewer),
+        onTap: () => context.push(AppRoutes.logViewer),
       ),
       _BlendToolTile(
         icon: Icons.swap_horiz,

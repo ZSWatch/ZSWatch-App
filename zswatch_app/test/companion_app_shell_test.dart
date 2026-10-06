@@ -8,6 +8,7 @@ import 'package:zswatch_app/providers/ai_providers.dart';
 import 'package:zswatch_app/providers/auto_reconnect_provider.dart';
 import 'package:zswatch_app/providers/chat_providers.dart';
 import 'package:zswatch_app/providers/dfu_providers.dart';
+import 'package:zswatch_app/providers/developer_providers.dart';
 import 'package:zswatch_app/providers/filesystem_providers.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
@@ -60,11 +61,13 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const methods = MethodChannel('dev.zswatch.app/companion_v1');
   const events = MethodChannel('dev.zswatch.app/companion_events_v1');
+  const logs = MethodChannel('dev.zswatch.app/companion_logs_v1');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   final calls = <MethodCall>[];
   final metadataWrites = <CompanionWatchMetadata>[];
   final subscriptions = <String>[];
+  final logSubscriptions = <String>[];
   final forbidden = <String>[];
   late Map<String, Object?> saved;
   var permissionRequests = 0;
@@ -159,12 +162,17 @@ void main() {
     calls.clear();
     metadataWrites.clear();
     subscriptions.clear();
+    logSubscriptions.clear();
     forbidden.clear();
     permissionRequests = 0;
     denyPermission = false;
     saved = snapshot();
     messenger.setMockMethodCallHandler(events, (call) async {
       subscriptions.add(call.method);
+      return null;
+    });
+    messenger.setMockMethodCallHandler(logs, (call) async {
+      logSubscriptions.add(call.method);
       return null;
     });
     messenger.setMockMethodCallHandler(methods, (call) async {
@@ -186,8 +194,77 @@ void main() {
   tearDown(() {
     messenger.setMockMethodCallHandler(methods, null);
     messenger.setMockMethodCallHandler(events, null);
+    messenger.setMockMethodCallHandler(logs, null);
     expect(forbidden, isEmpty);
   });
+
+  testWidgets(
+    'existing log view observes native logs and detaches without stopping BLE',
+    (tester) async {
+      await mount(tester, snapshot(active: true, ready: true));
+      router(tester).go(AppRoutes.developer);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Log Viewer'));
+      await tester.pumpAndSettle();
+      expect(logSubscriptions, ['listen']);
+      expect(calls, isEmpty);
+
+      Future<void> logEvent(Map<String, Object?> event) async {
+        await messenger.handlePlatformMessage(
+          logs.name,
+          const StandardMethodCodec().encodeSuccessEnvelope({
+            'version': 1,
+            ...event,
+          }),
+          (_) {},
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await logEvent({
+        'kind': 'state',
+        'requested': false,
+        'written': false,
+        'pending': false,
+      });
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      expect(calls.single.method, 'setLogStreaming');
+      expect(calls.single.arguments, {'version': 1, 'enabled': true});
+      await logEvent({
+        'kind': 'state',
+        'requested': true,
+        'written': true,
+        'pending': false,
+      });
+      expect(find.text('Enabled'), findsOneWidget);
+      await logEvent({
+        'kind': 'log',
+        'message': '<inf> genuine native fixture räven 🦊',
+      });
+      final scope = ProviderScope.containerOf(
+        tester.element(find.text('Log Viewer')),
+      );
+      expect(
+        scope.read(logEntriesProvider).single.message,
+        '<inf> genuine native fixture räven 🦊',
+      );
+      scope.read(logEntriesProvider.notifier).clear();
+      expect(scope.read(logEntriesProvider), isEmpty);
+      await logEvent({
+        'kind': 'state',
+        'requested': false,
+        'written': false,
+        'pending': false,
+      });
+      expect(find.text('Disabled'), findsOneWidget);
+      router(tester).pop();
+      await tester.pumpAndSettle();
+      expect(logSubscriptions, ['listen', 'cancel']);
+      expect(calls.map((call) => call.method), ['setLogStreaming']);
+      expect(find.text('Developer Tools'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'app projects a historical Ready receipt without starting a stopped owner',

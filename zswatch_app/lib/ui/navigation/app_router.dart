@@ -128,6 +128,10 @@ class AppRouter {
         builder: (context, state) => const DeveloperScreen(),
       ),
       GoRoute(
+        path: AppRoutes.logViewer,
+        builder: (context, state) => const LogViewerScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.shell,
         builder: (context, state) => const ShellScreen(),
       ),

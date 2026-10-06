@@ -8,10 +8,10 @@ import '../../../data/models/log_filter.dart'; // For LogStreamingState
 import '../../../providers/developer_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 
-/// Log viewer screen displaying all incoming BLE NUS data
+/// Log viewer displaying firmware messages wrapped by the BLE log backend.
 ///
 /// Features:
-/// - Display ALL incoming BLE NUS data (logs + protocol messages)
+/// - Display firmware logs without treating their contents as protocol messages
 /// - Timestamp and direction for each entry
 /// - Auto-scroll with pause option
 /// - Clear log button

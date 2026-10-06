@@ -377,7 +377,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var token = 0L
     private var operation = 0L
     private var retryDelay = 5000L
-    private val framer = NusJsonFramer()
+    val liveLogs = CompanionLiveLogs(PrototypeHub::publishLiveLog)
+    private val framer = NusJsonFramer(log = liveLogs::receive)
     private val writes = ArrayDeque<NusWrite>()
     private var payloadSize = 20
     private var awaitingMtu = false
@@ -628,6 +629,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
         }
     }
     fun requestDeviceInfo() { command("GB({\"t\":\"ver\"})") }
+    fun setLogStreaming(enabled: Boolean) {
+        liveLogs.request(enabled) { value, done -> command("GB({\"t\":\"log\",\"status\":$value})", done) }
+    }
 
     fun configureHttp(enabled: Boolean) {
         PrototypeHttpRelay.configure(store, enabled)
@@ -949,6 +953,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         val previous = gatt; gatt = null; tx = null
         runCatching { previous?.disconnect() }; runCatching { previous?.close() }
         framer.reset()
+        liveLogs.reset()
         closing = false
     }
 

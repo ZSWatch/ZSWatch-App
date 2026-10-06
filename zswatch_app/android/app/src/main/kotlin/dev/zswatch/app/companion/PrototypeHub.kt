@@ -13,6 +13,8 @@ object PrototypeHub {
     val worker = Handler(thread.looper)
     val main = Handler(Looper.getMainLooper())
     val observers = CopyOnWriteArraySet<() -> Unit>()
+    val logObservers = CopyOnWriteArraySet<(Map<String, Any?>) -> Unit>()
+    fun publishLiveLog(event: Map<String, Any?>) { logObservers.forEach { it(event) } }
     private var store: PrototypeStore? = null
     private var jobStore: PrototypeStore? = null
 

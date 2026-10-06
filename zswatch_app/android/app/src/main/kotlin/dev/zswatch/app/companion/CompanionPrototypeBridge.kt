@@ -18,6 +18,12 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
     private val association = PrototypeAssociation(activity)
     private val methods = MethodChannel(messenger, "dev.zswatch.app/companion_v1")
     private val events = EventChannel(messenger, "dev.zswatch.app/companion_events_v1")
+    private val logs = EventChannel(messenger, "dev.zswatch.app/companion_logs_v1")
+    @Volatile private var logSink: EventChannel.EventSink? = null
+    private val logChanged: (Map<String, Any?>) -> Unit = { event ->
+        val expected = logSink
+        PrototypeHub.main.post { if (expected != null && logSink === expected) expected.success(event) }
+    }
     private var sink: EventChannel.EventSink? = null
     private val changed: () -> Unit = { snapshot(deliver = { sink?.success(it) }) }
 
@@ -26,6 +32,15 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
             if ((call.arguments as? Map<*, *>)?.get("version") != 1) {
                 result.error("VERSION", "Unsupported companion bridge version", null)
             } else when (call.method) {
+                "setLogStreaming" -> PrototypeHub.worker.post {
+                    try {
+                        val enabled = call.argument<Boolean>("enabled") ?: error("Boolean enabled required")
+                        if (enabled) check(PrototypeHub.logObservers.contains(logChanged)) { "Open the log viewer first" }
+                        val link = CompanionPrototypeService.instance?.transport ?: error("Service not running")
+                        link.setLogStreaming(enabled)
+                        PrototypeHub.main.post { result.success(mapOf("version" to 1, "accepted" to true)) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("LOG_STREAM_FAILED", error.message, null) } }
+                }
                 "configureVoiceProcessing" -> PrototypeHub.worker.post {
                     try {
                         val args = call.arguments as Map<*, *>
@@ -366,6 +381,22 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
             }
             override fun onCancel(arguments: Any?) { detach() }
         })
+        logs.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, eventSink: EventChannel.EventSink) {
+                if ((arguments as? Map<*, *>)?.get("version") != 1) {
+                    eventSink.error("VERSION", "Unsupported log subscription", null); return
+                }
+                logSink = eventSink
+                PrototypeHub.worker.post {
+                    // Activity disposal can race a queued listen.
+                    if (logSink !== eventSink) return@post
+                    PrototypeHub.logObservers.add(logChanged)
+                    logChanged(CompanionPrototypeService.instance?.transport?.liveLogs?.state()
+                        ?: mapOf("version" to 1, "kind" to "state", "requested" to false, "written" to false, "pending" to false))
+                }
+            }
+            override fun onCancel(arguments: Any?) { detachLogs() }
+        })
     }
 
     private fun snapshot(deliver: (Any?) -> Unit, failed: (String?) -> Unit = { sink?.error("SNAPSHOT_FAILED", it, null) }) {
@@ -385,5 +416,23 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
 
     fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) = association.onActivityResult(requestCode, resultCode, data)
 
-    fun dispose() { association.dispose(); detach(); methods.setMethodCallHandler(null); events.setStreamHandler(null) }
+    private fun detachLogs() {
+        logSink = null
+        PrototypeHub.worker.post {
+            PrototypeHub.logObservers.remove(logChanged)
+            if (PrototypeHub.logObservers.isEmpty()) {
+                val link = CompanionPrototypeService.instance?.transport
+                if (link?.liveLogs?.state()?.get("requested") == true) {
+                    // Detaching diagnostics never stops the companion. If the
+                    // link is already gone, reset has fenced the pending write.
+                    runCatching { link.setLogStreaming(false) }.onFailure { link.liveLogs.reset() }
+                }
+            }
+        }
+    }
+
+    fun dispose() {
+        association.dispose(); detach(); detachLogs()
+        methods.setMethodCallHandler(null); events.setStreamHandler(null); logs.setStreamHandler(null)
+    }
 }
