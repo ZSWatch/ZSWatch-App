@@ -47,7 +47,7 @@ artifact identities, measured scope and earlier failed attempts.
 | Durable result / dedup / interrupted work | Real watch application ACK, job reuse and process-loss recovery with saved transcript pass. Deliberately lost ACK/replay physical acceptance pending. |
 | Cancellation and invalid/unavailable inputs | Real GGUF cancel and Stop pass. LiteRT channel cancellation: four controlled-callback regressions pass, actual model unavailable. Release real Whisper Base STT cancellation on the owned 37.8 s fixture passes before transcript/result persistence: native abort log, Cancelled UI, compute service gone at the first 2.425 s observation, same PID and 22 watch originals retained. Existing Retry processing control and missing-model case pass in release: selecting undownloaded Whisper Small English gives Processing failed / Reason: model_missing without a new transcript or result; 23 phone receipts remain. Remaining silence/malformed/storage physical coverage pending. |
 | BLE under AI load / resources | Actual prompt-time watch HTTP and notification pass (observed bounds 1.511/1.363 s); same process/generation and Flutter absent. New release English inference completes in about 72 s with same PID, Flutter absent and real remote HTTP callback during work. Prompt prefill and RSS/thermal snapshot recorded. Concurrent time-write and battery/endurance remain pending. |
-| Explicit local / hybrid / remote choices | Local-only flow passes. Real remote provider, credentials and upload consent remain external pending inputs; no automatic upload/fallback acceptance claimed. |
+| Explicit local / hybrid / remote choices | Local-only flow is implemented and passes. Real remote audio/STT and hybrid local-STT/remote-text voice adapters are not implemented yet; the native remote fixtures prove job contracts only. Implementation and real acceptance await selected provider, credentials and upload consent. Existing ordinary policy explicitly uses local models; unsupported remote/hybrid or upload-authorized requests reject before local processing, so no automatic upload/fallback is claimed. |
 | Live firmware log viewer | Existing Flutter Log Viewer now uses the single native NUS owner and the firmware's existing log toggle/tags. 59 affected native framing/HTTP/contract tests and 34 Flutter app-shell/client tests pass; release APK builds. Logs are ephemeral, bounded, excluded from protocol parsing and the durable journal; view disposal cancels observation and requests logging off without stopping BLE. New APK is prepared but not installed; the endurance observer has ended and OnePlus is currently absent from USB/ADB. Physical log/core-traffic acceptance remains pending. Comm Log, Crash Reports and sensor diagnostics remain separate incomplete parity. |
 | OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. Real Chrome MediaSession metadata and watch next/pause/play pass with both apps' UI in background, Flutter task absent and same PID; owned quiet tone/page, not commercial-player coverage. Previous-track remains unverified. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Release Shell command completes after Flutter task destruction (independent watch-state transition, same PID). Owned Android notification body replacement and phone-side removal pass with Flutter absent and same PID; independent UART shows remove/add with watch ID 1000004. Watch-originated dismissal, Shell/DFU arbitration, logs/cache isolation and complete ordinary connection/settings pass pending. Accepted native watchface upload survives Flutter task removal: Verifying background observed before teardown, Fume Guilloche full hash matches afterward, same PID. Original Retro Sunburst restored with its exact prior hash. Early UI disposal during preparation correctly leaves the original image unchanged; disconnect/process-loss interruption remains separate pending coverage. |
 | Firmware/resource updates | New fixed application and combined operations pass, acknowledged firmware ~41 KB/s with Flutter removed; active image/resource/original checks pass. Earlier failed combined operation stays failed; SDK network-core index 1 remains unavailable. |
@@ -249,6 +249,20 @@ it is **not** physical acceptance. Follow the scoped physical procedure in
 same-result retry/application ACK and unchanged originals/actions. Evidence:
 `.companion-hil-runs/20261006-lost-ack-preparation-smoke-2/`. Actual ACK omission,
 reset/replay and receipt-capacity cleanup remain pending.
+
+October 6 remote-scope audit: the real headless processor accepts only
+`dart-voice-v1` / `backend=local` / `upload_authorized=false`; its native producer
+and ordinary automatic-processing tile agree. No existing remote voice adapter
+was found in the shared AI implementation. The remote-job fixtures must not be
+presented as implemented remote transcription or text analysis. Once the selected
+provider/credentials/data consent arrive, add that adapter in shared Dart using
+the existing native job/checkpoint/outbox lifecycle. Local STT + remote text does
+not accelerate transcription; remote audio/STT needs audio-upload consent, while
+remote text needs consent for the transcript. The pending dependency question
+remains open. A focused regression rejects remote, hybrid, mismatched-provider
+and upload-authorized requests before recording decode/file/model access or a
+transcript checkpoint. All five affected voice-processor tests pass; no product
+code, provider choice, upload or local model behavior changed in this audit.
 
 ### Shared Dart architecture clarification
 
