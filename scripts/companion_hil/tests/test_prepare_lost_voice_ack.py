@@ -1,6 +1,9 @@
 import json
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import tempfile
 import unittest
 
 from prepare_lost_voice_ack import ack_call, ack_condition, script
@@ -77,6 +80,28 @@ class PrepareLostVoiceAckTest(unittest.TestCase):
             script(Path('/tmp/watch.elf'), 1, b'1234', 'true', Path('/tmp/run'), 80)
         with self.assertRaises(ValueError):
             script(Path('/tmp/watch\nreset.elf'), 1, b'1234', 'true', Path('/tmp/run'), 2331)
+        with self.assertRaises(ValueError):
+            script(Path('/tmp/watch.elf'), 1, b'1234', 'true', Path('/tmp/space path'), 2331)
+
+    @unittest.skipUnless(shutil.which('gdb') and shutil.which('cc'), 'Host GDB/cc unavailable')
+    def test_generated_dump_command_writes_ack_bytes_with_real_gdb(self):
+        # Read static ELF bytes without running a process or attaching hardware.
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            source = output / 'ack.c'
+            source.write_text('const char ack[] = "{\\\"status\\\":\\\"accepted\\\"}"; '
+                              'int main(void) { return 0; }\n')
+            binary = output / 'ack'
+            subprocess.run(['cc', '-g', '-no-pie', str(source), '-o', str(binary)],
+                           check=True, capture_output=True, timeout=20)
+            generated = script(binary, 1, b'1234', 'true', output, 2331)
+            dump = next(line.strip() for line in generated.splitlines()
+                        if line.strip().startswith('dump binary memory '))
+            subprocess.run(['gdb', '-q', '-nx', '-batch', str(binary),
+                            '-ex', 'set $r0 = (unsigned char *)ack',
+                            '-ex', 'set $r1 = sizeof(ack) - 1', '-ex', dump],
+                           check=True, capture_output=True, timeout=20)
+            self.assertEqual(b'{"status":"accepted"}', (output / 'omitted-ack.json').read_bytes())
 
 
 if __name__ == '__main__':

@@ -44,7 +44,7 @@ artifact identities, measured scope and earlier failed attempts.
 | Short Swedish/English and longer input | Swedish pass. English Whisper Base + Qwen and a 37.8 s replay of real microphone audio complete real headless processing/persistence/watch ACK in release. English duration is transcribed correctly; brand name and longer Swedish transcript have errors. Timer classification remains an existing AI-quality limitation, explicitly deferred by the user on 2026-10-05; do not tune prompts/models for this refactor. |
 | Existing Flutter UI / single native owner | Real transcript/summary/action review, ordinary Process dedup and actual audio playback pass. Original audio retained. Release missing-model retry and reuse of an older successful result after a newer failed model pass; selected transcript/summary persist across Flutter task removal/reopen without compute service. Complete settings/model coverage remains part of the consolidated pass. |
 | Action confirmation / side effects | Real release local-calendar Create/Undo passes for owned entry ZSWatch_HIL_release_20261005; Calendar independently shows tomorrow 09:00–09:30 and app confirms removal. Original transcript/audio retained. Timer/alarm OS dispatch and timezone coverage pending; existing model misclassification does not authorize AI-quality work. |
-| Durable result / dedup / interrupted work | Real watch application ACK, job reuse and process-loss recovery with saved transcript pass. A fresh result exposed a firmware sysworkq stack overflow; c8f05d09 fixes it. The already committed phone result then delivers with Flutter absent and the same PID, without rerunning AI. Deliberately lost ACK physical acceptance remains pending; the first debugger attempt did not omit an ACK. |
+| Durable result / dedup / interrupted work | Real watch application ACK, job reuse and process-loss recovery with saved transcript pass. A fresh result exposed a firmware sysworkq stack overflow; c8f05d09 fixes it. The already committed phone result then delivers with Flutter absent and the same PID, without rerunning AI. Deliberately lost ACK now passes on fixed firmware: one durable-new ACK omitted, native retry receives duplicate ACK after 10.544 s, normal UI Accepted by watch, same PID and Flutter absent. The earlier failed debugger attempts remain recorded separately. Receipt capacity and independent reset/replay scenarios remain separate pending coverage. |
 | Cancellation and invalid/unavailable inputs | Real GGUF cancel and Stop pass. LiteRT channel cancellation: four controlled-callback regressions pass, actual model unavailable. Release real Whisper Base STT cancellation on the owned 37.8 s fixture passes before transcript/result persistence: native abort log, Cancelled UI, compute service gone at the first 2.425 s observation, same PID and 22 watch originals retained. Existing Retry processing control and missing-model case pass in release: selecting undownloaded Whisper Small English gives Processing failed / Reason: model_missing without a new transcript or result; 23 phone receipts remain. Remaining silence/malformed/storage physical coverage pending. |
 | BLE under AI load / resources | Actual prompt-time watch HTTP and notification pass (observed bounds 1.511/1.363 s); same process/generation and Flutter absent. New release English inference completes in about 72 s with same PID, Flutter absent and real remote HTTP callback during work. Prompt prefill and RSS/thermal snapshot recorded. Concurrent time-write and battery/endurance remain pending. |
 | Explicit local / hybrid / remote choices | Local-only flow is implemented and passes. Real remote audio/STT and hybrid local-STT/remote-text voice adapters are not implemented yet; the native remote fixtures prove job contracts only. Implementation and real acceptance await selected provider, credentials and upload consent. Existing ordinary policy explicitly uses local models; unsupported remote/hybrid or upload-authorized requests reject before local processing, so no automatic upload/fallback is claimed. |
@@ -298,6 +298,33 @@ Evidence: `20261006-oneplus-lost-ack-2/` and `20261006-receipt-stack-fix/` under
 `.companion-hil-runs/`. The debugger preparation script now removes its pending
 breakpoint, detaches and exits with failure if the target stops without a matched
 owned ACK; all four existing safety/identity regressions pass.
+
+October 6 deliberate lost-ACK physical acceptance passes on firmware
+`c8f05d09` and installed app runtime `1923062`. An owned byte-identical 7.56 s
+microphone replay is fully verified before ordinary automatic local processing;
+Flutter task is removed after the recording-list refresh. The temporary hardware
+breakpoint matches the exact owned key and generation 1, saves the real ACK,
+skips only its send with -EIO and immediately detaches. Actual UART records one
+`durable result new, ACK=-5`, then `durable result duplicate, ACK=0` 10.544 s
+later. Captured ACK identifiers/key/generation/digest are retained privately;
+GDB exits 0. Same phone PID 4832 and absent Flutter task are verified during
+retry. Independent USB readback confirms the owned audio still equals its source;
+normal Flutter Voice Notes then shows Processed / Accepted by watch. The watch
+contains all 22 prior originals plus three clearly owned replay fixtures (25
+recordings). No transcript, result or external action is injected by the test.
+This is real application-ACK retry and duplicate acceptance on a live link,
+not an additional radio/reset recovery, receipt-capacity or eight-hour pass.
+Evidence: `20261006-oneplus-lost-ack-fixed-3/` under `.companion-hil-runs/`.
+
+The first fixed-firmware setup fails on a USB read before fixture/debugger work.
+The second reaches the exact ACK but GDB treats the quoted dump path as a literal
+filename; it fails before register modification, so no ACK is omitted. Both
+failed attempts remain separate. The generator now uses an unquoted filename
+and rejects paths containing whitespace/quotes/backslashes. A new regression
+executes that exact generated dump command with real host GDB over static ELF
+bytes, without running a process or touching hardware. All five affected
+regressions pass. SDK USB fragment retries are bounded and captured separately;
+no custom SMP or app-library change is introduced for this test.
 
 Physical dropped-ACK preparation: `scripts/companion_hil/prepare_lost_voice_ack.py`
 generates, but never runs, a temporary hardware breakpoint at the real durable

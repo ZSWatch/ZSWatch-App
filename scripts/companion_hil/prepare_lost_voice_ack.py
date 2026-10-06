@@ -57,6 +57,11 @@ def script(elf, call, encoding, condition, output, port):
     for path in (elf, output):
         if any(char in str(path) for char in "\r\n\x00"):
             raise ValueError("GDB paths cannot contain control characters")
+    dump_path = output / 'omitted-ack.json'
+    # Unlike `file`, GDB's dump command treats quotes as filename characters.
+    # Use a plain filename token and reject paths that cannot be represented.
+    if any(char.isspace() or char in "\"'\\" for char in str(dump_path)):
+        raise ValueError("ACK dump path cannot contain whitespace, quotes or backslashes")
     next_instruction = call + len(encoding)
     matches_code = " && ".join(f"*(unsigned char *)0x{call + i:x} == {byte}" for i, byte in enumerate(encoding))
     return f'''set pagination off
@@ -76,7 +81,7 @@ commands
     detach
     quit 2
   end
-  dump binary memory {json.dumps(str(output / 'omitted-ack.json'))} $r0 ($r0 + $r1)
+  dump binary memory {dump_path} $r0 ($r0 + $r1)
   printf "ZSW_OWNED_ACK_OMITTED accepted=%d\\n", accepted
   set $pc = 0x{next_instruction:x}
   set $r0 = -5
