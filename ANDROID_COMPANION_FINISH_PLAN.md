@@ -48,6 +48,7 @@ artifact identities, measured scope and earlier failed attempts.
 | Cancellation and invalid/unavailable inputs | Real GGUF cancel and Stop pass. LiteRT channel cancellation: four controlled-callback regressions pass, actual model unavailable. Release real Whisper Base STT cancellation on the owned 37.8 s fixture passes before transcript/result persistence: native abort log, Cancelled UI, compute service gone at the first 2.425 s observation, same PID and 22 watch originals retained. Existing Retry processing control and missing-model case pass in release: selecting undownloaded Whisper Small English gives Processing failed / Reason: model_missing without a new transcript or result; 23 phone receipts remain. Remaining silence/malformed/storage physical coverage pending. |
 | BLE under AI load / resources | Actual prompt-time watch HTTP and notification pass (observed bounds 1.511/1.363 s); same process/generation and Flutter absent. New release English inference completes in about 72 s with same PID, Flutter absent and real remote HTTP callback during work. Prompt prefill and RSS/thermal snapshot recorded. Concurrent time-write and battery/endurance remain pending. |
 | Explicit local / hybrid / remote choices | Local-only flow passes. Real remote provider, credentials and upload consent remain external pending inputs; no automatic upload/fallback acceptance claimed. |
+| Live firmware log viewer | Existing Flutter Log Viewer now uses the single native NUS owner and the firmware's existing log toggle/tags. 59 affected native framing/HTTP/contract tests and 34 Flutter app-shell/client tests pass; release APK builds. Logs are ephemeral, bounded, excluded from protocol parsing and the durable journal; view disposal cancels observation and requests logging off without stopping BLE. New APK is prepared but not installed during the ongoing endurance window; physical log/core-traffic acceptance remains pending. Comm Log, Crash Reports and sensor diagnostics remain separate incomplete parity. |
 | OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. Real Chrome MediaSession metadata and watch next/pause/play pass with both apps' UI in background, Flutter task absent and same PID; owned quiet tone/page, not commercial-player coverage. Previous-track remains unverified. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Release Shell command completes after Flutter task destruction (independent watch-state transition, same PID). Owned Android notification body replacement and phone-side removal pass with Flutter absent and same PID; independent UART shows remove/add with watch ID 1000004. Watch-originated dismissal, Shell/DFU arbitration, logs/cache isolation and complete ordinary connection/settings pass pending. Accepted native watchface upload survives Flutter task removal: Verifying background observed before teardown, Fume Guilloche full hash matches afterward, same PID. Original Retro Sunburst restored with its exact prior hash. Early UI disposal during preparation correctly leaves the original image unchanged; disconnect/process-loss interruption remains separate pending coverage. |
 | Firmware/resource updates | New fixed application and combined operations pass, acknowledged firmware ~41 KB/s with Flutter removed; active image/resource/original checks pass. Earlier failed combined operation stays failed; SDK network-core index 1 remains unavailable. |
 | Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Physical phone reboot/first unlock passes: native foreground service and real watch HTTP (229 bytes) return with Flutter absent. Android broadcast queue records boot receiver delivery after 80.277 s; this is delayed system delivery, not immediate availability after unlock. Watch USB/UART transient disappearance and failed first observer remain recorded. First eight-hour observer stops on ADB disappearance after 46.3 minutes of good sampled operation. October 6 same native PID is present, but Flutter/screen are active; the gap is unverified. ~8 h endurance pending; USB-attached coverage does not prove unplugged behavior. |
@@ -162,7 +163,7 @@ Ordinary Developer entry also still targeted the prototype. The existing Flutter
 Developer Tools view is now registered for the native app and the dashboard
 opens it. Find reuses the existing native timed button; Sync Time and Device Info
 use already implemented native commands. Shell and File System retain their
-migrated routes. Legacy live Log Viewer/Comm Log, Crash Reports, sensor GATT and
+migrated routes. At this checkpoint live Log Viewer/Comm Log, Crash Reports, sensor GATT and
 synthetic debug panels remain unavailable rather than starting a second BLE
 owner; their parity is not claimed. These diagnostics remain separate incomplete
 coverage, not evidence that all pre-refactor developer features are restored.
@@ -180,6 +181,42 @@ running on this latest artifact in `.companion-hil-runs/20261006-oneplus-enduran
 Temporary ADB failures are recorded without restarting the app; any missing
 screen/owner observations remain gaps and prevent a clean screen-off pass.
 A host observation failure is distinct from an observed native service failure.
+
+October 6 live-log implementation, source `1923062`: restored the existing
+Flutter Log Viewer route and toggle through a dedicated ephemeral native event
+channel. No new BLE connection, SMP implementation or firmware change. Native
+write completion drives streaming state; it is not an application acknowledgement.
+The receive framer separates `<BLELOG>` bodies from real JSON, including split
+tags/UTF-8, embedded JSON, adjacent control messages, invalid/oversized bodies,
+connection reset and an expired missing tail. Capture is off by default, resets
+on disconnection, and late write callbacks cannot re-enable it after disable or
+reset. Closing the view cancels its event subscription and requests the existing
+firmware disable command; the companion service remains running. The view keeps
+its existing filters, clear/copy controls and a 1,000-entry in-memory buffer,
+discarded when the native log view closes. Deferred iOS provider lifetime is
+retained. Six new log regressions plus 39 existing contracts and 14 HTTP tests
+pass; all 34 affected Flutter app-shell/client tests pass. Dart analysis reports
+no errors or warnings (one pre-existing test-only unawaited route-push info).
+Actual watch log delivery, disable/disconnect behavior and simultaneous native
+HTTP/time/status/voice receipts still require physical acceptance. Keep the
+current eight-hour observer on its installed `e5ccaa9` artifact until it finishes;
+host source/build changes do not count as testing the new APK on OnePlus.
+Release build passes (49.8 s); prepared non-debuggable production SHA-256
+`1d3e51edae4314587d2d461ebccc36544e5db226ccf2fb47121f271bcc248ea6`,
+lab re-signed SHA-256
+`8143cb8d8e760c71f796ccbbde914cd12ca30b8031ff15ee442124940ef8833a`.
+Non-signature APK entries are identical. Artifact:
+`.companion-hil-runs/20261006-oneplus-live-logs/artifact.json`.
+It has not replaced the installed endurance artifact.
+After that window, install this prepared APK once and exercise ordinary
+Developer Tools → Log Viewer: enable after the firmware's initial three-second
+log suppression, obtain actual watch log lines, and check a real time/status/HTTP
+round trip while logging. Clear/filter the existing view, disable and reopen it,
+then remove Flutter and verify the same companion owner plus core traffic.
+Record actual received logs and write completion separately; do not label host
+fixtures or command acceptance as watch confirmation. Bundle this with the
+remaining main recovery/action checks rather than repeatedly reinstalling for
+each diagnostic control. Pre-existing LLM classification errors remain deferred.
 
 ### Shared Dart architecture clarification
 
