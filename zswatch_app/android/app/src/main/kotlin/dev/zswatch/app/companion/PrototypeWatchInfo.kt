@@ -44,7 +44,7 @@ class PrototypeWatchInfo(private val store: PrototypeStore) {
                     val file = message.opt("file") as? String ?: return false
                     val time = message.opt("time") as? String ?: return false
                     val line = message.opt("line")
-                    if (line !is Int || line < 0 || file.toByteArray(Charsets.UTF_8).size !in 1..512 ||
+                    if (line !is Int || line < 0 || file.toByteArray(Charsets.UTF_8).size > 512 ||
                         time.length !in 1..80) return false
                     fields["coredump"] = JSONObject().put("file", file).put("line", line).put("time", time)
                 } else fields["coredump"] = JSONObject.NULL

@@ -23,6 +23,8 @@ class PrototypeWatchInfoTest {
         assertFalse(receiver.receive(JSONObject("""{"t":"coredump","available":true,"file":"x","line":-1,"time":"x"}"""), 1, 102))
         assertTrue(receiver.receive(PrototypeCoredumpSummary.packet("No stored coredumps"), 1, 103))
         assertNull(info(journal)["coredump"])
+        assertTrue(receiver.receive(PrototypeCoredumpSummary.packet("Stored coredumps: 1\n  Timestamp: owned time\n  File: \n  Line: 0\n"), 1, 104))
+        assertEquals("", (info(journal)["coredump"] as Map<*, *>)["file"])
     }
 
     @Test fun firmwareAndBatterySurviveProcessReopenAsCachedWatchData() {

@@ -13,6 +13,13 @@ class PrototypeCoredumpSummaryTest {
         assertEquals("2026-10-06 22:00:00", packet.getString("time"))
         assertFalse(PrototypeCoredumpSummary.packet("\r\nNo stored coredumps\r\n").getBoolean("available"))
     }
+    @Test fun actualFirmwareDumpWithoutAssertLocationIsValid() {
+        val packet = PrototypeCoredumpSummary.packet("\r\nStored coredumps: 1\r\n  Timestamp: 19:27 06/09\r\n  File: \r\n  Line: 0\r\n")
+        assertTrue(packet.getBoolean("available"))
+        assertEquals("", packet.getString("file"))
+        assertEquals(0, packet.getInt("line"))
+        assertThrows(IllegalArgumentException::class.java) { PrototypeCoredumpSummary.packet("Stored coredumps: 1\n  Timestamp: x\n  Line: 0\n") }
+    }
     @Test fun FailureMalformedAndAmbiguousOutputCannotClearOrInventAReport() {
         for (output in listOf("Failed to read summary (-5)", response.replace("Line: 321", "Line: -1"),
             response.replace("Stored coredumps: 1", "Stored coredumps: 0"), response + "  File: other.c\n",

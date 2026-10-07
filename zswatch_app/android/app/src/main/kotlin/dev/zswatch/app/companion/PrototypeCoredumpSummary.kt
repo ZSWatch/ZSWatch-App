@@ -13,17 +13,19 @@ internal object PrototypeCoredumpSummary {
         require(returnCode == 0L) { "Coredump summary command failed" }
         if (output.trim() == "No stored coredumps")
             return JSONObject().put("t", "coredump").put("available", false)
-        fun field(name: String): String {
-            val matches = Regex("^\\s*${Regex.escape(name)}: (.+?)\\s*$", RegexOption.MULTILINE)
+        fun field(name: String, allowEmpty: Boolean = false): String {
+            val matches = Regex("^\\h*${Regex.escape(name)}:\\h*([^\\r\\n]*)\\r?$", RegexOption.MULTILINE)
                 .findAll(output).toList()
             require(matches.size == 1) { "Invalid coredump $name" }
-            return matches.single().groupValues[1].trim()
+            val value = matches.single().groupValues[1].trim()
+            require(allowEmpty || value.isNotEmpty()) { "Invalid coredump $name" }
+            return value
         }
         require(field("Stored coredumps").toIntOrNull() in 1..32) { "Invalid coredump count" }
         val line = field("Line").toIntOrNull()
         require(line != null && line >= 0) { "Invalid coredump line" }
-        val file = field("File"); val time = field("Timestamp")
-        require(file.toByteArray(Charsets.UTF_8).size in 1..512 && time.length in 1..80)
+        val file = field("File", allowEmpty = true); val time = field("Timestamp")
+        require(file.toByteArray(Charsets.UTF_8).size <= 512 && time.length in 1..80)
         return JSONObject().put("t", "coredump").put("available", true)
             .put("file", file).put("line", line).put("time", time)
     }
