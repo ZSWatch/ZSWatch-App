@@ -60,6 +60,34 @@ Do not launch or schedule another long observer as a completion step.
 | Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Physical phone reboot/first unlock passes: native foreground service and real watch HTTP (229 bytes) return with Flutter absent. Android broadcast queue records boot receiver delivery after 80.277 s; this is delayed system delivery, not immediate availability after unlock. Watch USB/UART transient disappearance and failed first observer remain recorded. First eight-hour observer stops on ADB disappearance after 46.3 minutes of good sampled operation. October 6 same native PID is present, but Flutter/screen are active; the gap is unverified. Second eight-hour observer ends after 26.2 minutes of good sampled operation and then 14 ADB-gap rows; the ADB-dependent loopback receives a real error callback. Subsequent fresh remote HTTP succeeds (283 bytes) with no reset/app start while USB/ADB remains absent. Phone PID/screen/battery cannot be observed in that later test. Long endurance is **deferred to the user by the October 7 instruction**; these observations do not prove clean unplugged endurance. Do not run another agent endurance observer. |
 | Final candidate / goal completion | 225 Android tests pass for LiteRT fix; 18 affected Flutter tests and release build pass for restored dashboard Watchface route. Retry-selection fix passes 17 native job tests, 8 Flutter recording tests, release build and physical reuse/reattachment. Latest ordinary connection/Developer wiring passes 16 affected Flutter tests, release build and the stated physical UI/Shell pass. Non-debuggable release code is installed and physically exercised, lab re-signed only to retain existing data. Latest installed release: production SHA-256 767802aec09bca2e5118f4833427f1cce6c6bb761e1925a3ed6dc9391c1eb93d; installed lab SHA-256 87588d0cbd7677067f8dba5e1320e9926280bcbf9cdb940947e9ae2433db0372; runtime source commit 9b9eef4. This release differs from pairing runtime a0ffc0d only in watchface upload packet-size selection and its metadata log. Its 243 selected native companion tests and exact-source release build pass. The unchanged Flutter code retains its prior 31 client/Shell test pass and clean analysis. The latest Settings/app-shell/action/policy suite (23 tests) and Files/app-shell suite (24 tests) pass; the unchanged native code retains its earlier 241-test pass. Exact-source release build and scoped physical acceptance are recorded below. Prior Comm Log physical acceptance remains valid for its stated earlier runtime. Pairing setup fix `a0ffc0d` passes host tests and is installed in release. Ordinary saved-watch Disconnect/Connect and a real headless watch HTTP callback pass; Fresh pairing now passes on October 7 through ordinary Android confirmation and the normal watch Pairable control, followed by actual headless watch HTTP. Clean empty-app onboarding is a separate scope. **Goal active and unfinished; the OnePlus has returned and physical acceptance has resumed. Remote provider/credentials/upload consent remain an independent external dependency.** |
 
+October 7 voice observer resolution:
+`.companion-hil-runs/20261007-oneplus-voice-watch-reset/`.
+The owned byte-identical microphone replay `hil_ack_reset_230119` automatically
+starts real local transcription. The observer sees a transitional Saved on phone
+row, opens its active-job dialog, then fails because it expects a Process button
+while the dialog says Transcribing. It detaches the debugger without omitting an
+ACK or resetting the watch. That observer remains failed; this is **not** a
+reset/replay acceptance result.
+
+The separate `resolution/observation.json` and fresh ordinary UI prove that the
+same job subsequently reaches Processed / Accepted by watch, with the original
+Swedish transcript and an unconfirmed Review & create action. No second job,
+processing submission or external action is created to replace the failed
+observer. Scoped cleanup deletes only this owned watch copy, returns the entire
+recording listing to its captured 26-recording baseline, and independently
+verifies the original microphone and background SHA-256 values. A real watch
+HTTP callback succeeds with Flutter absent, no compute service, and the same
+native foreground process. Independent watch-reset receipt replay remains
+pending; do not reopen a delivered job to manufacture that evidence.
+
+Shell/DFU ownership has also been checked in the current source: Shell refuses
+firmware-busy work; firmware handoff refuses active Shell, recording, preparation,
+log and watchface operations before taking the prepared Nordic transport. Existing
+host coverage remains valid. No new physical concurrent Shell/DFU test or firmware
+transfer is claimed by this source review. The larger remote/hybrid implementation
+dependency remains provider, credentials and explicit upload consent; incidental
+observer failures do not justify repeatedly re-running local inference.
+
 October 7 corrected-release watchface crash recovery:
 `.companion-hil-runs/20261007-oneplus-watchface-process-loss-fixed/observation.json`.
 On app runtime `9b9eef4` and fixed firmware `098977c4`, ordinary Fume upload

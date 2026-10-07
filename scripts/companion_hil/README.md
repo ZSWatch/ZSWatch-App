@@ -528,8 +528,10 @@ python3 scripts/companion_hil/prepare_lost_voice_ack.py \
   --output "$ZSW_NEW_ACK_RUN"
 ```
 
-Run the physical phase after the endurance observer releases the watch, UART
-and phone. First verify the active watch ImageState against the signed image
+Run the physical phase only when the watch, UART and phone are available and
+other observers have released them. Do not start an endurance observer for this
+test; the user has deferred endurance to their own testing. First verify the
+active watch ImageState against the signed image
 matching this ELF. Select an owned recording and a genuinely new native result
 generation; reselecting a completed job deliberately performs no new delivery.
 Keep original audio and any confirmed external actions. Capture the original
@@ -558,3 +560,13 @@ the native owner still running during recovery. Inspect the real journal/outbox
 and receipt bytes through the existing tooling. Command-file generation or a
 debugger exit alone proves none of these. Record radio/process/reset recovery
 separately: this test deliberately omits one ACK on an otherwise live link.
+
+Automatic processing can start while the ordinary recording row still says
+Saved on phone. If opening the row/control shows Queued, Transcribing or
+Analyzing, observe that existing job and close the dialog as needed; do not
+expect a Process submission dialog or create a replacement job. If an observer
+ends, inspect the same job's current state before doing anything else. A job
+already Accepted by watch cannot satisfy a new-receipt breakpoint; retain the
+failed observation and report the intended omission/reset case as unverified.
+If release tooling cannot independently read a journal or watch receipt, record
+that evidence limit explicitly instead of claiming direct persistence inspection.
