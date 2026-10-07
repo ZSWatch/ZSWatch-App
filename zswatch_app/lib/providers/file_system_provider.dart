@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -64,19 +67,32 @@ class FileSystemNotifier extends StateNotifier<FileSystemState> {
   final FileSystemService _service;
   final WatchService? _watchService;
   final Future<CompanionLogFiles> Function(String? path)? _nativeInspect;
+  final String? _cacheScope;
 
   FileSystemNotifier(
     this._service,
     this._watchService, {
     Future<CompanionLogFiles> Function(String? path)? nativeInspect,
+    String? nativeAddress,
   }) : _nativeInspect = nativeInspect,
+       _cacheScope = nativeAddress == null
+           ? null
+           : sha256
+                 .convert(utf8.encode(nativeAddress.toUpperCase()))
+                 .toString(),
        super(const FileSystemState());
 
   Future<void> refreshLogs() async {
     if (state.isLoadingLogs || state.downloadingPath != null) return;
     final native = _nativeInspect;
     if (native != null) {
-      state = state.copyWith(isLoadingLogs: true, loadError: null);
+      // The firmware exposes sizes, not a revision or content hash. A fresh
+      // listing cannot establish that a previously downloaded file is unchanged.
+      state = state.copyWith(
+        isLoadingLogs: true,
+        loadError: null,
+        downloadedPaths: const {},
+      );
       try {
         final result = await native(null);
         if (mounted) {
@@ -141,6 +157,7 @@ class FileSystemNotifier extends StateNotifier<FileSystemState> {
       );
       try {
         final result = await native(entry.path);
+        if (!mounted) return;
         final localPath = await _saveToLocalStorage(
           result.files.single.name,
           result.bytes!,
@@ -214,7 +231,9 @@ class FileSystemNotifier extends StateNotifier<FileSystemState> {
 
   Future<String> _saveToLocalStorage(String name, List<int> data) async {
     final appDir = await getApplicationDocumentsDirectory();
-    final downloadDir = Directory(p.join(appDir.path, 'fs_downloads'));
+    final downloadDir = Directory(
+      p.join(appDir.path, 'fs_downloads', _cacheScope ?? ''),
+    );
     if (!downloadDir.existsSync()) {
       downloadDir.createSync(recursive: true);
     }
@@ -236,12 +255,22 @@ final fileSystemProvider =
     StateNotifierProvider<FileSystemNotifier, FileSystemState>((ref) {
       final service = ref.watch(fileSystemServiceProvider);
       if (ref.watch(nativeCompanionRuntimeProvider)) {
+        // Replacing the selected watch disposes in-flight UI state. Reconnects
+        // and unrelated status updates keep the same notifier; native generation
+        // fences still protect the service-owned SMP operation itself.
+        final address = ref.watch(
+          companionSnapshotProvider.select(
+            (snapshot) => snapshot.valueOrNull?.fields['address'] as String?,
+          ),
+        );
         return FileSystemNotifier(
           service,
           null,
+          nativeAddress: address,
           nativeInspect: (path) async {
             final snapshot = ref.read(companionSnapshotProvider).requireValue;
-            if (!snapshot.protocolReady) {
+            if (!snapshot.protocolReady ||
+                snapshot.fields['address'] != address) {
               throw StateError('Current Ready session required');
             }
             final client = ref.read(companionClientProvider);

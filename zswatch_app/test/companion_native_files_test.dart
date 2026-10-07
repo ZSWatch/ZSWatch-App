@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -176,6 +177,128 @@ void main() {
       container.dispose();
       done.complete(reply());
       await future;
+    },
+  );
+  test(
+    'native refresh rereads same-size files and isolates each selected watch',
+    () async {
+      final dir = Directory.systemTemp.createTempSync('zsw-native-logs-');
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      messenger.setMockMethodCallHandler(paths, (call) async => dir.path);
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(paths, null);
+        dir.deleteSync(recursive: true);
+      });
+      var content = Uint8List.fromList([65, 66]);
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'prepareShell') {
+          return {'version': 1, 'generation': 8, 'prepared_from_generation': 7};
+        }
+        return reply(
+          bytes: (call.arguments as Map)['path'] == null ? null : content,
+        );
+      });
+      final snapshots = StreamController<CompanionPrototypeSnapshot>();
+      final container = ProviderContainer(
+        overrides: [
+          nativeCompanionRuntimeProvider.overrideWithValue(true),
+          companionSnapshotProvider.overrideWith((ref) => snapshots.stream),
+          watchServiceProvider.overrideWith(
+            (ref) => throw StateError('Legacy BLE'),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(snapshots.close);
+      snapshots.add(ready);
+      await container.read(companionSnapshotProvider.future);
+      final observation = container.listen(fileSystemProvider, (_, _) {});
+      addTearDown(observation.close);
+      final first = container.read(fileSystemProvider.notifier);
+      await first.refreshLogs();
+      await first.downloadFile(first.state.logFiles.single);
+      final firstPath = first.state.downloadedPaths.values.single;
+      expect(await File(firstPath).readAsBytes(), [65, 66]);
+      content = Uint8List.fromList([67, 68]);
+      await first.refreshLogs();
+      expect(first.state.downloadedPaths, isEmpty);
+      await first.downloadFile(first.state.logFiles.single);
+      expect(await File(firstPath).readAsBytes(), [67, 68]);
+      snapshots.add(
+        CompanionPrototypeSnapshot.decode({...ready.fields, 'generation': 8}),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(fileSystemProvider.notifier), same(first));
+      snapshots.add(
+        CompanionPrototypeSnapshot.decode({
+          ...ready.fields,
+          'address': '11:22:33:44:55:66',
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+      final second = container.read(fileSystemProvider.notifier);
+      expect(second, isNot(same(first)));
+      expect(second.state.downloadedPaths, isEmpty);
+      content = Uint8List.fromList([69, 70]);
+      await second.refreshLogs();
+      await second.downloadFile(second.state.logFiles.single);
+      final secondPath = second.state.downloadedPaths.values.single;
+      expect(secondPath, isNot(firstPath));
+      expect(await File(firstPath).readAsBytes(), [67, 68]);
+      expect(await File(secondPath).readAsBytes(), [69, 70]);
+    },
+  );
+
+  test(
+    'watch replacement discards a late download before local file access',
+    () async {
+      final completed = Completer<Object?>();
+      final started = Completer<void>();
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'prepareShell') {
+          return {'version': 1, 'generation': 8, 'prepared_from_generation': 7};
+        }
+        if ((call.arguments as Map)['path'] == null) return reply();
+        started.complete();
+        return completed.future;
+      });
+      const paths = MethodChannel('plugins.flutter.io/path_provider');
+      var localAccesses = 0;
+      messenger.setMockMethodCallHandler(paths, (call) async {
+        localAccesses++;
+        throw StateError('Disposed download must not access local storage');
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(paths, null));
+      final snapshots = StreamController<CompanionPrototypeSnapshot>();
+      final container = ProviderContainer(
+        overrides: [
+          nativeCompanionRuntimeProvider.overrideWithValue(true),
+          companionSnapshotProvider.overrideWith((ref) => snapshots.stream),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(snapshots.close);
+      snapshots.add(ready);
+      await container.read(companionSnapshotProvider.future);
+      final observation = container.listen(fileSystemProvider, (_, _) {});
+      addTearDown(observation.close);
+      final first = container.read(fileSystemProvider.notifier);
+      await first.refreshLogs();
+      final downloading = first.downloadFile(first.state.logFiles.single);
+      await started.future;
+      snapshots.add(
+        CompanionPrototypeSnapshot.decode({
+          ...ready.fields,
+          'address': '11:22:33:44:55:66',
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+      final current = container.read(fileSystemProvider.notifier);
+      expect(current, isNot(same(first)));
+      completed.complete(reply(bytes: Uint8List.fromList([65, 66])));
+      await downloading;
+      expect(current.state.downloadedPaths, isEmpty);
+      expect(localAccesses, 0);
     },
   );
 }

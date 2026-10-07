@@ -165,7 +165,12 @@ class _LogsContent extends ConsumerWidget {
     }
 
     try {
-      await ref.read(fileSystemProvider.notifier).downloadFile(entry);
+      final notifier = ref.read(fileSystemProvider.notifier);
+      await notifier.downloadFile(entry);
+      if (!context.mounted ||
+          !identical(notifier, ref.read(fileSystemProvider.notifier))) {
+        return;
+      }
       final updatedPath = ref
           .read(fileSystemProvider)
           .downloadedPaths[entry.path];
