@@ -570,3 +570,15 @@ already Accepted by watch cannot satisfy a new-receipt breakpoint; retain the
 failed observation and report the intended omission/reset case as unverified.
 If release tooling cannot independently read a journal or watch receipt, record
 that evidence limit explicitly instead of claiming direct persistence inspection.
+
+### Ordinary Flutter UI observers
+
+Read fresh accessibility output and the current control labels before acting.
+Completing a firmware receipt with Done can return to the dashboard; do not
+assume it remains on the firmware-selection screen. Let Flutter route animations
+settle before another navigation tap and verify the destination before submitting
+work. A disabled Shell input can disappear from the accessibility tree while
+native SMP preparation reconnects; that is a pending operation to observe, not
+evidence of a secure lock screen or a reason to resubmit its command. Keep failed
+observers separate from later scoped evidence and report the actual phase/error
+observed rather than treating all operation-conflict cases as interchangeable.
