@@ -247,6 +247,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
             val sdk = mcuTransport(store.control()["address"] as String, token)
             sdk.setLoggingEnabled(false)
             val manager = FsManager(sdk)
+            if (sdk.maxPacketLength > 0) manager.setUploadMtu(sdk.maxPacketLength)
+            android.util.Log.i("ZSWCompanionBle", "watchface_upload max_packet=${sdk.maxPacketLength} window=3")
             // Preserve the existing user fork's windowed Nordic upload settings.
             // No legacy Flutter-engine transport or raw payload logger is needed.
             watchfaceTransfer = FileUploader(manager, "/user/bg_new.bin", bytes, 3, 4)
