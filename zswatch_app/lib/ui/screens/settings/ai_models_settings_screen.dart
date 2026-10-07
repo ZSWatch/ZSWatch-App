@@ -90,7 +90,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
           const _ImportModelTile(),
           if (native) const CompanionVoicePolicyTile(),
 
-          if (!native && ref.watch(localAiEnabledProvider)) ...[
+          if (native || ref.watch(localAiEnabledProvider)) ...[
             const SizedBox(height: 24),
             const Divider(height: 1),
             const SizedBox(height: 8),
@@ -136,7 +136,10 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             const SizedBox(height: 24),
             const Divider(height: 1),
             const SizedBox(height: 8),
-
+          ],
+          // The existing Clock controls use the productivity channel only.
+          // They do not depend on legacy BLE, repositories or local inference.
+          ...[
             // ---- Timer / Alarm test section ----
             const _SectionHeader(
               title: 'Timer & Alarm Test',

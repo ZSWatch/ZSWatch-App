@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zswatch_app/app.dart';
 import 'package:zswatch_app/data/database/app_database.dart';
 import 'package:zswatch_app/providers/ai_providers.dart';
@@ -612,6 +614,67 @@ void main() {
       await tester.pumpAndSettle();
       expect(subscriptions, ['listen', 'cancel']);
       expect(calls.where((c) => c.method == 'stop'), isEmpty);
+    },
+  );
+
+  testWidgets(
+    'native Settings keeps common preferences without legacy startup or automatic permission requests',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.binding.setSurfaceSize(const Size(800, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      const permissions = MethodChannel(
+        'flutter.baseflow.com/permissions/methods',
+      );
+      final permissionCalls = <String>[];
+      messenger.setMockMethodCallHandler(permissions, (call) async {
+        permissionCalls.add(call.method);
+        return true;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(permissions, null));
+      await mount(tester, snapshot(active: true, ready: true));
+      final routes = router(tester);
+      unawaited(routes.push<void>(AppRoutes.settings));
+      await tester.pumpAndSettle();
+      expect(permissionCalls, isEmpty);
+      expect(calls, isEmpty);
+      expect(find.text('Persistent Connection'), findsNothing);
+      expect(find.text('Demo Mode'), findsNothing);
+      await tester.ensureVisible(find.text('App Permissions'));
+      await tester.tap(find.text('App Permissions'));
+      await tester.pumpAndSettle();
+      expect(permissionCalls, ['openAppSettings']);
+      await tester.ensureVisible(find.text('Keep Screen On During DFU'));
+      await tester.tap(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text('Keep Screen On During DFU'),
+            matching: find.byType(ListTile),
+          ),
+          matching: find.byType(Switch),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Coredump Server'));
+      await tester.tap(find.text('Coredump Server'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'http://127.0.0.1:18879');
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('keep_screen_on_during_dfu'), isFalse);
+      expect(prefs.getString('coredump_server_url'), 'http://127.0.0.1:18879');
+      routes.pop();
+      await tester.pumpAndSettle();
+      unawaited(routes.push<void>(AppRoutes.settings));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Coredump Server'));
+      expect(find.text('http://127.0.0.1:18879'), findsOneWidget);
+      expect(find.text('App Version'), findsOneWidget);
+      expect(find.text('Licenses'), findsOneWidget);
+      expect(calls, isEmpty);
+      expect(permissionRequests, 0);
+      expect(subscriptions.where((kind) => kind == 'listen'), hasLength(1));
     },
   );
 

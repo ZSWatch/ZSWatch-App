@@ -37,67 +37,76 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(nativeCompanionRuntimeProvider)) {
-      return const CompanionSettingsView();
-    }
+    final native = ref.watch(nativeCompanionRuntimeProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
           // Connection Settings
           const _SectionHeader(title: 'Connection'),
-          _SettingsTile(
-            leading: Icon(
-              ref.watch(backgroundConnectionEnabledProvider)
-                  ? Icons.bluetooth_connected
-                  : Icons.bluetooth_disabled,
-              color: ref.watch(backgroundConnectionEnabledProvider)
-                  ? AppTheme.primaryColor
-                  : AppTheme.textSecondary,
-            ),
-            title: 'Persistent Connection',
-            subtitle: 'Keep watch connected when app is in background',
-            trailing: Switch(
-              value: ref.watch(backgroundConnectionEnabledProvider),
-              onChanged: (value) async {
-                if (value && Platform.isAndroid) {
-                  // Check notification permission before enabling
-                  final permState = ref.read(permissionNotifierProvider);
-                  if (!permState.status.isNotificationGranted) {
-                    // Request notification permission
-                    final result = await ref
-                        .read(permissionNotifierProvider.notifier)
-                        .requestNotificationPermission();
-                    if (!result.isGranted && context.mounted) {
-                      // Show warning that feature won't work properly
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Notification permission is required for the persistent connection indicator',
+          if (native) const CompanionConnectionSettings(),
+          if (!native)
+            _SettingsTile(
+              leading: Icon(
+                ref.watch(backgroundConnectionEnabledProvider)
+                    ? Icons.bluetooth_connected
+                    : Icons.bluetooth_disabled,
+                color: ref.watch(backgroundConnectionEnabledProvider)
+                    ? AppTheme.primaryColor
+                    : AppTheme.textSecondary,
+              ),
+              title: 'Persistent Connection',
+              subtitle: 'Keep watch connected when app is in background',
+              trailing: Switch(
+                value: ref.watch(backgroundConnectionEnabledProvider),
+                onChanged: (value) async {
+                  if (value && Platform.isAndroid) {
+                    // Check notification permission before enabling
+                    final permState = ref.read(permissionNotifierProvider);
+                    if (!permState.status.isNotificationGranted) {
+                      // Request notification permission
+                      final result = await ref
+                          .read(permissionNotifierProvider.notifier)
+                          .requestNotificationPermission();
+                      if (!result.isGranted && context.mounted) {
+                        // Show warning that feature won't work properly
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Notification permission is required for the persistent connection indicator',
+                            ),
+                            duration: Duration(seconds: 3),
                           ),
-                          duration: Duration(seconds: 3),
-                        ),
-                      );
+                        );
+                      }
                     }
                   }
-                }
-                ref
-                    .read(backgroundConnectionEnabledProvider.notifier)
-                    .setEnabled(value);
-                // If disabling while connected, the service will keep running
-                // until the watch is disconnected
-                if (!value && context.mounted) {
-                  _showPersistentConnectionDisabledDialog(context);
-                }
-              },
+                  ref
+                      .read(backgroundConnectionEnabledProvider.notifier)
+                      .setEnabled(value);
+                  // If disabling while connected, the service will keep running
+                  // until the watch is disconnected
+                  if (!value && context.mounted) {
+                    _showPersistentConnectionDisabledDialog(context);
+                  }
+                },
+              ),
             ),
-          ),
 
           const Divider(height: 32),
 
           // Permissions Section (consolidated)
           const _SectionHeader(title: 'Permissions'),
-          _PermissionsSummaryTile(),
+          if (native)
+            const _SettingsTile(
+              leading: Icon(Icons.security, color: AppTheme.textSecondary),
+              title: 'App Permissions',
+              subtitle: 'Manage app permissions in Android settings',
+              trailing: Icon(Icons.open_in_new, size: 20),
+              onTap: openAppSettings,
+            )
+          else
+            _PermissionsSummaryTile(),
 
           const Divider(height: 32),
 
@@ -124,7 +133,16 @@ class SettingsScreen extends ConsumerWidget {
 
           // Voice Memo AI (sub-page)
           const _SectionHeader(title: 'Voice Memo AI'),
-          _AiTranscriptionNavTile(),
+          if (native)
+            _SettingsTile(
+              leading: const Icon(Icons.mic, color: AppTheme.primaryColor),
+              title: 'Voice memo models',
+              subtitle: 'Transcription, analysis and automatic processing',
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(AppRoutes.aiModels),
+            )
+          else
+            _AiTranscriptionNavTile(),
 
           const Divider(height: 32),
 
@@ -175,25 +193,26 @@ class SettingsScreen extends ConsumerWidget {
 
           // Demo Mode (for app store reviewers without hardware)
           const _SectionHeader(title: 'Developer'),
-          _SettingsTile(
-            leading: Icon(
-              Icons.science,
-              color: ref.watch(demoModeProvider)
-                  ? AppTheme.primaryColor
-                  : AppTheme.textSecondary,
+          if (!native)
+            _SettingsTile(
+              leading: Icon(
+                Icons.science,
+                color: ref.watch(demoModeProvider)
+                    ? AppTheme.primaryColor
+                    : AppTheme.textSecondary,
+              ),
+              title: 'Demo Mode',
+              subtitle: 'Simulate a connected watch without hardware',
+              trailing: Switch(
+                value: ref.watch(demoModeProvider),
+                onChanged: (value) {
+                  ref.read(demoModeProvider.notifier).state = value;
+                  if (value) {
+                    context.go(AppRoutes.home);
+                  }
+                },
+              ),
             ),
-            title: 'Demo Mode',
-            subtitle: 'Simulate a connected watch without hardware',
-            trailing: Switch(
-              value: ref.watch(demoModeProvider),
-              onChanged: (value) {
-                ref.read(demoModeProvider.notifier).state = value;
-                if (value) {
-                  context.go(AppRoutes.home);
-                }
-              },
-            ),
-          ),
           _SettingsTile(
             leading: const Icon(
               Icons.dns_outlined,

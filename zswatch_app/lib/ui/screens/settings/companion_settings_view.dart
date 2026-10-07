@@ -10,52 +10,43 @@ import 'companion_http_settings_tile.dart';
 import 'companion_gps_settings_tile.dart';
 
 /// Existing settings use the native owner's persistent connection intent.
-class CompanionSettingsView extends ConsumerWidget {
-  const CompanionSettingsView({super.key});
+class CompanionConnectionSettings extends ConsumerWidget {
+  const CompanionConnectionSettings({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final connection = ref.watch(watchConnectionProvider);
     final snapshot = ref.watch(companionSnapshotProvider).asData?.value;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        children: [
-          ListTile(
-            leading: const Icon(Icons.bluetooth),
-            title: const Text('Watch connection'),
-            subtitle: Text(connection.state.statusText),
-            onTap: () => context.push(AppRoutes.savedWatches),
-          ),
-          if (snapshot?.runtimeActive == true)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'The connection runs in the background. Disconnect to stop it.',
-              ),
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.bluetooth),
+          title: const Text('Watch connection'),
+          subtitle: Text(connection.state.statusText),
+          onTap: () => context.push(AppRoutes.savedWatches),
+        ),
+        if (snapshot?.runtimeActive == true)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text(
+              'The connection runs in the background. Disconnect to stop it.',
             ),
-          ListTile(
-            leading: const Icon(Icons.notifications),
-            title: const Text('Notifications'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(AppRoutes.notifications),
           ),
-          ListTile(
-            leading: const Icon(Icons.mic),
-            title: const Text('Voice notes'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(AppRoutes.voiceMemos),
-          ),
-          ListTile(
-            leading: const Icon(Icons.auto_awesome),
-            title: const Text('Voice memo models'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push(AppRoutes.aiModels),
-          ),
-          const CompanionHttpSettingsTile(),
-          const CompanionGpsSettingsTile(),
-        ],
-      ),
+        ListTile(
+          leading: const Icon(Icons.notifications),
+          title: const Text('Notifications'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push(AppRoutes.notifications),
+        ),
+        ListTile(
+          leading: const Icon(Icons.mic),
+          title: const Text('Voice notes'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push(AppRoutes.voiceMemos),
+        ),
+        const CompanionHttpSettingsTile(),
+        const CompanionGpsSettingsTile(),
+      ],
     );
   }
 }
