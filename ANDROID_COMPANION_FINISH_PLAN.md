@@ -33,10 +33,16 @@ Avoid a new native UI, legacy fallback, custom SMP, broad model benchmarks or iO
 work. Finish with one evidence-backed pass/fail/pending matrix and clear limits
 for externally blocked or physically unavailable tests.
 
-### Current OnePlus acceptance matrix (2026-10-06)
+### Current OnePlus acceptance matrix (2026-10-07)
 
 Use this matrix to select remaining work. The detailed checkpoints below retain
 artifact identities, measured scope and earlier failed attempts.
+
+**User direction, 2026-10-07:** do not run any more eight-hour tests. The user will
+perform endurance acceptance later. This supersedes agent-run endurance gates in
+this plan and the active goal; continue implementation and short functional/
+recovery tests. Record longer endurance as deferred to the user, never as passed.
+Do not launch or schedule another long observer as a completion step.
 
 | Requirement | Current authoritative status |
 | --- | --- |
@@ -48,11 +54,11 @@ artifact identities, measured scope and earlier failed attempts.
 | Cancellation and invalid/unavailable inputs | Real GGUF cancel and Stop pass. LiteRT channel cancellation: four controlled-callback regressions pass, actual model unavailable. Release real Whisper Base STT cancellation on the owned 37.8 s fixture passes before transcript/result persistence: native abort log, Cancelled UI, compute service gone at the first 2.425 s observation, same PID and 22 watch originals retained. Existing Retry processing control and missing-model case pass in release: selecting undownloaded Whisper Small English gives Processing failed / Reason: model_missing without a new transcript or result; 23 phone receipts remain. Owned truncated-container physical acceptance passes: Download failed before processing/playback, no compute service, watch source retained until explicit owned cleanup, same PID. A subsequent remote HTTP request times out (status 1), so the overall observer remains failed while this file-validation scope passes separately. Silence and storage-failure physical coverage remain pending. |
 | BLE under AI load / resources | Actual prompt-time watch HTTP and notification pass (observed bounds 1.511/1.363 s); same process/generation and Flutter absent. New release English inference completes in about 72 s with same PID, Flutter absent and real remote HTTP callback during work. Prompt prefill and RSS/thermal snapshot recorded. Ordinary Sync Time is submitted with the compute service active; actual local HTTP also succeeds in 1.287 s while computing/logging. This is command-path concurrency, not an independent RTC or time-write completion readback. Battery/endurance remain pending. |
 | Explicit local / hybrid / remote choices | Local-only flow is implemented and passes. Real remote audio/STT and hybrid local-STT/remote-text voice adapters are not implemented yet; the native remote fixtures prove job contracts only. Implementation and real acceptance await selected provider, credentials and upload consent. Existing ordinary policy explicitly uses local models; unsupported remote/hybrid or upload-authorized requests reject before local processing, so no automatic upload/fallback is claimed. |
-| Live firmware log viewer | Existing Flutter Log Viewer now uses the single native NUS owner and the firmware's existing log toggle/tags. 59 affected native framing/HTTP/contract tests and 34 Flutter app-shell/client tests pass; release APK builds. Logs are ephemeral, bounded, excluded from protocol parsing and the durable journal; view disposal cancels observation and requests logging off without stopping BLE. The non-debuggable release is now installed on OnePlus. Physical enable/actual firmware logs/filter/clear/disable/disposal/reopen pass, with real HTTP success while logging and after view/Flutter teardown; same PID 4832 and foreground native owner. Physical log capture resets on radio disconnection, stays disabled afterward and can be re-enabled for actual traffic; a fresh real voice-result receipt is visible during logging and compute-time local HTTP succeeds. Comm Log now passes physical release acceptance. Crash Reports and Sensors pass host integration tests/release build; physical acceptance remains pending. |
+| Live firmware log viewer | Existing Flutter Log Viewer now uses the single native NUS owner and the firmware's existing log toggle/tags. 59 affected native framing/HTTP/contract tests and 34 Flutter app-shell/client tests pass; release APK builds. Logs are ephemeral, bounded, excluded from protocol parsing and the durable journal; view disposal cancels observation and requests logging off without stopping BLE. The non-debuggable release is now installed on OnePlus. Physical enable/actual firmware logs/filter/clear/disable/disposal/reopen pass, with real HTTP success while logging and after view/Flutter teardown; same PID 4832 and foreground native owner. Physical log capture resets on radio disconnection, stays disabled afterward and can be re-enabled for actual traffic; a fresh real voice-result receipt is visible during logging and compute-time local HTTP succeeds. Comm Log now passes physical release acceptance. Crash Reports physical summary/refresh/history pass in the latest release. Sensors physical accelerometer/quaternion streaming, HTTP while streaming and disposal/reopen pass; other sensor types and reconnect coverage remain separate pending checks. |
 | OnePlus core features | Baseline time, owned notifications, HTTP and GPS/Weather pass. Release ordinary Shell app state and restored dashboard Watchface → existing gallery pass. Real Chrome MediaSession metadata and watch next/pause/play pass with both apps' UI in background, Flutter task absent and same PID; owned quiet tone/page, not commercial-player coverage. Previous-track remains unverified. No log files available: ordinary UI and independent USB FileStatus agree; nonempty download remains pending. Release Shell command completes after Flutter task destruction (independent watch-state transition, same PID). Owned Android notification body replacement and phone-side removal pass with Flutter absent and same PID; independent UART shows remove/add with watch ID 1000004. Watch-originated dismissal of an actual UTF-8 Shell notification passes with Flutter absent and PID 4832 unchanged; the original forwarding policy is restored. Shell/DFU arbitration, logs/cache isolation and complete ordinary connection/settings coverage remain pending. Accepted native watchface upload survives Flutter task removal: Verifying background observed before teardown, Fume Guilloche full hash matches afterward, same PID. Original Retro Sunburst restored with its exact prior hash. Early UI disposal during preparation correctly leaves the original image unchanged; disconnect/process-loss interruption remains separate pending coverage. |
 | Firmware/resource updates | New fixed application and combined operations pass, acknowledged firmware ~41 KB/s with Flutter removed; active image/resource/original checks pass. Earlier failed combined operation stays failed; SDK network-core index 1 remains unavailable. |
-| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Physical phone reboot/first unlock passes: native foreground service and real watch HTTP (229 bytes) return with Flutter absent. Android broadcast queue records boot receiver delivery after 80.277 s; this is delayed system delivery, not immediate availability after unlock. Watch USB/UART transient disappearance and failed first observer remain recorded. First eight-hour observer stops on ADB disappearance after 46.3 minutes of good sampled operation. October 6 same native PID is present, but Flutter/screen are active; the gap is unverified. Second eight-hour observer ends after 26.2 minutes of good sampled operation and then 14 ADB-gap rows; the ADB-dependent loopback receives a real error callback. Subsequent fresh remote HTTP succeeds (283 bytes) with no reset/app start while USB/ADB remains absent. Phone PID/screen/battery cannot be observed in that later test. ~8 h endurance remains pending; these observations do not prove clean unplugged endurance. |
-| Final candidate / goal completion | 225 Android tests pass for LiteRT fix; 18 affected Flutter tests and release build pass for restored dashboard Watchface route. Retry-selection fix passes 17 native job tests, 8 Flutter recording tests, release build and physical reuse/reattachment. Latest ordinary connection/Developer wiring passes 16 affected Flutter tests, release build and the stated physical UI/Shell pass. Non-debuggable release code is installed and physically exercised, lab re-signed only to retain existing data. Latest installed Comm Log release: production SHA-256 1bbd64fc6a79250af62f101bc21110c420861acbbe73fb2db297f0a3add368aa; installed lab SHA-256 a7595bbb03d67cf7ceb85f83c2ad0932dd20bb1f3a3cc4c12b34d184c90ab01e; runtime source commit 354c806. All 35 affected Flutter tests, 59 native contracts, release build and physical Comm Log acceptance pass. Pairing rough-edge cleanup follows remaining main feature pass. **Goal active and unfinished; OnePlus returned and physical acceptance has resumed. Remote provider/credentials/upload consent remain an independent external dependency.** |
+| Modern lifecycle / endurance | Radio/watch-reset/SIGKILL recovery and explicit Stop persistence pass in tested USB setup. Release headless execution and a real HTTP callback with phone noninteractive pass. Release five-minute screen-off pass: 310.1 s with the same PID, Flutter absent, foreground connected-device service and both remote/local HTTP callbacks. Earlier observer waking at 64 s remains failed. Physical phone reboot/first unlock passes: native foreground service and real watch HTTP (229 bytes) return with Flutter absent. Android broadcast queue records boot receiver delivery after 80.277 s; this is delayed system delivery, not immediate availability after unlock. Watch USB/UART transient disappearance and failed first observer remain recorded. First eight-hour observer stops on ADB disappearance after 46.3 minutes of good sampled operation. October 6 same native PID is present, but Flutter/screen are active; the gap is unverified. Second eight-hour observer ends after 26.2 minutes of good sampled operation and then 14 ADB-gap rows; the ADB-dependent loopback receives a real error callback. Subsequent fresh remote HTTP succeeds (283 bytes) with no reset/app start while USB/ADB remains absent. Phone PID/screen/battery cannot be observed in that later test. Long endurance is **deferred to the user by the October 7 instruction**; these observations do not prove clean unplugged endurance. Do not run another agent endurance observer. |
+| Final candidate / goal completion | 225 Android tests pass for LiteRT fix; 18 affected Flutter tests and release build pass for restored dashboard Watchface route. Retry-selection fix passes 17 native job tests, 8 Flutter recording tests, release build and physical reuse/reattachment. Latest ordinary connection/Developer wiring passes 16 affected Flutter tests, release build and the stated physical UI/Shell pass. Non-debuggable release code is installed and physically exercised, lab re-signed only to retain existing data. Latest installed diagnostics/action collection release: production SHA-256 84d4d125eef8f9ed98d3076f41e3ff4916cbbd33d036f0c2628e0faf94f7a85f; installed lab SHA-256 421909be69c7a2199dc9b591f7bf0e43e582bae0369f8dffa9d3644d9748ccc0; runtime source commit 874a8cc. All 241 native tests and 43 affected Flutter tests pass, with release build and scoped physical diagnostics acceptance recorded below. Prior Comm Log physical acceptance remains valid for its stated earlier runtime. Pairing rough-edge cleanup follows remaining main feature pass. **Goal active and unfinished; OnePlus returned and physical acceptance has resumed. Remote provider/credentials/upload consent remain an independent external dependency.** |
 
 Release evidence: `.companion-hil-runs/20261005-oneplus-final-release/` and
 `.companion-hil-runs/20261005-oneplus-release-acceptance/` (calendar UI,
@@ -562,6 +568,35 @@ a missing File field and invalid line/size; native regression and all unit tests
 pass. The same existing SDK/shell/file path is reused, with no firmware change.
 Physical UI acceptance follows on the next installed release.
 
+October 7 short physical diagnostics acceptance: installed the non-debuggable
+`874a8cc` release, lab re-signed with identical runtime entries, on OnePlus.
+Package replacement starts PID 28073; it remains unchanged through this pass.
+Ordinary Developer → Crash Reports reads the existing locationless dump (empty
+File, Line 0), shows History, and successfully refreshes the same summary. No
+new dump was generated, erased, analyzed or uploaded. The first refresh observer
+captured loading and the subsequent transient reconnect before returning to the
+dashboard; it did not prove refresh completion. A later bounded observation
+captures completed summary and refresh, then Connected/MTU 247 dashboard.
+
+Ordinary Sensor Debug displays actual accelerometer values (0/0/9, about 4.9 Hz,
+100 retained samples) and fusion quaternion/Euler values. Real owned loopback
+HTTP succeeds while streaming (35 bytes, 1.321 s) and after view disposal (35
+bytes, 1.783 s); PID stays 28073. Android GATT logs record both sensor notification
+disables on the same GATT object at disposal; reopening shows zero streams and
+all switches off. Continuous chart updates make UIAutomator's idle-based dump
+fail and reuse an old XML file; that observer output is not current sensor-state
+evidence. Actual screenshots and the later settled reopening prove the stated
+scope. Other sensor types and radio-recovery acceptance remain pending.
+Ordinary Voice Notes → Alarms & Timers opens the expected empty collection;
+no saved current timer/alarm suggestion exists. This proves navigation/empty
+state only, not actual Clock dispatch, which remains pending. No inference or
+pre-existing semantic behavior was changed to manufacture an action.
+Evidence: `.companion-hil-runs/20261007-oneplus-diagnostics/artifact.json` and
+`physical/` (observation.json, sensor screenshots, notification callbacks,
+crash summary/refresh/history and clock-collection XML). Phone is left on the
+Connected dashboard. No long observer is running or newly scheduled; endurance
+acceptance is deferred to the user.
+
 Physical dropped-ACK preparation: `scripts/companion_hil/prepare_lost_voice_ack.py`
 generates, but never runs, a temporary hardware breakpoint at the real durable
 result ACK send. The breakpoint checks the owned key/exact generation and
@@ -732,8 +767,9 @@ the first local execution/delivery seam; the remaining goal stays active.
    Run bounded radio/out-of-range/watch-reset recovery, process interruption,
    Stop persistence, UI reattachment and one phone-reboot case where unlock is
    available. Test one screen-off quiet period with real network requests and
-   queued AI work, followed by one approximately eight-hour endurance window after
-   functional fixes. Record physical power and OnePlus battery settings; USB or
+   queued AI work. The user will run the long endurance window later; do not launch
+   or schedule an agent eight-hour test (October 7 direction). Record physical
+   power and OnePlus battery settings; USB or
    forced idle does not prove unplugged operation. Prepare wireless ADB before
    physical phone disconnection if available; save evidence locally during a
    cable-free interval rather than requiring continuous polling. Do not disable
