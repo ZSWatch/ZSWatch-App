@@ -9,8 +9,11 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/models/extracted_action.dart';
 import '../../../providers/ai_providers.dart';
 import '../../../providers/settings_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
+import '../../../providers/companion_clock_actions_provider.dart';
 import '../../../services/ai/extracted_action_creation_service.dart';
 import '../../navigation/app_router.dart';
+import '../../widgets/voice_memos/companion_voice_action_card.dart';
 
 /// Dedicated screen for managing alarm and timer extracted actions.
 ///
@@ -22,6 +25,36 @@ class AlarmsTimersScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      final actions = ref.watch(companionClockActionsProvider);
+      return Scaffold(
+        appBar: AppBar(title: const Text('Alarms & Timers')),
+        body: actions.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) =>
+              Center(child: Text('Error loading actions: $error')),
+          data: (items) => items.isEmpty
+              ? const _EmptyState()
+              : ListView(
+                  padding: const EdgeInsets.all(AppTheme.spacingMd),
+                  children: [
+                    for (final item in items)
+                      CompanionVoiceActionCard(
+                        key: ValueKey('${item.jobId}:${item.index}'),
+                        jobId: item.jobId,
+                        index: item.index,
+                        action: item.action,
+                        state: item.state,
+                        canCreate: item.canCreate,
+                        onChanged: () => ref.invalidate(
+                          companionVoiceJobProvider(item.jobId),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      );
+    }
     final actionsAsync = ref.watch(alarmTimerActionsProvider);
 
     return Scaffold(

@@ -74,6 +74,7 @@ void main() {
   final logSubscriptions = <String>[];
   final trafficSubscriptions = <String>[];
   final sensorSubscriptions = <String>[];
+  final nativeJobDetails = <String, Map<String, Object?>>{};
   final forbidden = <String>[];
   late Map<String, Object?> saved;
   var permissionRequests = 0;
@@ -177,6 +178,7 @@ void main() {
     logSubscriptions.clear();
     trafficSubscriptions.clear();
     sensorSubscriptions.clear();
+    nativeJobDetails.clear();
     forbidden.clear();
     permissionRequests = 0;
     denyPermission = false;
@@ -199,6 +201,10 @@ void main() {
     });
     messenger.setMockMethodCallHandler(methods, (call) async {
       calls.add(call);
+      if (call.method == 'voiceJob') {
+        final id = (call.arguments as Map)['job_id'] as String;
+        return {'version': 1, 'job_id': id, 'job': nativeJobDetails[id]!};
+      }
       if (call.method == 'sensorState') {
         return {
           'version': 1,
@@ -290,6 +296,92 @@ void main() {
       expect(find.text('owned.c:123'), findsOneWidget);
       expect(calls.where((call) => call.method == 'downloadCoredump'), isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'existing Alarms & Timers reads saved native actions without processing',
+    (tester) async {
+      final current = 'a' * 64;
+      final previous = 'b' * 64;
+      final other = 'c' * 64;
+      final processing = 'd' * 64;
+      nativeJobDetails[current] = {
+        'selected': true,
+        'state': 'delivered',
+        'result': {
+          'actions': [
+            {'type': 'reminder', 'title': 'Owned reminder'},
+            {'type': 'timer', 'title': 'Owned timer', 'duration_seconds': 60},
+          ],
+        },
+      };
+      nativeJobDetails[previous] = {
+        'selected': false,
+        'state': 'cancelled',
+        'result': {
+          'actions': [
+            {'type': 'alarm', 'title': 'Old unused suggestion'},
+            {
+              'type': 'timer',
+              'title': 'Owned prior timer',
+              'duration_seconds': 30,
+            },
+          ],
+        },
+        'action_states': {
+          '1': {'state': 'dispatched'},
+        },
+      };
+      final state = snapshot(active: true, ready: true);
+      state['voice_jobs'] = [
+        for (final id in [current, previous, other, processing])
+          {
+            'job_id': id,
+            'recording_id': id,
+            'generation': 1,
+            'watch_id': id == other ? 'OTHER' : state['address'],
+            'state': id == processing
+                ? 'ready'
+                : id == previous
+                ? 'cancelled'
+                : 'delivered',
+            'selected': id != previous,
+            'action_revision': id == previous ? 1 : 0,
+          },
+      ];
+      await mount(tester, state);
+      router(tester).go(AppRoutes.voiceMemos);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Alarms & Timers'));
+      await tester.pumpAndSettle();
+      expect(find.text('Alarms & Timers'), findsOneWidget);
+      expect(find.text('Owned timer'), findsOneWidget);
+      expect(find.text('Owned prior timer'), findsOneWidget);
+      expect(find.text('Old unused suggestion'), findsNothing);
+      expect(find.text('Owned reminder'), findsNothing);
+      expect(
+        find.text('Sent to Clock. Manage or remove it in the Clock app.'),
+        findsOneWidget,
+      );
+      final reads = calls.where((call) => call.method == 'voiceJob').toList();
+      expect(reads, hasLength(2));
+      await emit(tester, {...state, 'unrelated_battery_status': 90});
+      await tester.pumpAndSettle();
+      expect(calls.where((call) => call.method == 'voiceJob'), hasLength(2));
+      expect(
+        calls.where(
+          (call) => [
+            'processRecording',
+            'start',
+            'cancelVoiceJob',
+          ].contains(call.method),
+        ),
+        isEmpty,
+      );
+      expect(subscriptions.where((kind) => kind == 'listen'), hasLength(1));
+      router(tester).pop();
       await tester.pumpAndSettle();
     },
   );

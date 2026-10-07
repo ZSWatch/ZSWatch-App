@@ -112,6 +112,10 @@ class AppRouter {
         builder: (context, state) => const VoiceMemosScreen(),
       ),
       GoRoute(
+        path: AppRoutes.alarmsTimers,
+        builder: (context, state) => const AlarmsTimersScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.aiModels,
         builder: (context, state) => const AiModelsSettingsScreen(),
       ),

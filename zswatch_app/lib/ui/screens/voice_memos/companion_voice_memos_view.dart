@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../data/database/companion_recording_database.dart'
@@ -13,6 +14,7 @@ import '../../../services/voice_memo/transcription_engine.dart';
 import '../../../providers/companion_recording_import_providers.dart';
 import '../../widgets/voice_memos/audio_playback_bar.dart';
 import '../../widgets/voice_memos/companion_voice_action_card.dart';
+import '../../navigation/app_router.dart';
 
 /// Native receipt view used by the existing Voice Notes screen during migration.
 /// It observes the core; opening this screen does not start sync or inference.
@@ -375,6 +377,11 @@ class _CompanionVoiceMemosViewState
       appBar: AppBar(
         title: const Text('Voice Notes'),
         actions: [
+          IconButton(
+            tooltip: 'Alarms & Timers',
+            icon: const Icon(Icons.alarm_outlined),
+            onPressed: () => context.push(AppRoutes.alarmsTimers),
+          ),
           IconButton(
             tooltip: 'Refresh recording list',
             onPressed: ready && !refreshing ? refreshList : null,
