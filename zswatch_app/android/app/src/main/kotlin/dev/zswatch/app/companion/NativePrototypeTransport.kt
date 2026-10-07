@@ -2,8 +2,12 @@
 package dev.zswatch.app.companion
 
 import android.bluetooth.*
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Handler
+import androidx.core.content.ContextCompat
 import dev.zswatch.app.LifecycleLogger
 import io.runtime.mcumgr.ble.McuMgrBleTransport
 import io.runtime.mcumgr.ble.exception.McuMgrNotSupportedException
@@ -429,6 +433,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var awaitingMtu = false
     private var linkConnected = false
     private var servicesHandled = false
+    private var bonding: PrototypeBonding? = null
+    private var bondReceiver: BroadcastReceiver? = null
     private val recordingInbox = PrototypeRecordingInbox(store) {
         // Subscription completion always requests a list, including for early hints.
         if (store.control()["phase"] == "ready") requestRecordings()
@@ -482,7 +488,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                     // Some Android stacks repeat CONNECTED during bonding.
                     if (linkConnected) return@accept
                     linkConnected = true
-                    discover(client, session)
+                    beginBonding(client, session)
                 } else if (state == BluetoothProfile.STATE_DISCONNECTED || status != BluetoothGatt.GATT_SUCCESS) {
                     lost(session, "GATT disconnect status=$status")
                 }
@@ -492,11 +498,13 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 if (awaitingMtu) subscribe(client, session)
             }
             override fun onServiceChanged(client: BluetoothGatt) = accept(client) {
+                if (bonding != null) return@accept // No cached ATT handles have been used yet.
                 // Enabling/disabling the firmware's SMP service changes ATT handles.
                 // Fence the old NUS/SDK objects and rediscover on a fresh session.
                 lost(session, "GATT services changed")
             }
             override fun onServicesDiscovered(client: BluetoothGatt, status: Int) = accept(client) {
+                if (bonding != null) return@accept
                 check(status == BluetoothGatt.GATT_SUCCESS) { "GATT discovery failed: $status" }
                 if (servicesHandled) return@accept
                 servicesHandled = true
@@ -581,6 +589,56 @@ class NativePrototypeTransport(private val context: Context, private val handler
         runtime.phase(session, "discovering")
         check(client.discoverServices()) { "GATT discovery rejected" }
         deadline(session, 15000, "Service discovery timed out")
+    }
+
+    private fun beginBonding(client: BluetoothGatt, session: Long) {
+        // The previous Flutter owner bonded before discovery. Keep that order;
+        // encrypted NUS CCCDs must not race the Android confirmation dialog.
+        operation++ // End the connection deadline before waiting for the user.
+        fun state(value: Int) = when (value) {
+            BluetoothDevice.BOND_BONDED -> PrototypeBonding.State.BONDED
+            BluetoothDevice.BOND_BONDING -> PrototypeBonding.State.BONDING
+            else -> PrototypeBonding.State.NONE
+        }
+        val gate = PrototypeBonding(
+            current = { runtime.owns(session) && gatt === client },
+            later = { delay, action -> handler.postDelayed({ safely(action) }, delay) },
+            request = {
+                // The watch can initiate security between our state read and
+                // createBond(). An already-started bond is not a rejection.
+                client.device.createBond() || client.device.bondState != BluetoothDevice.BOND_NONE
+            },
+            done = { error ->
+                clearBonding()
+                if (error == null) discover(client, session) else lost(session, error)
+            },
+        )
+        bonding = gate
+        if (client.device.bondState != BluetoothDevice.BOND_BONDED) {
+            runtime.phase(session, "bonding")
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    if (intent?.action != BluetoothDevice.ACTION_BOND_STATE_CHANGED) return
+                    val device = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) ?: return
+                    if (device.address != client.device.address) return
+                    val next = state(intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.ERROR))
+                    handler.post { if (bonding === gate && runtime.owns(session) && gatt === client) safely { gate.changed(next) } }
+                }
+            }
+            ContextCompat.registerReceiver(context, receiver,
+                IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED), ContextCompat.RECEIVER_EXPORTED)
+            bondReceiver = receiver
+        }
+        // Re-read after registration so a completion during registration is not lost.
+        gate.start(state(client.device.bondState))
+        if (bonding === gate && client.device.bondState == BluetoothDevice.BOND_BONDED)
+            gate.changed(PrototypeBonding.State.BONDED)
+    }
+
+    private fun clearBonding() {
+        bonding?.close(); bonding = null
+        val receiver = bondReceiver; bondReceiver = null
+        if (receiver != null) runCatching { context.unregisterReceiver(receiver) }
     }
 
     private fun subscribe(client: BluetoothGatt, session: Long) {
@@ -1032,6 +1090,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     override fun close() {
         closing = true
+        clearBonding()
         // Preparation can wait for one service-change reconnect, but it never
         // executes/replays a command. Persisted Stop cancels it immediately.
         if (store.control()["desired_running"] != true) smpPreparation.close()

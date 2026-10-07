@@ -107,7 +107,7 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
 
     fun phase(token: Long, phase: String, error: String? = null): Boolean {
         if (!owns(token)) return false
-        require(phase in setOf("connecting", "discovering", "subscribing", "ready", "disconnected", "error"))
+        require(phase in setOf("connecting", "bonding", "discovering", "subscribing", "ready", "disconnected", "error"))
         val fields = mutableMapOf<String, Any?>("phase" to phase, "last_error" to error)
         // Durable metadata projection may happen after Flutter has detached or Stop.
         // This receipt records readiness, not pairing or application delivery.

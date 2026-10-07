@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/models/connection_state.dart';
+import 'package:zswatch_app/data/models/connection_phase.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/developer/companion_prototype_app.dart';
 
@@ -376,6 +377,21 @@ void main() {
       await client.command('requestDeviceInfo');
       await client.command('startLocalFixture');
       expect(calls.last.arguments, {'version': 1});
+    },
+  );
+
+  test(
+    'native pairing uses the existing setup UI and is never Ready',
+    () async {
+      saved['phase'] = 'bonding';
+      saved['protocol_ready'] = false;
+      final snapshot = await client.snapshot();
+      expect(
+        snapshot.connectionPhase,
+        const ConnectionPhase.settingUp(step: SetupStep.bonding),
+      );
+      expect(snapshot.connection.isConnected, false);
+      expect(snapshot.protocolReady, false);
     },
   );
 

@@ -51,6 +51,7 @@ class CompanionPrototypeSnapshot {
     if (protocolReady) return const ConnectionPhase.connected();
     return switch (phase) {
       'connecting' => const ConnectionPhase.connecting(),
+      'bonding' => const ConnectionPhase.settingUp(step: SetupStep.bonding),
       'discovering' => const ConnectionPhase.settingUp(
         step: SetupStep.discoveringServices,
       ),
