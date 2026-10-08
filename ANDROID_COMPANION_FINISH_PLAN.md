@@ -1,6 +1,9 @@
 # Finish the Android companion — fixed checklist for Sol
 
-**User direction, 2026-10-08.** This is the authoritative remaining work list.
+**Completed, 2026-10-08.** The user resumed this checklist; required acceptance
+and the concrete onboarding fix are complete. See [the final report](ANDROID_COMPANION_FINAL_REPORT.md).
+
+**User direction, 2026-10-08.** This is the authoritative completion scope.
 It supersedes earlier rollout/migration requirements, the stored goal's remote/
 hybrid requirements, and exhaustive testing requirements in older plans.
 **Remote/hybrid AI and iOS are out of scope.** The user will do long-term testing;
@@ -47,53 +50,53 @@ Details and earlier failures are in [the acceptance history](ANDROID_COMPANION_A
 
 ### 1. Close the current test loop and identify the deliverable — no phone needed
 
-- [ ] Read this checklist and inspect current Git state once. Preserve unrelated
+- [x] Read this checklist and inspect current Git state once. Preserve unrelated
   modifications and the local library forks; do not repeat the broad review.
-- [ ] Identify the current APK/source and relevant passed reports. Start from
+- [x] Identify the current APK/source and relevant passed reports. Start from
   `.companion-hil-runs/20261007-oneplus-watchface-mtu/artifact.json` (runtime
   9b9eef4). Reuse that release if code has not changed; rebuild only if needed.
-- [ ] Record the interrupted custom-image test as unverified and deferred. Its
+- [x] Record the interrupted custom-image test as unverified and deferred. Its
   observer rejected a rendered thumbnail color before selecting/cropping/uploading;
   this is not a demonstrated app defect. No more retries of that observer.
 
 ### 2. One fresh-app onboarding and permission pass — phone required
 
-- [ ] Wait until the user makes the OnePlus available again. Do not touch the
+- [x] Wait until the user makes the OnePlus available again. Do not touch the
   phone during the user's absence or substitute more peripheral tests for waiting.
-- [ ] Use ordinary app UI from clean app data: grant required permissions, select
+- [x] Use ordinary app UI from clean app data: grant required permissions, select
   the existing watch and reach Connected/Ready without prototype/debug commands
   or repeated manual unpair/reset rituals. The user has already allowed app data
   and permission resets; preserve watch recordings/background and unrelated apps.
   This is app onboarding, not another exhaustive Bluetooth-bond-state matrix.
-- [ ] Remove the Flutter task, observe the native foreground owner, and deliver
+- [x] Remove the Flutter task, observe the native foreground owner, and deliver
   one real watch data request or notification. Reopen the UI and confirm normal
   attachment. Existing local AI and update passes remain valid for unchanged code;
   do not download models or rerun inference/large transfers just for this check.
-- [ ] On return, remove only our owned phone image
+- [x] On return, remove only our owned phone image
   `/sdcard/Pictures/ZSWatchLab/hil_custom_red_20261007.png` if still present.
   Clear an abandoned picker through normal navigation. Do not reset the watch.
 
 ### 3. Fix only blockers exposed by that pass; run affected checks
 
-- [ ] A blocker is a reproducible regression preventing ordinary setup/connect,
+- [x] A blocker is a reproducible regression preventing ordinary setup/connect,
   breaking the required background data/local voice flow, losing/corrupting data,
   or causing a crash in these flows. Fix it in the existing app/FW ownership path.
   Cosmetic details, pre-existing AI quality and extra failure combinations are not
   blockers for this milestone. If there is no blocker, close this item directly.
-- [ ] For an actual code change, run the affected tests and release build, then
+- [x] For an actual code change, run the affected tests and release build, then
   verify the changed phone/watch behavior. Repeat unrelated accepted tests only
   when the change creates a specific regression risk. Documentation-only changes
   do not require rebuilding/reinstalling the app.
 
 ### 4. Deliver and stop
 
-- [ ] Provide the final APK path/hash, source commit and any required firmware
+- [x] Provide the final APK path/hash, source commit and any required firmware
   commit/artifact. Distinguish production release from lab re-signing. Existing
   signatures/data preservation do not justify another migration project.
-- [ ] Write one short final result: accepted features, fresh onboarding outcome,
+- [x] Write one short final result: accepted features, fresh onboarding outcome,
   actual remaining defects (if any), and the deferred limits below. Link existing
   artifacts instead of copying their full history into this checklist.
-- [ ] Commit only task changes. Leave the watch originals intact and end owned
+- [x] Commit only task changes. Leave the watch originals intact and end owned
   test processes/fixtures. When items 1–4 are verified and no blocker remains,
   mark the revised local Android goal complete and stop. A missing phone leaves
   item 2 pending; do not claim completion or fill the gap with new experiments.
@@ -125,5 +128,5 @@ new automation framework, debugger protocol or test fixture catalog to finish.
 Use fresh UI state and allow route transitions to settle. Do not infer secure
 lock from missing accessibility labels. Never rerun a passed scenario merely to
 get cleaner logs or a stronger-looking status. Report deferred cases honestly;
-they do not reopen the fixed checklist. This edit is a handoff plan: it does not
-resume the paused goal or authorize taking the user's phone back now.
+they do not reopen the fixed checklist. The user resumed work on October 8;
+the completed checklist is retained as evidence, not a new work queue.
