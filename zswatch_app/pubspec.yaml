@@ -88,6 +88,7 @@ dependencies:
     path: ../third_party/fllama
   chrono_ai_flow:
     path: ../packages/chrono_ai_flow
+  drift_sqflite: ^2.0.1
 
 dev_dependencies:
   just_audio_platform_interface: ^4.6.0

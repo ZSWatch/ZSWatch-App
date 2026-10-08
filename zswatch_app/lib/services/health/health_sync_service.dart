@@ -115,7 +115,11 @@ class ActivityBreakdown {
 /// - Activity data sync via Gadgetbridge protocol (placeholder)
 /// - Data persistence to health repository
 class HealthSyncService {
-  final WatchService _watchService;
+  final WatchService? _watchService;
+  final String? Function()? _companionWatchId;
+  bool _disposed = false;
+  String? get _watchId =>
+      _companionWatchId?.call() ?? _watchService?.currentWatch?.id;
   final HealthRepository _healthRepository;
 
   StreamSubscription<List<int>>? _hrSubscription;
@@ -165,13 +169,30 @@ class HealthSyncService {
     required WatchService watchService,
     required HealthRepository healthRepository,
   }) : _watchService = watchService,
+       _companionWatchId = null,
        _healthRepository = healthRepository {
     _initialize();
   }
 
+  /// UI projection only: the native owner has already committed these samples.
+  /// This path never creates a BluetoothDevice or writes duplicate rows.
+  HealthSyncService.forCompanion({
+    required HealthRepository healthRepository,
+    required String? Function() watchId,
+    required Stream<Map<String, dynamic>> activity,
+  }) : _watchService = null,
+       _companionWatchId = watchId,
+       _healthRepository = healthRepository {
+    _activitySubscription = activity.listen(
+      _handleActivityMessage,
+      onError: (Object error) =>
+          debugPrint('[HealthSync] Observer error: $error'),
+    );
+  }
+
   void _initialize() {
     // Listen for activity messages from watch (Gadgetbridge protocol)
-    _activitySubscription = _watchService.incomingMessages.listen(
+    _activitySubscription = _watchService!.incomingMessages.listen(
       _handleActivityMessage,
     );
   }
@@ -181,6 +202,11 @@ class HealthSyncService {
   /// Subscribes to the standard BLE Heart Rate Service (0x180D)
   /// and emits readings in real-time.
   Future<void> startHeartRateStreaming(String deviceId) async {
+    if (_companionWatchId != null) {
+      // The product Heart Rate view consumes the watch's regular act messages.
+      // Standard GATT streaming is not used by that view and remains native-owned.
+      return;
+    }
     if (_isStreamingController.value) {
       debugPrint('[HealthSync] HR streaming already active');
       return;
@@ -316,7 +342,7 @@ class HealthSyncService {
 
   /// Persist heart rate reading to database
   Future<void> _persistHeartRate(int bpm, [DateTime? timestamp]) async {
-    final watchId = _watchService.currentWatch?.id;
+    final watchId = _watchId;
     if (watchId == null) return;
 
     try {
@@ -355,9 +381,10 @@ class HealthSyncService {
 
   /// Handle activity messages from Gadgetbridge protocol
   ///
-  /// NOTE: Activity sync via Gadgetbridge is not yet implemented in watch firmware.
-  /// This is a placeholder for when `t:"act"` and `t:"actfetch"` messages are added.
+  /// The watch emits live `act` updates. Historical `actfetch` remains a
+  /// firmware placeholder.
   void _handleActivityMessage(Map<String, dynamic> message) {
+    if (_disposed) return;
     final type = message['t'] as String?;
     if (type == null) return;
 
@@ -379,7 +406,7 @@ class HealthSyncService {
   /// { "t": "act", "stp": 1234, "hrm": 72, "act": "WALKING", "ts": 1234567890000, "rt": 1 }
   /// ts is optional - milliseconds since 1970. If not specified, current time is used.
   void _handleActivityUpdate(Map<String, dynamic> message) {
-    final watchId = _watchService.currentWatch?.id;
+    final watchId = _watchId;
     if (watchId == null) return;
 
     // Parse timestamp - use provided ts or current time
@@ -394,7 +421,9 @@ class HealthSyncService {
 
     if (steps != null) {
       _stepsController.add(steps);
-      _persistSteps(watchId, steps, timestamp);
+      if (_companionWatchId == null) {
+        unawaited(_persistSteps(watchId, steps, timestamp));
+      }
     }
 
     if (heartRate != null) {
@@ -402,13 +431,19 @@ class HealthSyncService {
         '[HealthSync] Activity update - HR: $heartRate, ts: $timestamp',
       );
       _heartRateController.add(heartRate);
-      _persistHeartRate(heartRate, timestamp);
+      if (_companionWatchId == null) {
+        unawaited(_persistHeartRate(heartRate, timestamp));
+      }
     }
 
     // Track activity state
     if (activityString != null) {
       final newState = ActivityState.fromString(activityString);
-      _persistAndUpdateActivityState(watchId, newState, timestamp);
+      if (_companionWatchId == null) {
+        unawaited(_persistAndUpdateActivityState(watchId, newState, timestamp));
+      } else {
+        unawaited(_refreshActivityBreakdown(watchId));
+      }
     }
   }
 
@@ -458,6 +493,7 @@ class HealthSyncService {
           ? ActivityState.fromValue(todayActivity.last.intValue)
           : null;
 
+      if (_disposed) return;
       _activityBreakdownController.add(
         ActivityBreakdown(
           durations: durations,
@@ -472,7 +508,7 @@ class HealthSyncService {
 
   /// Load activity breakdown from database (call on startup/reconnect)
   Future<void> loadActivityBreakdown() async {
-    final watchId = _watchService.currentWatch?.id;
+    final watchId = _watchId;
     if (watchId == null) return;
     await _refreshActivityBreakdown(watchId);
   }
@@ -487,7 +523,7 @@ class HealthSyncService {
   /// Expected format (Gadgetbridge):
   /// { "t": "actfetch", "d": [{ "ts": 1234567890, "stp": 100, "hrm": 72 }, ...] }
   void _handleActivityFetch(Map<String, dynamic> message) {
-    final watchId = _watchService.currentWatch?.id;
+    final watchId = _watchId;
     if (watchId == null) return;
 
     final data = message['d'] as List<dynamic>?;
@@ -517,6 +553,7 @@ class HealthSyncService {
 
   /// Dispose resources
   Future<void> dispose() async {
+    _disposed = true;
     await stopHeartRateStreaming();
     await _activitySubscription?.cancel();
     await _heartRateController.close();

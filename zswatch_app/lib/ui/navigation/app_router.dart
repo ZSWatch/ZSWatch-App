@@ -88,6 +88,20 @@ class AppRouter {
     initialLocation: AppRoutes.home,
     routes: [
       GoRoute(
+        path: AppRoutes.health,
+        builder: (context, state) => const HealthScreen(),
+        routes: [
+          GoRoute(
+            path: 'heart-rate',
+            builder: (context, state) => const HeartRateScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: AppRoutes.analytics,
+        builder: (context, state) => const AnalyticsScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => const _HomeScreen(),
       ),

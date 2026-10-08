@@ -10,6 +10,7 @@ import '../data/models/companion_notification_status.dart';
 import '../data/models/companion_http_status.dart';
 import '../data/models/companion_gps_status.dart';
 import '../data/models/companion_watchface_status.dart';
+import 'watch_providers.dart' show databaseProvider;
 
 /// Android always uses the service owner; other platforms retain their own path.
 bool get useNativeCompanionRuntime =>
@@ -88,6 +89,12 @@ final companionConnectionPermissionsProvider =
           throw StateError('Bluetooth permission is required to connect');
         }
         await Permission.notification.request();
+        // Flutter owns schema creation/migrations. Initialize it before the
+        // native owner can collect health/analytics while Flutter is absent.
+        await ref
+            .read(databaseProvider)
+            .customSelect('SELECT 1 FROM watches LIMIT 1')
+            .get();
       };
     });
 
@@ -145,13 +152,17 @@ Stream<T> companionValues<T>(
   T Function(CompanionPrototypeSnapshot) project,
 ) {
   final values = StreamController<T>();
-  ref.listen(companionSnapshotProvider, (previous, next) {
+  final subscription = ref.listen(companionSnapshotProvider, (previous, next) {
+    if (values.isClosed) return;
     next.when(
       data: (snapshot) => values.add(project(snapshot)),
       error: values.addError,
       loading: () {},
     );
   }, fireImmediately: true);
-  ref.onDispose(() => unawaited(values.close()));
+  ref.onDispose(() {
+    subscription.close();
+    unawaited(values.close());
+  });
   return values.stream;
 }

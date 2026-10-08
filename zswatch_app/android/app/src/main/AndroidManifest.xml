@@ -53,6 +53,8 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher">
+        <!-- Drift/sqflite and native collection share Android SQLite in WAL mode. -->
+        <meta-data android:name="com.tekartik.sqflite.wal_enabled" android:value="true" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

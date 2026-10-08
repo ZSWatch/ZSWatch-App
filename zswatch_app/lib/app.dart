@@ -175,6 +175,7 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
   Widget build(BuildContext context) {
     if (ref.watch(nativeCompanionRuntimeProvider)) {
       ref.watch(companionWatchPersistenceProvider);
+      ref.watch(companionTelemetryUpdatesProvider);
     }
 
     return MaterialApp.router(

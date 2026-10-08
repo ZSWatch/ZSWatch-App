@@ -10,6 +10,7 @@ class PrototypeStore(private val directory: File, private val eventLimit: Int = 
     private val file = File(directory, "state-v1.json")
     private var data: JSONObject
     var onChanged: (() -> Unit)? = null
+    internal var onCommitted: (() -> Unit)? = null
 
     init {
         require(eventLimit > 0)
@@ -92,6 +93,7 @@ class PrototypeStore(private val directory: File, private val eventLimit: Int = 
             // Keep the exact published value, without aliases to caller-owned JSON.
             data = JSONObject(encoded)
         } finally { temporary.delete() }
+        onCommitted?.invoke()
         onChanged?.invoke()
     }
 

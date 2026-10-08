@@ -46,6 +46,8 @@ class CompanionPrototypeService : Service() {
         private set
     internal var firmware: NativePrototypeFirmware? = null
         private set
+    private var telemetry: CompanionTelemetry? = null
+    private var telemetrySink: AndroidTelemetrySink? = null
     private var media: AndroidPrototypeMedia? = null
     internal var gps: AndroidPrototypeGps? = null
         private set
@@ -118,6 +120,11 @@ class CompanionPrototypeService : Service() {
                 val files = ReceiptFiles(File(filesDir, "companion-prototype/recordings"))
                 val link = NativePrototypeTransport(applicationContext, PrototypeHub.worker, store, files)
                 transport = link
+                telemetrySink = AndroidTelemetrySink(applicationContext)
+                telemetry = CompanionTelemetry(telemetrySink!!, store)
+                // Complete SQLite writes before notifying Flutter about this state.
+                store.onCommitted = { recordTelemetry { telemetry?.observe(store.control()) } }
+                link.healthReceive = { message, generation -> recordTelemetry { telemetry?.activity(message, generation) } }
                 runtime = PrototypeRuntime(store, link) { reason -> firmware?.fenced(reason) }.also { link.runtime = it }
                 firmware = NativePrototypeFirmware(PrototypeHub.worker, store, runtime!!, link)
                 link.firmwareBusy = { firmware?.busy == true }
@@ -281,6 +288,14 @@ class CompanionPrototypeService : Service() {
         }
     }
 
+    private fun recordTelemetry(action: () -> Unit) {
+        try { action() }
+        catch (error: Exception) {
+            // Collection failure must not tear down the watch's BLE connection.
+            LifecycleLogger.log("CompanionPrototype", "telemetry_persistence_failed ${error.javaClass.simpleName}: ${error.message}")
+        }
+    }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
         LifecycleLogger.log("CompanionPrototype", "task_removed runtimeOwnedByService=true")
         super.onTaskRemoved(rootIntent)
@@ -296,6 +311,10 @@ class CompanionPrototypeService : Service() {
             gps?.close(); gps = null
             remoteFixture?.close(); remoteFixture = null
             localFixture?.close(); localFixture = null
+            runtime?.store?.onCommitted = null
+            recordTelemetry { telemetry?.close() }
+            telemetry = null
+            telemetrySink?.close(); telemetrySink = null
             runtime?.destroy(); transport?.dispose(); runtime = null; transport = null
         } }
         stopForeground(STOP_FOREGROUND_REMOVE)

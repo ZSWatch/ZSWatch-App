@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:drift_sqflite/drift_sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -113,9 +114,18 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// Insert or update a watch
-  Future<void> upsertWatch(WatchesCompanion watch) {
-    return into(watches).insertOnConflictUpdate(watch);
-  }
+  Future<void> upsertWatch(WatchesCompanion watch) => transaction(() async {
+    // Android's older system SQLite lacks ON CONFLICT ... DO UPDATE. Keep the
+    // same sparse update semantics without REPLACE deleting related history.
+    final existing = await getWatchById(watch.id.value);
+    if (existing == null) {
+      await into(watches).insert(watch);
+    } else {
+      await (update(
+        watches,
+      )..where((row) => row.id.equals(watch.id.value))).write(watch);
+    }
+  });
 
   /// Set a watch as primary (clears other primary flags)
   Future<void> setWatchAsPrimary(String watchId) async {
@@ -807,6 +817,11 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'zswatch_app.db'));
+    if (Platform.isAndroid) {
+      // Native telemetry uses Android SQLiteDatabase. Do not open the same
+      // file through a second bundled SQLite library in this process.
+      return SqfliteQueryExecutor(path: file.path);
+    }
     return NativeDatabase.createInBackground(file);
   });
 }

@@ -36,6 +36,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     var mediaReady: (Long) -> Unit = {}
     var mediaClosed: () -> Unit = {}
     var mediaControl: (JSONObject, Long) -> Unit = { _, _ -> }
+    internal var healthReceive: (JSONObject, Long) -> Unit = { _, _ -> }
     var gpsReady: (Long) -> Unit = {}
     var gpsClosed: () -> Unit = {}
     var gpsRequest: (JSONObject, Long) -> Unit = { _, _ -> }
@@ -924,6 +925,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
             // sends time anyway; do not disconnect a valid subscribing link.
             if (message.optString("t") == "time" && store.control()["phase"] == "ready") syncTime()
             PrototypeWatchInfo(store).receive(message, token, System.currentTimeMillis())
+            if (message.optString("t") == "act") healthReceive(message, token)
             val dismissals = PrototypeNotifications(store).dismissalKeys(message, token, System.currentTimeMillis())
             if (dismissals.isNotEmpty()) {
                 try {

@@ -90,6 +90,31 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   configureHostSqlite();
 
+  test('portable sparse watch upsert preserves metadata and history', () async {
+    final db = AppDatabase.forTesting(
+      NativeDatabase.memory(),
+      recoverLegacyProcessing: false,
+    );
+    try {
+      await seed(db);
+      final before = await db.getAllWatches();
+      final original = before.first;
+      final memos = await db.select(db.voiceMemos).get();
+      await db.upsertWatch(
+        WatchesCompanion(id: Value(original.id), batteryLevel: const Value(74)),
+      );
+      final updated = await db.getWatchById(original.id);
+      expect(updated!.batteryLevel, 74);
+      expect(updated.name, original.name);
+      expect(updated.customName, original.customName);
+      expect(updated.createdAt, original.createdAt);
+      expect(await db.select(db.voiceMemos).get(), memos);
+      expect(await db.getAllWatches(), hasLength(before.length));
+    } finally {
+      await db.close();
+    }
+  });
+
   test('v6 upgrade removes only prototype chat history', () async {
     final directory = await Directory.systemTemp.createTemp('chat-removal-');
     final file = File('${directory.path}/app.db');

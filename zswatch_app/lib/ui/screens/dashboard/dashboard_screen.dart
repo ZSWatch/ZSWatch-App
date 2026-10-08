@@ -75,7 +75,7 @@ class DashboardScreen extends ConsumerWidget {
     final native = ref.watch(nativeCompanionRuntimeProvider);
     final watch = ref.watch(currentWatchProvider);
     final connection = ref.watch(watchConnectionProvider);
-    final healthSummary = native ? null : ref.watch(healthSummaryProvider);
+    final healthSummary = ref.watch(healthSummaryProvider);
     final crashSummary = ref.watch(crashSummaryProvider);
     final showCrash = ref.watch(showCrashIndicatorProvider);
 
@@ -120,9 +120,8 @@ class DashboardScreen extends ConsumerWidget {
                   ? ref.watch(batteryLevelProvider)
                   : watch?.batteryLevel,
               firmwareVersion: watch?.shortFirmwareVersion,
-              todaySteps: healthSummary?.todaySteps ?? 0,
-              latestHeartRate: healthSummary?.latestHeartRate,
-              showHealth: !native,
+              todaySteps: healthSummary.todaySteps,
+              latestHeartRate: healthSummary.latestHeartRate,
             ),
 
             const SizedBox(height: AppTheme.spacingMd),
@@ -167,7 +166,7 @@ class DashboardScreen extends ConsumerWidget {
             const SizedBox(height: AppTheme.spacingMd),
 
             // Feature shortcuts
-            _FeatureShortcuts(native: native),
+            const _FeatureShortcuts(),
           ],
         ),
       ),
@@ -248,14 +247,12 @@ class _ConnectionStatusCard extends StatelessWidget {
 
 /// Compact stats row with 4 mini cards
 class _StatsRow extends StatelessWidget {
-  final bool showHealth;
   final int? batteryLevel;
   final String? firmwareVersion;
   final int todaySteps;
   final int? latestHeartRate;
 
   const _StatsRow({
-    this.showHealth = true,
     this.batteryLevel,
     this.firmwareVersion,
     this.todaySteps = 0,
@@ -285,7 +282,7 @@ class _StatsRow extends StatelessWidget {
                 : AppTheme.textSecondary,
           ),
         ),
-        if (showHealth) ...[
+        ...[
           const SizedBox(width: AppTheme.spacingSm),
           Expanded(
             child: _StatCard(
@@ -538,8 +535,7 @@ class _QuickActionsSection extends StatelessWidget {
 }
 
 class _FeatureShortcuts extends StatelessWidget {
-  final bool native;
-  const _FeatureShortcuts({this.native = false});
+  const _FeatureShortcuts();
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -554,23 +550,21 @@ class _FeatureShortcuts extends StatelessWidget {
           mainAxisSpacing: AppTheme.spacingSm,
           crossAxisSpacing: AppTheme.spacingSm,
           children: [
-            if (!native)
-              _FeatureTile(
-                icon: Icons.favorite,
-                label: 'Health',
-                onTap: () => context.push(AppRoutes.health),
-              ),
+            _FeatureTile(
+              icon: Icons.favorite,
+              label: 'Health',
+              onTap: () => context.push(AppRoutes.health),
+            ),
             _FeatureTile(
               icon: Icons.notifications,
               label: 'Notifications',
               onTap: () => context.push(AppRoutes.notifications),
             ),
-            if (!native)
-              _FeatureTile(
-                icon: Icons.analytics,
-                label: 'Analytics',
-                onTap: () => context.push(AppRoutes.analytics),
-              ),
+            _FeatureTile(
+              icon: Icons.analytics,
+              label: 'Analytics',
+              onTap: () => context.push(AppRoutes.analytics),
+            ),
             _FeatureTile(
               icon: Icons.watch,
               label: 'Watchface',

@@ -9,6 +9,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zswatch_app/app.dart';
 import 'package:zswatch_app/data/database/app_database.dart';
 import 'package:zswatch_app/providers/ai_providers.dart';
+import 'package:zswatch_app/providers/analytics_providers.dart';
+import 'package:zswatch_app/ui/screens/health/health_screen.dart';
+import 'package:zswatch_app/ui/screens/health/heart_rate_screen.dart';
+import 'package:zswatch_app/ui/screens/analytics/analytics_screen.dart';
 import 'package:zswatch_app/providers/auto_reconnect_provider.dart';
 import 'package:zswatch_app/providers/dfu_providers.dart';
 import 'package:zswatch_app/providers/developer_providers.dart';
@@ -104,6 +108,14 @@ void main() {
     Map<String, Object?> state, {
     AppDatabase? crashDb,
   }) async {
+    final db =
+        crashDb ??
+        AppDatabase.forTesting(
+          NativeDatabase.memory(),
+          recoverLegacyProcessing: false,
+        );
+    if (crashDb == null) addTearDown(db.close);
+    await tester.runAsync(() => db.getAllWatches());
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -125,9 +137,7 @@ void main() {
           filesystemUploadServiceProvider.overrideWith(
             (ref) => legacy('legacy FS'),
           ),
-          database.databaseProvider.overrideWith(
-            (ref) => crashDb ?? legacy('Drift'),
-          ),
+          database.databaseProvider.overrideWith((ref) => db),
           watchServiceProvider.overrideWith(
             (ref) => legacy('Dart WatchService'),
           ),
@@ -143,7 +153,13 @@ void main() {
           foregroundServiceNotifierProvider.overrideWith(
             (ref) => legacy('legacy FGS notifier'),
           ),
-          foregroundServiceProvider.overrideWith((ref) => legacy('legacy FGS')),
+          lifecycleLogEntriesProvider.overrideWith((ref, id) async => []),
+          batteryStorageServiceProvider.overrideWith(
+            (ref) => legacy('Dart battery collector'),
+          ),
+          connectionAnalyticsServiceProvider.overrideWith(
+            (ref) => legacy('Dart connection collector'),
+          ),
           voiceMemoRecoveryProvider.overrideWith(
             (ref) => legacy('legacy voice recovery'),
           ),
@@ -158,7 +174,6 @@ void main() {
             (ref) => legacy('Dart forwarding'),
           ),
           mediaControlProvider.overrideWith((ref) => legacy('media')),
-          healthSummaryProvider.overrideWith((ref) => legacy('health')),
         ],
         child: const ZSWatchApp(),
       ),
@@ -243,6 +258,144 @@ void main() {
     messenger.setMockMethodCallHandler(sensors, null);
     expect(forbidden, isEmpty);
   });
+
+  testWidgets(
+    'Health and Analytics reuse stored native data and one snapshot owner',
+    (tester) async {
+      final db = AppDatabase.forTesting(
+        NativeDatabase.memory(),
+        recoverLegacyProcessing: false,
+      );
+      addTearDown(db.close);
+      final now = DateTime.now();
+      const address = 'AA:BB:CC:DD:EE:FF';
+      await tester.runAsync(() async {
+        await db.upsertWatch(
+          WatchesCompanion.insert(
+            id: address,
+            name: 'Owned watch',
+            createdAt: now,
+          ),
+        );
+        for (final entry in {
+          'steps': 1234.0,
+          'heartRate': 72.0,
+          'activity': 7.0,
+        }.entries) {
+          await db.insertHealthSample(
+            HealthSamplesCompanion.insert(
+              watchId: address,
+              type: entry.key,
+              value: entry.value,
+              timestamp: now.subtract(const Duration(minutes: 5)),
+              granularity: 'realtime',
+              syncedAt: now,
+            ),
+          );
+        }
+        await db.insertBatteryReading(
+          BatteryReadingsCompanion.insert(
+            watchId: address,
+            level: 87,
+            timestamp: now,
+          ),
+        );
+        await db.insertConnectionEvent(
+          ConnectionEventsCompanion.insert(
+            watchId: address,
+            eventType: 'connected',
+            timestamp: now.subtract(const Duration(minutes: 5)),
+          ),
+        );
+      });
+      await mount(tester, snapshot(active: true, ready: true), crashDb: db);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(DashboardScreen)),
+      );
+      expect(container.read(healthSummaryProvider).todaySteps, 1234);
+      expect(container.read(healthSummaryProvider).latestHeartRate, 72);
+      expect(find.text('Health'), findsOneWidget);
+      expect(find.text('Analytics'), findsOneWidget);
+      final routes = router(tester);
+      routes.go(AppRoutes.health);
+      await tester.pumpAndSettle();
+      expect(find.byType(HealthScreen), findsOneWidget);
+      for (final tab in ['Week', 'Month', 'Today']) {
+        await tester.tap(find.text(tab));
+        await tester.pumpAndSettle();
+      }
+      expect(container.read(stepsHistoryProvider).totalSteps, 1234);
+      container.read(heartRateStreamingProvider);
+      await tester.runAsync(() async {
+        // External native writes are deliberately invisible to Drift until the snapshot.
+        for (final entry in {'steps': 2345.0, 'heartRate': 76.0}.entries) {
+          await db.customStatement(
+            'INSERT INTO health_samples(watch_id,type,value,timestamp,granularity,synced_at) VALUES(?,?,?,?,?,?)',
+            [
+              address,
+              entry.key,
+              entry.value,
+              now.millisecondsSinceEpoch ~/ 1000,
+              'realtime',
+              now.millisecondsSinceEpoch ~/ 1000,
+            ],
+          );
+        }
+      });
+      final live = snapshot(active: true, ready: true)
+        ..['latest_health'] = {
+          'address': address,
+          'generation': 10,
+          'sequence': 77,
+          'ts': now.millisecondsSinceEpoch,
+          'stp': 2345,
+          'hrm': 76,
+        };
+      await emit(tester, live);
+      await tester.pumpAndSettle();
+      expect(container.read(healthSummaryProvider).todaySteps, 2345);
+      expect(container.read(healthSummaryProvider).latestHeartRate, 76);
+      final samples = await tester.runAsync(
+        () => db.select(db.healthSamples).get(),
+      );
+      expect(
+        samples,
+        hasLength(5),
+      ); // UI projection did not persist duplicates.
+      final readings = container
+          .read(heartRateStreamingProvider)
+          .recentReadings
+          .length;
+      await emit(tester, {...live, 'event_cursor': 88});
+      await tester.pumpAndSettle();
+      expect(
+        container.read(heartRateStreamingProvider).recentReadings,
+        hasLength(readings),
+      );
+      routes.go(AppRoutes.heartRate);
+      await tester.pumpAndSettle();
+      expect(find.byType(HeartRateScreen), findsOneWidget);
+      expect(find.text('76'), findsNWidgets(4));
+      routes.go(AppRoutes.analytics);
+      await tester.pumpAndSettle();
+      expect(find.byType(AnalyticsScreen), findsOneWidget);
+      expect(
+        await container.read(batteryReadings24HoursProvider(address).future),
+        hasLength(1),
+      );
+      await tester.tap(find.text('Connection'));
+      await tester.pumpAndSettle();
+      expect(
+        container.read(connectionStats24HoursProvider(address)).hasValue,
+        isTrue,
+      );
+      expect(forbidden, isEmpty);
+      expect(calls, isEmpty);
+      expect(subscriptions.where((kind) => kind == 'listen'), hasLength(1));
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets(
     'existing Crash Reports uses native summary and keeps UI history after absence',
@@ -771,7 +924,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(DashboardScreen), findsOneWidget);
       expect(find.text('87%'), findsOneWidget);
-      expect(find.text('Health'), findsNothing);
+      expect(find.text('Health'), findsOneWidget);
+      expect(find.text('Analytics'), findsOneWidget);
       expect(find.text('Update Firmware'), findsOneWidget);
       await tester.tap(find.text('Disconnect'));
       await tester.pumpAndSettle();
@@ -848,27 +1002,26 @@ void main() {
     },
   );
 
-  testWidgets(
-    'deep links to unmigrated health and DB detail features stay unavailable',
-    (tester) async {
-      await mount(tester, snapshot(active: true, ready: true));
-      final routes = router(tester);
-      for (final path in [AppRoutes.health, AppRoutes.voiceMemoDetail(12)]) {
-        routes.go(path);
-        await tester.pumpAndSettle();
-        expect(
-          find.text('This feature is not available in this build'),
-          findsOneWidget,
-        );
-      }
-      expect(calls, isEmpty);
-      routes.go(AppRoutes.home);
+  testWidgets('unmigrated legacy voice-memo DB detail links stay unavailable', (
+    tester,
+  ) async {
+    await mount(tester, snapshot(active: true, ready: true));
+    final routes = router(tester);
+    for (final path in [AppRoutes.voiceMemoDetail(12)]) {
+      routes.go(path);
       await tester.pumpAndSettle();
-      expect(find.byType(DashboardScreen), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-      await tester.pumpAndSettle();
-    },
-  );
+      expect(
+        find.text('This feature is not available in this build'),
+        findsOneWidget,
+      );
+    }
+    expect(calls, isEmpty);
+    routes.go(AppRoutes.home);
+    await tester.pumpAndSettle();
+    expect(find.byType(DashboardScreen), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
 
   testWidgets(
     'reconnection and observer failures remove live dashboard; cancel goes only to native Stop',

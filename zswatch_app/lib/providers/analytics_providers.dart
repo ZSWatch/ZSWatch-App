@@ -7,6 +7,7 @@ import '../core/utils/lifecycle_logger.dart';
 import '../services/analytics/battery_storage_service.dart';
 import '../services/analytics/connection_analytics_service.dart';
 import 'foreground_service_providers.dart';
+import 'companion_runtime_providers.dart';
 import 'watch_providers.dart';
 import 'watch_service_provider.dart';
 
@@ -25,6 +26,43 @@ export '../services/analytics/connection_analytics_service.dart'
     show connectionAnalyticsServiceProvider;
 export '../core/utils/lifecycle_logger.dart' show LifecycleLogEntry;
 export 'foreground_service_providers.dart' show foregroundServiceProvider;
+
+/// A committed native health/battery/connection change invalidates queries.
+/// Job progress and other high-volume snapshots do not recreate these providers.
+final companionTelemetryRevisionProvider = Provider<Object?>((ref) {
+  if (!ref.watch(nativeCompanionRuntimeProvider)) return null;
+  return ref.watch(
+    companionSnapshotProvider.select((value) {
+      final s = value.valueOrNull;
+      if (s == null) return null;
+      final info = s.fields['watch_info'];
+      final health = s.fields['latest_health'];
+      return (
+        s.fields['address'],
+        s.generation,
+        s.fields['phase'],
+        info is Map ? info['status_observed_ms'] : null,
+        health is Map ? health['sequence'] : null,
+      );
+    }),
+  );
+});
+
+/// SQLite writes happen in Android while the existing Drift UI stays reactive.
+final companionTelemetryUpdatesProvider = Provider<void>((ref) {
+  if (!ref.watch(nativeCompanionRuntimeProvider)) return;
+  final db = ref.watch(databaseProvider);
+  ref.listen(companionTelemetryRevisionProvider, (_, revision) {
+    if (revision != null) {
+      db.markTablesUpdated({
+        db.healthSamples,
+        db.batteryReadings,
+        db.connectionEvents,
+        db.watches,
+      });
+    }
+  }, fireImmediately: true);
+});
 
 // ============================================================================
 // Enums and Constants
@@ -51,6 +89,7 @@ enum TimeRangeOption {
 /// Provider for battery readings from the last 24 hours
 final batteryReadings24HoursProvider = FutureProvider.autoDispose
     .family<List<BatteryReadingEntity>, String>((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(batteryRepositoryProvider);
       return repository.getLast24Hours(watchId);
     });
@@ -58,6 +97,7 @@ final batteryReadings24HoursProvider = FutureProvider.autoDispose
 /// Provider for battery readings from the last 7 days
 final batteryReadings7DaysProvider = FutureProvider.autoDispose
     .family<List<BatteryReadingEntity>, String>((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(batteryRepositoryProvider);
       return repository.getLast7Days(watchId);
     });
@@ -65,6 +105,7 @@ final batteryReadings7DaysProvider = FutureProvider.autoDispose
 /// Provider for daily battery snapshots (for 7-day chart)
 final batteryDailySnapshotsProvider = FutureProvider.autoDispose
     .family<List<BatteryReadingEntity>, String>((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(batteryRepositoryProvider);
       return repository.getDailySnapshots(watchId: watchId, days: 7);
     });
@@ -72,6 +113,7 @@ final batteryDailySnapshotsProvider = FutureProvider.autoDispose
 /// Provider for battery drain rate (% per hour)
 final batteryDrainRateProvider = FutureProvider.autoDispose
     .family<double?, String>((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(batteryRepositoryProvider);
       final now = DateTime.now();
       return repository.calculateDrainRatePerHour(
@@ -84,6 +126,7 @@ final batteryDrainRateProvider = FutureProvider.autoDispose
 /// Provider for estimated remaining battery time
 final estimatedBatteryTimeProvider = FutureProvider.autoDispose
     .family<Duration?, String>((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(batteryRepositoryProvider);
       return repository.estimateRemainingTime(watchId);
     });
@@ -104,6 +147,7 @@ final currentWatchBatteryReadingsProvider =
       final selectedWatchId = ref.watch(selectedWatchIdProvider);
       if (selectedWatchId == null) return [];
 
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(batteryRepositoryProvider);
       return repository.getLast24Hours(selectedWatchId);
     });
@@ -115,6 +159,7 @@ final currentWatchDrainRateProvider = FutureProvider.autoDispose<double?>((
   final selectedWatchId = ref.watch(selectedWatchIdProvider);
   if (selectedWatchId == null) return null;
 
+  ref.watch(companionTelemetryRevisionProvider);
   final repository = ref.watch(batteryRepositoryProvider);
   final now = DateTime.now();
   return repository.calculateDrainRatePerHour(
@@ -130,6 +175,7 @@ final currentWatchEstimatedTimeProvider = FutureProvider.autoDispose<Duration?>(
     final selectedWatchId = ref.watch(selectedWatchIdProvider);
     if (selectedWatchId == null) return null;
 
+    ref.watch(companionTelemetryRevisionProvider);
     final repository = ref.watch(batteryRepositoryProvider);
     return repository.estimateRemainingTime(selectedWatchId);
   },
@@ -153,6 +199,7 @@ final connectionTimelineRangeProvider = StateProvider.autoDispose
 /// Provider for connection stats for the last 24 hours
 final connectionStats24HoursProvider = FutureProvider.autoDispose
     .family<ConnectionStats, String>((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(connectionAnalyticsRepositoryProvider);
       return repository.getLast24HoursStats(watchId);
     });
@@ -160,6 +207,7 @@ final connectionStats24HoursProvider = FutureProvider.autoDispose
 /// Provider for connection stats for the last 7 days
 final connectionStats7DaysProvider = FutureProvider.autoDispose
     .family<ConnectionStats, String>((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(connectionAnalyticsRepositoryProvider);
       return repository.getLast7DaysStats(watchId);
     });
@@ -167,6 +215,7 @@ final connectionStats7DaysProvider = FutureProvider.autoDispose
 /// Provider for uptime percentage
 final uptimePercentageProvider = FutureProvider.autoDispose
     .family<double, ({String watchId, Duration window})>((ref, params) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(connectionAnalyticsRepositoryProvider);
       final now = DateTime.now();
       return repository.calculateUptimePercentage(
@@ -179,6 +228,7 @@ final uptimePercentageProvider = FutureProvider.autoDispose
 /// Provider for disconnection count in last 24 hours
 final disconnectionCountProvider = FutureProvider.autoDispose
     .family<int, String>((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(connectionAnalyticsRepositoryProvider);
       final now = DateTime.now();
       return repository.getDisconnectionCount(
@@ -191,6 +241,7 @@ final disconnectionCountProvider = FutureProvider.autoDispose
 /// Provider for average session duration
 final averageSessionDurationProvider = FutureProvider.autoDispose
     .family<Duration, String>((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(connectionAnalyticsRepositoryProvider);
       final now = DateTime.now();
       return repository.calculateAverageSessionDuration(
@@ -206,6 +257,7 @@ final currentWatchConnectionStatsProvider =
       final selectedWatchId = ref.watch(selectedWatchIdProvider);
       if (selectedWatchId == null) return null;
 
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(connectionAnalyticsRepositoryProvider);
       return repository.getLast24HoursStats(selectedWatchId);
     });
@@ -216,6 +268,7 @@ final currentWatchConnectionStats7DaysProvider =
       final selectedWatchId = ref.watch(selectedWatchIdProvider);
       if (selectedWatchId == null) return null;
 
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(connectionAnalyticsRepositoryProvider);
       return repository.getLast7DaysStats(selectedWatchId);
     });
@@ -223,6 +276,7 @@ final currentWatchConnectionStats7DaysProvider =
 /// Provider for connection events stream (for real-time updates)
 final connectionEventsStreamProvider = StreamProvider.autoDispose
     .family<List<ConnectionEventEntity>, String>((ref, watchId) {
+      ref.watch(companionTelemetryUpdatesProvider);
       final db = ref.watch(databaseProvider);
       return db.watchConnectionEvents(watchId: watchId, limit: 50);
     });
@@ -238,6 +292,7 @@ final lifecycleLogEntriesProvider = FutureProvider.autoDispose
 /// Used to auto-size the timeline window.
 final oldestConnectionEventTimeProvider = FutureProvider.autoDispose
     .family<DateTime?, String>((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(connectionAnalyticsRepositoryProvider);
       return repository.getOldestEventTime(watchId);
     });
@@ -253,6 +308,7 @@ final connectionTimelineProvider = FutureProvider.autoDispose
       }),
       String
     >((ref, watchId) async {
+      ref.watch(companionTelemetryRevisionProvider);
       final repository = ref.watch(connectionAnalyticsRepositoryProvider);
       final selectedRange = ref.watch(connectionTimelineRangeProvider(watchId));
       final now = DateTime.now();
@@ -274,6 +330,7 @@ final currentWatchConnectionEventsProvider =
         return Stream.value([]);
       }
 
+      ref.watch(companionTelemetryUpdatesProvider);
       final db = ref.watch(databaseProvider);
       return db.watchConnectionEvents(watchId: selectedWatchId, limit: 50);
     });
@@ -285,6 +342,10 @@ final currentWatchConnectionEventsProvider =
 /// Provider that ensures analytics services are initialized
 /// Should be watched in a top-level widget to start the services
 final analyticsServicesInitializedProvider = Provider<bool>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    ref.watch(companionTelemetryUpdatesProvider);
+    return true; // Collection belongs to the native service, not this screen.
+  }
   // Watch the services to ensure they're started
   ref.watch(batteryStorageServiceProvider);
   ref.watch(connectionAnalyticsServiceProvider);
