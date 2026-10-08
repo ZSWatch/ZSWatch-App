@@ -108,7 +108,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             if (Platform.isAndroid) const _CalendarPickerTile(),
           ],
 
-          if (!native) ...[
+          ...[
             const SizedBox(height: 24),
             const Divider(height: 1),
             const SizedBox(height: 8),

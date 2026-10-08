@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../../services/background/companion_prototype_client.dart';
 import '../../../providers/companion_runtime_providers.dart';
@@ -75,13 +74,7 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
   }
 
   Future<void> connect() async {
-    final statuses = await [
-      Permission.bluetoothConnect,
-      Permission.notification,
-    ].request();
-    if (statuses[Permission.bluetoothConnect]?.isDenied == true) {
-      throw StateError('Bluetooth connection permission is required');
-    }
+    await ref.read(companionConnectionPermissionsProvider)();
     await ref.read(watchNotifierProvider.notifier).connectById(address.text);
     show(await client.snapshot());
   }

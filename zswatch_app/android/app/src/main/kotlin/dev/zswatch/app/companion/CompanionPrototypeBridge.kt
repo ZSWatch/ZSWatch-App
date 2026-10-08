@@ -58,6 +58,17 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
             if ((call.arguments as? Map<*, *>)?.get("version") != 1) {
                 result.error("VERSION", "Unsupported companion bridge version", null)
             } else when (call.method) {
+                "permissionStatus" -> {
+                    fun granted(permission: String) = ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+                    val location = granted(Manifest.permission.ACCESS_FINE_LOCATION) || granted(Manifest.permission.ACCESS_COARSE_LOCATION)
+                    result.success(mapOf("version" to 1,
+                        "bluetooth" to (Build.VERSION.SDK_INT < 31 || granted(Manifest.permission.BLUETOOTH_CONNECT)),
+                        "notifications" to androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled(),
+                        "notification_access" to dev.zswatch.app.NotificationListenerServiceImpl.isNotificationAccessEnabled(context),
+                        "location" to location,
+                        "background_location" to (location && (Build.VERSION.SDK_INT < 29 || granted(Manifest.permission.ACCESS_BACKGROUND_LOCATION))),
+                        "battery_exemption" to context.getSystemService(android.os.PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)))
+                }
                 "sensorState", "setSensor" -> PrototypeHub.worker.post {
                     try {
                         val link = CompanionPrototypeService.instance?.transport ?: error("Native owner required")
@@ -317,7 +328,7 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         } }
                     } catch (error: Exception) { PrototypeHub.main.post { result.error("LOG_FILES_FAILED", error.message, null) } }
                 }
-                "prepareShell", "executeShell" -> PrototypeHub.worker.post {
+                "restartWatch", "prepareShell", "executeShell" -> PrototypeHub.worker.post {
                     try {
                         val args = call.arguments as? Map<*, *> ?: error("Arguments required")
                         val generation = when (val value = args["generation"]) {
@@ -327,7 +338,12 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                         require(generation >= 0)
                         val link = CompanionPrototypeService.instance?.transport ?: error("Native owner required")
-                        if (call.method == "prepareShell") {
+                        if (call.method == "restartWatch") {
+                            link.restartWatch(generation) { outcome -> PrototypeHub.main.post {
+                                outcome.fold({ result.success(mapOf("version" to 1, "acknowledged" to true)) },
+                                    { error -> result.error("RESTART_FAILED", error.message, null) })
+                            } }
+                        } else if (call.method == "prepareShell") {
                             link.prepareShell(generation) { outcome -> PrototypeHub.main.post {
                                 outcome.fold({ prepared -> result.success(mapOf("version" to 1,
                                     "generation" to prepared, "prepared_from_generation" to generation)) },

@@ -276,6 +276,26 @@ class CompanionPrototypeClient {
         }),
       );
 
+  Future<Map<String, bool>> permissionStatus() async {
+    final reply = await methods.invokeMethod<Object?>('permissionStatus', {
+      'version': 1,
+    });
+    const keys = [
+      'bluetooth',
+      'notifications',
+      'notification_access',
+      'location',
+      'background_location',
+      'battery_exemption',
+    ];
+    if (reply is! Map ||
+        reply['version'] != 1 ||
+        keys.any((key) => reply[key] is! bool)) {
+      throw const FormatException('Unsupported permission status');
+    }
+    return {for (final key in keys) key: reply[key] as bool};
+  }
+
   Future<String> processRecording(Map<String, Object?> configuration) async {
     final result = await methods.invokeMethod<Object?>('processRecording', {
       ...configuration,
@@ -508,6 +528,21 @@ class CompanionPrototypeClient {
       throw const FormatException('Unsupported SMP preparation response');
     }
     return value['generation'] as int;
+  }
+
+  Future<void> restartWatch(int generation) async {
+    if (generation < 0) {
+      throw const FormatException('Invalid restart generation');
+    }
+    final reply = await methods.invokeMethod<Object?>('restartWatch', {
+      'version': 1,
+      'generation': generation,
+    });
+    if (reply is! Map ||
+        reply['version'] != 1 ||
+        reply['acknowledged'] != true) {
+      throw const FormatException('Restart was not acknowledged');
+    }
   }
 
   Future<CompanionFirmwareAcceptance> startFirmware(

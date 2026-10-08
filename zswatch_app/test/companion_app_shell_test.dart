@@ -233,6 +233,9 @@ void main() {
         };
       }
       if (call.method == 'setSensor') return {'version': 1, 'completed': true};
+      if (call.method == 'restartWatch') {
+        return {'version': 1, 'acknowledged': true};
+      }
       if (call.method == 'start') return {'version': 1, 'accepted': true};
       if (call.method == 'inspectCoredump') {
         return {'version': 1, 'completed': true};
@@ -247,9 +250,69 @@ void main() {
           ],
         };
       }
+      if (call.method == 'permissionStatus') {
+        return {
+          'version': 1,
+          'bluetooth': true,
+          'notifications': true,
+          'notification_access': false,
+          'location': true,
+          'background_location': false,
+          'battery_exemption': false,
+        };
+      }
       return saved;
     });
   });
+  testWidgets(
+    'Restart confirmation uses only the native owner and generation',
+    (tester) async {
+      await mount(tester, snapshot(active: true, ready: true));
+      await tester.ensureVisible(find.text('Restart Watch'));
+      await tester.tap(find.text('Restart Watch'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(calls.where((c) => c.method == 'restartWatch'), isEmpty);
+      await tester.tap(find.text('Restart Watch'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Restart'));
+      await tester.pumpAndSettle();
+      expect(calls.where((c) => c.method == 'restartWatch').single.arguments, {
+        'version': 1,
+        'generation': 10,
+      });
+      expect(find.text('Restart command sent to watch'), findsOneWidget);
+      expect(
+        calls.where((c) => c.method == 'start' || c.method == 'stop'),
+        isEmpty,
+      );
+      expect(forbidden, isEmpty);
+    },
+  );
+
+  testWidgets('Permission overview observes native status without prompting', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await mount(tester, snapshot(active: true, ready: true));
+    unawaited(router(tester).push(AppRoutes.settings));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('App Permissions'));
+    await tester.tap(find.text('App Permissions'));
+    await tester.pumpAndSettle();
+    expect(find.text('3 of 6 granted'), findsOneWidget);
+    expect(find.text('Bluetooth connection'), findsOneWidget);
+    expect(find.text('Notification access'), findsOneWidget);
+    expect(find.text('Background location'), findsOneWidget);
+    expect(find.text('Battery optimization'), findsOneWidget);
+    expect(permissionRequests, 0);
+    expect(calls.where((c) => c.method == 'permissionStatus'), isNotEmpty);
+    expect(calls.where((c) => c.method == 'notificationDiagnostic'), isEmpty);
+    expect(forbidden, isEmpty);
+  });
+
   tearDown(() {
     messenger.setMockMethodCallHandler(methods, null);
     messenger.setMockMethodCallHandler(events, null);
@@ -762,7 +825,10 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
-      expect(calls.map((c) => c.method), ['notificationStatus']);
+      expect(calls.map((c) => c.method), [
+        'permissionStatus',
+        'notificationStatus',
+      ]);
       expect(subscriptions, ['listen']);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
@@ -791,13 +857,18 @@ void main() {
       unawaited(routes.push<void>(AppRoutes.settings));
       await tester.pumpAndSettle();
       expect(permissionCalls, isEmpty);
-      expect(calls, isEmpty);
+      expect(calls.map((c) => c.method), ['permissionStatus']);
       expect(find.text('Persistent Connection'), findsNothing);
       expect(find.text('Demo Mode'), findsNothing);
       await tester.ensureVisible(find.text('App Permissions'));
       await tester.tap(find.text('App Permissions'));
       await tester.pumpAndSettle();
+      expect(permissionCalls, isEmpty);
+      await tester.tap(find.text('Open Android app settings'));
+      await tester.pumpAndSettle();
       expect(permissionCalls, ['openAppSettings']);
+      await tester.tap(find.text('App Permissions'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Keep Screen On During DFU'));
       await tester.tap(
         find.descendant(
@@ -826,7 +897,7 @@ void main() {
       expect(find.text('http://127.0.0.1:18879'), findsOneWidget);
       expect(find.text('App Version'), findsOneWidget);
       expect(find.text('Licenses'), findsOneWidget);
-      expect(calls, isEmpty);
+      expect(calls.every((c) => c.method == 'permissionStatus'), isTrue);
       expect(permissionRequests, 0);
       expect(subscriptions.where((kind) => kind == 'listen'), hasLength(1));
     },
@@ -847,18 +918,18 @@ void main() {
       expect(find.byType(LinearProgressIndicator), findsNothing);
       expect(find.text('Companion prototype'), findsNothing);
       expect(find.text('Connection setup'), findsNothing);
-      expect(calls, isEmpty);
+      expect(calls.every((c) => c.method == 'permissionStatus'), isTrue);
       expect(permissionRequests, 0);
 
       routes.pop();
       await tester.pumpAndSettle();
       expect(find.text('Settings'), findsOneWidget);
-      expect(calls, isEmpty);
+      expect(calls.every((c) => c.method == 'permissionStatus'), isTrue);
       await tester.tap(find.text('Watch connection'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Disconnect'));
       await tester.pumpAndSettle();
-      expect(calls.map((call) => call.method), ['stop']);
+      expect(calls.map((call) => call.method), ['permissionStatus', 'stop']);
       await emit(tester, snapshot());
       await tester.pumpAndSettle();
       expect(find.text('Connect'), findsOneWidget);

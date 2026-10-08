@@ -18,6 +18,7 @@ import '../../../services/voice_memo/transcription_engine.dart';
 import '../../navigation/app_router.dart';
 import '../onboarding/permission_onboarding_screen.dart';
 import 'companion_settings_view.dart';
+import 'companion_permissions_summary.dart';
 
 /// Settings screen for app configuration
 ///
@@ -98,13 +99,7 @@ class SettingsScreen extends ConsumerWidget {
           // Permissions Section (consolidated)
           const _SectionHeader(title: 'Permissions'),
           if (native)
-            const _SettingsTile(
-              leading: Icon(Icons.security, color: AppTheme.textSecondary),
-              title: 'App Permissions',
-              subtitle: 'Manage app permissions in Android settings',
-              trailing: Icon(Icons.open_in_new, size: 20),
-              onTap: openAppSettings,
-            )
+            const CompanionPermissionsSummary()
           else
             _PermissionsSummaryTile(),
 

@@ -49,7 +49,17 @@ Future<void> _restartWatch(BuildContext context, WidgetRef ref) async {
   if (deviceId.isEmpty) return;
 
   try {
-    await OsManager.reset(deviceId);
+    if (ref.read(nativeCompanionRuntimeProvider)) {
+      final snapshot = ref.read(companionSnapshotProvider).asData?.value;
+      if (snapshot?.protocolReady != true) {
+        throw StateError('Current watch connection required');
+      }
+      await ref
+          .read(companionClientProvider)
+          .restartWatch(snapshot!.generation);
+    } else {
+      await OsManager.reset(deviceId);
+    }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Restart command sent to watch')),
@@ -153,7 +163,7 @@ class DashboardScreen extends ConsumerWidget {
                   context.go(AppRoutes.home);
                 }
               },
-              onRestartWatch: ref.watch(hasSmpServiceProvider)
+              onRestartWatch: (native || ref.watch(hasSmpServiceProvider))
                   ? () => _restartWatch(context, ref)
                   : null,
             ),
