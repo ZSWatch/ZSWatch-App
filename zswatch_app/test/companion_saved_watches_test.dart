@@ -90,6 +90,45 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   configureHostSqlite();
 
+  test('v6 upgrade removes only prototype chat history', () async {
+    final directory = await Directory.systemTemp.createTemp('chat-removal-');
+    final file = File('${directory.path}/app.db');
+    var db = AppDatabase.forTesting(
+      NativeDatabase(file),
+      recoverLegacyProcessing: false,
+    );
+    try {
+      await seed(db);
+      final watches = await db.getAllWatches();
+      final memos = await db.select(db.voiceMemos).get();
+      // Model an existing v6 database containing the prototype-only table.
+      await db.customStatement(
+        'CREATE TABLE chat_history (id INTEGER PRIMARY KEY)',
+      );
+      await db.customStatement('INSERT INTO chat_history VALUES (1)');
+      await db.customStatement('PRAGMA user_version = 6');
+      await db.close();
+      db = AppDatabase.forTesting(
+        NativeDatabase(file),
+        recoverLegacyProcessing: false,
+      );
+      expect(await db.getAllWatches(), watches);
+      expect(await db.select(db.voiceMemos).get(), memos);
+      expect(
+        await db
+            .customSelect(
+              "SELECT name FROM sqlite_master WHERE type='table' AND name='chat_history'",
+            )
+            .get(),
+        isEmpty,
+      );
+      expect(db.schemaVersion, 7);
+    } finally {
+      await db.close();
+      await directory.delete(recursive: true);
+    }
+  });
+
   test(
     'native database reopen preserves processing; legacy reopen recovers it',
     () async {
@@ -113,7 +152,7 @@ void main() {
           (await db.customSelect('PRAGMA user_version').getSingle()).read<int>(
             'user_version',
           ),
-          6,
+          7,
         );
         await db.close();
         db = AppDatabase.forTesting(NativeDatabase(file));

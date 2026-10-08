@@ -1,6 +1,11 @@
 # Android companion completion — 2026-10-08
 
-The fixed local Android checklist is complete. Remote/hybrid AI, iOS and long
+**Reopened after the user's parity review:** the listed checks passed, but this
+report omitted existing Health, Analytics and other Android functionality. It
+does not establish full app completion. Remaining work is tracked in
+[the parity inventory](ANDROID_FEATURE_PARITY.md).
+
+The fixed local Android checklist was completed. Remote/hybrid AI, iOS and long
 endurance remain outside this milestone. Earlier accepted functionality and
 its precise limits are preserved in [the acceptance history](ANDROID_COMPANION_ACCEPTANCE_HISTORY.md).
 

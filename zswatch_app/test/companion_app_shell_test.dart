@@ -10,7 +10,6 @@ import 'package:zswatch_app/app.dart';
 import 'package:zswatch_app/data/database/app_database.dart';
 import 'package:zswatch_app/providers/ai_providers.dart';
 import 'package:zswatch_app/providers/auto_reconnect_provider.dart';
-import 'package:zswatch_app/providers/chat_providers.dart';
 import 'package:zswatch_app/providers/dfu_providers.dart';
 import 'package:zswatch_app/providers/developer_providers.dart';
 import 'package:zswatch_app/providers/filesystem_providers.dart';
@@ -27,6 +26,8 @@ import 'package:zswatch_app/providers/watch_providers.dart' as database;
 import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/ui/navigation/app_router.dart';
 import 'package:zswatch_app/ui/screens/dashboard/dashboard_screen.dart';
+
+import 'support/host_sqlite.dart';
 
 Map<String, Object?> snapshot({bool active = false, bool ready = false}) => {
   'version': 1,
@@ -63,6 +64,7 @@ Map<String, Object?> snapshot({bool active = false, bool ready = false}) => {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  configureHostSqlite();
   const methods = MethodChannel('dev.zswatch.app/companion_v1');
   const events = MethodChannel('dev.zswatch.app/companion_events_v1');
   const logs = MethodChannel('dev.zswatch.app/companion_logs_v1');
@@ -142,7 +144,6 @@ void main() {
             (ref) => legacy('legacy FGS notifier'),
           ),
           foregroundServiceProvider.overrideWith((ref) => legacy('legacy FGS')),
-          watchChatServiceProvider.overrideWith((ref) => legacy('watch chat')),
           voiceMemoRecoveryProvider.overrideWith(
             (ref) => legacy('legacy voice recovery'),
           ),
@@ -683,7 +684,7 @@ void main() {
     (tester) async {
       await mount(tester, snapshot(active: true, ready: true));
       final routes = router(tester);
-      routes.push(AppRoutes.settings);
+      unawaited(routes.push(AppRoutes.settings));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Watch connection'));
       await tester.pumpAndSettle();

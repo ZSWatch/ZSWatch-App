@@ -28,10 +28,6 @@ Guid _guid(String uuid) => Guid(uuid);
 class WatchService {
   final BleConnectionService _ble;
 
-  /// Dedicated callback for chat messages. This avoids relying solely on the
-  /// generic incoming message broadcast path for the chat pipeline.
-  void Function(Map<String, dynamic> message)? onChatMessage;
-
   WatchService(this._ble) {
     LifecycleLogger.log('WatchService', 'created');
     // Register our setup callback so BleConnectionService calls us
@@ -349,16 +345,6 @@ class WatchService {
   /// Reset the watchface background to the firmware default.
   Future<Map<String, dynamic>> resetWatchfaceBackground() =>
       sendWatchfaceBackgroundCommand('reset');
-
-  /// Send a chat command to the watch.
-  Future<void> sendChatCommand(
-    String action, {
-    Map<String, dynamic>? extraData,
-  }) async {
-    final data = <String, dynamic>{'t': 'chat', 'action': action};
-    if (extraData != null) data.addAll(extraData);
-    await _sendGb(data);
-  }
 
   /// Enable MCUmgr/SMP on the watch.
   Future<void> enableSmp() => _sendGb({'t': 'smp', 'status': true});
@@ -743,11 +729,6 @@ class WatchService {
         debugPrint(
           '[WatchService] Watchface background message: ${message['action']}',
         );
-        break;
-
-      case 'chat':
-        debugPrint('[WatchService] Chat message: ${message['action']}');
-        onChatMessage?.call(message);
         break;
     }
   }

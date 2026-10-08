@@ -10,7 +10,6 @@ import 'core/utils/lifecycle_logger.dart';
 import 'data/models/connection_state.dart';
 import 'providers/analytics_providers.dart';
 import 'providers/ble_providers.dart';
-import 'providers/chat_providers.dart';
 import 'providers/companion_runtime_providers.dart';
 import 'providers/companion_watch_providers.dart';
 import 'providers/coredump_providers.dart';
@@ -47,12 +46,6 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     if (ref.read(nativeCompanionRuntimeProvider)) {
       _nativeRouter = AppRouter.createNativeRouter();
       return; // Observe the existing service; UI startup never sends Start.
-    }
-    try {
-      ref.read(watchChatServiceProvider);
-      debugPrint('[app] watchChatServiceProvider initialized in initState');
-    } catch (e, st) {
-      debugPrint('[app] early watchChatServiceProvider init failed: $e\n$st');
     }
     // Initialize BLE service after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -180,12 +173,8 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
 
   @override
   Widget build(BuildContext context) {
-    // Keep the chat service alive for the full app lifetime so incoming
-    // question_ready messages are always consumed even if no chat UI is open.
     if (ref.watch(nativeCompanionRuntimeProvider)) {
       ref.watch(companionWatchPersistenceProvider);
-    } else {
-      ref.watch(watchChatServiceProvider);
     }
 
     return MaterialApp.router(

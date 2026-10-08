@@ -88,7 +88,6 @@ dependencies:
     path: ../third_party/fllama
   chrono_ai_flow:
     path: ../packages/chrono_ai_flow
-  flutter_tts: ^4.2.5
 
 dev_dependencies:
   just_audio_platform_interface: ^4.6.0

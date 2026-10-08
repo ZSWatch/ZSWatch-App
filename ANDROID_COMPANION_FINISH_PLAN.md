@@ -1,7 +1,8 @@
 # Finish the Android companion — fixed checklist for Sol
 
-**Completed, 2026-10-08.** The user resumed this checklist; required acceptance
-and the concrete onboarding fix are complete. See [the final report](ANDROID_COMPANION_FINAL_REPORT.md).
+**Reopened, 2026-10-08.** The checks below passed, but omitted existing Android
+features. Full completion now requires [the feature parity inventory](ANDROID_FEATURE_PARITY.md).
+The narrower results are preserved in [the earlier report](ANDROID_COMPANION_FINAL_REPORT.md).
 
 **User direction, 2026-10-08.** This is the authoritative completion scope.
 It supersedes earlier rollout/migration requirements, the stored goal's remote/
