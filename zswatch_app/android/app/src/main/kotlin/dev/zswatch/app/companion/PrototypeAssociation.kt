@@ -2,11 +2,13 @@ package dev.zswatch.app.companion
 
 import android.app.Activity
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.le.ScanFilter
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanResult
 import android.companion.AssociationInfo
 import android.companion.AssociationRequest
 import android.companion.BluetoothLeDeviceFilter
+import android.companion.BluetoothDeviceFilter
 import android.companion.CompanionDeviceManager
 import android.content.Intent
 import android.content.IntentSender
@@ -18,7 +20,14 @@ import java.util.regex.Pattern
 /** Explicit Android picker; no Flutter scanner or second GATT connection. */
 @Suppress("DEPRECATION")
 class PrototypeAssociation(private val activity: Activity) {
-    companion object { const val REQUEST = 61003 }
+    companion object {
+        const val REQUEST = 61003
+
+        internal fun connectedWatch(devices: List<BluetoothDevice>): String? = devices
+            .filter { it.bondState == BluetoothDevice.BOND_BONDED &&
+                it.name?.contains("ZSWatch", ignoreCase = true) == true }
+            .map { it.address.uppercase() }.distinct().singleOrNull()
+    }
     private class Pending(val result: MethodChannel.Result, val address: String?, val generation: Long?) {
         var completing = false
         var pickerShown = false
@@ -26,7 +35,20 @@ class PrototypeAssociation(private val activity: Activity) {
     private var pending: Pending? = null
     private var disposed = false
 
-    fun discover(generation: Long, result: MethodChannel.Result) = begin(null, generation, result)
+    fun discover(generation: Long, result: MethodChannel.Result) {
+        // Android's HID connection can survive app-data clearing. That watch is
+        // no longer advertising; CDM can confirm a bonded address without a scan.
+        // Never arbitrarily choose between multiple connected watches.
+        try {
+            val bluetooth = activity.getSystemService(BluetoothManager::class.java)
+            val connected = if (bluetooth == null) emptyList() else
+                bluetooth.getConnectedDevices(BluetoothProfile.GATT) +
+                    bluetooth.getConnectedDevices(BluetoothProfile.GATT_SERVER)
+            begin(connectedWatch(connected), generation, result)
+        } catch (error: Exception) {
+            result.error("ASSOCIATION_FAILED", error.message, null)
+        }
+    }
     fun associate(selected: String, result: MethodChannel.Result) = begin(selected, null, result)
 
     private fun begin(selected: String?, generation: Long?, result: MethodChannel.Result) {
@@ -39,10 +61,10 @@ class PrototypeAssociation(private val activity: Activity) {
             if (selected != null && PrototypePresence.associated(activity, selected)) {
                 finishAssociation(operation, selected); return
             }
-            val filter = BluetoothLeDeviceFilter.Builder().apply {
-                if (selected != null) setScanFilter(ScanFilter.Builder().setDeviceAddress(selected).build())
-                else setNamePattern(Pattern.compile(".*ZSWatch.*", Pattern.CASE_INSENSITIVE))
-            }.build()
+            val filter = if (selected != null)
+                BluetoothDeviceFilter.Builder().setAddress(selected).build()
+            else BluetoothLeDeviceFilter.Builder()
+                .setNamePattern(Pattern.compile(".*ZSWatch.*", Pattern.CASE_INSENSITIVE)).build()
             val request = AssociationRequest.Builder().addDeviceFilter(filter).setSingleDevice(selected != null).build()
             if (Build.VERSION.SDK_INT >= 33) {
                 manager.associate(request, Executor { action -> PrototypeHub.main.post(action) },
