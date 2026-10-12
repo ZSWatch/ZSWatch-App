@@ -39,6 +39,22 @@ class WatchUsbTests(unittest.TestCase):
                 asyncio.run(watch_usb.run(args))
             start.assert_not_called()
 
+    def test_macos_java_launcher_is_not_a_debugger(self):
+        args = watch_usb.arguments(['--port', '/dev/cu.example', '--reset', 'jlink', '--probe', '123'])
+        with patch.object(watch_usb.sys, 'platform', 'darwin'), \
+                patch.object(watch_usb.shutil, 'which', side_effect=[None, '/usr/bin/JLink']):
+            with self.assertRaisesRegex(RuntimeError, 'SEGGER'):
+                watch_usb.reset_command(args, '/tmp')
+
+    def test_segger_commander_selects_probe_and_only_resets(self):
+        import tempfile
+        args = watch_usb.arguments(['--port', '/dev/cu.example', '--reset', 'jlink', '--probe', '123'])
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(watch_usb.shutil, 'which', return_value='/opt/SEGGER/JLinkExe'):
+                command = watch_usb.reset_command(args, directory)
+            self.assertEqual(command[:5], ['/opt/SEGGER/JLinkExe', '-SelectEmuBySN', '123', '-Device', 'NRF5340_XXAA_APP'])
+            self.assertEqual(Path(command[-1]).read_text(), 'r\ng\nexit\n')
+
 
 if __name__ == '__main__':
     unittest.main()

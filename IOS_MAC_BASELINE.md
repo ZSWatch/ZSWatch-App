@@ -100,3 +100,76 @@ Next acceptance: implement the native owner and normal Flutter integration,
 then verify NUS events and replies, reconnect, explicit Stop/Forget and actual
 CoreBluetooth restoration on the connected iPhone/watch. The presence of
 `bluetooth-central` in Info.plist does not prove those behaviors.
+
+## Fresh repository and tool recheck
+
+On 2026-10-12 all four origins were fetched again. The latest handoff refs are
+still app `d7a51f1`, firmware `0f56aec7`, Nordic `f67c186` and fllama `115e799`.
+The app remains on `codex/ios-companion`, preserving local baseline commit
+`baaabfa`; detached library HEADs match both the handoff gitlinks and their
+latest handoff branches. The firmware branch also has local tool-only commit
+`e9fcd5b5`; its runtime firmware source was not changed.
+
+The fresh **signed Release** build passed (79.8 MB), and `codesign --verify
+--deep --strict` verified the app and its nested libraries. It was installed on
+the same iPhone without uninstalling or clearing app data. The exact build
+source was `baaabfa` plus its pinned submodule trees. Generated app and binary
+hashes are kept in ignored `.companion-hil-runs/20261012-mac-tools-check/`.
+It also launched successfully. A deliberately bounded 12-second `devicectl
+--console` capture received real Flutter/plugin output, including Bluetooth
+powered-on and reconnect requests. The console command timed out as expected
+while the app was running; a separate ordinary launch leaves the app available.
+This establishes app launch and console access, not BLE connection acceptance.
+
+The first in-place Release attempt stalled in `dsymutil` while macOS requested
+Documents-folder access and the desktop was locked. That build was stopped.
+The successful build used Git archives of the exact app/library trees in
+`/tmp/zswatch-ios-release-check-20261012`, with ordinary `flutter pub get` and
+`flutter build ios --release --no-pub`. It generated symbols normally; no
+privacy settings, Xcode binaries or Flutter SDK code were changed. No Mac
+unlock or extra filesystem grant was needed for that isolated build.
+
+| Tool/check | Actual result |
+| --- | --- |
+| Timestamped `hil.py capture --watch-only` | Now supports macOS; captured 318 bytes of actual display/IMU/app-picker logs at 115200 baud. Saved raw bytes, readable text, timeline and capture manifest. |
+| Firmware `serial_capture.py` | Captured another 183 bytes of actual UART logs. An earlier passive sample was empty, honestly retained as no data. |
+| USB/SMP shell | `app state`, `power status`, `kernel uptime`, `voice_memo status` and `ble_fota status` succeeded; a 25-second open-port check also succeeded. |
+| USB filesystem fixture | 5,472 bytes; upload interrupted at 256 and download at 2,425; resumed bytes and SHA-256 matched. Only the uniquely owned fixture was deleted; recording count stayed 26. This is USB transport evidence, not BLE throughput. |
+| SEGGER Commander | Official signed/notarized V9.24a package installed; `ShowEmuList` detects USB probe `51022722` without connecting/resetting the target. |
+| Nordic `nrfutil` | Existing 8.1.1 binary, device module 2.22.0 installed; explicit `--jlink-dll` inventory finds J-Link, FTDI and watch CDC. Default DLL discovery remains unavailable; use the command below. |
+| Apple Metal compiler | Installed official Metal Toolchain 17B54; `xcrun metal --version` succeeds (32023.830). |
+| Host test suite | 59 tests: 58 pass, one Linux-only hardware-capture test skipped on Darwin. Correct invocation includes `PYTHONPATH=scripts/companion_hil`. |
+| Firmware flash-helper guards | Four tests pass. `--help`, missing action/probe, and an absent image cannot trigger hardware access; every mutating command selects the probe explicitly. |
+
+SEGGER files are available in `/Applications/SEGGER/JLink_V924a` and
+`~/.local/opt/segger-jlink/JLink_V924a`. The watch virtual environment links
+`JLinkExe` and `nrfutil`, so activate it for their PATH-based use:
+
+```sh
+source .venv-watch/bin/activate
+JLinkExe -AutoConnect 0 -CommandFile /tmp/zswatch-jlink-inventory.jlink
+nrfutil device --jlink-dll /Applications/SEGGER/JLink_V924a/libjlinkarm.9.24.1.dylib list
+python scripts/companion_hil/hil.py capture --watch-only \
+  --watch-uart /dev/cu.usbserial-BG00RS5E --duration 20 --output /tmp/NEW-uart-capture
+```
+
+The inventory command file contains only `ShowEmuList` and `exit`. Keep using
+explicit probe selection for any later target operation. `watch_usb.py` no
+longer mistakes macOS's Java launcher `/usr/bin/JLink` for a SEGGER executable.
+The legacy firmware flash helper was also corrected: formerly `--help` was
+treated as a firmware filename; the failed old invocation never flashed
+anything because `nrfjprog` is absent. The updated helper requires `--port`,
+`--probe` and an explicit `--flash EXISTING.hex` or `--reset`, and verifies its
+UART port before an action.
+
+This recheck did not reset, halt, flash or erase the watch. UI wake/close actions
+generated logs; Update was restored and BLE FOTA remains enabled. A Weather
+launch attempt was rejected while the app picker was still closing, so no
+Weather/HTTP acceptance is claimed.
+
+Firmware **compilation and flashing remain unverified**. The Mac has NCS
+v3.2.0 installed, while this firmware's `app/west.yml` requires
+v3.3.0-preview1. A matching SDK workspace and ELF are still needed for firmware
+compilation and symbolic GDB inspection. No full SDK migration was performed
+merely to test app builds or logging. BLE, restoration and local-AI acceptance
+remain implementation-stage work, separate from this build/tool preflight.

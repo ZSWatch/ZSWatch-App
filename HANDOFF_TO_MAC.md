@@ -117,6 +117,13 @@ Other already committed reusable tools:
 | Firmware `.agent_tools/serial_capture.py` | UART capture with `--port`, `--baud` and `--seconds`; use 115200 for the current UART configuration. |
 | Firmware `.agent_tools/flash_and_log.py` | Historical flash/reset plus log helper. It does not select a debugger serial. Use only after adding explicit target selection or establishing a single correct target; prefer `watch_usb.py` for bootstrap reset. |
 
+Mac recheck update: the firmware helper now uses an explicit CLI requiring
+`--port`, `--probe` and either `--flash EXISTING.hex` or `--reset`. `--help` and
+invalid invocations cannot open ports or execute a debugger. It requires
+`nrfjprog` (currently absent on this Mac); use `watch_usb.py` and the installed
+SEGGER Commander for Mac bootstrap reset. See `IOS_MAC_BASELINE.md` for the
+verified UART/SMP and debugger inventory and remaining firmware-build limits.
+
 Hundreds of one-off Android UI scripts, private recordings, raw logs/screenshots,
 model weights, virtual environments and local build outputs are not a portable
 source deliverable and are not uploaded. The source-controlled helpers above

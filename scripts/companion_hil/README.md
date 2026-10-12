@@ -14,6 +14,34 @@ Its CLI safeguards have host tests; the consolidated script and its J-Link Mac
 backend still need first physical validation on the Mac. Earlier Linux evidence
 applies to the underlying SMP/DTR sequence, not to an unperformed Mac test.
 
+Mac recheck (2026-10-12): ordinary USB/SMP requests and a 25-second open-port
+check succeeded on `/dev/cu.usbmodem21301`. Both the firmware UART helper and
+`hil.py capture --watch-only` captured real watch logs from the FTDI UART
+`/dev/cu.usbserial-BG00RS5E` at 115200. The timestamped collector now supports
+Linux and macOS; Android preflight/logcat still requires an Android phone and is
+not an iPhone adapter. A successful quiet capture with `NO_DATA` does not prove
+watch logging. Wake/UI activity was needed to obtain actual logs on this rig.
+
+For Mac UART capture, use a fresh output directory and one reader per port:
+
+```bash
+.venv-watch/bin/python scripts/companion_hil/hil.py capture \
+  --watch-only --watch-uart /dev/cu.usbserial-BG00RS5E \
+  --duration 20 --output /tmp/zswatch-mac-uart-NEW
+```
+
+The collector preserves raw bytes, readable logs, a receipt timeline and
+`capture.json`, deasserts UART DTR/RTS and never sends UART commands.
+
+`/usr/bin/JLink` on macOS is a Java launcher, **not** SEGGER Commander. The USB
+wrapper now rejects that misleading path. SEGGER Commander V9.24a is installed
+locally at `~/.local/opt/segger-jlink/JLink_V924a/JLinkExe`; the watch virtual
+environment's `bin/JLinkExe` links to it. Activate the environment before using
+the J-Link backend. `ShowEmuList` verified USB probe `51022722`; no target reset,
+halt, erase or flash was performed. Reset remains a separate, explicit bootstrap
+operation and is still rejected while the USB CDC path exists. Do not substitute
+an invented absent device path to get around that safeguard.
+
 Existing `watch_file_probe.py` mutates a uniquely named synthetic file and cleans
 up its own fixture. It tests USB file recovery, not BLE throughput or real audio.
 The older `hil.py` phone inventory and capture commands below are Android/Linux
@@ -38,7 +66,7 @@ Run from the ZSWatchApp repository root:
 ```bash
 python3 -m venv /tmp/zswatch-companion-tools
 /tmp/zswatch-companion-tools/bin/pip install -r scripts/companion_hil/requirements.txt
-/tmp/zswatch-companion-tools/bin/python -m unittest discover -s scripts/companion_hil/tests -v
+PYTHONPATH=scripts/companion_hil /tmp/zswatch-companion-tools/bin/python -m unittest discover -s scripts/companion_hil/tests -v
 ```
 
 Tests use a PTY as a simulated UART and a fake ADB process. They exercise byte

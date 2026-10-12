@@ -9,6 +9,7 @@ import argparse
 import asyncio
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 import time
 
@@ -47,7 +48,13 @@ def reset_command(args, directory):
     if args.reset == 'nrfutil':
         return ['nrfutil', 'device', 'reset', '--serial-number', args.probe,
                 '--family', 'nrf53']
-    executable = shutil.which('JLinkExe') or shutil.which('JLink')
+    executable = shutil.which('JLinkExe')
+    if not executable:
+        candidate = shutil.which('JLink')
+        # macOS ships a Java launcher named /usr/bin/JLink. It is not SEGGER.
+        if candidate and not (sys.platform == 'darwin' and
+                              Path(candidate).resolve() == Path('/usr/bin/JLink')):
+            executable = candidate
     if not executable:
         raise RuntimeError('JLinkExe/JLink not on PATH; install SEGGER tools or choose another backend')
     commands = Path(directory) / 'reset.jlink'

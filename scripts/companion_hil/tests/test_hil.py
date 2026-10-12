@@ -83,6 +83,19 @@ class CaptureTests(unittest.TestCase):
         with self.assertRaises(BlockingIOError):
             os.read(self.master, 4096)  # Collector must never transmit UART commands.
 
+    def test_macos_watch_capture_accepts_serial_port_and_records_host(self):
+        with patch.object(hil.platform, "system", return_value="Darwin"):
+            result = hil.capture(self.args)
+        self.assertEqual(result["host_system"], "Darwin")
+        self.assertEqual(result["profile"], "watch_only_capture")
+        self.assertEqual(result["acceptance"], "NOT_RUN")
+
+    def test_unsupported_host_rejected_before_opening_uart(self):
+        with patch.object(hil.platform, "system", return_value="Windows"):
+            with self.assertRaisesRegex(RuntimeError, "Linux or macOS"):
+                hil.capture(self.args)
+        self.assertFalse(self.args.output.exists())
+
     def test_silent_uart_is_not_reported_as_functional_success(self):
         result = hil.capture(self.args)
         self.assertEqual(result["uart_observation"], "NO_DATA")

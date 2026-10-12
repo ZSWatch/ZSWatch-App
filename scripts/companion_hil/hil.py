@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only Android lab inventory and bounded UART/logcat capture.
+"""Read-only Android inventory and Linux/macOS UART capture (logcat for Android).
 
 No install, launch, pairing, BLE connection, flash, recover or reset commands.
 The manifest describes observations, never companion acceptance results.
@@ -142,7 +142,7 @@ def inspect_lab(args):
 
 @contextlib.contextmanager
 def resource_locks(resources, directory=None):
-    """Cooperative Linux locks; serial exclusivity additionally protects the UART."""
+    """Cooperative POSIX locks; serial exclusivity additionally protects the UART."""
     import fcntl
     root = Path(directory or Path(tempfile.gettempdir()) / f"zswatch-hil-locks-{os.getuid()}")
     root.mkdir(mode=0o700, exist_ok=True)
@@ -163,8 +163,8 @@ def resource_locks(resources, directory=None):
 
 
 def capture(args):
-    if platform.system() != "Linux":
-        raise RuntimeError("This capture adapter currently requires Linux")
+    if platform.system() not in ("Linux", "Darwin"):
+        raise RuntimeError("This capture adapter requires Linux or macOS")
     import serial
     if not args.watch_uart or not Path(args.watch_uart).exists():
         raise RuntimeError("An existing explicit --watch-uart is required")
@@ -182,6 +182,7 @@ def capture(args):
         args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
         summary = {"schema_version": 1, "profile": "watch_only_capture" if args.watch_only else "phone_watch_capture",
                    "started_utc": utc_now(), "status": "RUNNING", "acceptance": "NOT_RUN",
+                   "host_system": platform.system(),
                    "android_serial": args.android_serial if not args.watch_only else None,
                    "watch_uart": str(Path(args.watch_uart).resolve()), "uart_bytes": 0,
                    "duration_requested_s": args.duration, "timestamp_basis": "Host receipt UTC and monotonic_ns; device clocks are independent"}
