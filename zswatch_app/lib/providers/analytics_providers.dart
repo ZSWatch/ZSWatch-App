@@ -8,6 +8,8 @@ import '../services/analytics/battery_storage_service.dart';
 import '../services/analytics/connection_analytics_service.dart';
 import 'foreground_service_providers.dart';
 import 'companion_runtime_providers.dart';
+import 'ios_telemetry_providers.dart';
+import 'package:flutter/foundation.dart';
 import 'watch_providers.dart';
 import 'watch_service_provider.dart';
 
@@ -48,10 +50,15 @@ final companionTelemetryRevisionProvider = Provider<Object?>((ref) {
   );
 });
 
-/// SQLite writes happen in Android while the existing Drift UI stays reactive.
+/// Android commits native SQLite writes. iOS hands durable native receipts to
+/// Flutter's sole Drift writer before acknowledging them.
 final companionTelemetryUpdatesProvider = Provider<void>((ref) {
   if (!ref.watch(nativeCompanionRuntimeProvider)) return;
   final db = ref.watch(databaseProvider);
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    ref.watch(iosTelemetryProjectionProvider);
+    return;
+  }
   ref.listen(companionTelemetryRevisionProvider, (_, revision) {
     if (revision != null) {
       db.markTablesUpdated({

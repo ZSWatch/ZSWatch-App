@@ -7,12 +7,20 @@ import UserNotifications
 @objc class AppDelegate: FlutterAppDelegate {
   private let productivityChannelName = "dev.zswatch.app/productivity"
   private let eventStore = EKEventStore()
+  private var companion: IOSCompanionCoordinator!
+  private var companionBridge: IOSCompanionBridge?
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    let restored = (launchOptions?[.bluetoothCentrals] as? [String])?.contains(IOSCompanionCoordinator.restorationID) == true
+    companion = IOSCompanionCoordinator(root: root, restoredLaunch: restored)
     GeneratedPluginRegistrant.register(with: self)
+    if let registrar = registrar(forPlugin: "IOSCompanionBridge") {
+      companionBridge = IOSCompanionBridge(messenger: registrar.messenger(), owner: companion)
+    }
 
     if let controller = window?.rootViewController as? FlutterViewController {
       let channel = FlutterMethodChannel(
@@ -26,6 +34,11 @@ import UserNotifications
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  override func applicationDidEnterBackground(_ application: UIApplication) {
+    companion.queue.async { [companion] in companion?.scanStop() }
+    super.applicationDidEnterBackground(application)
   }
 
   private func handleProductivityCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -65,13 +78,13 @@ import UserNotifications
     let reminderMinutes = (args["reminderMinutes"] as? NSNumber)?.intValue
     let durationSeconds = (args["durationSeconds"] as? NSNumber)?.intValue
 
-    // Timer and alarm use Clock app URLs on iOS — no calendar permission needed.
+    // Timer and alarm schedule local app notifications; no calendar permission is needed.
     if actionType == "timer" {
-      createTimerViaClockApp(durationSeconds: durationSeconds ?? 0, label: title, result: result)
+      createTimerNotification(durationSeconds: durationSeconds ?? 0, label: title, result: result)
       return
     }
     if actionType == "alarm" {
-      createAlarmViaClockApp(scheduledAtMillis: scheduledAtMillis, label: title, result: result)
+      createAlarmNotification(scheduledAtMillis: scheduledAtMillis, label: title, result: result)
       return
     }
 
@@ -104,7 +117,7 @@ import UserNotifications
     }
   }
 
-  private func createTimerViaClockApp(durationSeconds: Int, label: String, result: @escaping FlutterResult) {
+  private func createTimerNotification(durationSeconds: Int, label: String, result: @escaping FlutterResult) {
     guard durationSeconds > 0 else {
       result(FlutterError(code: "INVALID_ARGUMENT", message: "durationSeconds must be > 0", details: nil))
       return
@@ -143,7 +156,7 @@ import UserNotifications
     }
   }
 
-  private func createAlarmViaClockApp(scheduledAtMillis: Double?, label: String, result: @escaping FlutterResult) {
+  private func createAlarmNotification(scheduledAtMillis: Double?, label: String, result: @escaping FlutterResult) {
     guard let scheduledAtMillis = scheduledAtMillis else {
       result(FlutterError(code: "INVALID_ARGUMENT", message: "scheduledAtMillis is required", details: nil))
       return

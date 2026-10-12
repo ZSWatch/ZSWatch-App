@@ -131,7 +131,7 @@ void main() {
           ),
           findsOneWidget,
         );
-        await tester.tap(find.byType(ListTile).first);
+        await tester.tap(find.byKey(ValueKey(identity(saved))));
         await tester.pumpAndSettle();
         expect(requested, [preferSaved ? savedId : failedId]);
         expect(
@@ -319,7 +319,18 @@ void main() {
       expect(find.text('Latest watch list: 3 recordings'), findsOneWidget);
       expect(find.textContaining('Download failed'), findsOneWidget);
       expect(find.textContaining('Waiting — downloads paused'), findsOneWidget);
-      expect(find.byType(ListTile), findsNWidgets(3));
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is ListTile &&
+              [
+                identity(pending),
+                identity(failed),
+                identity(saved),
+              ].any((id) => widget.key == ValueKey(id)),
+        ),
+        findsNWidgets(3),
+      );
       expect(calls, isEmpty); // Opening the screen sends no sync/model command.
       await tester.tap(find.byTooltip('Refresh recording list'));
       await tester.pumpAndSettle();

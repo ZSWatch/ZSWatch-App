@@ -91,6 +91,8 @@ dependencies:
   drift_sqflite: ^2.0.1
 
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   just_audio_platform_interface: ^4.6.0
   flutter_test:
     sdk: flutter

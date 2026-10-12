@@ -147,7 +147,7 @@ void main() {
             .get(),
         isEmpty,
       );
-      expect(db.schemaVersion, 8);
+      expect(db.schemaVersion, 9);
     } finally {
       await db.close();
       await directory.delete(recursive: true);
@@ -177,7 +177,7 @@ void main() {
           (await db.customSelect('PRAGMA user_version').getSingle()).read<int>(
             'user_version',
           ),
-          8,
+          9,
         );
         await db.close();
         db = AppDatabase.forTesting(NativeDatabase(file));
@@ -392,12 +392,15 @@ void main() {
     },
   );
 
-  test('Android selection accepts MACs and rejects old iOS IDs', () {
-    expect(isCompanionWatchAddress(address.toLowerCase()), true);
-    expect(isCompanionWatchAddress('bad'), false);
-    expect(
-      isCompanionWatchAddress('7AFB25CA-1234-ABCD-DCBA-ABCDEF123456'),
-      false,
-    );
-  });
+  test(
+    'Catalogue accepts native MAC/UUID identifiers and rejects invalid IDs',
+    () {
+      expect(isCompanionWatchAddress(address.toLowerCase()), true);
+      expect(isCompanionWatchAddress('bad'), false);
+      expect(
+        isCompanionWatchAddress('7AFB25CA-1234-ABCD-DCBA-ABCDEF123456'),
+        true,
+      );
+    },
+  );
 }

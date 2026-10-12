@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../data/models/connection_state.dart';
 import '../../../providers/companion_runtime_providers.dart';
+import '../../../providers/ios_telemetry_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../navigation/app_router.dart';
 import 'companion_http_settings_tile.dart';
@@ -31,6 +32,20 @@ class CompanionConnectionSettings extends ConsumerWidget {
             child: Text(
               'The connection runs in the background. Disconnect to stop it.',
             ),
+          ),
+        if (snapshot?.isIos == true &&
+            ref.watch(iosTelemetryProjectionStateProvider).hasError)
+          ListTile(
+            leading: const Icon(Icons.sync_problem),
+            title: const Text('Could not save watch history'),
+            subtitle: const Text(
+              'Observations remain on this phone. Tap to retry.',
+            ),
+            onTap: snapshot == null
+                ? null
+                : () => ref
+                      .read(iosTelemetryProjectionStateProvider.notifier)
+                      .observe(snapshot),
           ),
         ListTile(
           leading: const Icon(Icons.notifications),

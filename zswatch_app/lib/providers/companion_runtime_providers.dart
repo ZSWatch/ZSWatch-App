@@ -12,9 +12,11 @@ import '../data/models/companion_gps_status.dart';
 import '../data/models/companion_watchface_status.dart';
 import 'watch_providers.dart' show databaseProvider;
 
-/// Android always uses the service owner; other platforms retain their own path.
+/// Mobile UI observes the platform owner without creating a legacy BLE session.
 bool get useNativeCompanionRuntime =>
-    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS);
 
 final nativeCompanionRuntimeProvider = Provider<bool>((ref) {
   return useNativeCompanionRuntime;
@@ -84,11 +86,17 @@ final companionGpsPermissionsProvider = Provider<Future<void> Function()>((
 final companionConnectionPermissionsProvider =
     Provider<Future<void> Function()>((ref) {
       return () async {
-        final status = await Permission.bluetoothConnect.request();
-        if (!status.isGranted) {
-          throw StateError('Bluetooth permission is required to connect');
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          await ref
+              .read(companionClientProvider)
+              .requestIosConnectionPermissions();
+        } else {
+          final status = await Permission.bluetoothConnect.request();
+          if (!status.isGranted) {
+            throw StateError('Bluetooth permission is required to connect');
+          }
+          await Permission.notification.request();
         }
-        await Permission.notification.request();
         // Flutter owns schema creation/migrations. Initialize it before the
         // native owner can collect health/analytics while Flutter is absent.
         await ref

@@ -115,6 +115,17 @@ void main() {
     () async {
       final calls = <MethodCall>[];
       messenger.setMockMethodCallHandler(methods, (call) async {
+        if (call.method == 'permissionStatus') {
+          return {
+            'version': 1,
+            'bluetooth': false,
+            'notifications': false,
+            'notification_access': false,
+            'location': false,
+            'background_location': false,
+            'battery_exemption': false,
+          };
+        }
         calls.add(call);
         return fields(enabled: false, cursor: 2);
       });
@@ -193,6 +204,17 @@ void main() {
       final values = StreamController<CompanionPrototypeSnapshot>.broadcast();
       final calls = <MethodCall>[];
       messenger.setMockMethodCallHandler(methods, (call) async {
+        if (call.method == 'permissionStatus') {
+          return {
+            'version': 1,
+            'bluetooth': false,
+            'notifications': false,
+            'notification_access': false,
+            'location': false,
+            'background_location': false,
+            'battery_exemption': false,
+          };
+        }
         calls.add(call);
         return fields(
           enabled: (call.arguments as Map)['enabled'] as bool,
@@ -270,7 +292,18 @@ void main() {
       final values = StreamController<CompanionPrototypeSnapshot>.broadcast();
       final result = Completer<Object?>();
       final calls = <MethodCall>[];
-      messenger.setMockMethodCallHandler(methods, (call) {
+      messenger.setMockMethodCallHandler(methods, (call) async {
+        if (call.method == 'permissionStatus') {
+          return {
+            'version': 1,
+            'bluetooth': false,
+            'notifications': false,
+            'notification_access': false,
+            'location': false,
+            'background_location': false,
+            'battery_exemption': false,
+          };
+        }
         calls.add(call);
         return result.future;
       });

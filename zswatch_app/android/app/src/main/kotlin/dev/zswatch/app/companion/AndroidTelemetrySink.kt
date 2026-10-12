@@ -13,7 +13,7 @@ internal class AndroidTelemetrySink(context: Context) : TelemetrySink, AutoClose
         check(file.exists()) { "Initialize the app database before connecting" }
         SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING).also {
             // v8 repairs legacy voice rows; the telemetry tables are unchanged.
-            if (it.version !in 6..8) {
+            if (it.version !in 6..9) {
                 it.close()
                 error("Unsupported app database version")
             }

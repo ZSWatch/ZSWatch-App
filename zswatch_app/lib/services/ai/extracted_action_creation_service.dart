@@ -261,9 +261,13 @@ class CreatedPlatformAction {
       case 'calendar_reminder':
         return 'Calendar reminder created$calendarSuffix';
       case 'timer':
-        return 'Timer sent to Clock';
+        return defaultTargetPlatform == TargetPlatform.iOS
+            ? 'Timer notification scheduled'
+            : 'Timer sent to Clock';
       case 'alarm':
-        return 'Alarm sent to Clock';
+        return defaultTargetPlatform == TargetPlatform.iOS
+            ? 'Alarm notification scheduled'
+            : 'Alarm sent to Clock';
       default:
         return 'Action created$calendarSuffix';
     }
@@ -531,8 +535,8 @@ class ExtractedActionCreationService {
       );
     }
 
-    // Timer/alarm use system intents (Android) or URL schemes (iOS) —
-    // no calendar or notification permission needed on either platform.
+    // Android dispatches Clock intents. iOS schedules local notifications and
+    // requests their authorization in the native scheduling operation.
     if (actionType == ExtractedActionType.timer ||
         actionType == ExtractedActionType.alarm) {
       return;

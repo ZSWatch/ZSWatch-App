@@ -220,7 +220,7 @@ void main() {
     expect(files, hasLength(1));
     final bytes = await files.single.readAsBytes();
     final row = await importer.prepare(recording);
-    expect(row.playbackPath, files.single.path);
+    expect(row.playbackPath, await files.single.resolveSymbolicLinks());
     expect(await files.single.readAsBytes(), bytes);
   });
 

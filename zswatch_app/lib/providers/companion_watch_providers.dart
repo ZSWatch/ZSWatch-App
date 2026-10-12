@@ -35,8 +35,8 @@ final companionRenameWatchProvider =
       };
     });
 
-/// Native-first destructive boundary. The service stops and disassociates the
-/// watch before its local row and history are removed.
+/// Native forget fences the selection before its local row/history are removed.
+/// System Bluetooth pairing is managed separately by the user.
 final companionForgetWatchProvider = Provider<Future<void> Function(String)>((
   ref,
 ) {
@@ -47,7 +47,7 @@ final companionForgetWatchProvider = Provider<Future<void> Function(String)>((
   final client = ref.watch(companionClientProvider);
   return (id) async {
     if (!isCompanionWatchAddress(id)) {
-      throw const FormatException('Expected an Android BLE MAC address');
+      throw const FormatException('Expected a native watch identifier');
     }
     await ref
         .read(companionWatchPersistenceStateProvider.notifier)

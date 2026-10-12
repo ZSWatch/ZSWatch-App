@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -79,6 +80,7 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
 
   @override
   Widget build(BuildContext context) {
+    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
     return ref
         .watch(companionPermissionsStatusProvider)
         .when(
@@ -86,7 +88,9 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
             leading: const Icon(Icons.security),
             title: const Text('App Permissions'),
             subtitle: Text(
-              '${status.values.where((v) => v).length} of ${status.length} granted',
+              isIos
+                  ? 'Bluetooth, notifications and location'
+                  : '${status.values.where((v) => v).length} of ${status.length} granted',
             ),
             children: [
               permission(
@@ -100,23 +104,26 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
                 status,
                 'notifications',
                 'App notifications',
-                'Background connection indicator',
+                isIos
+                    ? 'Timers, alarms and app alerts'
+                    : 'Background connection indicator',
                 () async {
                   final result = await Permission.notification.request();
                   if (!result.isGranted) await openAppSettings();
                 },
               ),
-              permission(
-                status,
-                'notification_access',
-                'Notification access',
-                'Forward phone notifications',
-                () async {
-                  await ref
-                      .read(companionClientProvider)
-                      .notificationDiagnostic(requestAccess: true);
-                },
-              ),
+              if (!isIos)
+                permission(
+                  status,
+                  'notification_access',
+                  'Notification access',
+                  'Forward phone notifications',
+                  () async {
+                    await ref
+                        .read(companionClientProvider)
+                        .notificationDiagnostic(requestAccess: true);
+                  },
+                ),
               permission(
                 status,
                 'location',
@@ -131,22 +138,27 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
                 status,
                 'background_location',
                 'Background location',
-                'Location while the app is closed',
+                'Location while the app is in the background',
                 () async {
                   await ref.read(companionGpsPermissionsProvider)();
                 },
               ),
-              permission(
-                status,
-                'battery_exemption',
-                'Battery optimization',
-                'Allow background operation',
-                () async {
-                  await Permission.ignoreBatteryOptimizations.request();
-                },
-              ),
+              if (!isIos)
+                permission(
+                  status,
+                  'battery_exemption',
+                  'Battery optimization',
+                  'Allow background operation',
+                  () async {
+                    await Permission.ignoreBatteryOptimizations.request();
+                  },
+                ),
               ListTile(
-                title: const Text('Open Android app settings'),
+                title: Text(
+                  isIos
+                      ? 'Open iPhone app settings'
+                      : 'Open Android app settings',
+                ),
                 trailing: const Icon(Icons.open_in_new),
                 onTap: busy
                     ? null

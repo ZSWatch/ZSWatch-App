@@ -140,11 +140,11 @@ class AiModelsSettingsScreen extends ConsumerWidget {
           // They do not depend on legacy BLE, repositories or local inference.
           ...[
             // ---- Timer / Alarm test section ----
-            const _SectionHeader(
+            _SectionHeader(
               title: 'Timer & Alarm Test',
-              subtitle:
-                  'Test creating timers and alarms via the system clock app '
-                  'without connecting a watch.',
+              subtitle: Platform.isIOS
+                  ? 'Test timer and alarm notifications from ZSWatch without connecting a watch.'
+                  : 'Test creating timers and alarms via the system clock app without connecting a watch.',
             ),
             const _TimerAlarmTestSection(),
           ],

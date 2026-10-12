@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../../data/database/app_database.dart';
+import '../../data/models/companion_watch_identity.dart';
+export '../../data/models/companion_watch_identity.dart'
+    show isCompanionWatchAddress;
 import 'companion_prototype_client.dart';
-
-bool isCompanionWatchAddress(String id) =>
-    RegExp(r'^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$').hasMatch(id);
 
 /// A native Ready receipt is historical metadata, never running intent.
 class CompanionWatchMetadata {

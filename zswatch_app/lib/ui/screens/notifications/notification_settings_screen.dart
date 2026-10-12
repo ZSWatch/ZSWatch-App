@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -78,6 +79,12 @@ class _NotificationSettingsScreenState
   @override
   Widget build(BuildContext context) {
     if (ref.watch(nativeCompanionRuntimeProvider)) {
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Notifications')),
+          body: _buildIosMessage(),
+        );
+      }
       return const CompanionNotificationSettingsView();
     }
     final isSupported = ref.watch(isNotificationForwardingSupported);
@@ -117,9 +124,21 @@ class _NotificationSettingsScreenState
               ),
             ),
             const SizedBox(height: AppTheme.spacingMd),
+            if (ref.watch(nativeCompanionRuntimeProvider))
+              Text(
+                ref
+                            .watch(companionSnapshotProvider)
+                            .asData
+                            ?.value
+                            .fields['ancs_authorized'] ==
+                        true
+                    ? 'System notification sharing is authorized'
+                    : 'System notification sharing is not authorized for the current connection',
+              ),
+            const SizedBox(height: AppTheme.spacingMd),
             const Text(
               'On iOS, notifications are forwarded directly from your iPhone to ZSWatch using Apple Notification Center Service (ANCS).\n\n'
-              'No app configuration is needed - just make sure your watch is connected and paired.',
+              'Pair your watch and allow it to share system notifications. You can change this in iPhone Settings > Bluetooth > ZSWatch > Share System Notifications. iOS controls which notifications are shared.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
             ),

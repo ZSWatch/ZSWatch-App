@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -112,9 +113,14 @@ class _CompanionVoiceActionCardState
     final confirmed = widget.state?['draft'] as Map<Object?, Object?>?;
     final status = switch (state) {
       'created' => 'Created in calendar',
-      'dispatched' => 'Sent to Clock. Manage or remove it in the Clock app.',
+      'dispatched' =>
+        defaultTargetPlatform == TargetPlatform.iOS
+            ? 'Alert scheduled by ZSWatch.'
+            : 'Sent to Clock. Manage or remove it in the Clock app.',
       'creating' when clock =>
-        'Interrupted request. Check Clock before creating another timer or alarm.',
+        defaultTargetPlatform == TargetPlatform.iOS
+            ? 'Scheduling was interrupted. An alert may already be scheduled.'
+            : 'Interrupted request. Check Clock before creating another timer or alarm.',
       'creating' =>
         'Creation interrupted. Recover the confirmed calendar entry.',
       'undoing' => 'Removal interrupted. Retry to finish removal.',
@@ -129,7 +135,7 @@ class _CompanionVoiceActionCardState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-            (confirmed?['title'] ?? widget.action['title']) as String,
+              (confirmed?['title'] ?? widget.action['title']) as String,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             Text(
@@ -144,7 +150,7 @@ class _CompanionVoiceActionCardState
             if (widget.action['notes'] is String)
               Text(widget.action['notes'] as String),
             Text(status),
-          if (state == 'created' && response?['syncDisabled'] == true)
+            if (state == 'created' && response?['syncDisabled'] == true)
               const Text('Saved locally. Calendar sync is disabled.'),
             if (error != null)
               Text(

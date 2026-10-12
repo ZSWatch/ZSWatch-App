@@ -5570,6 +5570,234 @@ class CrashReportsCompanion extends UpdateCompanion<CrashReportEntity> {
   }
 }
 
+class $CompanionTelemetryCursorsTable extends CompanionTelemetryCursors
+    with TableInfo<$CompanionTelemetryCursorsTable, CompanionTelemetryCursor> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CompanionTelemetryCursorsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _journalIdMeta = const VerificationMeta(
+    'journalId',
+  );
+  @override
+  late final GeneratedColumn<String> journalId = GeneratedColumn<String>(
+    'journal_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sequenceMeta = const VerificationMeta(
+    'sequence',
+  );
+  @override
+  late final GeneratedColumn<int> sequence = GeneratedColumn<int>(
+    'sequence',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [journalId, sequence];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'companion_telemetry_cursors';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CompanionTelemetryCursor> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('journal_id')) {
+      context.handle(
+        _journalIdMeta,
+        journalId.isAcceptableOrUnknown(data['journal_id']!, _journalIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_journalIdMeta);
+    }
+    if (data.containsKey('sequence')) {
+      context.handle(
+        _sequenceMeta,
+        sequence.isAcceptableOrUnknown(data['sequence']!, _sequenceMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sequenceMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {journalId};
+  @override
+  CompanionTelemetryCursor map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CompanionTelemetryCursor(
+      journalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}journal_id'],
+      )!,
+      sequence: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sequence'],
+      )!,
+    );
+  }
+
+  @override
+  $CompanionTelemetryCursorsTable createAlias(String alias) {
+    return $CompanionTelemetryCursorsTable(attachedDatabase, alias);
+  }
+}
+
+class CompanionTelemetryCursor extends DataClass
+    implements Insertable<CompanionTelemetryCursor> {
+  final String journalId;
+  final int sequence;
+  const CompanionTelemetryCursor({
+    required this.journalId,
+    required this.sequence,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['journal_id'] = Variable<String>(journalId);
+    map['sequence'] = Variable<int>(sequence);
+    return map;
+  }
+
+  CompanionTelemetryCursorsCompanion toCompanion(bool nullToAbsent) {
+    return CompanionTelemetryCursorsCompanion(
+      journalId: Value(journalId),
+      sequence: Value(sequence),
+    );
+  }
+
+  factory CompanionTelemetryCursor.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CompanionTelemetryCursor(
+      journalId: serializer.fromJson<String>(json['journalId']),
+      sequence: serializer.fromJson<int>(json['sequence']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'journalId': serializer.toJson<String>(journalId),
+      'sequence': serializer.toJson<int>(sequence),
+    };
+  }
+
+  CompanionTelemetryCursor copyWith({String? journalId, int? sequence}) =>
+      CompanionTelemetryCursor(
+        journalId: journalId ?? this.journalId,
+        sequence: sequence ?? this.sequence,
+      );
+  CompanionTelemetryCursor copyWithCompanion(
+    CompanionTelemetryCursorsCompanion data,
+  ) {
+    return CompanionTelemetryCursor(
+      journalId: data.journalId.present ? data.journalId.value : this.journalId,
+      sequence: data.sequence.present ? data.sequence.value : this.sequence,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CompanionTelemetryCursor(')
+          ..write('journalId: $journalId, ')
+          ..write('sequence: $sequence')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(journalId, sequence);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CompanionTelemetryCursor &&
+          other.journalId == this.journalId &&
+          other.sequence == this.sequence);
+}
+
+class CompanionTelemetryCursorsCompanion
+    extends UpdateCompanion<CompanionTelemetryCursor> {
+  final Value<String> journalId;
+  final Value<int> sequence;
+  final Value<int> rowid;
+  const CompanionTelemetryCursorsCompanion({
+    this.journalId = const Value.absent(),
+    this.sequence = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CompanionTelemetryCursorsCompanion.insert({
+    required String journalId,
+    required int sequence,
+    this.rowid = const Value.absent(),
+  }) : journalId = Value(journalId),
+       sequence = Value(sequence);
+  static Insertable<CompanionTelemetryCursor> custom({
+    Expression<String>? journalId,
+    Expression<int>? sequence,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (journalId != null) 'journal_id': journalId,
+      if (sequence != null) 'sequence': sequence,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CompanionTelemetryCursorsCompanion copyWith({
+    Value<String>? journalId,
+    Value<int>? sequence,
+    Value<int>? rowid,
+  }) {
+    return CompanionTelemetryCursorsCompanion(
+      journalId: journalId ?? this.journalId,
+      sequence: sequence ?? this.sequence,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (journalId.present) {
+      map['journal_id'] = Variable<String>(journalId.value);
+    }
+    if (sequence.present) {
+      map['sequence'] = Variable<int>(sequence.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CompanionTelemetryCursorsCompanion(')
+          ..write('journalId: $journalId, ')
+          ..write('sequence: $sequence, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5587,6 +5815,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $CrashReportsTable crashReports = $CrashReportsTable(this);
+  late final $CompanionTelemetryCursorsTable companionTelemetryCursors =
+      $CompanionTelemetryCursorsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5600,6 +5830,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     voiceMemos,
     extractedActions,
     crashReports,
+    companionTelemetryCursors,
   ];
 }
 
@@ -9059,6 +9290,168 @@ typedef $$CrashReportsTableProcessedTableManager =
       CrashReportEntity,
       PrefetchHooks Function({bool watchId})
     >;
+typedef $$CompanionTelemetryCursorsTableCreateCompanionBuilder =
+    CompanionTelemetryCursorsCompanion Function({
+      required String journalId,
+      required int sequence,
+      Value<int> rowid,
+    });
+typedef $$CompanionTelemetryCursorsTableUpdateCompanionBuilder =
+    CompanionTelemetryCursorsCompanion Function({
+      Value<String> journalId,
+      Value<int> sequence,
+      Value<int> rowid,
+    });
+
+class $$CompanionTelemetryCursorsTableFilterComposer
+    extends Composer<_$AppDatabase, $CompanionTelemetryCursorsTable> {
+  $$CompanionTelemetryCursorsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get journalId => $composableBuilder(
+    column: $table.journalId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sequence => $composableBuilder(
+    column: $table.sequence,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CompanionTelemetryCursorsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CompanionTelemetryCursorsTable> {
+  $$CompanionTelemetryCursorsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get journalId => $composableBuilder(
+    column: $table.journalId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sequence => $composableBuilder(
+    column: $table.sequence,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CompanionTelemetryCursorsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CompanionTelemetryCursorsTable> {
+  $$CompanionTelemetryCursorsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get journalId =>
+      $composableBuilder(column: $table.journalId, builder: (column) => column);
+
+  GeneratedColumn<int> get sequence =>
+      $composableBuilder(column: $table.sequence, builder: (column) => column);
+}
+
+class $$CompanionTelemetryCursorsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CompanionTelemetryCursorsTable,
+          CompanionTelemetryCursor,
+          $$CompanionTelemetryCursorsTableFilterComposer,
+          $$CompanionTelemetryCursorsTableOrderingComposer,
+          $$CompanionTelemetryCursorsTableAnnotationComposer,
+          $$CompanionTelemetryCursorsTableCreateCompanionBuilder,
+          $$CompanionTelemetryCursorsTableUpdateCompanionBuilder,
+          (
+            CompanionTelemetryCursor,
+            BaseReferences<
+              _$AppDatabase,
+              $CompanionTelemetryCursorsTable,
+              CompanionTelemetryCursor
+            >,
+          ),
+          CompanionTelemetryCursor,
+          PrefetchHooks Function()
+        > {
+  $$CompanionTelemetryCursorsTableTableManager(
+    _$AppDatabase db,
+    $CompanionTelemetryCursorsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CompanionTelemetryCursorsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CompanionTelemetryCursorsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CompanionTelemetryCursorsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> journalId = const Value.absent(),
+                Value<int> sequence = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CompanionTelemetryCursorsCompanion(
+                journalId: journalId,
+                sequence: sequence,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String journalId,
+                required int sequence,
+                Value<int> rowid = const Value.absent(),
+              }) => CompanionTelemetryCursorsCompanion.insert(
+                journalId: journalId,
+                sequence: sequence,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CompanionTelemetryCursorsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CompanionTelemetryCursorsTable,
+      CompanionTelemetryCursor,
+      $$CompanionTelemetryCursorsTableFilterComposer,
+      $$CompanionTelemetryCursorsTableOrderingComposer,
+      $$CompanionTelemetryCursorsTableAnnotationComposer,
+      $$CompanionTelemetryCursorsTableCreateCompanionBuilder,
+      $$CompanionTelemetryCursorsTableUpdateCompanionBuilder,
+      (
+        CompanionTelemetryCursor,
+        BaseReferences<
+          _$AppDatabase,
+          $CompanionTelemetryCursorsTable,
+          CompanionTelemetryCursor
+        >,
+      ),
+      CompanionTelemetryCursor,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9079,4 +9472,9 @@ class $AppDatabaseManager {
       $$ExtractedActionsTableTableManager(_db, _db.extractedActions);
   $$CrashReportsTableTableManager get crashReports =>
       $$CrashReportsTableTableManager(_db, _db.crashReports);
+  $$CompanionTelemetryCursorsTableTableManager get companionTelemetryCursors =>
+      $$CompanionTelemetryCursorsTableTableManager(
+        _db,
+        _db.companionTelemetryCursors,
+      );
 }

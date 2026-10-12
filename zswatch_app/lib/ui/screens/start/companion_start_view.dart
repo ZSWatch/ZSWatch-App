@@ -58,15 +58,26 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
     watch: watch,
     allowForget: true,
     forgetDescription:
-        'This removes the watch and its saved history from this app '
-        'and removes its Android companion association. The Bluetooth pairing '
-        'is kept. Use Add Watch to set it up again.',
+        ref.read(companionSnapshotProvider).asData?.value.isIos == true
+        ? 'This removes the watch and its saved history from this app. To remove '
+              'the Bluetooth pairing, open iPhone Settings > Bluetooth > ZSWatch > '
+              'Forget This Device. Use Add Watch to set it up again.'
+        : 'This removes the watch and its saved history from this app '
+              'and removes its Android companion association. The Bluetooth pairing '
+              'is kept. Use Add Watch to set it up again.',
     onRename: ref.read(companionRenameWatchProvider),
     onForget: ref.read(companionForgetWatchProvider),
   );
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(companionSnapshotProvider, (previous, next) {
+      if (next.asData?.value.protocolReady == true &&
+          previous?.asData?.value.protocolReady != true &&
+          mounted) {
+        context.go(AppRoutes.home);
+      }
+    });
     final snapshot = ref.watch(companionSnapshotProvider).asData?.value;
     final watch = ref.watch(currentWatchProvider);
     final saved = ref.watch(database.allWatchesProvider);
@@ -145,7 +156,7 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
                         !busy &&
                         !active &&
                         snapshot != null &&
-                        isCompanionWatchAddress(item.id),
+                        snapshot.acceptsWatchAddress(item.id),
                     onTap: () => changeConnection(item.id),
                     onConfig: () => configureWatch(item),
                   ),

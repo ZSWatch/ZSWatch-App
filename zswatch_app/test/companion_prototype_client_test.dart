@@ -88,6 +88,53 @@ void main() {
     },
   );
 
+  test(
+    'iOS snapshots and commands use UUIDs, never Android associations',
+    () async {
+      const uuid = 'F31A05BD-1C30-4B66-AAC0-157004320111';
+      saved = {
+        ...saved,
+        'owner': 'ios_companion_native',
+        'platform': 'ios',
+        'address': uuid,
+      };
+      expect((await client.snapshot()).isIos, true);
+      await client.start(uuid.toLowerCase());
+      expect((calls.last.arguments as Map)['address'], uuid);
+      saved = {
+        ...saved,
+        'address': '',
+        'runtime_active': false,
+        'protocol_ready': false,
+        'forgotten_watches': {uuid: 2},
+        'forget_receipt': {
+          'address': uuid,
+          'generation': 2,
+          'selection_removed': true,
+          'association_removed': false,
+          'system_unpair_required': true,
+        },
+      };
+      expect((await client.forgetWatch(uuid)).runtimeActive, false);
+      saved = {
+        ...saved,
+        'forget_receipt': {
+          'address': uuid,
+          'generation': 2,
+          'association_removed': true,
+        },
+      };
+      await expectLater(client.forgetWatch(uuid), throwsFormatException);
+      expect(
+        () => CompanionPrototypeSnapshot.decode({
+          ...saved,
+          'address': 'AA:BB:CC:DD:EE:FF',
+        }),
+        throwsFormatException,
+      );
+    },
+  );
+
   test('invalid address never reaches the native owner', () async {
     await expectLater(client.start('watch UUID'), throwsFormatException);
     expect(calls, isEmpty);

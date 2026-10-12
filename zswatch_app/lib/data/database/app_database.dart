@@ -17,6 +17,15 @@ import 'tables/watches_table.dart';
 
 part 'app_database.g.dart';
 
+/// A transactionally committed receipt watermark prevents telemetry replay
+/// after Flutter dies between committing data and acknowledging native storage.
+class CompanionTelemetryCursors extends Table {
+  TextColumn get journalId => text()();
+  IntColumn get sequence => integer()();
+  @override
+  Set<Column<Object>> get primaryKey => {journalId};
+}
+
 /// Main application database using drift (SQLite)
 ///
 /// Manages all persistent data:
@@ -35,6 +44,7 @@ part 'app_database.g.dart';
     VoiceMemos,
     ExtractedActions,
     CrashReports,
+    CompanionTelemetryCursors,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -53,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Database schema version
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -87,6 +97,9 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 8) {
           await _repairLegacyVoiceMemos(m);
+        }
+        if (from < 9) {
+          await m.createTable(companionTelemetryCursors);
         }
       },
       beforeOpen: (details) async {

@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 
 import '../../data/models/connection.dart';
+import '../../data/models/companion_watch_identity.dart';
 import '../../data/models/connection_phase.dart';
 import '../../data/models/connection_state.dart';
 import '../../data/models/watch.dart';
@@ -23,7 +24,10 @@ class CompanionPrototypeSnapshot {
   factory CompanionPrototypeSnapshot.decode(Object? value) {
     if (value is! Map ||
         value['version'] != 1 ||
-        value['owner'] != 'android_service_native' ||
+        !const [
+          'android_service_native',
+          'ios_companion_native',
+        ].contains(value['owner']) ||
         value['runtime_active'] is! bool ||
         value['protocol_ready'] is! bool ||
         value['phase'] is! String ||
@@ -33,8 +37,23 @@ class CompanionPrototypeSnapshot {
         value['recordings'] is! Map) {
       throw const FormatException('Unsupported companion snapshot');
     }
+    final address = value['address'];
+    if (address != null &&
+        (address is! String ||
+            (address.isNotEmpty &&
+                !(value['owner'] == 'ios_companion_native'
+                    ? isIosWatchAddress(address)
+                    : isAndroidWatchAddress(address))))) {
+      throw const FormatException(
+        'Watch identifier does not match native owner',
+      );
+    }
     return CompanionPrototypeSnapshot._(Map<String, Object?>.from(value));
   }
+
+  bool get isIos => fields['owner'] == 'ios_companion_native';
+  bool acceptsWatchAddress(String address) =>
+      isIos ? isIosWatchAddress(address) : isAndroidWatchAddress(address);
 
   String get phase => fields['phase']! as String;
   bool get runtimeActive => fields['runtime_active']! as bool;
@@ -251,12 +270,7 @@ class CompanionPrototypeClient {
 
   Future<void> startDiscovered(CompanionWatchSelection selection) async {
     // Validate even when a caller constructed the value rather than decoding it.
-    CompanionWatchSelection.decode({
-      'version': 1,
-      'associated': true,
-      'address': selection.address,
-      'generation': selection.generation,
-    });
+    CompanionWatchSelection.decode(selection.fields);
     final response = await methods.invokeMethod<Object?>('startDiscovered', {
       'version': 1,
       'address': selection.address,
@@ -275,6 +289,39 @@ class CompanionPrototypeClient {
           'version': 1,
         }),
       );
+
+  Future<void> requestIosConnectionPermissions() async {
+    final value = await methods.invokeMethod<Object?>(
+      'requestConnectionPermissions',
+      {'version': 1},
+    );
+    if (value is! Map || value['version'] != 1 || value['bluetooth'] != true) {
+      throw StateError('Bluetooth permission is required to connect');
+    }
+  }
+
+  Future<CompanionPrototypeSnapshot> scan({required bool start}) async =>
+      CompanionPrototypeSnapshot.decode(
+        await methods.invokeMethod<Object?>(start ? 'scanStart' : 'scanStop', {
+          'version': 1,
+        }),
+      );
+
+  Future<CompanionPrototypeSnapshot> ackTelemetry(
+    String journalId,
+    int sequence,
+  ) async {
+    if (!isIosWatchAddress(journalId) || sequence < 0) {
+      throw const FormatException('Invalid telemetry acknowledgement');
+    }
+    return CompanionPrototypeSnapshot.decode(
+      await methods.invokeMethod<Object?>('ackTelemetry', {
+        'version': 1,
+        'journal_id': journalId,
+        'sequence': sequence,
+      }),
+    );
+  }
 
   Future<Map<String, bool>> permissionStatus() async {
     final reply = await methods.invokeMethod<Object?>('permissionStatus', {
@@ -449,8 +496,8 @@ class CompanionPrototypeClient {
 
   Future<void> start(String address) async {
     final normalized = address.trim().toUpperCase();
-    if (!RegExp(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$').hasMatch(normalized)) {
-      throw const FormatException('Expected an Android BLE MAC address');
+    if (!isCompanionWatchAddress(normalized)) {
+      throw const FormatException('Expected a native watch identifier');
     }
     final response = await methods.invokeMethod<Object?>('start', {
       'version': 1,
@@ -465,8 +512,8 @@ class CompanionPrototypeClient {
 
   Future<CompanionPrototypeSnapshot> forgetWatch(String address) async {
     final normalized = address.trim().toUpperCase();
-    if (!RegExp(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$').hasMatch(normalized)) {
-      throw const FormatException('Expected an Android BLE MAC address');
+    if (!isCompanionWatchAddress(normalized)) {
+      throw const FormatException('Expected a native watch identifier');
     }
     final snapshot = CompanionPrototypeSnapshot.decode(
       await methods.invokeMethod<Object?>('forgetWatch', {
@@ -478,7 +525,11 @@ class CompanionPrototypeClient {
     final tombstones = snapshot.fields['forgotten_watches'];
     if (receipt is! Map ||
         receipt['address'] != normalized ||
-        receipt['association_removed'] != true ||
+        (snapshot.isIos
+            ? receipt['selection_removed'] != true ||
+                  receipt['system_unpair_required'] != true ||
+                  receipt['association_removed'] != false
+            : receipt['association_removed'] != true) ||
         receipt['generation'] is! int ||
         (receipt['generation'] as int) < 0 ||
         receipt['generation'] != snapshot.generation ||
@@ -495,8 +546,8 @@ class CompanionPrototypeClient {
     bool associate = false,
   }) async {
     final normalized = address.trim().toUpperCase();
-    if (!RegExp(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$').hasMatch(normalized)) {
-      throw const FormatException('Expected an Android BLE MAC address');
+    if (!isCompanionWatchAddress(normalized)) {
+      throw const FormatException('Expected a native watch identifier');
     }
     final value = await methods.invokeMethod<Object?>(
       associate ? 'associatePresence' : 'presenceStatus',
