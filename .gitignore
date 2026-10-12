@@ -30,3 +30,6 @@ Thumbs.db
 
 # Local companion HIL evidence (device logs and build provenance)
 .companion-hil-runs/
+
+# Local Mac/Linux watch-control Python environment
+/.venv-watch/

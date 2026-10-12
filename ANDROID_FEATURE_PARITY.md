@@ -33,6 +33,20 @@ Evidence: `.companion-hil-runs/20261008-remove-voice-chat/validation.json`.
 
 ## Health / Analytics restoration evidence
 
+### Handoff update, 2026-10-12
+
+Commit `67976ef` records previously pending standalone transcription,
+re-transcription/re-analysis, batch queue controls and automatic-transcription
+versus optional-analysis settings. The three affected Flutter test files passed
+28 tests; native `PrototypeJobsTest` and `PrototypeVoicePolicyTest`, Flutter
+analysis and the Android release build passed. This is code/build validation,
+not fresh physical acceptance. Search/filter/archive, local deletion,
+transcript editing/copy, offline processing after explicit companion Stop,
+demo/developer parity and the remaining inventory still require closure.
+Do not interpret the publication of the handoff branch as full feature parity.
+
+### Previously accepted Health / Analytics implementation
+
 The existing Dart screens and database remain. Native collection writes their
 existing health/battery/connection tables before publishing snapshots; Flutter
 invalidates the corresponding queries and projects live activity without writing

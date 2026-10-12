@@ -1,5 +1,24 @@
 # Companion background test foundation
 
+## Mac / iOS handoff
+
+See [`HANDOFF_TO_MAC.md`](../../HANDOFF_TO_MAC.md) for published branches and the
+confirmed rig: the same debugger and USB wiring as Linux. Reset and USB work on
+Mac; the firmware build SDK is not installed and is not needed for USB control.
+
+`watch_usb.py` is the portable consolidation of the previous temporary reset,
+boot-guard and USB shell probes. It uses the existing smpclient transport, with
+explicit port/probe arguments and no automatic reset. Install its separate
+`requirements-watch.txt` in a Python virtual environment. Run `--help` before use.
+Its CLI safeguards have host tests; the consolidated script and its J-Link Mac
+backend still need first physical validation on the Mac. Earlier Linux evidence
+applies to the underlying SMP/DTR sequence, not to an unperformed Mac test.
+
+Existing `watch_file_probe.py` mutates a uniquely named synthetic file and cleans
+up its own fixture. It tests USB file recovery, not BLE throughput or real audio.
+The older `hil.py` phone inventory and capture commands below are Android/Linux
+oriented. Use watch USB probes directly on Mac; do not pass an iPhone to ADB.
+
 Current Android ownership and acceptance follow
 [`ANDROID_COMPANION_FINISH_PLAN.md`](../../ANDROID_COMPANION_FINISH_PLAN.md).
 The native owner is now the normal path in all build modes; older sections below

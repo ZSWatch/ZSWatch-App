@@ -1,0 +1,4 @@
+# Versions used by the Linux USB/SMP probes; independent of the firmware SDK.
+-r requirements.txt
+smpclient==7.3.0
+smp==4.2.0
