@@ -43,16 +43,24 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         advance()
         return id
     }
-    fun startRecording(identity: String, stt: String, llm: String, correct: Boolean): String {
+    fun startRecording(identity: String, stt: String, llm: String, correct: Boolean, operation: String = "process"): String {
         check(running()) { "Running companion required" }
+        require(operation in listOf("process", "transcribe", "retranscribe", "reanalyze")) { "Unknown voice operation" }
         PrototypeVoicePolicy.configuration(stt, llm, correct)
         val metadata = service.runtime!!.store.record(identity) ?: error("Unknown recording")
         val receipt = ReceiptFiles(File(context.filesDir, "companion-prototype/recordings")).recover(identity, metadata)
             ?: error("Verified recording receipt required")
         require(receipt["sha256"] == metadata["sha256"] && receipt["address"] == service.runtime!!.store.control()["address"])
         val model = "$stt|$llm|$correct"
+        val revision = if (operation in listOf("transcribe", "retranscribe")) "transcribe-v1" else "voice-v1"
         val previous = jobs.identities().map { jobs.state(it) }.filter { it.getJSONObject("spec").getString("recording_id") == identity }
-        val existing = previous.firstOrNull { it.getJSONObject("spec").getString("model") == model &&
+        val selected = previous.firstOrNull { it.optBoolean("selected") }
+            ?: previous.maxByOrNull { it.getJSONObject("spec").getLong("generation") }
+        val transcript = selected?.optJSONObject("result")?.optString("transcript")?.takeIf { it.isNotBlank() }
+            ?: selected?.optString("transcript")?.takeIf { it.isNotBlank() }
+        if (operation == "reanalyze") require(transcript != null) { "Transcribe the recording first" }
+        val existing = previous.firstOrNull { operation !in listOf("retranscribe", "reanalyze") &&
+            it.getJSONObject("spec").getString("pipeline_revision") == revision && it.getJSONObject("spec").getString("model") == model &&
             it.getJSONObject("spec").getString("input_sha256") == receipt["sha256"] &&
             it.getString("state") !in listOf("failed", "cancelled") }
         if (existing != null) {
@@ -65,8 +73,8 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         val next = (previous.maxOfOrNull { it.getJSONObject("spec").getLong("generation") } ?: 0) + 1
         val spec = JSONObject().put("version", 1).put("watch_id", receipt["address"]).put("recording_id", identity)
             .put("input_sha256", receipt["sha256"]).put("backend", "local").put("provider", "dart-voice-v1")
-            .put("model", model).put("pipeline_revision", "voice-v1").put("generation", next).put("upload_authorized", false)
-        val id = jobs.create(spec); advance(); return id
+            .put("model", model).put("pipeline_revision", revision).put("generation", next).put("upload_authorized", false)
+        val id = jobs.create(spec, if (operation == "reanalyze") transcript else null); advance(); return id
     }
 
     private fun enqueueAutomatic() {
@@ -78,15 +86,17 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
             val request = record["processing_request"] as? Map<*, *> ?: continue
             if (record["state"] != "downloaded" || record["address"] != store.control()["address"]) continue
             val model = PrototypeVoicePolicy.model(request)
+            val revision = if (request["analysis_enabled"] == false) "transcribe-v1" else "voice-v1"
             // Failed/cancelled work also counts: automatic maintenance never
             // invents new generations or repeatedly retranscribes a failure.
             if (jobs.identities().any { id ->
                 val spec = jobs.state(id).getJSONObject("spec")
-                spec.getString("recording_id") == identity && spec.getString("model") == model &&
+                spec.getString("recording_id") == identity && spec.getString("model") == model && spec.getString("pipeline_revision") == revision &&
                     spec.getString("input_sha256") == record["sha256"]
             }) continue
             startRecording(identity as String, request["transcription_model"] as String,
-                request["analysis_model"] as String, request["correct_transcription"] as Boolean)
+                request["analysis_model"] as String, request["correct_transcription"] as Boolean,
+                if (request["analysis_enabled"] == false) "transcribe" else "process")
         }
     }
 
@@ -134,7 +144,9 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
                     val received = System.currentTimeMillis() / 1000
                     val validated = response.mapCatching { value ->
                         require(value["version"] == 1 && value["job_id"] == claim.id && value["plugin_ready"] == true) { "worker_envelope" }
-                        JSONObject(value["result"] as Map<*, *>).also(PrototypeJobs::validateResult)
+                        JSONObject(value["result"] as Map<*, *>).also {
+                            PrototypeJobs.validateResult(it, claim.spec.optString("pipeline_revision") == "transcribe-v1")
+                        }
                     }
                     validated.fold({ result ->
                         if (jobs.complete(claim, received, result, null))

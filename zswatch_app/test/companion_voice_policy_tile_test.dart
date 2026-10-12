@@ -70,12 +70,13 @@ void main() {
       values.add(CompanionPrototypeSnapshot.decode(fields));
       await tester.pumpAndSettle();
       expect(calls, isEmpty);
-      await tester.tap(find.byType(SwitchListTile));
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
-        true,
+      final automatic = find.widgetWithText(
+        SwitchListTile,
+        'Automatically process new recordings',
       );
+      await tester.tap(automatic);
+      await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(automatic).value, true);
       expect(calls.single.method, 'configureVoiceProcessing');
       expect(calls.single.arguments, {
         'version': 1,
@@ -84,17 +85,22 @@ void main() {
         'transcription_model': 'kbWhisperBase',
         'analysis_model': 'qwen',
         'correct_transcription': false,
+        'analysis_enabled': true,
       });
-      await tester.tap(find.byType(SwitchListTile));
+      await tester.tap(
+        find.widgetWithText(SwitchListTile, 'Analyze after transcription'),
+      );
+      await tester.pumpAndSettle();
+      expect((calls.last.arguments as Map)['analysis_enabled'], false);
+      expect((calls.last.arguments as Map)['enabled'], true);
+      await tester.tap(automatic);
       await tester.pumpAndSettle();
       expect(calls.map((call) => (call.arguments as Map)['enabled']), [
         true,
+        true,
         false,
       ]);
-      expect(
-        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
-        false,
-      );
+      expect(tester.widget<SwitchListTile>(automatic).value, false);
       await tester.pumpWidget(const SizedBox());
       await values.close();
     },

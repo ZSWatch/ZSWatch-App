@@ -335,6 +335,7 @@ class CompanionPrototypeClient {
     required String transcriptionModel,
     required String analysisModel,
     required bool correctTranscription,
+    bool analyze = true,
   }) async => CompanionPrototypeSnapshot.decode(
     await methods.invokeMethod<Object?>('configureVoiceProcessing', {
       'version': 1,
@@ -343,6 +344,7 @@ class CompanionPrototypeClient {
       'transcription_model': transcriptionModel,
       'analysis_model': analysisModel,
       'correct_transcription': correctTranscription,
+      'analysis_enabled': analyze,
     }),
   );
 

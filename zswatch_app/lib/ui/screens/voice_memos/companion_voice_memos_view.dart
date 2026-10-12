@@ -14,6 +14,7 @@ import '../../../services/voice_memo/transcription_engine.dart';
 import '../../../providers/companion_recording_import_providers.dart';
 import '../../widgets/voice_memos/audio_playback_bar.dart';
 import '../../widgets/voice_memos/companion_voice_action_card.dart';
+import '../../widgets/companion_voice_batch_button.dart';
 import '../../navigation/app_router.dart';
 
 /// Native receipt view used by the existing Voice Notes screen during migration.
@@ -84,17 +85,27 @@ class _CompanionVoiceMemosViewState
     }
   }
 
-  Future<void> processRecording(CompanionRecording recording) async {
+  Future<void> processRecording(
+    CompanionRecording recording, {
+    String operation = 'process',
+  }) async {
     try {
+      final transcriptionOnly = [
+        'transcribe',
+        'retranscribe',
+      ].contains(operation);
       final prefs = await ref.read(sharedPreferencesProvider.future);
-      final llmModels = await ref.read(llmAvailableModelsProvider.future);
+      final llmModels = transcriptionOnly
+          ? <LlmModelInfo>[]
+          : await ref.read(llmAvailableModelsProvider.future);
       var selectedStt =
           prefs.getString(SettingsKeys.transcriptionEngineType) ??
           TranscriptionEngineType.whisperTinyEn.name;
       var selectedLlm =
           prefs.getString(SettingsKeys.selectedAiModelId) ??
           LlmService.defaultModelId;
-      if (!llmModels.any((model) => model.id == selectedLlm)) {
+      if (!transcriptionOnly &&
+          !llmModels.any((model) => model.id == selectedLlm)) {
         selectedLlm = LlmService.defaultModelId;
       }
       if (!mounted) return;
@@ -102,51 +113,58 @@ class _CompanionVoiceMemosViewState
         context: context,
         builder: (context) => StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
-            title: const Text('Process recording locally'),
+            title: Text(switch (operation) {
+              'transcribe' => 'Transcribe recording',
+              'retranscribe' => 'Re-transcribe recording',
+              'reanalyze' => 'Re-analyze transcript',
+              _ => 'Process recording locally',
+            }),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
                   'Uses models already downloaded on this phone. Audio stays on the phone.',
                 ),
-                DropdownButton<String>(
-                  isExpanded: true,
-                  value: selectedStt,
-                  items: [
-                    for (final model in TranscriptionModelCatalog.all)
-                      DropdownMenuItem(
-                        value: model.type.name,
-                        child: Text(
-                          model.name,
-                          overflow: TextOverflow.ellipsis,
+                if (operation != 'reanalyze')
+                  DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedStt,
+                    items: [
+                      for (final model in TranscriptionModelCatalog.all)
+                        DropdownMenuItem(
+                          value: model.type.name,
+                          child: Text(
+                            model.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() => selectedStt = value);
-                    }
-                  },
-                ),
-                DropdownButton<String>(
-                  isExpanded: true,
-                  value: selectedLlm,
-                  items: [
-                    for (final model in llmModels)
-                      DropdownMenuItem(
-                        value: model.id,
-                        child: Text(
-                          model.displayName,
-                          overflow: TextOverflow.ellipsis,
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedStt = value);
+                      }
+                    },
+                  ),
+                if (!transcriptionOnly)
+                  DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedLlm,
+                    items: [
+                      for (final model in llmModels)
+                        DropdownMenuItem(
+                          value: model.id,
+                          child: Text(
+                            model.displayName,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() => selectedLlm = value);
-                    }
-                  },
-                ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => selectedLlm = value);
+                      }
+                    },
+                  ),
               ],
             ),
             actions: [
@@ -156,7 +174,7 @@ class _CompanionVoiceMemosViewState
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Process'),
+                child: Text(transcriptionOnly ? 'Transcribe' : 'Process'),
               ),
             ],
           ),
@@ -165,6 +183,7 @@ class _CompanionVoiceMemosViewState
       if (accepted != true) return;
       await ref.read(companionClientProvider).processRecording({
         'identity': recording.identity,
+        'operation': operation,
         'transcription_model': selectedStt,
         'analysis_model': selectedLlm,
         'correct_transcription':
@@ -234,7 +253,8 @@ class _CompanionVoiceMemosViewState
                           const Text('Transcript'),
                           SelectableText(text),
                         ],
-                        if (result != null) ...[
+                        if (result != null &&
+                            (result['summary'] as String).isNotEmpty) ...[
                           const SizedBox(height: 16),
                           const Text('Summary'),
                           SelectableText(result['summary'] as String),
@@ -302,6 +322,7 @@ class _CompanionVoiceMemosViewState
   }
 
   static String jobLabel(Map<Object?, Object?> job) => switch (job['state']) {
+    'transcribed' => 'Transcribed',
     'ready' =>
       job['processing'] == true
           ? job['transcript_saved'] == true
@@ -423,6 +444,14 @@ class _CompanionVoiceMemosViewState
                 ),
               ],
               const SizedBox(height: 16),
+              const CompanionVoiceBatchButton(
+                operation: 'transcribe',
+                label: 'Transcribe all untranscribed',
+              ),
+              const CompanionVoiceBatchButton(
+                operation: 'process',
+                label: 'Process all unprocessed',
+              ),
               if (items.isEmpty)
                 const Text('No recordings saved for this watch'),
               for (final item in items)
@@ -458,6 +487,26 @@ class _CompanionVoiceMemosViewState
                                   ? () => processRecording(item)
                                   : null,
                               icon: const Icon(Icons.auto_awesome),
+                            ),
+                            PopupMenuButton<String>(
+                              tooltip: 'Transcription actions',
+                              enabled: ready,
+                              onSelected: (operation) =>
+                                  processRecording(item, operation: operation),
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(
+                                  value: 'transcribe',
+                                  child: Text('Transcribe only'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'retranscribe',
+                                  child: Text('Re-transcribe'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'reanalyze',
+                                  child: Text('Re-analyze transcript'),
+                                ),
+                              ],
                             ),
                             IconButton(
                               tooltip:

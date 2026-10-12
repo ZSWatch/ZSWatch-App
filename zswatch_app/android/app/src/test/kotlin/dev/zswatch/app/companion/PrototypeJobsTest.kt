@@ -13,6 +13,42 @@ class PrototypeJobsTest {
     private fun fixture(name: String) = JSONObject(File(fixtures, name).readText())
     private fun store() = PrototypeStore(File(temporary.root, "jobs"))
     private fun spec() = fixture("job-v1.json")
+
+    @Test fun standaloneTranscriptionIsDurableTerminalPhoneDataWithNoWatchOutbox() {
+        val jobs = PrototypeJobs(store())
+        val id = jobs.create(spec().put("backend", "local").put("upload_authorized", false)
+            .put("provider", "dart-voice-v1").put("pipeline_revision", "transcribe-v1"))
+        val claim = jobs.claim(id, 100)!!
+        assertTrue(jobs.checkpointTranscript(claim, 101, "A real transcript"))
+        val result = JSONObject().put("version", 1).put("transcript", "A real transcript")
+            .put("summary", "").put("category", "").put("actions", org.json.JSONArray())
+        assertTrue(jobs.complete(claim, 102, result, null))
+        val reopened = PrototypeJobs(store())
+        assertEquals("transcribed", reopened.state(id).getString("state"))
+        assertEquals("A real transcript", reopened.state(id).getJSONObject("result").getString("transcript"))
+        assertTrue(reopened.pending("fixture-watch").isEmpty())
+        assertNull(reopened.claim(id, 103))
+        assertFalse(reopened.complete(claim, 103, result, null))
+        rejected { PrototypeJobs.validateResult(result) }
+        rejected { PrototypeJobs.validateResult(JSONObject(result.toString()).put("summary", "Unexpected analysis"), true) }
+        rejected { PrototypeJobs.validateResult(JSONObject(result.toString()).put("actions", org.json.JSONArray()
+            .put(JSONObject().put("type", "timer").put("title", "Tea"))), true) }
+    }
+
+    @Test fun explicitReanalysisCapturesTranscriptBeforeClaimAndFencesOldExecution() {
+        val jobs = PrototypeJobs(store())
+        val first = jobs.create(spec().put("backend", "local").put("upload_authorized", false).put("provider", "dart-voice-v1"))
+        val old = jobs.claim(first, 100)!!
+        jobs.checkpointTranscript(old, 101, "Original speech")
+        val next = jobs.create(JSONObject(old.spec.toString()).put("generation", 2), "Edited speech")
+        val reopened = PrototypeJobs(store())
+        val current = reopened.claim(next, 102)!!
+        assertEquals("Edited speech", reopened.state(next).getString("transcript"))
+        assertFalse(reopened.complete(old, 103, fixture("result-v1.json"), null))
+        assertTrue(reopened.complete(current, 103, fixture("result-v1.json"), null))
+        assertEquals(1, reopened.pending("fixture-watch").size)
+        assertEquals(next, reopened.summary().single { it["selected"] == true }["job_id"])
+    }
     private fun rejected(action: () -> Unit) { try { action(); fail("Expected rejection") } catch (_: IllegalArgumentException) {} }
 
     private fun finishedVoice(type: String = "reminder"): Pair<PrototypeJobs, String> {

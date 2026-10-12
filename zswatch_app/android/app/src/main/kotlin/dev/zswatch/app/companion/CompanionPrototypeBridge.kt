@@ -105,7 +105,8 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         val enabled = args["enabled"] as Boolean
                         if (enabled) check(store.control()["desired_running"] == true) { "Connect the watch first" }
                         val config = PrototypeVoicePolicy.configuration(args["transcription_model"] as String,
-                            args["analysis_model"] as String, args["correct_transcription"] as Boolean)
+                            args["analysis_model"] as String, args["correct_transcription"] as Boolean,
+                            args["analysis_enabled"] != false)
                         store.update("voice_processing_policy_changed", mapOf("voice_processing_policy" to
                             (config + mapOf("watch_id" to watch, "enabled" to enabled))))
                         snapshot(result::success) { result.error("PROCESSING_POLICY_FAILED", it, null) }
@@ -137,7 +138,8 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         val input = call.arguments as Map<*, *>
                         val id = (CompanionPrototypeService.instance?.localFixture ?: error("Running companion required"))
                             .startRecording(input["identity"] as String, input["transcription_model"] as String,
-                                input["analysis_model"] as String, input["correct_transcription"] as Boolean)
+                                input["analysis_model"] as String, input["correct_transcription"] as Boolean,
+                                input["operation"] as? String ?: "process")
                         PrototypeHub.main.post { result.success(mapOf("version" to 1, "job_id" to id)) }
                     } catch (error: Exception) { PrototypeHub.main.post { result.error("PROCESSING_FAILED", error.message, null) } }
                 }

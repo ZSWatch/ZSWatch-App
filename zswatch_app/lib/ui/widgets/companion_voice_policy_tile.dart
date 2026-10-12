@@ -15,7 +15,7 @@ class CompanionVoicePolicyTile extends ConsumerStatefulWidget {
 class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
   bool _saving = false;
 
-  Future<void> _save(bool enabled) async {
+  Future<void> _save(bool enabled, {bool? analyze}) async {
     final snapshot = ref.read(companionSnapshotProvider).asData?.value;
     final watch = snapshot?.watch;
     if (watch == null) return;
@@ -29,6 +29,13 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
             transcriptionModel: ref.read(transcriptionEngineTypeProvider).name,
             analysisModel: ref.read(selectedAiModelIdProvider),
             correctTranscription: ref.read(aiCorrectionEnabledProvider),
+            analyze:
+                analyze ??
+                (snapshot?.fields['voice_processing_policy'] is Map
+                    ? (snapshot!.fields['voice_processing_policy']
+                              as Map)['analysis_enabled'] !=
+                          false
+                    : true),
           );
     } catch (error) {
       if (mounted) {
@@ -71,6 +78,14 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
           ),
           value: enabled,
           onChanged: !_saving && (enabled || canSave) ? _save : null,
+        ),
+        SwitchListTile(
+          title: const Text('Analyze after transcription'),
+          subtitle: const Text(
+            'Turn off to automatically transcribe without an LLM.',
+          ),
+          value: policy['analysis_enabled'] != false,
+          onChanged: canSave ? (value) => _save(enabled, analyze: value) : null,
         ),
         if (enabled && changed)
           ListTile(

@@ -22,6 +22,7 @@ import '../../../services/ai/model_benchmark_service.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../widgets/ai_debug_widgets.dart';
 import '../../widgets/companion_voice_policy_tile.dart';
+import '../../widgets/companion_voice_batch_button.dart';
 
 // ---------------------------------------------------------------------------
 // Benchmark provider (screen-scoped singleton)
@@ -66,7 +67,13 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             subtitle: 'Speech-to-text engine used for voice memos',
           ),
           const _TranscriptionModelSelector(),
-          if (!native) const _RetranscribeButton(),
+          if (native)
+            const CompanionVoiceBatchButton(
+              operation: 'retranscribe',
+              label: 'Re-transcribe all with selected model',
+            )
+          else
+            const _RetranscribeButton(),
 
           const SizedBox(height: 24),
           const Divider(height: 1),
@@ -89,6 +96,11 @@ class AiModelsSettingsScreen extends ConsumerWidget {
           const _AiModelSelector(),
           const _ImportModelTile(),
           if (native) const CompanionVoicePolicyTile(),
+          if (native)
+            const CompanionVoiceBatchButton(
+              operation: 'process',
+              label: 'Process all unprocessed',
+            ),
 
           if (native || ref.watch(localAiEnabledProvider)) ...[
             const SizedBox(height: 24),

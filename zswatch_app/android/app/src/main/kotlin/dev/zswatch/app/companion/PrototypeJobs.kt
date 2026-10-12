@@ -17,7 +17,8 @@ class PrototypeJobs(private val store: PrototypeStore) {
     private fun commit(kind: String, jobs: JSONObject, outbox: JSONObject = outbox()) =
         store.update(kind, mapOf("jobs" to jobs, "outbox" to outbox))
 
-    fun create(spec: JSONObject): String {
+    fun create(spec: JSONObject, transcript: String? = null): String {
+        if (transcript != null) require(transcript.isNotBlank() && transcript.toByteArray(Charsets.UTF_8).size <= 65536)
         val id = key(spec)
         val jobs = jobs(); val outbox = outbox()
         require(jobs.has(id) || jobs.length() < 100) { "Job capacity reached" }
@@ -31,9 +32,13 @@ class PrototypeJobs(private val store: PrototypeStore) {
             }
             if (oldGeneration < generation && old.getString("state") != "delivered") cancelItem(oldId, old, outbox)
         }
-        if (!jobs.has(id)) jobs.put(id, JSONObject().put("spec", JSONObject(spec.toString())).put("state", "ready")
-            .put("remote_id", JSONObject.NULL).put("fence", 0L).put("lease_until", JSONObject.NULL)
-            .put("attempts", 0).put("next_attempt", 0L).put("last_error", JSONObject.NULL))
+        if (!jobs.has(id)) {
+            val item = JSONObject().put("spec", JSONObject(spec.toString())).put("state", "ready")
+                .put("remote_id", JSONObject.NULL).put("fence", 0L).put("lease_until", JSONObject.NULL)
+                .put("attempts", 0).put("next_attempt", 0L).put("last_error", JSONObject.NULL)
+            if (transcript != null) item.put("transcript", transcript)
+            jobs.put(id, item)
+        }
         if (spec.getString("provider") == "dart-voice-v1") selectItem(jobs, id)
         commit("job_created", jobs, outbox)
         return id
@@ -208,12 +213,21 @@ class PrototypeJobs(private val store: PrototypeStore) {
     }
 
     fun complete(claim: Claim, now: Long, result: JSONObject, remoteId: String?): Boolean {
-        validateResult(result)
+        val transcriptionOnly = claim.spec.optString("pipeline_revision") == "transcribe-v1"
+        validateResult(result, transcriptionOnly)
         val jobs = jobs(); val item = owned(jobs, claim, now) ?: return false
         val actualRemote = if (item.isNull("remote_id")) null else item.getString("remote_id")
         require(actualRemote == remoteId)
         val spec = item.getJSONObject("spec")
         require(spec.getString("backend") != "remote" || remoteId != null)
+        if (transcriptionOnly) {
+            require(spec.getString("provider") == "dart-voice-v1" && spec.getString("backend") == "local")
+            item.put("result", result).put("transcript", result.getString("transcript"))
+                .put("state", "transcribed").put("lease_until", JSONObject.NULL).put("last_error", JSONObject.NULL)
+            // A transcript is phone data, not an AI popup/action for the watch.
+            commit("job_transcription_completed", jobs)
+            return true
+        }
         val resultId = sha("result-v1:" + claim.id)
         val envelope = JSONObject().put("version", 1).put("result_id", resultId).put("job_id", claim.id)
             .put("watch_id", spec.getString("watch_id")).put("recording_id", spec.getString("recording_id"))
@@ -270,6 +284,7 @@ class PrototypeJobs(private val store: PrototypeStore) {
             "selected" to item.optBoolean("selected"),
             "watch_id" to spec.getString("watch_id"), "recording_id" to spec.getString("recording_id"),
             "provider" to spec.getString("provider"), "model" to spec.getString("model"),
+            "pipeline_revision" to spec.getString("pipeline_revision"),
             "generation" to spec.getLong("generation"),
             "processing" to !item.isNull("lease_until"), "transcript_saved" to item.has("transcript"),
             "action_revision" to item.optLong("action_revision"),
@@ -293,12 +308,16 @@ class PrototypeJobs(private val store: PrototypeStore) {
             require(spec.getString("backend") != "remote" || spec.getBoolean("upload_authorized"))
             return sha(canonical(spec))
         }
-        fun validateResult(result: JSONObject) {
+        fun validateResult(result: JSONObject, transcriptionOnly: Boolean = false) {
             require(result.keys().asSequence().toSet() == setOf("version", "transcript", "summary", "category", "actions")) { "result_fields" }
             require(integer(result.get("version")) && result.getLong("version") == 1L) { "result_version" }
             for (name in listOf("transcript", "summary", "category")) require(result.get(name) is String) { "result_text_type" }
-            require(result.getString("summary").isNotBlank()) { "result_summary_empty" }
+            if (transcriptionOnly) {
+                require(result.getString("transcript").isNotBlank()) { "result_transcript_empty" }
+                require(result.getString("summary").isEmpty() && result.getString("category").isEmpty()) { "result_unexpected_analysis" }
+            } else require(result.getString("summary").isNotBlank()) { "result_summary_empty" }
             require(result.get("actions") is JSONArray) { "result_actions_type" }
+            if (transcriptionOnly) require(result.getJSONArray("actions").length() == 0) { "result_unexpected_actions" }
             for (i in 0 until result.getJSONArray("actions").length()) {
                 val action = result.getJSONArray("actions").getJSONObject(i)
                 require(action.get("type") in listOf("task", "calendar_event", "reminder", "timer", "alarm"))

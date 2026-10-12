@@ -47,7 +47,8 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
   if (request['version'] != 1 ||
       spec['provider'] != 'dart-voice-v1' ||
       spec['backend'] != 'local' ||
-      spec['upload_authorized'] != false) {
+      spec['upload_authorized'] != false ||
+      !['voice-v1', 'transcribe-v1'].contains(spec['pipeline_revision'])) {
     throw const FormatException('Unsupported voice processing request');
   }
   final recording = CompanionRecording.decode(
@@ -63,11 +64,13 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
     throw const FormatException('Invalid processing configuration');
   }
   final sttType = TranscriptionEngineType.values.byName(models[0]);
-  final engine = createTranscriptionEngine(sttType);
-  final llm = LlmService(isCancelled: () => control.isCancelled)
-    ..selectModel(models[1]);
+  TranscriptionEngine? engine;
+  LlmService? llm;
   control.bind(() async {
-    await Future.wait([engine.cancel(), llm.cancelProcessing()]);
+    await Future.wait([
+      if (engine != null) engine.cancel(),
+      if (llm != null) llm.cancelProcessing(),
+    ]);
   });
   Directory? scratch;
   try {
@@ -78,7 +81,9 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
     control.check();
     var transcript = request['transcript'] as String?;
     if (transcript == null) {
-      if (!await engine.isAvailable()) {
+      final transcriber = createTranscriptionEngine(sttType);
+      engine = transcriber;
+      if (!await transcriber.isAvailable()) {
         throw PlatformException(code: 'MODEL_MISSING');
       }
       control.check();
@@ -91,24 +96,38 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
         flush: true,
       );
       control.check();
-      transcript = (await engine.transcribe(audio.path)).trim();
+      transcript = (await transcriber.transcribe(audio.path)).trim();
       control.check();
       requireCompanionSpeech(transcript);
       // Complete this platform persistence callback before starting analysis.
       await saveTranscript(transcript);
+      transcriber.dispose();
+      engine = null;
     }
     control.check();
     requireCompanionSpeech(transcript);
-    if (!await llm.isModelDownloaded()) {
+    if (spec['pipeline_revision'] == 'transcribe-v1') {
+      return {
+        'version': 1,
+        'transcript': transcript,
+        'summary': '',
+        'category': '',
+        'actions': <Object?>[],
+      };
+    }
+    final analyzer = LlmService(isCancelled: () => control.isCancelled)
+      ..selectModel(models[1]);
+    llm = analyzer;
+    if (!await analyzer.isModelDownloaded()) {
       throw PlatformException(code: 'MODEL_MISSING');
     }
     control.check();
-    final result = llm.isBrainDump(transcript)
-        ? await llm.processTranscriptBrainDump(
+    final result = analyzer.isBrainDump(transcript)
+        ? await analyzer.processTranscriptBrainDump(
             transcript,
             correctTranscription: models[2] == 'true',
           )
-        : await llm.processTranscript(
+        : await analyzer.processTranscript(
             transcript,
             correctTranscription: models[2] == 'true',
           );
@@ -138,8 +157,8 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
     };
   } finally {
     control.unbind();
-    engine.dispose();
-    llm.dispose();
+    engine?.dispose();
+    llm?.dispose();
     if (scratch != null && scratch.existsSync()) {
       await scratch.delete(recursive: true);
     }
