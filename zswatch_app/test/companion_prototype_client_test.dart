@@ -111,6 +111,7 @@ void main() {
         'transcription_model': 'kbWhisperBase',
         'analysis_model': 'qwen',
         'correct_transcription': false,
+        'analysis_enabled': true,
       });
     },
   );

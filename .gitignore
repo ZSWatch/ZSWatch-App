@@ -1,5 +1,6 @@
 # Local development directories (not part of this repo - clone separately)
 ZSWatch-Firmware
+/ZSWatch/
 
 # Reference materials (kept locally, not needed for compilation)
 Gadgetbridge
