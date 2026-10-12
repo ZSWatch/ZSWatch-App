@@ -13,9 +13,9 @@ Established 2026-10-12 for `IOS_COMPANION_IMPLEMENTATION_PLAN.md`, stage 1.
   Podfile.lock. Those three paths are preserved in the named stash
   `Mac local database repair and Podfile before iOS companion handoff 2026-10-12`.
   Exact files and a binary patch also remain at
-  `/tmp/zswatch-ios-handoff-preserved-20261012/`. They have not been discarded or
-  automatically applied over the newer schema-7 handoff database. Review the
-  repair against the final iOS storage design before restoring it.
+  `/tmp/zswatch-ios-handoff-preserved-20261012/`. The useful database repair and
+  its regression test have now been reviewed and adapted into schema 8; see
+  the review below. The original stash remains a backup.
 - `flutter pub get` left the pinned pubspec lock unchanged. CocoaPods regenerated
   the iOS lock for dependencies already present in the handoff pubspec.
 
@@ -173,3 +173,34 @@ v3.3.0-preview1. A matching SDK workspace and ELF are still needed for firmware
 compilation and symbolic GDB inspection. No full SDK migration was performed
 merely to test app builds or logging. BLE, restoration and local-AI acceptance
 remain implementation-stage work, separate from this build/tool preflight.
+
+## Preserved local changes reviewed
+
+The original database regression test reproduced a null-cast crash on the
+handoff baseline. Its repair is needed: older database files can claim schema
+6/7 while holding null required voice metadata or missing AI columns. The fix
+is integrated as a schema-8 migration, using Drift to add missing columns and
+updating only rows with invalid nulls. It runs once during upgrade, preserves
+recordings/transcripts/action flags and respects the native processing owner.
+The existing `forTesting` constructor already covered the old local addition;
+the ID-only upsert rewrite is redundant after repair and was not carried over.
+
+Four database regressions now cover null-row repair, missing AI columns,
+preservation of valid data/native pending state, and file-backed reopening
+without additional updates. The affected voice recovery/sync and saved-watch
+suites pass all 47 tests, and targeted Dart analysis reports no issues.
+Android's telemetry writer accepts schema 8 because its tables are unchanged.
+An Android native build was not run: this Mac has no Android SDK/JDK installed.
+The signed iOS Release build with the schema-8 fix also passed, followed by
+strict signature verification. Its app and validation logs are retained in
+ignored `.companion-hil-runs/20261012-local-repair/`.
+
+The iOS Podfile.lock already committed with the baseline includes the required
+image-picker/share dependencies and the current sqflite integration. The old
+`flutter_tts` additions are obsolete with the removed voice-chat feature and
+were not restored. No dependency pins were changed.
+
+App fixes are on `codex/ios-companion`. Firmware tool-only commit `e9fcd5b5`
+is also on a new firmware `codex/ios-companion` branch; no runtime firmware
+source change or flash was needed. The original handoff refs and unrelated
+historical stashes are retained. These are local commits, not publication.

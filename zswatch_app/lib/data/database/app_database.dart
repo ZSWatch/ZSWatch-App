@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Database schema version
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -85,12 +85,55 @@ class AppDatabase extends _$AppDatabase {
           // Remove the unsupported voice-chat prototype, preserving app data.
           await customStatement('DROP TABLE IF EXISTS chat_history');
         }
+        if (from < 8) {
+          await _repairLegacyVoiceMemos(m);
+        }
       },
       beforeOpen: (details) async {
         // Reset memos stuck in intermediate processing states from a crash.
         if (recoverLegacyProcessing) await resetStuckProcessingMemos();
       },
     );
+  }
+
+  /// Earlier development databases reported v6/v7 while retaining nullable
+  /// required fields or missing AI columns. Repair them once during upgrade,
+  /// before Drift maps rows or legacy processing recovery reads those columns.
+  Future<void> _repairLegacyVoiceMemos(Migrator migrator) async {
+    final info = await customSelect('PRAGMA table_info(voice_memos)').get();
+    if (info.isEmpty) return;
+    final existing = info.map((row) => row.read<String>('name')).toSet();
+    for (final column in [
+      voiceMemos.summary,
+      voiceMemos.category,
+      voiceMemos.processingStatus,
+      voiceMemos.aiModel,
+      voiceMemos.aiProcessedAt,
+      voiceMemos.taskCreated,
+      voiceMemos.calendarEventCreated,
+      voiceMemos.actionReviewState,
+      voiceMemos.archived,
+    ]) {
+      if (!existing.contains(column.name)) {
+        await migrator.addColumn(voiceMemos, column);
+      }
+    }
+    await customStatement('''
+      UPDATE voice_memos
+      SET
+        timestamp_utc = COALESCE(timestamp_utc, 0),
+        duration_ms = COALESCE(duration_ms, 0),
+        size_bytes = COALESCE(size_bytes, 0),
+        synced_from_watch = COALESCE(synced_from_watch, 0),
+        deleted_on_watch = COALESCE(deleted_on_watch, 0),
+        task_created = COALESCE(task_created, 0),
+        calendar_event_created = COALESCE(calendar_event_created, 0),
+        archived = COALESCE(archived, 0)
+      WHERE timestamp_utc IS NULL OR duration_ms IS NULL OR size_bytes IS NULL
+        OR synced_from_watch IS NULL OR deleted_on_watch IS NULL
+        OR task_created IS NULL OR calendar_event_created IS NULL
+        OR archived IS NULL
+    ''');
   }
 
   // ==================== Watch Operations ====================

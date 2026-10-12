@@ -147,7 +147,7 @@ void main() {
             .get(),
         isEmpty,
       );
-      expect(db.schemaVersion, 7);
+      expect(db.schemaVersion, 8);
     } finally {
       await db.close();
       await directory.delete(recursive: true);
@@ -177,7 +177,7 @@ void main() {
           (await db.customSelect('PRAGMA user_version').getSingle()).read<int>(
             'user_version',
           ),
-          7,
+          8,
         );
         await db.close();
         db = AppDatabase.forTesting(NativeDatabase(file));
