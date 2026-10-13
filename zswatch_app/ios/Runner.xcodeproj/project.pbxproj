@@ -11,11 +11,11 @@
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		4CB6FD9C8DD8179434BB8DF8 /* IOSCompanionFirmware.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1E25455B091AF85900ACDFB /* IOSCompanionFirmware.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
-		E78D85215D5A3D113C24392C /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E26C8E899F826FCC65DF8BE4 /* Pods_Runner.framework */; };
 		A10000000000000000000002 /* CompanionJournal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* CompanionJournal.swift */; };
 		A10000000000000000000004 /* CompanionNusFramer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* CompanionNusFramer.swift */; };
 		A10000000000000000000006 /* IOSCompanionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* IOSCompanionCoordinator.swift */; };
@@ -32,6 +32,8 @@
 		A1000000000000000000001C /* IOSDartVoiceWorker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* IOSDartVoiceWorker.swift */; };
 		A1000000000000000000001E /* IOSVoiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001D /* IOSVoiceCoordinator.swift */; };
 		A10000000000000000000020 /* IOSCompanionActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001F /* IOSCompanionActions.swift */; };
+		DFF97A3173C99B29AD3DFB3D /* CompanionFirmwareContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = F378617ADE1AFE8E9048487B /* CompanionFirmwareContract.swift */; };
+		E78D85215D5A3D113C24392C /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E26C8E899F826FCC65DF8BE4 /* Pods_Runner.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -76,11 +78,6 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A3ADEE59B91882B0D6F571D7 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
-		D00119E8634A43A1687263A3 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
-		E26C8E899F826FCC65DF8BE4 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		F303EE2259FC9671FC170520 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
-		FC0A46FEFC2BCF96C22517AB /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000001 /* CompanionJournal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionJournal.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* CompanionNusFramer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionNusFramer.swift; sourceTree = "<group>"; };
 		A10000000000000000000005 /* IOSCompanionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSCompanionCoordinator.swift; sourceTree = "<group>"; };
@@ -97,6 +94,13 @@
 		A1000000000000000000001B /* IOSDartVoiceWorker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSDartVoiceWorker.swift; sourceTree = "<group>"; };
 		A1000000000000000000001D /* IOSVoiceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSVoiceCoordinator.swift; sourceTree = "<group>"; };
 		A1000000000000000000001F /* IOSCompanionActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSCompanionActions.swift; sourceTree = "<group>"; };
+		A3ADEE59B91882B0D6F571D7 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
+		D00119E8634A43A1687263A3 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
+		E1E25455B091AF85900ACDFB /* IOSCompanionFirmware.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IOSCompanionFirmware.swift; sourceTree = "<group>"; };
+		E26C8E899F826FCC65DF8BE4 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		F303EE2259FC9671FC170520 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
+		F378617ADE1AFE8E9048487B /* CompanionFirmwareContract.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompanionFirmwareContract.swift; sourceTree = "<group>"; };
+		FC0A46FEFC2BCF96C22517AB /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -186,6 +190,8 @@
 				A10000000000000000000003 /* CompanionNusFramer.swift */,
 				A10000000000000000000001 /* CompanionJournal.swift */,
 				74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */,
+				F378617ADE1AFE8E9048487B /* CompanionFirmwareContract.swift */,
+				E1E25455B091AF85900ACDFB /* IOSCompanionFirmware.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -475,6 +481,8 @@
 				A10000000000000000000004 /* CompanionNusFramer.swift in Sources */,
 				A10000000000000000000002 /* CompanionJournal.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
+				DFF97A3173C99B29AD3DFB3D /* CompanionFirmwareContract.swift in Sources */,
+				4CB6FD9C8DD8179434BB8DF8 /* IOSCompanionFirmware.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

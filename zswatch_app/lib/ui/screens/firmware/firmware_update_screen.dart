@@ -103,8 +103,7 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
     final watch = ref.watch(currentWatchProvider);
     final isConnected = ref.watch(isWatchConnectedProvider);
     final fsUploadState = ref.watch(firmwareFilesystemStateProvider);
-    final native = ref.watch(nativeCompanionRuntimeProvider);
-    final hasSmp = native ? false : ref.watch(hasSmpServiceProvider);
+    final hasSmp = ref.watch(hasSmpServiceProvider);
 
     // Manage wakelock based on DFU/upload state
     final isDfuInProgress =

@@ -18,6 +18,7 @@ import 'package:zswatch_app/providers/dfu_providers.dart';
 import 'package:zswatch_app/providers/developer_providers.dart';
 import 'package:zswatch_app/providers/filesystem_providers.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
+import 'package:zswatch_app/providers/demo_mode_provider.dart';
 import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
 import 'package:zswatch_app/providers/companion_watch_providers.dart';
 import 'package:zswatch_app/services/background/companion_watch_catalogue.dart';
@@ -267,6 +268,37 @@ void main() {
       return saved;
     });
   });
+  testWidgets('native settings enters isolated demo and all six entrances remain usable', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.binding.setSurfaceSize(const Size(1000, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await mount(tester, snapshot());
+    router(tester).go(AppRoutes.settings);
+    await tester.pumpAndSettle();
+    expect(find.text('Demo Mode'), findsOneWidget);
+    await tester.ensureVisible(find.text('Demo Mode'));
+    final toggle = find.descendant(of: find.ancestor(of: find.text('Demo Mode'), matching: find.byType(ListTile)), matching: find.byType(Switch));
+    final target = toggle.evaluate().isNotEmpty ? toggle : find.byType(Switch).last;
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+    expect(find.byType(DashboardScreen), findsOneWidget);
+    final scope = ProviderScope.containerOf(tester.element(find.byType(DashboardScreen)));
+    expect(scope.read(demoModeProvider), true);
+    expect(calls.where((c) => c.method == 'stop'), hasLength(1));
+    calls.clear(); metadataWrites.clear();
+    for (final route in [AppRoutes.health, AppRoutes.notifications, AppRoutes.analytics, AppRoutes.watchfaceBackground, AppRoutes.developer, AppRoutes.voiceMemos]) {
+      router(tester).go(route);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: route);
+    }
+    expect(calls, isEmpty); expect(metadataWrites, isEmpty); expect(forbidden, isEmpty);
+    await scope.read(demoModeControllerProvider).set(false);
+    await tester.pump();
+    await emit(tester, snapshot());
+    await tester.pumpAndSettle();
+    expect(calls.where((c) => c.method == 'start'), isEmpty);
+  });
+
   testWidgets(
     'Restart confirmation uses only the native owner and generation',
     (tester) async {
@@ -916,7 +948,7 @@ void main() {
       expect(permissionCalls, isEmpty);
       expect(calls.map((c) => c.method), ['permissionStatus']);
       expect(find.text('Persistent Connection'), findsNothing);
-      expect(find.text('Demo Mode'), findsNothing);
+      expect(find.text('Demo Mode'), findsOneWidget);
       await tester.ensureVisible(find.text('App Permissions'));
       await tester.tap(find.text('App Permissions'));
       await tester.pumpAndSettle();

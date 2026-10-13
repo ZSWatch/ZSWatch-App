@@ -7,6 +7,7 @@ import '../../data/models/connection_state.dart';
 import '../../data/models/voice_memo.dart';
 import '../../providers/auto_reconnect_provider.dart';
 import '../../providers/companion_runtime_providers.dart';
+import '../../providers/demo_mode_provider.dart';
 import '../../providers/foreground_service_providers.dart';
 import '../../providers/permission_providers.dart';
 import '../../providers/watch_service_provider.dart';
@@ -361,6 +362,7 @@ class _HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(demoModeProvider)) return const DashboardScreen();
     if (ref.watch(nativeCompanionRuntimeProvider)) {
       final snapshot = ref.watch(companionSnapshotProvider);
       return snapshot.when(

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/background/companion_prototype_client.dart';
 import '../services/background/ios_telemetry_projector.dart';
 import 'companion_runtime_providers.dart';
+import 'demo_mode_provider.dart';
 import 'companion_watch_providers.dart';
 import 'watch_providers.dart';
 
@@ -18,7 +19,7 @@ class IosTelemetryProjection extends StateNotifier<AsyncValue<void>> {
   bool _disposed = false;
 
   void observe(CompanionPrototypeSnapshot snapshot) {
-    if (_disposed || !snapshot.isIos) return;
+    if (_disposed || !snapshot.isIos || snapshot.fields['demo'] == true) return;
     _pending = snapshot;
     if (!_working) unawaited(_drain());
   }
@@ -72,6 +73,7 @@ final iosTelemetryProjectionStateProvider =
     });
 
 final iosTelemetryProjectionProvider = Provider<void>((ref) {
+  if (ref.watch(demoModeProvider)) return;
   final writer = ref.watch(iosTelemetryProjectionStateProvider.notifier);
   void retry() {
     final snapshot = ref.read(companionSnapshotProvider).asData?.value;

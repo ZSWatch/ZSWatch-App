@@ -8,6 +8,7 @@ import '../services/analytics/battery_storage_service.dart';
 import '../services/analytics/connection_analytics_service.dart';
 import 'foreground_service_providers.dart';
 import 'companion_runtime_providers.dart';
+import 'demo_mode_provider.dart';
 import 'ios_telemetry_providers.dart';
 import 'package:flutter/foundation.dart';
 import 'watch_providers.dart';
@@ -53,7 +54,9 @@ final companionTelemetryRevisionProvider = Provider<Object?>((ref) {
 /// Android commits native SQLite writes. iOS hands durable native receipts to
 /// Flutter's sole Drift writer before acknowledging them.
 final companionTelemetryUpdatesProvider = Provider<void>((ref) {
-  if (!ref.watch(nativeCompanionRuntimeProvider)) return;
+  if (!ref.watch(nativeCompanionRuntimeProvider) || ref.watch(demoModeProvider)) {
+    return;
+  }
   final db = ref.watch(databaseProvider);
   if (defaultTargetPlatform == TargetPlatform.iOS) {
     ref.watch(iosTelemetryProjectionProvider);

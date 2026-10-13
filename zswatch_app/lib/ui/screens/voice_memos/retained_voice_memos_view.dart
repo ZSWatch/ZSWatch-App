@@ -9,11 +9,14 @@ import 'package:share_plus/share_plus.dart';
 import '../../../data/models/voice_memo.dart';
 import '../../../providers/companion_recording_import_providers.dart';
 import '../../../providers/voice_memo_providers.dart';
+import '../../../providers/demo_mode_provider.dart';
 import '../../../services/voice_memo/retained_recording_playback.dart';
 import '../../widgets/voice_memos/audio_playback_bar.dart';
 
 final retainedVoiceMemosProvider = StreamProvider.autoDispose<List<VoiceMemo>>(
-  (ref) => ref.watch(voiceMemoRepositoryProvider).watchAllMemos(),
+  (ref) => ref.watch(demoModeProvider)
+      ? Stream.value([])
+      : ref.watch(voiceMemoRepositoryProvider).watchAllMemos(),
 );
 
 /// Access existing rows directly; no filename adoption, BLE or inference owner.

@@ -16,6 +16,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     notify: { [weak self] characteristic, enabled in self?.peripheral?.setNotifyValue(enabled, for: characteristic) },
     failed: { [weak self] in self?.lost("Sensor subscription timed out") })
   private var smpOwner: IOSCompanionSmp?
+  lazy var firmware = IOSCompanionFirmware(owner: self)
   private var gpsRequested = false
   private var gpsToken = UUID()
   private lazy var gps = CompanionLocationRelay(
@@ -40,7 +41,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     try publish("gps_configuration", ["gps_enabled": enabled,
       "gps_runtime": ["generation": journal.generation, "state": enabled ? "idle" : "disabled", "requested": false]])
   }
-  func uiForegrounded() { inbox?.foregrounded(); voice?.foregrounded() }
+  func uiForegrounded() { firmware.foregrounded(); inbox?.foregrounded(); voice?.foregrounded() }
   func uiInactive() { voice?.inactive() }
   func journalChanged() {
     if journal.loadError != nil { storageFailedIfNeeded(); return }
@@ -48,6 +49,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     for observer in observers.values { observer(value) }
   }
   func uiBackgrounded() {
+    firmware.backgrounded()
     inbox?.backgrounded()
     scanStop()
     if gpsRequested, CompanionLocationRelay.permissions["background"] != true {
@@ -128,10 +130,11 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
         old["phase"] = "failed"; old["error"] = "interrupted"
         try? self.publish("watchface_process_interrupted", ["watchface_operation": old])
       }
-      self.inbox = IOSRecordingInbox(owner: self, root: root)
-      self.inbox?.recover()
+      self.firmware.recover()
       do { self.voice = try IOSVoiceCoordinator(owner: self, root: root) }
       catch { try? self.publish("voice_storage_unavailable", ["voice_error": "Voice job storage unavailable"]) }
+      self.inbox = IOSRecordingInbox(owner: self, root: root)
+      self.inbox?.recover()
       if (self.journal.fields["http_pending_count"] as? Int ?? 0) > 0 {
         try? self.publish("http_process_interrupted", ["http_pending_count": 0,
           "last_http": ["generation": self.journal.generation, "outcome": "process_interrupted", "utc_ms": CompanionJournal.now]])
@@ -175,7 +178,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       "ancs_authorized": peripheral?.ancsAuthorized ?? false,
       "capabilities": ["ble_restoration": true, "system_unpair": false,
                        "notification_filters": false, "ancs": true, "ams": true,
-                       "smp": false, "voice_processing": voice != nil],
+                       "smp": true, "voice_processing": voice != nil],
     ]) { _, live in live }
     if let error = journal.loadError { fields["last_error"] = error }
     return fields
@@ -201,6 +204,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     }
     do { try journal.update(event, changes) }
     catch {
+      firmware.abort("storage_unavailable")
       closeLink(); phase = "error"
       for observer in observers.values { observer(snapshot()) }
       throw error
@@ -212,6 +216,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
 
   func storageFailedIfNeeded() {
     guard journal.loadError != nil else { return }
+    firmware.abort("storage_unavailable")
     closeLink(); phase = "error"
     for observer in observers.values { observer(snapshot()) }
   }
@@ -241,6 +246,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   }
 
   func start(_ id: String, expected: Int? = nil) throws {
+    guard !firmware.isActive else { throw CompanionFailure.unavailable("Wait for the firmware operation or stop it first") }
     if let expected {
       guard let selected = UUID(uuidString: id), scans[selected] != nil,
             expected == journal.generation, !journal.desired else {
@@ -263,6 +269,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       try changed("user_disconnect", journal.telemetryChanges(kind: "connection", payload: ["event_type": "disconnected", "reason": "user_requested"]))
     }
     try journal.stop()
+    firmware.abort("stopped")
     retryToken += 1
     scanStop(); closeLink()
     phase = "stopped"
@@ -272,6 +279,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   func forget(_ id: String) throws {
     let selected = UUID(uuidString: id)?.uuidString == journal.address
     try journal.forget(id)
+    if selected { firmware.abort("forgotten") }
     if selected { retryToken += 1; scanStop(); closeLink(); phase = "stopped" }
     try changed("watch_forgotten")
   }
@@ -309,7 +317,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   }
 
   private func connectSelected() {
-    guard peripheral == nil, journal.desired, central?.state == .poweredOn,
+    guard !firmware.holdsLink, journal.loadError == nil, peripheral == nil, journal.desired, central?.state == .poweredOn,
           let id = UUID(uuidString: journal.address), !cancellations.contains(id) else { return }
     guard let found = central?.retrievePeripherals(withIdentifiers: [id]).first else {
       setPhase("error", error: "Watch unavailable; scan and choose it again"); return
@@ -319,6 +327,17 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     found.delegate = linkDelegate
     if found.state == .connected { discover(found) }
     else { setPhase("connecting"); central?.connect(found, options: nil) }
+  }
+  func suspendForFirmware(_ generation: Int) throws {
+    guard isReadySession(generation), firmware.isActive else { throw CompanionFailure.unavailable("Firmware session expired") }
+    retryToken += 1
+    try changed("firmware_session_fenced", ["generation": generation + 1])
+    closeLink(); phase = "updating"
+    try changed("firmware_session_suspended", ["phase": "updating"])
+  }
+  func resumeAfterFirmware() {
+    guard journal.loadError == nil, journal.desired, !firmware.holdsLink else { return }
+    connectSelected()
   }
 
   private func discover(_ item: CBPeripheral) {
@@ -603,6 +622,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
         connectSelected()
       }
     } else {
+      firmware.abort("radio_unavailable")
       scanStop(); closeLink(); cancellations.removeAll(); cancellationHandles.removeAll()
       if journal.desired {
         try? changed("radio_fenced", ["generation": journal.generation + 1])

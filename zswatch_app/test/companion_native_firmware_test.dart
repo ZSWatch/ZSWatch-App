@@ -97,6 +97,40 @@ Uint8List resourceFixture() {
 }
 
 void main() {
+  test(
+    'iOS firmware status accepts only its UUID and retains uncertain outcomes',
+    () {
+      const uuid = 'FE88C737-593F-DB9B-732D-E11FF4C463F5';
+      final fields = <String, Object?>{
+        'owner': 'ios_companion_native',
+        'firmware_operation': {
+          ...firmware('failed', unknown: true),
+          'address': uuid,
+        },
+      };
+      final status = CompanionFirmwareStatus.decode(fields)!;
+      expect(status.address, uuid);
+      expect(status.resultUnknown, true);
+      expect(status.dfuState.status, DfuStatus.failed);
+      expect(
+        () => CompanionFirmwareStatus.decode({
+          ...fields,
+          'owner': 'android_service_native',
+        }),
+        throwsFormatException,
+      );
+      expect(
+        () => CompanionFirmwareStatus.decode({
+          ...fields,
+          'firmware_operation': {
+            ...firmware('uploading'),
+            'address': 'AA:BB:CC:DD:EE:FF',
+          },
+        }),
+        throwsFormatException,
+      );
+    },
+  );
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel('dev.zswatch.app/companion_v1');
   final messenger =

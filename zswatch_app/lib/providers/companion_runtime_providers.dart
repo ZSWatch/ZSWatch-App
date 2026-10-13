@@ -5,12 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../services/background/companion_prototype_client.dart';
+import '../services/background/demo_companion_client.dart';
 import '../data/models/companion_recording.dart';
 import '../data/models/companion_notification_status.dart';
 import '../data/models/companion_http_status.dart';
 import '../data/models/companion_gps_status.dart';
 import '../data/models/companion_watchface_status.dart';
 import 'watch_providers.dart' show databaseProvider;
+import 'demo_mode_provider.dart';
 
 /// Mobile UI observes the platform owner without creating a legacy BLE session.
 bool get useNativeCompanionRuntime =>
@@ -23,6 +25,11 @@ final nativeCompanionRuntimeProvider = Provider<bool>((ref) {
 });
 
 final companionClientProvider = Provider<CompanionPrototypeClient>((ref) {
+  if (ref.watch(demoModeProvider)) {
+    return DemoCompanionClient(
+      ios: defaultTargetPlatform == TargetPlatform.iOS,
+    );
+  }
   return const CompanionPrototypeClient();
 });
 
@@ -73,6 +80,9 @@ final companionGpsPermissionsProvider = Provider<Future<void> Function()>((
   ref,
 ) {
   return () async {
+    if (ref.read(demoModeProvider)) {
+      throw StateError('Location controls are unavailable in Demo Mode');
+    }
     if (!(await Permission.locationWhenInUse.request()).isGranted) {
       throw StateError('Location permission required');
     }

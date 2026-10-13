@@ -322,3 +322,86 @@ Ordinary signed Release builds pass. Interactive phone controls, actual sharing,
 speech playback, native BLE downloads and scheduled background execution remain
 physical acceptance work. Firmware/resources/filesystem-browser work remains
 open, and the overall goal is not complete.
+
+## 2026-10-13: native firmware/resources update owner
+
+The existing firmware selection/progress UI now routes to a native iOS update
+owner. It takes the prepared Nordic transport, fences the NUS generation and
+suspends ordinary reconnect/SMP admission during transfer. The retained SDK
+manager/delegates survive UI disposal and the expected reboot. Stop, Forget,
+radio loss, storage failure and background expiration invalidate the transport
+and end the operation with an explicit uncertain result when a write was admitted.
+Background continuation is limited to a system grant and a 20-second cap; no
+unlimited upload or automatic reset replay is claimed.
+
+Firmware input uses the actual bounds-checked Nordic MCUboot parser and SDK
+slot-one Image/Upgrade APIs. The read-only preflight rejects selected indices
+that this watch cannot report. Buffer negotiation chooses at most three pending
+requests, leaving one of the reported buffers free; unsupported parameter
+queries fall back to one. No Android MTU is copied into the iOS transport.
+Snapshot progress describes the SDK's current image, not an invented aggregate
+index. Progress persistence is throttled to avoid writing the journal for every
+BLE packet.
+
+SDK success begins a new boot check: reconnect NUS, obtain current-generation
+version/status, prepare a fresh SDK transport, and require every selected image
+to be active with its selected hash. Upload progress alone cannot complete the
+operation. Only a verified, actually transferred ordinary image-zero update
+records an acknowledged-byte throughput measurement; an already-active image
+does not unlock the large-resource gate.
+
+Resource inputs validate the existing /S/full_fs format, known board/partition,
+UTF-8 names, table/trailer, entry bounds and non-overlap. Transfers receive full
+byte readback before reset/firmware application, then another full readback of
+the freshly mounted resource image. Resource-only reset requires an actual SDK
+ACK. Images larger than 512 KB wait for a measured, verified ordinary firmware
+transfer on this phone, following the plan's measurement order.
+
+The vendored SDK retains version 1.10.1 and its normal cancel/DFU behavior. A
+separate terminal abort API fences late transitions and releases its update
+self-retention even when a cancelled transport never calls back. Its executable
+proof compiles the entire actual SDK with the pinned CocoaPods dependencies,
+uses no Bluetooth, and passes late-callback, no-restart and deallocation checks,
+including teardown before start. Resource/state host tests and 24 affected
+Flutter tests pass; targeted analysis is clean and signed Release builds pass.
+These are implementation checks, not a physical firmware transfer or throughput
+measurement. No watch image/resource was written or flashed.
+
+Inventory clarification: the earlier File System screen exposed log probes and
+downloads; its Files tab directed recordings to Voice Memos. A general directory
+browser was not an existing product feature. Find Phone appears only in the
+separate Chronos protocol/watch application, with no corresponding Gadgetbridge
+session handler in this app. These do not justify inventing new protocols or
+unrelated UI features for this rewrite. Native log/files, recording downloads,
+resource uploads and watchface uploads still need their short physical checks.
+
+
+### Native demo isolation and phone inspection (2026-10-13)
+
+Settings now exposes Demo Mode on the native app. Entry first persists Stop and
+rejects entry during an active firmware operation; a failed Stop keeps real
+observers installed. Synthetic snapshots and sensor/log/traffic streams never
+open a platform channel. Hardware commands are rejected, telemetry/catalogue
+projection is disabled, and the earlier-recordings view stays empty in preview.
+All six dashboard entrances remain navigable. Exit resumes only the pre-entry
+connection intent; a process restart after demo entry retains native Stop, so a
+normal Connect is required. Demo does not manufacture persisted watch/history
+rows or grant permissions.
+
+USB debugging can capture the real iPhone screen and enumerate its accessibility
+elements while the Mac is locked. Accessibility Activate on the ordinary Connect
+button has not caused an observed UI/connection transition. This is inspection
+evidence, not successful phone control or pairing. The standalone XCTest runner
+also timed out enabling automation mode through an independent USB test-manager
+client, before either test method ran. No watch recording
+was removed, no firmware was flashed, and physical acceptance remains open.
+
+Large resource admission now requires a measured ordinary firmware transfer on
+the selected peripheral UUID; a measurement for a different saved watch cannot
+open the gate. Final signed artifacts and acceptance logs are recorded below when
+verification completes.
+
+Validation: 64 affected Flutter tests pass (firmware, native app shell, demo,
+shared runtime, telemetry, catalogue); 12-file targeted analysis is clean. Actual
+Swift firmware/resource state tests and the entire vendored SDK abort proof pass.
+The signed release build passes; no physical firmware/resource transfer is claimed.

@@ -36,7 +36,7 @@ final class IOSCompanionSmp {
   private func begin(_ generation: Int, timeout: Double,
                      complete: @escaping (Result<[String: Any], Error>) -> Void) throws -> UUID {
     guard let owner, owner.isReadySession(generation) else { throw CompanionFailure.unavailable("Watch session expired") }
-    guard pending == nil else { throw CompanionFailure.unavailable("Another watch operation is in progress") }
+    guard pending == nil, !owner.firmware.isActive else { throw CompanionFailure.unavailable("Another watch operation is in progress") }
     let next = Pending(id: UUID(), address: owner.journal.address, generation: generation, complete: complete)
     pending = next
     owner.queue.asyncAfter(deadline: .now() + timeout) { [weak self] in
@@ -59,6 +59,7 @@ final class IOSCompanionSmp {
 
   func prepare(_ generation: Int, complete: @escaping (Result<[String: Any], Error>) -> Void) throws {
     guard let owner, owner.isReadySession(generation) else { throw CompanionFailure.unavailable("Connect the watch first") }
+    guard !owner.firmware.isActive else { throw CompanionFailure.unavailable("Firmware operation is in progress") }
     if pending == nil, preparedGeneration == generation, transport != nil {
       complete(.success(["version": 1, "prepared_from_generation": generation, "generation": generation])); return
     }
@@ -67,6 +68,13 @@ final class IOSCompanionSmp {
     do { try owner.send("GB({\"t\":\"smp\",\"status\":true})") }
     catch { finish(.failure(error)); return }
     pollPreparation(id)
+  }
+  /// Move the prepared SDK transport into the reboot-spanning update owner.
+  func takePrepared(_ generation: Int) throws -> McuMgrBleTransport {
+    guard pending == nil, owner?.firmware.isActive != true else { throw CompanionFailure.unavailable("Another watch operation is in progress") }
+    let sdk = try prepared(generation)
+    transport = nil; preparedGeneration = nil; attempt = UUID()
+    return sdk
   }
   private func pollPreparation(_ id: UUID) {
     guard let owner, let pending, pending.id == id, preparing else { return }
@@ -305,7 +313,7 @@ final class IOSCompanionSmp {
     return true
   }
 
-  var isIdle: Bool { pending == nil }
+  var isIdle: Bool { pending == nil && owner?.firmware.isActive != true }
   func cancelActive(_ reason: String) {
     transport?.invalidate(); transport = nil; preparedGeneration = nil
     finish(.failure(CompanionFailure.unavailable(reason)))

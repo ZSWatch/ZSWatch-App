@@ -188,26 +188,37 @@ class SettingsScreen extends ConsumerWidget {
 
           // Demo Mode (for app store reviewers without hardware)
           const _SectionHeader(title: 'Developer'),
-          if (!native)
-            _SettingsTile(
-              leading: Icon(
-                Icons.science,
-                color: ref.watch(demoModeProvider)
-                    ? AppTheme.primaryColor
-                    : AppTheme.textSecondary,
-              ),
-              title: 'Demo Mode',
-              subtitle: 'Simulate a connected watch without hardware',
-              trailing: Switch(
-                value: ref.watch(demoModeProvider),
-                onChanged: (value) {
-                  ref.read(demoModeProvider.notifier).state = value;
-                  if (value) {
-                    context.go(AppRoutes.home);
-                  }
-                },
-              ),
+          _SettingsTile(
+            leading: Icon(
+              Icons.science,
+              color: ref.watch(demoModeProvider)
+                  ? AppTheme.primaryColor
+                  : AppTheme.textSecondary,
             ),
+            title: 'Demo Mode',
+            subtitle: native
+                ? 'Preview the app; a real watch is temporarily disconnected'
+                : 'Simulate a connected watch without hardware',
+            trailing: Switch(
+              value: ref.watch(demoModeProvider),
+              onChanged: ref.watch(demoModeBusyProvider)
+                  ? null
+                  : (value) async {
+                      try {
+                        await ref.read(demoModeControllerProvider).set(value);
+                        if (value && context.mounted) {
+                          context.go(AppRoutes.home);
+                        }
+                      } catch (error) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(error.toString())),
+                          );
+                        }
+                      }
+                    },
+            ),
+          ),
           _SettingsTile(
             leading: const Icon(
               Icons.dns_outlined,

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'dfu_state.dart';
+import 'companion_watch_identity.dart';
 
 /// Metadata only. Native Nordic owns payloads, upgrade and boot verification.
 class CompanionFirmwareStatus {
@@ -50,9 +51,9 @@ class CompanionFirmwareStatus {
     if (value is! Map ||
         !validId(value['id']) ||
         value['address'] is! String ||
-        !RegExp(
-          r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$',
-        ).hasMatch(value['address'] as String) ||
+        !(fields['owner'] == 'ios_companion_native'
+            ? isIosWatchAddress(value['address'] as String)
+            : isAndroidWatchAddress(value['address'] as String)) ||
         value['generation'] is! int ||
         (value['generation'] as int) < 0 ||
         !{

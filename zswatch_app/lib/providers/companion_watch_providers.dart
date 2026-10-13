@@ -9,6 +9,7 @@ import '../services/background/companion_watch_catalogue.dart';
 export '../services/background/companion_watch_catalogue.dart'
     show isCompanionWatchAddress;
 import 'companion_runtime_providers.dart';
+import 'demo_mode_provider.dart';
 import 'watch_providers.dart';
 
 /// Rename only the selected metadata column, preserving IDs, connection
@@ -180,7 +181,9 @@ final companionWatchPersistenceStateProvider =
 /// App-lifetime projection, independent of which Flutter screen is visible.
 /// Disposal cancels observation; native BLE and its durable journal continue.
 final companionWatchPersistenceProvider = Provider<void>((ref) {
-  if (!ref.watch(nativeCompanionRuntimeProvider)) return;
+  if (!ref.watch(nativeCompanionRuntimeProvider) || ref.watch(demoModeProvider)) {
+    return;
+  }
   final writer = ref.watch(companionWatchPersistenceStateProvider.notifier);
   ref.listen(companionSnapshotProvider, (previous, next) {
     final snapshot = next.asData?.value;

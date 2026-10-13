@@ -121,6 +121,18 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
             guard let bytes = args["bytes"] as? FlutterStandardTypedData, let name = args["name"] as? String else { throw CompanionFailure.invalid("Background image required") }
             reply(try owner.smp.startWatchface(generation, bytes: bytes.data, name: name))
           } else { reply(try owner.smp.startWatchface(generation, bytes: nil, name: "Default")) }
+        case "startFirmware":
+          guard let generation = CompanionRecordingFiles.integer(args["generation"]),
+                let raw = args["images"] as? [[String: Any]], raw.count <= 3,
+                args["resources"] == nil || args["resources"] is FlutterStandardTypedData else { throw CompanionFailure.invalid("Firmware payload required") }
+          let images = try raw.map { item -> (Int, Data) in
+            guard let index = CompanionRecordingFiles.integer(item["index"]), let bytes = item["bytes"] as? FlutterStandardTypedData else { throw CompanionFailure.invalid("Firmware image required") }
+            return (index, bytes.data)
+          }
+          reply(try owner.firmware.start(generation, payloads: images, resources: (args["resources"] as? FlutterStandardTypedData)?.data))
+        case "cancelFirmware":
+          guard let id = args["id"] as? String else { throw CompanionFailure.invalid("Firmware operation required") }
+          try owner.firmware.cancel(id); reply(["version": 1, "accepted": true])
         case "verifyWorkerRuntime":
           guard let voice = owner.voice else { throw CompanionFailure.unavailable("Voice owner unavailable") }
           try voice.verifyWorker { answer in

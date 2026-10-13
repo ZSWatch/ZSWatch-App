@@ -59,6 +59,7 @@ final connectionPhaseStreamProvider = StreamProvider<ConnectionPhase>((ref) {
 
 /// Provider for current connection phase.
 final connectionPhaseProvider = Provider<ConnectionPhase>((ref) {
+  if (ref.watch(demoModeProvider)) return const ConnectionPhase.connected();
   if (ref.watch(nativeCompanionRuntimeProvider)) {
     return ref.watch(companionSnapshotProvider).asData?.value.connectionPhase ??
         const ConnectionPhase.disconnected();
@@ -81,12 +82,12 @@ final watchConnectionStreamProvider = StreamProvider<Connection>((ref) {
 /// In demo mode, returns a fake "connected" connection so all screens
 /// are accessible without real hardware.
 final watchConnectionProvider = Provider<Connection>((ref) {
+  final demo = demoConnectionOrNull(ref);
+  if (demo != null) return demo;
   if (ref.watch(nativeCompanionRuntimeProvider)) {
     return ref.watch(companionSnapshotProvider).asData?.value.connection ??
         const Connection(watchId: '', state: WatchConnectionState.disconnected);
   }
-  final demo = demoConnectionOrNull(ref);
-  if (demo != null) return demo;
 
   final asyncValue = ref.watch(watchConnectionStreamProvider);
   return asyncValue.valueOrNull ??
@@ -118,6 +119,8 @@ final watchInfoStreamProvider = StreamProvider<Watch?>((ref) {
 ///
 /// In demo mode, returns a static placeholder watch.
 final currentWatchProvider = Provider<Watch?>((ref) {
+  final demo = demoWatchOrNull(ref);
+  if (demo != null) return demo;
   if (ref.watch(nativeCompanionRuntimeProvider)) {
     final live = ref.watch(companionSnapshotProvider).asData?.value.watch;
     if (live == null) return null;
@@ -141,8 +144,6 @@ final currentWatchProvider = Provider<Watch?>((ref) {
       lastConnectedAt: metadata.lastConnectedAt,
     );
   }
-  final demo = demoWatchOrNull(ref);
-  if (demo != null) return demo;
 
   final asyncValue = ref.watch(watchInfoStreamProvider);
   final service = ref.watch(watchServiceProvider);
@@ -193,8 +194,11 @@ final batteryLevelProvider = Provider<int?>((ref) {
 
 /// Provider for whether the connected watch has the SMP service available.
 final hasSmpServiceProvider = Provider<bool>((ref) {
-  // UI SMP actions need native coordination before they can be exposed.
-  if (ref.watch(nativeCompanionRuntimeProvider)) return false;
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    final state = ref.watch(companionSnapshotProvider).asData?.value;
+    return state?.protocolReady == true &&
+        (state?.fields['capabilities'] as Map?)?['smp'] == true;
+  }
   final isConnected = ref.watch(isWatchConnectedProvider);
   if (!isConnected) return false;
   final ble = ref.watch(bleConnectionServiceProvider);

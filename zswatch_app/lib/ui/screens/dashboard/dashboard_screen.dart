@@ -146,8 +146,8 @@ class DashboardScreen extends ConsumerWidget {
               onFirmwareUpdate: () => context.push(AppRoutes.firmware),
               onDisconnect: () async {
                 // In demo mode, just turn off the flag
-                if (!native && ref.read(demoModeProvider)) {
-                  ref.read(demoModeProvider.notifier).state = false;
+                if (ref.read(demoModeProvider)) {
+                  await ref.read(demoModeControllerProvider).set(false);
                   if (context.mounted) context.go(AppRoutes.home);
                   return;
                 }
