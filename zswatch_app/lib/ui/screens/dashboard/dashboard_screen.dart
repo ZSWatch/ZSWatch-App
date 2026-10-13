@@ -94,6 +94,7 @@ class DashboardScreen extends ConsumerWidget {
         title: SvgPicture.asset('assets/images/ZSWatch_Text.svg', height: 24),
         actions: [
           IconButton(
+            tooltip: 'Settings',
             icon: const Icon(Icons.settings),
             onPressed: () => context.push(AppRoutes.settings),
           ),

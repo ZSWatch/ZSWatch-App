@@ -1221,4 +1221,24 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+  testWidgets('Ready transitions preserve an open Voice route above disconnected Home', (tester) async {
+    await mount(tester, snapshot());
+    final routes = router(tester);
+    unawaited(routes.push<void>(AppRoutes.voiceMemos));
+    await tester.pumpAndSettle();
+    expect(find.text('Voice Notes'), findsOneWidget);
+    await emit(tester, snapshot(active: true, ready: true));
+    await tester.pumpAndSettle();
+    expect(find.text('Voice Notes'), findsOneWidget);
+    await emit(tester, {...snapshot(active: true), 'phase': 'disconnected'});
+    await tester.pumpAndSettle();
+    await emit(tester, snapshot(active: true, ready: true));
+    await tester.pumpAndSettle();
+    expect(find.text('Voice Notes'), findsOneWidget);
+    expect(calls.where((c) => c.method == 'start' || c.method == 'stop'), isEmpty);
+    expect(forbidden, isEmpty);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
+
 }

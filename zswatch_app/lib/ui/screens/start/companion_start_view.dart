@@ -71,13 +71,8 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(companionSnapshotProvider, (previous, next) {
-      if (next.asData?.value.protocolReady == true &&
-          previous?.asData?.value.protocolReady != true &&
-          mounted) {
-        context.go(AppRoutes.home);
-      }
-    });
+    // Home rebuilds from the snapshot. Ready must not navigate: this page can
+    // remain mounted beneath Voice, Shell or Settings during reconnect.
     final snapshot = ref.watch(companionSnapshotProvider).asData?.value;
     final watch = ref.watch(currentWatchProvider);
     final saved = ref.watch(database.allWatchesProvider);

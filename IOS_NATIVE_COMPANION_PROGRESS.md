@@ -464,3 +464,113 @@ The USB bootstrap now backs out of nested Settings pages with bounded Close/Stat
 checks before applying the previously verified touch coordinates. It never
 touches the bond-deletion row. The normal signed app is restored after probes;
 XCTest and accessibility control limitations remain as observed above.
+
+
+### Encrypted Ready and normal phone UI (2026-10-13)
+
+The installed signed normal release is app `8ee84dd`, Nordic `e8f17ee`, fllama
+`115e799`; artifact `signed-connection-waits/Runner.app` under the ignored
+20261013 evidence directory. iPhone 11 / iOS 26.1 reached encrypted Ready with
+watch UUID FE88C737-593F-DB9B-732D-E11FF4C463F5, firmware 0.8.1, board
+watchdk@1/nrf5340/cpuapp. Ready preceded the automated pairing test, so successful
+pairing is not attributed to XCTest. Native observed ATT payload 244 bytes,
+battery 89%, live pulse and matching fresh status/version generations.
+
+All 26 recording receipts downloaded through the native Nordic BLE owner,
+578145 source bytes total. The owned 37.8-second HIL speech recording was copied
+back from the phone; its 155127 bytes and SHA256 match the native receipt. No
+watch recording was deleted. This establishes actual downloads, not a measured
+firmware throughput result or an interrupted-download recovery pass.
+
+XCTest on the ordinary app passed Health, Notifications, Analytics, Watchface,
+Developer and Voice routes, returning to connected Home each time. Health
+Today/Week/Month navigation passed. Actual playback conversion and the iOS
+decoder loaded a 7-second recording; Play advanced to 0:02 and Pause worked. The
+combined playback/shell test subsequently failed its shell assertion, so it is
+not reported as a complete pass. A real shell response was observed in an
+accessibility value, but the corrected standalone shell acceptance remains open.
+Model settings opened; actual model download/inference is still pending.
+
+Evidence is retained privately in
+`.companion-hil-runs/20261013-ios-companion/unlocked-acceptance/`: summary, Ready
+snapshot, source hash verification and exported route/playback screenshots. The
+UI runner uses Xcode automation and temporary accessibility inspection; it does
+not enable a product flag or change the VoiceOver preference.
+
+On the later continuation the native journal contained a persisted Stop
+(generation 29, desired_running=false), and the normal Home showed Connect.
+Automation now accepts this disconnected Home for offline model tests and does
+not silently restart the connection. The origin of that intervening Stop is not
+established by this capture. Genuine OS restoration, ANCS/AMS, background
+telemetry, firmware/resource acceptance, real AI and the other open parity rows
+remain outstanding.
+
+
+### Exact firmware SDK build and offline model controls (2026-10-13)
+
+Installed NCS v3.3.0-preview1 and its matching toolchain through Nordic
+sdk-manager, matching app/west.yml. Full WatchDK@1 sysbuild with UART debug
+configuration passes. Firmware local commit `f637ba51` corrects LVGL relocation
+paths for an SDK workspace outside the nested checkout; this removed an 80668-byte
+internal FLASH overflow. The existing narrow 2048 LVGL-9 compatibility changes
+and BMP5 FIFO initialization were reviewed, committed on their own
+codex/ios-companion submodule branches and pinned. App internal FLASH uses
+838052 / 916992 bytes; executable external FLASH uses 481216 / 1048064 bytes.
+See `ZSWatch/.agent_tools/MAC_BUILD.md` for the exact build invocation.
+
+The generated matched DFU bundle contains image 0 (838604 bytes), image 2
+(481768 bytes) and image 1 (176012 bytes). It has not been installed. Relinking
+internal code can change references into external code, so an isolated internal
+image from this build is not accepted as a safe replacement for an unknown
+installed external image. BLE firmware throughput remains unmeasured. Private
+build logs, bundle manifest and SHA256 are under the firmware-sdk-build evidence
+directory. USB still reports 26 recordings and 9464 KB free.
+
+The normal model UI selected and downloaded Whisper Tiny (English) while the
+watch was explicitly stopped. The 20-second XCTest passed its downloaded/Delete
+controls check. Original selection was Whisper Small (English); the temporary
+Tiny preference must be restored after inference acceptance. Automatic processing
+remains off. No inference result is claimed by the model download.
+
+
+### Preserve feature screens through Ready changes (2026-10-13)
+
+Normal phone acceptance exposed a Start-page listener navigating Home when the
+native owner became Ready again, even with Voice or a transcription confirmation
+open above that page. Reconnect could discard UI input without cancelling the
+durable native work. Home already renders from the current snapshot; the
+redundant navigation listener is removed. The scan flow keeps its explicit
+return after selection. Dashboard Settings also has its accessible tooltip.
+
+The regression reproduces loss of the visible Voice screen on the previous
+source, then passes after removing the listener. It covers initial Ready and
+a disconnect/Ready cycle with the Voice route still open, without Start/Stop
+commands or legacy owners. All 24 app-shell tests and three-file targeted analysis
+pass. The signed normal release build and deep/strict codesign verification pass.
+Physical acceptance of this new release follows installation; old-image route
+failure evidence is retained separately from passing route checks.
+
+A reusable standalone XCTest runner lives in scripts/companion_hil/ios_ui. Its
+bundle builds and its 20-second background/return test passed against the previous
+normal image. During the verified runningBackground interval, native journal
+telemetry advanced 1548 to 1554, then 1557 after return, with the same Ready
+generation 32 and zero drops. Dart projection acknowledged these receipts while
+backgrounded, so this does not prove an independently suspended Dart engine or
+genuine OS relaunch. It establishes the short ordinary background exchange and
+connected UI return. It is not a locked-screen test.
+
+A read-only copied phone database passed integrity_check: 1395 health samples,
+939 battery readings, 18 connection events and one telemetry cursor at that
+capture. These are actual storage counts, not proof of every chart or retention
+policy. Private snapshots/results are retained in the ignored evidence directory.
+
+The long cached owned fixture returned No speech detected and retained its source;
+no transcript/analysis acceptance is claimed. A fresh 6.88-second, 26850-byte watch
+microphone recording of a known Mac speech sentence was created through USB
+start/stop and automatically downloaded over BLE after normal saved-watch
+reconnect. UART records microphone start/stop/new-file notification and PCM
+overflow warnings. The new filename is 20261013_234746; only this new fixture is
+owned by this test. The original 26 files are retained. Its AI confirmation was
+interrupted by the navigation bug; transcription is pending the corrected image.
+The selected analysis model download is still in progress; the original model
+selection must be restored after inference acceptance.
