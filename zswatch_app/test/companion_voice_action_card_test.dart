@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/providers/settings_providers.dart';
@@ -137,6 +138,28 @@ void main() {
       expect(service.identities.single, ('owned-job', 2));
       service.pending.complete();
       await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'iOS timer review explains the app alert without offering Clock',
+    (tester) async {
+      final original = debugDefaultTargetPlatformOverride;
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        final service = FakeActions();
+        await mount(tester, service);
+        await tester.tap(find.text('Review & create'));
+        await tester.pump(const Duration(seconds: 1));
+        expect(find.text('Schedule alert'), findsOneWidget);
+        expect(find.text('Send to Clock'), findsNothing);
+        expect(find.textContaining('app notification'), findsOneWidget);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(service.created, isEmpty);
+      } finally {
+        debugDefaultTargetPlatformOverride = original;
+      }
     },
   );
 

@@ -1,4 +1,5 @@
 import EventKit
+import BackgroundTasks
 import Flutter
 import UIKit
 import UserNotifications
@@ -8,6 +9,7 @@ import UserNotifications
   private let productivityChannelName = "dev.zswatch.app/productivity"
   private let eventStore = EKEventStore()
   private var companion: IOSCompanionCoordinator!
+  private var companionActions: IOSCompanionActions?
   private var companionBridge: IOSCompanionBridge?
 
   override func application(
@@ -17,6 +19,12 @@ import UserNotifications
     let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
     let restored = (launchOptions?[.bluetoothCentrals] as? [String])?.contains(IOSCompanionCoordinator.restorationID) == true
     companion = IOSCompanionCoordinator(root: root, restoredLaunch: restored)
+    companionActions = IOSCompanionActions(owner: companion)
+    BGTaskScheduler.shared.register(forTaskWithIdentifier: IOSVoiceCoordinator.backgroundID, using: companion.queue) { [weak self] task in
+      guard let task = task as? BGProcessingTask, let owner = self?.companion else { task.setTaskCompleted(success: false); return }
+      guard let voice = owner.voice else { task.setTaskCompleted(success: false); return }
+      voice.grant(task)
+    }
     GeneratedPluginRegistrant.register(with: self)
     if let registrar = registrar(forPlugin: "IOSCompanionBridge") {
       companionBridge = IOSCompanionBridge(messenger: registrar.messenger(), owner: companion)
@@ -36,6 +44,16 @@ import UserNotifications
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  override func applicationWillResignActive(_ application: UIApplication) {
+    companion.queue.async { [companion] in companion?.uiInactive() }
+    super.applicationWillResignActive(application)
+  }
+
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    companion.queue.async { [companion] in companion?.uiForegrounded() }
+    super.applicationDidBecomeActive(application)
+  }
+
   override func applicationDidEnterBackground(_ application: UIApplication) {
     companion.queue.async { [companion] in companion?.uiBackgrounded() }
     super.applicationDidEnterBackground(application)
@@ -43,6 +61,9 @@ import UserNotifications
 
   private func handleProductivityCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "companionAction":
+      guard let args = call.arguments as? [String: Any] else { result(FlutterError(code: "INVALID_ARGUMENT", message: "Confirmed action required", details: nil)); return }
+      companionActions?.handle(args, result: result)
     case "createAction":
       handleCreateAction(call, result: result)
     case "getDeviceMemoryMB":

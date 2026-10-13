@@ -9,6 +9,8 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   static let transmit = CBUUID(string: "6E400002-B5A3-F393-E0A9-E50E24DCCA9E")
   let queue = DispatchQueue(label: "dev.zswatch.companion", qos: .userInitiated)
   let journal: CompanionJournal
+  private(set) var voice: IOSVoiceCoordinator?
+  private(set) var inbox: IOSRecordingInbox?
   lazy var sensors = CompanionSensors(
     later: { [weak self] delay, work in self?.queue.asyncAfter(deadline: .now() + delay, execute: work) },
     notify: { [weak self] characteristic, enabled in self?.peripheral?.setNotifyValue(enabled, for: characteristic) },
@@ -38,7 +40,14 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     try publish("gps_configuration", ["gps_enabled": enabled,
       "gps_runtime": ["generation": journal.generation, "state": enabled ? "idle" : "disabled", "requested": false]])
   }
+  func uiForegrounded() { inbox?.foregrounded(); voice?.foregrounded() }
+  func uiInactive() { voice?.inactive() }
+  func journalChanged() {
+    let value = snapshot()
+    for observer in observers.values { observer(value) }
+  }
   func uiBackgrounded() {
+    inbox?.backgrounded()
     scanStop()
     if gpsRequested, CompanionLocationRelay.permissions["background"] != true {
       gpsRequested = false; gpsToken = UUID()
@@ -92,6 +101,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   private var tx: CBCharacteristic?
   private var phase = "stopped"
   private var cancellations = Set<UUID>()
+  private var cancellationHandles: [UUID: CBPeripheral] = [:]
   private var writes: [(data: Data, offset: Int, chunks: Int, generation: Int, admission: () -> Bool, done: () -> Void)] = []
   private var awaitingWrite = false
   private let framer = CompanionNusFramer()
@@ -111,6 +121,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     journal = CompanionJournal(url: root.appendingPathComponent("ios-companion/state.json"))
     super.init()
     queue.async {
+      self.inbox = IOSRecordingInbox(owner: self, root: root)
+      self.inbox?.recover()
+      do { self.voice = try IOSVoiceCoordinator(owner: self, root: root) }
+      catch { try? self.publish("voice_storage_unavailable", ["voice_error": "Voice job storage unavailable"]) }
       if (self.journal.fields["http_pending_count"] as? Int ?? 0) > 0 {
         try? self.publish("http_process_interrupted", ["http_pending_count": 0,
           "last_http": ["generation": self.journal.generation, "outcome": "process_interrupted", "utc_ms": CompanionJournal.now]])
@@ -144,6 +158,8 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     fields["event_gap"] = firstEvent > (journal.fields["acked_cursor"] as? Int ?? 0) + 1
     fields["telemetry_pending_count"] = (journal.fields["telemetry"] as? [[String: Any]] ?? []).count
     fields["gps_permissions"] = CompanionLocationRelay.permissions
+    fields["bluetooth_state"] = central?.state.rawValue ?? CBManagerState.unknown.rawValue
+    fields["pending_cancellations"] = cancellationHandles.values.map { ["address": $0.identifier.uuidString, "state": $0.state.rawValue] }
     fields.merge([
       "version": 1, "owner": "ios_companion_native", "platform": "ios",
       "runtime_active": journal.desired, "protocol_ready": journal.desired && phase == "ready",
@@ -152,7 +168,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       "ancs_authorized": peripheral?.ancsAuthorized ?? false,
       "capabilities": ["ble_restoration": true, "system_unpair": false,
                        "notification_filters": false, "ancs": true, "ams": true,
-                       "smp": false, "voice_processing": false],
+                       "smp": false, "voice_processing": voice != nil],
     ]) { _, live in live }
     if let error = journal.loadError { fields["last_error"] = error }
     return fields
@@ -328,25 +344,31 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   private func cancel(_ item: CBPeripheral) {
     // Cancelling an already-disconnected restored handle produces no disconnect
     // callback. Do not wait forever for a callback CoreBluetooth will not emit.
-    guard item.state != .disconnected else { cancellations.remove(item.identifier); return }
-    cancellations.insert(item.identifier)
-    central?.cancelPeripheralConnection(item)
+    guard item.state != .disconnected else {
+      cancellations.remove(item.identifier); cancellationHandles.removeValue(forKey: item.identifier); return
+    }
+    cancellations.insert(item.identifier); cancellationHandles[item.identifier] = item
+    if central?.state == .poweredOn { central?.cancelPeripheralConnection(item) }
+    NSLog("[iOSCompanion] cancellation pending peripheral=%ld central=%ld", item.state.rawValue, central?.state.rawValue ?? 0)
     pollCancellation(item)
   }
   private func pollCancellation(_ item: CBPeripheral) {
     queue.asyncAfter(deadline: .now() + 2) { [weak self] in
       guard let self, self.cancellations.contains(item.identifier) else { return }
       if item.state == .disconnected {
-        self.cancellations.remove(item.identifier)
+        self.cancellations.remove(item.identifier); self.cancellationHandles.removeValue(forKey: item.identifier)
         if self.journal.desired, self.peripheral == nil { self.connectSelected() }
       } else { self.pollCancellation(item) }
     }
   }
 
   private func closeLink() {
+    phase = "disconnected"
     gpsRequested = false; gpsToken = UUID()
     http.close(); gps.close()
     smpOwner?.sessionClosed()
+    inbox?.closed()
+    voice?.sessionClosed()
     sensors.reset(journal.generation)
     discoveryToken += 1
     writes.removeAll(); awaitingWrite = false; rx = nil; tx = nil; framer.reset()
@@ -436,6 +458,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     setPhase("ready")
     // CTS supplies iOS system time; app sync is explicit or responds to the watch's request.
     try? send("GB({\"t\":\"ver\"})")
+    try? send("GB({\"t\":\"voice_memo\",\"action\":\"list\"})")
     // Firmware publishes current battery/status after the connection event.
   }
 
@@ -512,6 +535,8 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       return
     }
     if http.receive(value, generation: journal.generation) { return }
+    if voice?.receiveAck(value) == true { return }
+    if inbox?.receive(value) == true { voice?.deliverResults(); return }
     if type == "ver" {
       var info: [String: Any] = ["version_generation": journal.generation]
       for (wire, field) in [("fw", "firmware_version"), ("hw", "hardware_version"), ("sha", "firmware_sha")] {
@@ -548,7 +573,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     catch { return }
     gpsRequested = false; gpsToken = UUID()
     http.close(); gps.close()
-    smpOwner?.sessionClosed()
+    smpOwner?.sessionClosed(allowPreparationRecovery: true)
     sensors.reset(journal.generation)
     writes.removeAll(); awaitingWrite = false
     linkDelegate = CompanionLinkDelegate(owner: self, generation: journal.generation)
@@ -562,12 +587,15 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     if central.state == .unknown || central.state == .resetting { permissionWaiters = waiters; return }
     for waiter in waiters.values { waiter(.success(CBCentralManager.authorization == .allowedAlways)) }
     if central.state == .poweredOn {
+      // Restoration may precede poweredOn. Rejected intent must be cancelled
+      // when the central can actually accept cancellation.
+      for item in cancellationHandles.values { central.cancelPeripheralConnection(item) }
       if journal.desired && peripheral == nil {
         try? changed("runtime_restored", ["generation": journal.generation + 1])
         connectSelected()
       }
     } else {
-      scanStop(); closeLink(); cancellations.removeAll()
+      scanStop(); closeLink(); cancellations.removeAll(); cancellationHandles.removeAll()
       if journal.desired {
         try? changed("radio_fenced", ["generation": journal.generation + 1])
         setPhase("disconnected", error: central.state == .unauthorized ? "Bluetooth permission required" : "Bluetooth is off")
@@ -605,12 +633,14 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   }
   func centralManager(_ central: CBCentralManager, didDisconnectPeripheral item: CBPeripheral, error: Error?) {
     if cancellations.remove(item.identifier) != nil {
+      cancellationHandles.removeValue(forKey: item.identifier)
       if journal.desired, peripheral == nil { connectSelected() }; return
     }
     if peripheral === item, journal.desired { lost("Watch disconnected") }
   }
   func centralManager(_ central: CBCentralManager, didFailToConnect item: CBPeripheral, error: Error?) {
     if cancellations.remove(item.identifier) != nil {
+      cancellationHandles.removeValue(forKey: item.identifier)
       if journal.desired, peripheral == nil { connectSelected() }; return
     }
     if peripheral === item, journal.desired { lost("Watch connection failed") }

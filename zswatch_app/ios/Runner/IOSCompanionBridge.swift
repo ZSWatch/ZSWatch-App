@@ -115,6 +115,32 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
             if args["path"] != nil && !(args["path"] is String) { throw CompanionFailure.invalid("Invalid log path") }
             try owner.smp.inspectLogs(generation, path: args["path"] as? String, complete: completed)
           }
+        case "verifyWorkerRuntime":
+          guard let voice = owner.voice else { throw CompanionFailure.unavailable("Voice owner unavailable") }
+          try voice.verifyWorker { answer in
+            switch answer {
+            case .success(let fields): reply(fields)
+            case .failure(let error): reply(FlutterError(code: "WORKER_FAILED", message: error.localizedDescription, details: nil))
+            }
+          }
+        case "processRecording":
+          guard let voice = owner.voice else { throw CompanionFailure.unavailable("Voice job storage unavailable") }
+          reply(["version": 1, "job_id": try voice.start(args)])
+        case "voiceJob", "cancelVoiceJob":
+          guard let voice = owner.voice, let id = args["job_id"] as? String,
+                id.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw CompanionFailure.invalid("Voice job required") }
+          if call.method == "cancelVoiceJob" { try voice.cancel(id) }
+          reply(["version": 1, "job_id": id, "job": try voice.jobs.detail(id)])
+        case "configureVoiceProcessing":
+          guard let voice = owner.voice else { throw CompanionFailure.unavailable("Voice job storage unavailable") }
+          try voice.configure(args); reply(owner.snapshot())
+        case "setRecordingSync":
+          guard let enabled = args["enabled"] as? Bool else { throw CompanionFailure.invalid("Recording sync policy required") }
+          try owner.publish("recording_sync_policy", ["recording_sync_enabled": enabled])
+          if enabled { owner.inbox?.resumeSync() }
+          else { owner.inbox?.pauseSync() }
+          reply(owner.snapshot())
+        case "retryRecordings": try owner.inbox?.retryFailed(); reply(owner.snapshot())
         case "sensorState": reply(owner.sensors.state)
         case "setSensor":
           guard let generation = args["generation"] as? Int, owner.isReadySession(generation),

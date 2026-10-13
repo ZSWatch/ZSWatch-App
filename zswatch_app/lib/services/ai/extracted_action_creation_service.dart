@@ -381,7 +381,9 @@ class ExtractedActionCreationService {
   }
 
   Future<void> undoCompanionAction(String jobId, int index) async {
-    await _ensurePermissions(ExtractedActionType.calendarEvent);
+    if (!Platform.isIOS) {
+      await _ensurePermissions(ExtractedActionType.calendarEvent);
+    }
     await _channel.invokeMethod<void>('companionAction', {
       'jobId': jobId,
       'index': index,

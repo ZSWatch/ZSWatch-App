@@ -1,4 +1,6 @@
 import 'package:flutter/services.dart';
+import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit_config.dart';
+import 'package:flutter/foundation.dart';
 import '../ai/companion_voice_processor.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
@@ -9,6 +11,11 @@ const companionWorkerChannel = 'dev.zswatch.app/companion_worker_v1';
 /// The deterministic job verifies the execution seam before enabling models.
 Future<void> startCompanionDartWorker() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Inference diagnostics must not routinely log private transcript/prompt text.
+  // The native owner reports bounded state/error codes for this engine.
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
   const channel = MethodChannel(companionWorkerChannel);
   var busy = false;
   String? currentJob;
@@ -30,6 +37,7 @@ Future<void> startCompanionDartWorker() async {
     cancellation = CompanionVoiceCancellation();
     try {
       final Map<String, Object?> result;
+      final runtime = <String, Object?>{};
       if (call.method == 'executeRecording') {
         result = await processCompanionVoiceRecording(
           request,
@@ -44,6 +52,13 @@ Future<void> startCompanionDartWorker() async {
       } else {
         result = companionLocalFixtureResult(request);
         await getTemporaryDirectory();
+        if (defaultTargetPlatform == TargetPlatform.iOS) {
+          runtime['ffmpeg_version'] = await FFmpegKitConfig.getFFmpegVersion();
+          runtime['available_memory_mb'] = await const MethodChannel(
+            'dev.zswatch.app/productivity',
+          ).invokeMethod<int>('getAvailableMemoryMB');
+          runtime['path_provider'] = true;
+        }
         await Future<void>.delayed(const Duration(seconds: 15));
       }
       return {
@@ -51,6 +66,7 @@ Future<void> startCompanionDartWorker() async {
         'job_id': request['job_id'],
         'plugin_ready': true,
         'result': result,
+        if (runtime.isNotEmpty) 'runtime': runtime,
       };
     } finally {
       currentJob = null;

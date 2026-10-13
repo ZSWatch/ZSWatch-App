@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:whisper_ggml_plus/whisper_ggml_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../../data/models/companion_recording.dart';
@@ -101,7 +102,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
       requireCompanionSpeech(transcript);
       // Complete this platform persistence callback before starting analysis.
       await saveTranscript(transcript);
-      transcriber.dispose();
+      await _releaseTranscriber(transcriber);
       engine = null;
     }
     control.check();
@@ -157,7 +158,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
     };
   } finally {
     control.unbind();
-    engine?.dispose();
+    if (engine != null) await _releaseTranscriber(engine);
     llm?.dispose();
     if (scratch != null && scratch.existsSync()) {
       await scratch.delete(recursive: true);
@@ -170,5 +171,14 @@ void requireCompanionSpeech(String transcript) {
   if (transcript.trim().isEmpty ||
       VoiceNoteAiPipeline.isNoSpeechTranscript(transcript)) {
     throw PlatformException(code: 'NO_SPEECH');
+  }
+}
+
+/// Free the native Whisper context before loading an analysis model. Closing a
+/// Dart stream alone does not release the package's process-global model cache.
+Future<void> _releaseTranscriber(TranscriptionEngine engine) async {
+  engine.dispose();
+  if (engine is WhisperEngine || engine is CustomGgmlWhisperEngine) {
+    await const Whisper(model: WhisperModel.base).dispose();
   }
 }

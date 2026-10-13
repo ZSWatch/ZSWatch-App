@@ -72,11 +72,16 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<!-- Background Modes for BLE -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>dev.zswatch.companion.voice.processing.v1</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
 		<string>location</string>
 		<string>fetch</string>
+		<string>processing</string>
 	</array>
 </dict>
 </plist>

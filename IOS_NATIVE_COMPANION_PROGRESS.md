@@ -168,3 +168,76 @@ pass (about 80.6 MB). Evidence is retained under the ignored
 is used explicitly. Tests of sensors, shell, GPS/Weather, reset, and crash files
 on BLE remain pending encrypted Ready. Firmware/resources/watchface transfers,
 recording receipts/jobs and shared Dart worker integration remain unfinished.
+
+## 2026-10-13: recording receipts and shared Dart execution
+
+Native recording list/new-event handling now captures header/list metadata and
+keeps up to 4096 source receipts. New-event stop timestamps never become source
+identities. Downloads use the same exclusive Nordic adapter, validate every
+returned offset/length and re-read a saved prefix before resuming it. Files are
+staged under the existing companion-prototype/recordings contract, validated as
+complete supported ZSWO containers and renamed before committing the journal
+receipt/hash. Process recovery can adopt a completed source after a lost journal
+commit. Original watch files are never deleted by this path.
+
+Stop/disconnect, disabled sync and UIKit expiration invalidate active SDK work.
+Interrupted downloads stay pending with their partial file. Background windows
+are bounded, with a foreground retry path; no permanent processing claim is
+made. Automatic local processing captures the enabled model policy when a
+recording first enters the inbox. Failed/cancelled generations are not silently
+recreated by automatic maintenance.
+
+Native durable jobs reuse the shared companion_voice_processor.dart entry point.
+They preserve transcript checkpoints, selection, attempts and monotonic fences.
+Transcribe, retranscribe, process and reanalyze are exposed; reanalysis reuses a
+saved transcript. Local processing does not require a live BLE link on iOS.
+Matching application result ACKs establish delivered state; ATT completion does
+not. Old firmware without negotiated receipt support remains pending.
+
+A single headless processing FlutterEngine registers path-provider, FFmpeg and
+a memory channel, with no BLE plugins or Drift writer. Its explicit library URI
+works with both ordinary and diagnostic entry points. It stays idle after first
+use because the pinned fllama fork retains native logger callbacks until its
+next request; destroying the isolate would leave native callback pointers.
+The shared processor awaits native Whisper disposal before loading an analysis
+model. Private inference prompts/transcripts are not routinely logged by the
+iOS worker. This idle engine supplies no extra background execution time.
+
+Execution policy is CPU in foreground or a system-granted BGProcessingTask.
+Leaving foreground fences and cancels an ungranted active attempt, retaining its
+checkpoint; task expiration does the same. Scheduling failures are visible and
+opening the app can continue queued work. BGContinuedProcessingTask/GPU access
+is not claimed. Apple's deferred scheduling is described in
+[BGProcessingTaskRequest](https://developer.apple.com/documentation/backgroundtasks/bgprocessingtaskrequest).
+
+The existing Mac Whisper wrapper fixes are now retained in NativeSupport and
+selected by CocoaPods without editing the pub cache. Its package archive SHA256
+matches pubspec.lock; a complete iOS source comparison found only the wrapper
+modified and no added cache files. CPU default and disabled CoreML prevent an
+implicit accelerator path for these jobs. Underlying Whisper/GGML and fllama
+sources remain the existing pinned dependencies.
+
+User-confirmed action receipts now cover creation, recovery, dismissal and undo.
+EventKit entries carry an app marker; admission is persisted before mutation.
+Recovery never blindly duplicates an admitted action with an unknown outcome.
+Timers/alarms use stable app-notification identifiers and retained fire times;
+iOS review wording says Schedule alert. Action and calendar/reminder acceptance
+on the phone is still pending.
+
+Physical worker proof: the first signed probe failed WORKER_START_TIMEOUT due to
+the diagnostic build's entry-point library. The corrected iPhone probe passed
+2026-10-13 07:23:48–07:24:03 UTC, returning plugin_ready, path-provider, FFmpeg
+version n8.0 and available-memory information. It executed a fixed metadata
+fixture, with no audio/model/watch mutation. It proves the headless runtime and
+plugin seam, not transcription, analysis or OS-scheduled execution. The two JSON
+results and console logs are retained in .companion-hil-runs/20261013-ios-companion.
+
+Source receipt and job host tests pass, including incomplete-file recovery,
+metadata/symlink rejection, stale checkpoints/results, reanalysis transcript
+reuse, immutable action confirmation and ACK matching. Thirteen affected voice
+Flutter tests pass; signed worker builds pass. Normal Release and final targeted
+analysis are also recorded with this checkpoint. Real models, background
+expiration/restoration, encrypted BLE downloads and original-file comparisons
+remain physical acceptance work. Search/archive/local deletion/edit/export and
+legacy recording presentation still need integration into the native receipt
+view. Firmware/resources/watchface work remains open; the goal is not complete.

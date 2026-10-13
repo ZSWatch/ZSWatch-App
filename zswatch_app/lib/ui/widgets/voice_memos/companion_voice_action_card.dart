@@ -112,7 +112,11 @@ class _CompanionVoiceActionCardState
     final response = widget.state?['response'] as Map<Object?, Object?>?;
     final confirmed = widget.state?['draft'] as Map<Object?, Object?>?;
     final status = switch (state) {
-      'created' => 'Created in calendar',
+      'created' =>
+        defaultTargetPlatform == TargetPlatform.iOS &&
+                ['task', 'reminder'].contains(widget.action['type'])
+            ? 'Created in Reminders'
+            : 'Created in calendar',
       'dispatched' =>
         defaultTargetPlatform == TargetPlatform.iOS
             ? 'Alert scheduled by ZSWatch.'
@@ -356,8 +360,10 @@ class _ActionReviewDialogState extends State<_ActionReviewDialog> {
               onChanged: (value) => setState(() => calendarId = value),
             ),
           if (clock)
-            const Text(
-              'Opens Clock to review the request. Alarms use the next occurrence of the selected time. Manage or remove them in Clock.',
+            Text(
+              defaultTargetPlatform == TargetPlatform.iOS
+                  ? 'ZSWatch schedules an app notification for this timer or alarm. Notification settings control its sound and delivery.'
+                  : 'Opens Clock to review the request. Alarms use the next occurrence of the selected time. Manage or remove them in Clock.',
             ),
           if (error != null) Text(error!),
         ],
@@ -370,7 +376,13 @@ class _ActionReviewDialogState extends State<_ActionReviewDialog> {
       ),
       TextButton(
         onPressed: confirm,
-        child: Text(clock ? 'Send to Clock' : 'Create'),
+        child: Text(
+          clock
+              ? defaultTargetPlatform == TargetPlatform.iOS
+                    ? 'Schedule alert'
+                    : 'Send to Clock'
+              : 'Create',
+        ),
       ),
     ],
   );

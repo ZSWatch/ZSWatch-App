@@ -367,6 +367,7 @@ class _CompanionVoiceMemosViewState
         item.identity: item,
     };
     final ready = snapshot?.protocolReady == true;
+    final canProcess = ready || snapshot?.isIos == true;
     final paused = snapshot?.fields['recording_sync_enabled'] == false;
     final watchId = snapshot?.fields['address'];
     final observed = snapshot?.fields['recording_list'];
@@ -443,6 +444,10 @@ class _CompanionVoiceMemosViewState
                   child: const Text('Retry playback imports'),
                 ),
               ],
+              if (snapshot?.isIos == true)
+                const Text(
+                  'Processing runs while the app is open or when iOS schedules background time.',
+                ),
               const SizedBox(height: 16),
               const CompanionVoiceBatchButton(
                 operation: 'transcribe',
@@ -483,14 +488,14 @@ class _CompanionVoiceMemosViewState
                           children: [
                             IconButton(
                               tooltip: 'Process recording locally',
-                              onPressed: ready
+                              onPressed: canProcess
                                   ? () => processRecording(item)
                                   : null,
                               icon: const Icon(Icons.auto_awesome),
                             ),
                             PopupMenuButton<String>(
                               tooltip: 'Transcription actions',
-                              enabled: ready,
+                              enabled: canProcess,
                               onSelected: (operation) =>
                                   processRecording(item, operation: operation),
                               itemBuilder: (_) => const [

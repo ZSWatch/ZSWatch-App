@@ -42,6 +42,27 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 
+    # Retain the existing abort/context fixes and default CPU policy in source
+    # control rather than depending on modifications to a developer's pub cache.
+    if target.name == 'whisper_ggml_plus'
+      wrapper = File.expand_path('NativeSupport/whisper_flutter_plus.cpp', __dir__)
+      target.source_build_phase.files.each do |file|
+        if File.basename(file.file_ref.path) == 'whisper_flutter_plus.cpp'
+          file.file_ref.source_tree = '<absolute>'
+          file.file_ref.path = wrapper
+        end
+      end
+      target.build_configurations.each do |config|
+        paths = config.build_settings['HEADER_SEARCH_PATHS'] || ['$(inherited)']
+        config.build_settings['HEADER_SEARCH_PATHS'] = Array(paths) + ['"$(PODS_TARGET_SRCROOT)/Classes"']
+        # CPU execution must not silently fall through to a CoreML GPU/ANE path.
+        ['OTHER_CFLAGS', 'OTHER_CPLUSPLUSFLAGS'].each do |field|
+          flags = config.build_settings[field] || '$(inherited)'
+          config.build_settings[field] = Array(flags) + ['-UWHISPER_USE_COREML']
+        end
+      end
+    end
+
     # Ensure all pods respect the minimum deployment target.
     # ffmpeg_kit_flutter_new_min requires 14.0; fllama/whisper_ggml_plus
     # require Metal (available since iOS 8) but benefit from 14.0+ APIs.

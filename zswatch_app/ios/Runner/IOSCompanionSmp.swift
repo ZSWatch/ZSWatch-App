@@ -21,12 +21,12 @@ final class IOSCompanionSmp {
   }
   init(owner: IOSCompanionCoordinator) { self.owner = owner }
 
-  func sessionClosed() {
+  func sessionClosed(allowPreparationRecovery: Bool = false) {
     attempt = UUID(); constructing = false
     transport?.invalidate(); transport = nil; preparedGeneration = nil
     if let manager = downloadManager { DispatchQueue.main.async { manager.cancelTransfer() } }
     downloadManager = nil
-    if preparing, let owner, owner.journal.desired { return }
+    if allowPreparationRecovery, preparing, let owner, owner.journal.desired { return }
     finish(.failure(CompanionFailure.unavailable("Watch session closed; any admitted command result may be unknown")))
   }
 
@@ -51,6 +51,7 @@ final class IOSCompanionSmp {
     let old = pending; pending = nil; preparing = false; constructing = false
     downloadManager = nil
     old?.complete(result)
+    owner?.queue.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.owner?.inbox?.downloadNext() }
   }
 
   func prepare(_ generation: Int, complete: @escaping (Result<[String: Any], Error>) -> Void) throws {
@@ -77,6 +78,7 @@ final class IOSCompanionSmp {
       DispatchQueue.main.async {
         let created = McuMgrBleTransport(uuid)
         created.chunkSendDataToMtuSize = true
+        created.retryOnMissingResponse = false
         owner.queue.async {
           guard self.pending?.id == id, self.attempt == token, owner.isReadySession(generation) else {
             created.invalidate(); return
@@ -193,6 +195,64 @@ final class IOSCompanionSmp {
         guard let current = try result.get()["generation"] as? Int else { throw CompanionFailure.invalid("Invalid preparation") }
         try self.readDiagnostic(current, path: "/user/coredump.txt", complete: complete)
       } catch { complete(.failure(error)) }
+    }
+  }
+
+  var isIdle: Bool { pending == nil }
+  func cancelActive(_ reason: String) {
+    transport?.invalidate(); transport = nil; preparedGeneration = nil
+    finish(.failure(CompanionFailure.unavailable(reason)))
+  }
+  /// Resume only after verifying the entire saved prefix against the watch.
+  /// SDK APIs encode SMP; this owner only validates returned offsets/lengths.
+  func downloadRecording(_ generation: Int, path: String, expected: Int, prefix: Data,
+                         append: @escaping (Int, Data) throws -> Void,
+                         complete: @escaping (Result<[String: Any], Error>) -> Void) throws {
+    guard path.range(of: "^/user/recordings/[A-Za-z0-9_-]{1,32}\\.zsw_opus$", options: .regularExpression) != nil,
+          (34...16 * 1024 * 1024).contains(expected), prefix.count <= expected else { throw CompanionFailure.invalid("Invalid recording download") }
+    let sdk = try prepared(generation)
+    let id = try begin(generation, timeout: 300, complete: complete)
+    let manager = FileSystemManager(transport: sdk); downloadManager = manager
+    guard let owner else { return }
+    DispatchQueue.main.async {
+      manager.status(name: path) { response, error in
+        owner.queue.async {
+          guard self.current(id, generation) else { return }
+          guard error == nil, response?.getError() == nil, response?.len == UInt64(expected) else {
+            self.finish(.failure(error ?? CompanionFailure.unavailable("Recording size changed"))); return
+          }
+          self.recordingChunk(id, generation, manager, path: path, expected: expected, prefix: prefix, offset: 0, verifying: !prefix.isEmpty, append: append)
+        }
+      }
+    }
+  }
+  private func recordingChunk(_ id: UUID, _ generation: Int, _ manager: FileSystemManager,
+                              path: String, expected: Int, prefix: Data, offset: Int, verifying: Bool,
+                              append: @escaping (Int, Data) throws -> Void) {
+    guard let owner, current(id, generation) else { return }
+    if verifying, offset >= prefix.count {
+      recordingChunk(id, generation, manager, path: path, expected: expected, prefix: Data(), offset: prefix.count, verifying: false, append: append); return
+    }
+    if !verifying, offset == expected { finish(.success(["version": 1, "completed": true])); return }
+    DispatchQueue.main.async {
+      manager.download(name: path, offset: UInt(offset)) { response, error in
+        owner.queue.async {
+          guard self.current(id, generation) else { return }
+          guard error == nil, response?.getError() == nil, let response, response.off == UInt64(offset),
+                response.len == nil || response.len == UInt64(expected), let chunk = response.data,
+                !chunk.isEmpty, offset + chunk.count <= expected else {
+            self.finish(.failure(error ?? CompanionFailure.unavailable("Recording chunk/length mismatch"))); return
+          }
+          let data = Data(chunk)
+          do {
+            if verifying {
+              let end = min(offset + data.count, prefix.count)
+              guard data.prefix(end - offset) == prefix.subdata(in: offset..<end) else { throw CompanionFailure.invalid("Saved recording prefix differs from the watch") }
+            } else { try append(offset, data) }
+            self.recordingChunk(id, generation, manager, path: path, expected: expected, prefix: prefix, offset: offset + data.count, verifying: verifying, append: append)
+          } catch { self.finish(.failure(error)) }
+        }
+      }
     }
   }
 

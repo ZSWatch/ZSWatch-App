@@ -26,6 +26,12 @@
 		A10000000000000000000010 /* CompanionSensors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000F /* CompanionSensors.swift */; };
 		A10000000000000000000012 /* CompanionCoredump.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* CompanionCoredump.swift */; };
 		A10000000000000000000014 /* CompanionBackgroundLease.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* CompanionBackgroundLease.swift */; };
+		A10000000000000000000016 /* CompanionRecordingFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* CompanionRecordingFiles.swift */; };
+		A10000000000000000000018 /* IOSRecordingInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* IOSRecordingInbox.swift */; };
+		A1000000000000000000001A /* CompanionVoiceJobs.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* CompanionVoiceJobs.swift */; };
+		A1000000000000000000001C /* IOSDartVoiceWorker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* IOSDartVoiceWorker.swift */; };
+		A1000000000000000000001E /* IOSVoiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001D /* IOSVoiceCoordinator.swift */; };
+		A10000000000000000000020 /* IOSCompanionActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001F /* IOSCompanionActions.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +91,12 @@
 		A1000000000000000000000F /* CompanionSensors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSensors.swift; sourceTree = "<group>"; };
 		A10000000000000000000011 /* CompanionCoredump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCoredump.swift; sourceTree = "<group>"; };
 		A10000000000000000000013 /* CompanionBackgroundLease.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionBackgroundLease.swift; sourceTree = "<group>"; };
+		A10000000000000000000015 /* CompanionRecordingFiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionRecordingFiles.swift; sourceTree = "<group>"; };
+		A10000000000000000000017 /* IOSRecordingInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSRecordingInbox.swift; sourceTree = "<group>"; };
+		A10000000000000000000019 /* CompanionVoiceJobs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionVoiceJobs.swift; sourceTree = "<group>"; };
+		A1000000000000000000001B /* IOSDartVoiceWorker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSDartVoiceWorker.swift; sourceTree = "<group>"; };
+		A1000000000000000000001D /* IOSVoiceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSVoiceCoordinator.swift; sourceTree = "<group>"; };
+		A1000000000000000000001F /* IOSCompanionActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSCompanionActions.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -157,6 +169,12 @@
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
+				A10000000000000000000015 /* CompanionRecordingFiles.swift */,
+				A10000000000000000000019 /* CompanionVoiceJobs.swift */,
+				A1000000000000000000001B /* IOSDartVoiceWorker.swift */,
+				A1000000000000000000001F /* IOSCompanionActions.swift */,
+				A1000000000000000000001D /* IOSVoiceCoordinator.swift */,
+				A10000000000000000000017 /* IOSRecordingInbox.swift */,
 				A10000000000000000000013 /* CompanionBackgroundLease.swift */,
 				A10000000000000000000011 /* CompanionCoredump.swift */,
 				A1000000000000000000000F /* CompanionSensors.swift */,
@@ -440,6 +458,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
+				A10000000000000000000016 /* CompanionRecordingFiles.swift in Sources */,
+				A1000000000000000000001A /* CompanionVoiceJobs.swift in Sources */,
+				A1000000000000000000001C /* IOSDartVoiceWorker.swift in Sources */,
+				A10000000000000000000020 /* IOSCompanionActions.swift in Sources */,
+				A1000000000000000000001E /* IOSVoiceCoordinator.swift in Sources */,
+				A10000000000000000000018 /* IOSRecordingInbox.swift in Sources */,
 				A10000000000000000000014 /* CompanionBackgroundLease.swift in Sources */,
 				A10000000000000000000012 /* CompanionCoredump.swift in Sources */,
 				A10000000000000000000010 /* CompanionSensors.swift in Sources */,

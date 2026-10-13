@@ -30,7 +30,10 @@ class _BatchState extends ConsumerState<CompanionVoiceBatchButton> {
         .whereType<Map<Object?, Object?>>();
     final items = all.where((recording) {
       if (!recording.hasCommittedReceipt ||
-          recording.watchId != snapshot?.watch?.id) {
+          recording.watchId !=
+              (snapshot?.isIos == true
+                  ? snapshot?.fields['address']
+                  : snapshot?.watch?.id)) {
         return false;
       }
       if (widget.operation == 'retranscribe') return true;
@@ -121,7 +124,10 @@ class _BatchState extends ConsumerState<CompanionVoiceBatchButton> {
       leading: Icon(
         widget.operation == 'process' ? Icons.auto_awesome : Icons.refresh,
       ),
-      onTap: busy || snapshot?.runtimeActive != true ? null : queue,
+      onTap:
+          busy || (snapshot?.runtimeActive != true && snapshot?.isIos != true)
+          ? null
+          : queue,
       trailing: busy
           ? const SizedBox(
               width: 18,
