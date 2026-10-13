@@ -1,7 +1,12 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../data/database/companion_recording_database.dart'
     show ImportedRecording;
@@ -11,11 +16,23 @@ import '../../../providers/settings_providers.dart';
 import '../../../providers/ai_providers.dart';
 import '../../../services/ai/llm_service.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
+import '../../../services/voice_memo/voice_memo_file_store.dart';
 import '../../../providers/companion_recording_import_providers.dart';
 import '../../widgets/voice_memos/audio_playback_bar.dart';
 import '../../widgets/voice_memos/companion_voice_action_card.dart';
 import '../../widgets/companion_voice_batch_button.dart';
 import '../../navigation/app_router.dart';
+import 'retained_voice_memos_view.dart';
+
+enum _RecordingFilter {
+  all,
+  notes,
+  tasks,
+  reminders,
+  alerts,
+  archived,
+  deleted,
+}
 
 /// Native receipt view used by the existing Voice Notes screen during migration.
 /// It observes the core; opening this screen does not start sync or inference.
@@ -31,6 +48,174 @@ class _CompanionVoiceMemosViewState
     extends ConsumerState<CompanionVoiceMemosView> {
   bool refreshing = false;
   String? preparing;
+  final search = TextEditingController();
+  Timer? searchTimer;
+  String query = '';
+  _RecordingFilter filter = _RecordingFilter.all;
+  bool selecting = false;
+  bool modifying = false;
+  final selected = <String>{};
+
+  @override
+  void dispose() {
+    searchTimer?.cancel();
+    search.dispose();
+    super.dispose();
+  }
+
+  Future<void> modify(Future<void> Function() action) async {
+    if (modifying) return;
+    setState(() => modifying = true);
+    try {
+      await action();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not save this change. Your recordings are retained.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => modifying = false);
+    }
+  }
+
+  Future<String?> editText(
+    String title,
+    String value, {
+    bool multiline = false,
+  }) async {
+    final controller = TextEditingController(text: value);
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: 480,
+            child: TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: multiline ? 16000 : 64,
+              maxLines: multiline ? 10 : 1,
+              decoration: multiline
+                  ? const InputDecoration(
+                      helperText:
+                          'Analyze again to update the summary and action drafts.',
+                    )
+                  : null,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (controller.text.trim().isNotEmpty) {
+                  Navigator.pop(context, controller.text.trim());
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> remove(List<String> identities) async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Delete ${identities.length} recording${identities.length == 1 ? '' : 's'} from phone?',
+        ),
+        content: const Text(
+          'Move local audio and saved notes to Recently deleted. You can restore them there. Watch originals, calendar entries and scheduled alerts remain.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete from phone'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    await modify(() async {
+      await VoiceMemoFileStore.exclusive(
+        () => ref.read(companionClientProvider).removeRecordings(identities),
+      );
+      if (mounted) {
+        setState(() {
+          selected.clear();
+          selecting = false;
+        });
+      }
+    });
+  }
+
+  Future<void> shareFile(File file) async {
+    if (!mounted) return;
+    final box = context.findRenderObject() as RenderBox?;
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      sharePositionOrigin: box == null
+          ? null
+          : box.localToGlobal(Offset.zero) & box.size,
+    );
+  }
+
+  Future<void> exportAudio(CompanionRecording recording) => modify(() async {
+    final imported = await ref.read(companionPreparePlaybackProvider)(
+      recording,
+    );
+    await ref
+        .read(companionRecordingExporterProvider)
+        .audio(imported, shareFile);
+  });
+
+  Future<void> recordingAction(
+    String operation,
+    CompanionRecording recording,
+  ) async {
+    final client = ref.read(companionClientProvider);
+    switch (operation) {
+      case 'rename':
+        final value = await editText('Recording title', recording.title);
+        if (value != null) {
+          await modify(
+            () => client.updateRecording(recording.identity, title: value),
+          );
+        }
+      case 'archive':
+        await modify(
+          () => client.updateRecording(
+            recording.identity,
+            archived: !recording.archived,
+          ),
+        );
+      case 'delete':
+        await remove([recording.identity]);
+      case 'restore':
+        await modify(() => client.restoreRecording(recording.identity));
+      case 'export':
+        await exportAudio(recording);
+      default:
+        await processRecording(recording, operation: operation);
+    }
+  }
 
   Future<void> preparePlayback(CompanionRecording recording) async {
     if (preparing != null) return;
@@ -52,7 +237,7 @@ class _CompanionVoiceMemosViewState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  recording.filename,
+                  recording.title,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 16),
@@ -235,11 +420,50 @@ class _CompanionVoiceMemosViewState
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          recording.filename,
+                          recording.title,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 12),
                         Text(jobLabel(job)),
+                        if (ref
+                                .read(companionSnapshotProvider)
+                                .asData
+                                ?.value
+                                .isIos ==
+                            true)
+                          PopupMenuButton<String>(
+                            tooltip: 'Saved revisions',
+                            onSelected: (other) {
+                              Navigator.pop(context);
+                              unawaited(showJob(other, recording));
+                            },
+                            itemBuilder: (_) => [
+                              for (final version
+                                  in (ref
+                                                  .read(
+                                                    companionSnapshotProvider,
+                                                  )
+                                                  .asData
+                                                  ?.value
+                                                  .fields['voice_jobs']
+                                              as List? ??
+                                          [])
+                                      .whereType<Map<Object?, Object?>>())
+                                if (version['recording_id'] ==
+                                        recording.identity &&
+                                    version['job_id'] != id)
+                                  PopupMenuItem(
+                                    value: version['job_id'] as String,
+                                    child: Text(
+                                      'Revision ${version['generation']} • ${jobLabel(version)}',
+                                    ),
+                                  ),
+                            ],
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Text('Saved revisions'),
+                            ),
+                          ),
                         if (job['last_error'] != null &&
                             [
                               'ready',
@@ -252,6 +476,64 @@ class _CompanionVoiceMemosViewState
                           const SizedBox(height: 16),
                           const Text('Transcript'),
                           SelectableText(text),
+                          Wrap(
+                            children: [
+                              TextButton.icon(
+                                icon: const Icon(Icons.copy),
+                                label: const Text('Copy transcript'),
+                                onPressed: () => Clipboard.setData(
+                                  ClipboardData(text: text),
+                                ),
+                              ),
+                              if (ref
+                                          .read(companionSnapshotProvider)
+                                          .asData
+                                          ?.value
+                                          .isIos ==
+                                      true &&
+                                  job['selected'] == true &&
+                                  recording.state !=
+                                      CompanionRecordingState.deleted)
+                                TextButton.icon(
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: const Text('Edit transcript'),
+                                  onPressed: () async {
+                                    final value = await editText(
+                                      'Edit transcript',
+                                      text,
+                                      multiline: true,
+                                    );
+                                    if (value == null) return;
+                                    await modify(() async {
+                                      final edited = await ref
+                                          .read(companionClientProvider)
+                                          .editVoiceTranscript(id, value);
+                                      ref.invalidate(
+                                        companionVoiceJobProvider(id),
+                                      );
+                                      if (context.mounted) {
+                                        Navigator.pop(context);
+                                        unawaited(showJob(edited, recording));
+                                      }
+                                    });
+                                  },
+                                ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.ios_share),
+                                label: const Text('Export text'),
+                                onPressed: () => modify(
+                                  () => ref
+                                      .read(companionRecordingExporterProvider)
+                                      .text(
+                                        recording.filename,
+                                        text,
+                                        result?['summary'] as String? ?? '',
+                                        shareFile,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                         if (result != null &&
                             (result['summary'] as String).isNotEmpty) ...[
@@ -280,7 +562,8 @@ class _CompanionVoiceMemosViewState
                                   ref.invalidate(companionVoiceJobProvider(id)),
                             ),
                         ],
-                        if (pending)
+                        if (pending &&
+                            recording.state != CompanionRecordingState.deleted)
                           TextButton(
                             onPressed: () async {
                               await ref
@@ -290,11 +573,12 @@ class _CompanionVoiceMemosViewState
                             },
                             child: const Text('Cancel job'),
                           ),
-                        if ([
-                          'failed',
-                          'cancelled',
-                          'blocked',
-                        ].contains(job['state']))
+                        if (recording.hasCommittedReceipt &&
+                            [
+                              'failed',
+                              'cancelled',
+                              'blocked',
+                            ].contains(job['state']))
                           TextButton(
                             onPressed: () {
                               Navigator.pop(context);
@@ -370,6 +654,10 @@ class _CompanionVoiceMemosViewState
     final canProcess = ready || snapshot?.isIos == true;
     final paused = snapshot?.fields['recording_sync_enabled'] == false;
     final watchId = snapshot?.fields['address'];
+    final ios = snapshot?.isIos == true;
+    final matches = ios && query.isNotEmpty
+        ? ref.watch(companionRecordingSearchProvider(query))
+        : null;
     final observed = snapshot?.fields['recording_list'];
     final jobs = <String, Map<Object?, Object?>>{};
     for (final job
@@ -399,6 +687,27 @@ class _CompanionVoiceMemosViewState
       appBar: AppBar(
         title: const Text('Voice Notes'),
         actions: [
+          if (ios)
+            IconButton(
+              tooltip: 'Earlier recordings',
+              icon: const Icon(Icons.history),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const RetainedVoiceMemosView(),
+                ),
+              ),
+            ),
+          if (ios)
+            IconButton(
+              tooltip: selecting ? 'Cancel selection' : 'Select recordings',
+              icon: Icon(selecting ? Icons.close : Icons.checklist),
+              onPressed: modifying
+                  ? null
+                  : () => setState(() {
+                      selecting = !selecting;
+                      selected.clear();
+                    }),
+            ),
           IconButton(
             tooltip: 'Alarms & Timers',
             icon: const Icon(Icons.alarm_outlined),
@@ -421,12 +730,161 @@ class _CompanionVoiceMemosViewState
         skipLoadingOnRefresh: false,
         skipLoadingOnReload: false,
         data: (all) {
-          final items = all.where((item) => item.watchId == watchId).toList();
-          final saved = items.where((item) => item.hasCommittedReceipt).length;
+          final watchItems = all
+              .where((item) => item.watchId == watchId)
+              .toList();
+          final saved = watchItems
+              .where((item) => item.hasCommittedReceipt)
+              .length;
+          final items = watchItems
+              .where((item) {
+                if (filter == _RecordingFilter.deleted) {
+                  return item.state == CompanionRecordingState.deleted;
+                }
+                if (item.state == CompanionRecordingState.deleted) return false;
+                if (filter == _RecordingFilter.archived
+                    ? !item.archived
+                    : item.archived) {
+                  return false;
+                }
+                final types =
+                    jobs[item.identity]?['action_types'] as List? ?? [];
+                if (filter == _RecordingFilter.tasks &&
+                    !types.contains('task')) {
+                  return false;
+                }
+                if (filter == _RecordingFilter.reminders &&
+                    !types.contains('reminder')) {
+                  return false;
+                }
+                if (filter == _RecordingFilter.alerts &&
+                    !types.any((type) => type == 'timer' || type == 'alarm')) {
+                  return false;
+                }
+                if (filter == _RecordingFilter.notes && types.isNotEmpty) {
+                  return false;
+                }
+                return true;
+              })
+              .where(
+                (item) =>
+                    query.isEmpty ||
+                    item.title.toLowerCase().contains(query) ||
+                    item.filename.toLowerCase().contains(query) ||
+                    matches?.asData?.value.contains(item.identity) == true,
+              )
+              .toList();
+          final selection = watchItems
+              .where(
+                (item) =>
+                    selected.contains(item.identity) &&
+                    item.hasCommittedReceipt,
+              )
+              .map((item) => item.identity)
+              .toSet();
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
               Text('${items.length} recordings • $saved saved on phone'),
+              if (ios) ...[
+                TextField(
+                  controller: search,
+                  maxLength: 128,
+                  decoration: const InputDecoration(
+                    hintText: 'Search titles, transcripts or actions',
+                    prefixIcon: Icon(Icons.search),
+                    counterText: '',
+                  ),
+                  onChanged: (text) {
+                    searchTimer?.cancel();
+                    searchTimer = Timer(const Duration(milliseconds: 200), () {
+                      if (mounted) {
+                        setState(() => query = text.trim().toLowerCase());
+                      }
+                    });
+                  },
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final option in _RecordingFilter.values)
+                      ChoiceChip(
+                        label: Text(switch (option) {
+                          _RecordingFilter.all => 'All',
+                          _RecordingFilter.notes => 'Notes',
+                          _RecordingFilter.tasks => 'Tasks',
+                          _RecordingFilter.reminders => 'Reminders',
+                          _RecordingFilter.alerts => 'Timers & Alarms',
+                          _RecordingFilter.archived => 'Archived',
+                          _RecordingFilter.deleted => 'Recently deleted',
+                        }),
+                        selected: filter == option,
+                        onSelected: (_) => setState(() {
+                          filter = option;
+                          selected.clear();
+                        }),
+                      ),
+                  ],
+                ),
+                if (matches?.isLoading == true) const LinearProgressIndicator(),
+                if (matches?.hasError == true)
+                  const Text(
+                    'Transcript search is unavailable. Showing title matches.',
+                  ),
+                if (filter == _RecordingFilter.deleted)
+                  const Text(
+                    'Restore deleted recordings here. Originals on the watch are retained.',
+                  ),
+                if (selecting && selection.isNotEmpty) ...[
+                  Text('${selection.length} selected'),
+                  Wrap(
+                    children: [
+                      TextButton(
+                        onPressed: modifying
+                            ? null
+                            : () => modify(() async {
+                                for (final identity in selection) {
+                                  await ref
+                                      .read(companionClientProvider)
+                                      .updateRecording(
+                                        identity,
+                                        archived:
+                                            filter != _RecordingFilter.archived,
+                                      );
+                                }
+                                if (mounted) {
+                                  setState(() {
+                                    selected.clear();
+                                    selecting = false;
+                                  });
+                                }
+                              }),
+                        child: Text(
+                          filter == _RecordingFilter.archived
+                              ? 'Unarchive selected'
+                              : 'Archive selected',
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: modifying
+                            ? null
+                            : () => remove(selection.toList()),
+                        child: const Text('Delete selected'),
+                      ),
+                    ],
+                  ),
+                  CompanionVoiceBatchButton(
+                    operation: 'transcribe',
+                    label: 'Transcribe selected',
+                    identities: selection,
+                  ),
+                  CompanionVoiceBatchButton(
+                    operation: 'process',
+                    label: 'Process selected',
+                    identities: selection,
+                  ),
+                ],
+              ],
               if (liveListCount != null)
                 Text('Latest watch list: $liveListCount recordings'),
               Text(
@@ -462,13 +920,33 @@ class _CompanionVoiceMemosViewState
               for (final item in items)
                 ListTile(
                   key: ValueKey(item.identity),
-                  leading: Icon(
-                    item.hasCommittedReceipt
-                        ? Icons.file_download_done
-                        : Icons.mic,
-                  ),
-                  title: Text(item.filename),
-                  onTap: jobs[item.identity] == null
+                  leading: selecting && item.hasCommittedReceipt
+                      ? Checkbox(
+                          value: selected.contains(item.identity),
+                          onChanged: modifying
+                              ? null
+                              : (value) => setState(() {
+                                  if (value == true && selected.length < 100) {
+                                    selected.add(item.identity);
+                                  } else {
+                                    selected.remove(item.identity);
+                                  }
+                                }),
+                        )
+                      : Icon(
+                          item.hasCommittedReceipt
+                              ? Icons.file_download_done
+                              : Icons.mic,
+                        ),
+                  title: Text(item.title),
+                  onTap: selecting && item.hasCommittedReceipt
+                      ? () => setState(() {
+                          if (!selected.remove(item.identity) &&
+                              selected.length < 100) {
+                            selected.add(item.identity);
+                          }
+                        })
+                      : jobs[item.identity] == null
                       ? null
                       : () => showJob(
                           jobs[item.identity]!['job_id'] as String,
@@ -482,7 +960,14 @@ class _CompanionVoiceMemosViewState
                     '${imported[item.identity]?.sourceSha256 == item.sha256 && item.hasCommittedReceipt ? ' • Playback prepared' : ''}',
                   ),
                   isThreeLine: true,
-                  trailing: item.hasCommittedReceipt
+                  trailing: ios && item.state == CompanionRecordingState.deleted
+                      ? TextButton(
+                          onPressed: modifying
+                              ? null
+                              : () => recordingAction('restore', item),
+                          child: const Text('Restore'),
+                        )
+                      : item.hasCommittedReceipt
                       ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -494,23 +979,44 @@ class _CompanionVoiceMemosViewState
                               icon: const Icon(Icons.auto_awesome),
                             ),
                             PopupMenuButton<String>(
+                              key: ValueKey('recording-menu:${item.identity}'),
                               tooltip: 'Transcription actions',
                               enabled: canProcess,
                               onSelected: (operation) =>
-                                  processRecording(item, operation: operation),
-                              itemBuilder: (_) => const [
-                                PopupMenuItem(
+                                  recordingAction(operation, item),
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
                                   value: 'transcribe',
                                   child: Text('Transcribe only'),
                                 ),
-                                PopupMenuItem(
+                                const PopupMenuItem(
                                   value: 'retranscribe',
                                   child: Text('Re-transcribe'),
                                 ),
-                                PopupMenuItem(
+                                const PopupMenuItem(
                                   value: 'reanalyze',
                                   child: Text('Re-analyze transcript'),
                                 ),
+                                const PopupMenuItem(
+                                  value: 'export',
+                                  child: Text('Export audio'),
+                                ),
+                                if (ios) ...[
+                                  const PopupMenuItem(
+                                    value: 'rename',
+                                    child: Text('Rename'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'archive',
+                                    child: Text(
+                                      item.archived ? 'Unarchive' : 'Archive',
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Delete from phone'),
+                                  ),
+                                ],
                               ],
                             ),
                             IconButton(
@@ -561,5 +1067,6 @@ class _CompanionVoiceMemosViewState
               : ready
               ? 'Queued for download'
               : 'Waiting for connection',
+        CompanionRecordingState.deleted => 'Recently deleted',
       };
 }

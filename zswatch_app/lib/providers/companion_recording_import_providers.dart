@@ -6,7 +6,27 @@ import 'package:path_provider/path_provider.dart';
 import '../data/database/companion_recording_database.dart';
 import '../data/models/companion_recording.dart';
 import '../services/voice_memo/companion_recording_importer.dart';
+import '../services/voice_memo/companion_recording_exporter.dart';
 import 'companion_runtime_providers.dart';
+
+final companionRecordingExporterProvider = Provider<CompanionRecordingExporter>(
+  (ref) => const CompanionRecordingExporter(
+    temporaryDirectory: getTemporaryDirectory,
+  ),
+);
+
+/// Search returns identities, keeping private text out of the event stream.
+final companionRecordingSearchProvider = FutureProvider.autoDispose
+    .family<Set<String>, String>((ref, query) {
+      ref.watch(
+        companionSnapshotProvider.select((value) {
+          final state = value.asData?.value;
+          // Refresh search after durable recording/job changes.
+          return state?.cursor;
+        }),
+      );
+      return ref.watch(companionClientProvider).searchRecordings(query);
+    });
 
 final companionRecordingSupportProvider = Provider<Future<Directory>>(
   (ref) => getApplicationSupportDirectory(),

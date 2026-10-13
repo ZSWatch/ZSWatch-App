@@ -36,6 +36,10 @@ final class CompanionVoiceJobs {
       var result = spec
       result["job_id"] = id; result["state"] = item["state"]; result["selected"] = item["selected"] ?? false
       result["processing"] = item["lease_until"] is Int; result["transcript_saved"] = item["transcript"] is String
+      if let body = item["result"] as? [String: Any] {
+        result["category"] = body["category"] ?? ""
+        result["action_types"] = (body["actions"] as? [[String: Any]] ?? []).compactMap { $0["type"] as? String }
+      }
       for key in ["attempts", "next_attempt", "last_error", "action_revision"] { result[key] = item[key] ?? NSNull() }
       return result
     }
@@ -60,10 +64,12 @@ final class CompanionVoiceJobs {
       (($0["spec"] as? [String: Any])?["generation"] as? Int ?? 0) < (($1["spec"] as? [String: Any])?["generation"] as? Int ?? 0)
     })
     let transcript = (selected?["result"] as? [String: Any])?["transcript"] as? String ?? selected?["transcript"] as? String
+    let reuseTranscript = operation == "reanalyze" || (operation == "process" &&
+      (selected?["spec"] as? [String: Any])?["pipeline_revision"] as? String == "transcript-edit-v1")
     guard operation != "reanalyze" || transcript?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else { throw CompanionFailure.unavailable("Transcribe this recording first") }
     var next = jobs
     func select(_ id: String) { for key in prior.keys { next[key]?["selected"] = key == id } }
-    if !["retranscribe", "reanalyze"].contains(operation), let existing = prior.first(where: {
+    if !["retranscribe", "reanalyze"].contains(operation), !reuseTranscript, let existing = prior.first(where: {
       let spec = $0.value["spec"] as? [String: Any]
       return spec?["model"] as? String == model && spec?["pipeline_revision"] as? String == revision &&
         spec?["input_sha256"] as? String == hash && !["failed", "cancelled"].contains($0.value["state"] as? String ?? "")
@@ -86,7 +92,7 @@ final class CompanionVoiceJobs {
     }
     var item: [String: Any] = ["spec": spec, "state": "ready", "fence": 0, "lease_until": NSNull(),
       "attempts": 0, "next_attempt": 0, "last_error": NSNull(), "remote_id": NSNull(), "selected": true]
-    if operation == "reanalyze" { item["transcript"] = transcript }
+    if reuseTranscript { item["transcript"] = transcript }
     next[id] = item; try commit("voice_job_created", next); return id
   }
   func claim(_ id: String) throws -> Claim? {
@@ -125,6 +131,52 @@ final class CompanionVoiceJobs {
     guard jobs[id] != nil else { throw CompanionFailure.invalid("Unknown voice job") }
     var next = jobs; next[id]?["state"] = "cancelled"; next[id]?["fence"] = (jobs[id]?["fence"] as? Int ?? 0) + 1; next[id]?["lease_until"] = NSNull()
     try commit("voice_job_cancelled", next)
+  }
+  func cancelRecordings(_ identities: Set<String>) throws {
+    var next = jobs
+    for (id, item) in jobs where identities.contains((item["spec"] as? [String: Any])?["recording_id"] as? String ?? "") {
+      next[id]?["fence"] = (item["fence"] as? Int ?? 0) + 1
+      next[id]?["lease_until"] = NSNull()
+      // Retain completed results and action receipts for Recently deleted/undo.
+      if ["ready", "blocked", "result_ready"].contains(item["state"] as? String ?? "") {
+        next[id]?["state"] = "cancelled"
+      }
+    }
+    try commit("voice_recordings_removed", next)
+  }
+  func editTranscript(_ id: String, transcript: String) throws -> String {
+    guard let original = jobs[id], original["selected"] as? Bool == true,
+          let spec = original["spec"] as? [String: Any], let identity = spec["recording_id"] as? String,
+          (original["result"] as? [String: Any])?["transcript"] is String || original["transcript"] is String,
+          !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          transcript.utf8.count <= 64000, jobs.count < 100 else { throw CompanionFailure.invalid("Current saved transcript required (maximum 64 KB)") }
+    let prior = jobs.filter { ($0.value["spec"] as? [String: Any])?["recording_id"] as? String == identity }
+    var changedSpec = spec
+    changedSpec["pipeline_revision"] = "transcript-edit-v1"
+    changedSpec["transcript_sha256"] = Self.sha(transcript)
+    changedSpec["generation"] = (prior.values.map { ($0["spec"] as? [String: Any])?["generation"] as? Int ?? 0 }.max() ?? 0) + 1
+    let editedID = Self.sha(try Self.canonical(changedSpec))
+    var next = jobs
+    for (key, item) in prior {
+      next[key]?["selected"] = false
+      next[key]?["fence"] = (item["fence"] as? Int ?? 0) + 1; next[key]?["lease_until"] = NSNull()
+      if ["ready", "blocked", "result_ready"].contains(item["state"] as? String ?? "") { next[key]?["state"] = "cancelled" }
+    }
+    next[editedID] = ["spec": changedSpec, "state": "transcribed", "selected": true, "fence": 0,
+      "lease_until": NSNull(), "attempts": 0, "next_attempt": 0, "last_error": NSNull(),
+      "transcript": transcript, "result": ["version": 1, "transcript": transcript, "summary": "", "category": "", "actions": [[String: Any]]()]]
+    try commit("voice_transcript_edited", next); return editedID
+  }
+  func search(_ query: String) -> Set<String> {
+    var matches = Set<String>()
+    for item in jobs.values where item["selected"] as? Bool == true {
+      guard let identity = (item["spec"] as? [String: Any])?["recording_id"] as? String else { continue }
+      let body = item["result"] as? [String: Any]
+      var texts = [item["transcript"] as? String ?? "", body?["transcript"] as? String ?? "", body?["summary"] as? String ?? ""]
+      for action in body?["actions"] as? [[String: Any]] ?? [] { texts += action.values.compactMap { $0 as? String } }
+      if texts.contains(where: { $0.localizedCaseInsensitiveContains(query) }) { matches.insert(identity) }
+    }
+    return matches
   }
   static func validate(_ result: [String: Any], transcriptionOnly: Bool) throws {
     guard Set(result.keys) == ["version", "transcript", "summary", "category", "actions"],

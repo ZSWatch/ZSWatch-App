@@ -266,3 +266,59 @@ and uses aligned integer copies. Host tests compile that actual parser/read
 method and pass valid-envelope, short-header, malformed-table/entry and unaligned
 read cases. The signed normal Release build with these SDK changes passes. This
 is preparation for the firmware adapter; no firmware transfer/flash is claimed.
+
+## 2026-10-13: offline recording controls and pairing investigation
+
+USB touch injection can enable Pairable on this watch. The Settings layout was
+checked using the current firmware Settings source and a headless build of its
+LVGL layout before sending the two taps. UART then explicitly reported
+`ble_comm: Enable Pairable`. USB status before and after still reported 26
+recordings and 9464 KB free, with no recording running. The installed shell has
+no `bt` command or dedicated pairing command. No bond clearing, firmware flash
+or watch recording deletion was performed. The pairing window expires normally.
+
+A signed standalone Xcode UI-test runner built and reached the iPhone, but
+initialization failed with `Timed out while enabling automation mode` before
+test methods ran. The phone reported unlocked with an active display; the Mac
+computer-use tool separately reported a locked Mac. These observations do not
+establish the exact cause of the automation timeout. The user is away from home,
+so pairing and physical acceptance remain pending; no further manual action is
+required for the implementation work in this checkpoint.
+
+The native receipt view now offers title/transcript/action search, category and
+archive filters, rename, archive/unarchive, copy/edit/export text, verified Ogg
+audio export, selected-only processing and local deletion with Restore.
+Private transcript search runs in the native job store and returns matching
+identities, rather than putting full transcripts into observation snapshots.
+Archive/title changes are journal-owned and survive transfer completion.
+
+Editing creates a selected immutable transcript revision, fences older attempts
+and clears the new revision's analysis/action draft. Reanalysis uses the saved
+edit. Previous revisions and their action receipts remain accessible; edits do
+not silently change already-created calendar entries or scheduled alerts.
+
+Local deletion first fences selected jobs and persists receipt tombstones, then
+moves only generated local audio/cache paths to Recently deleted. Recovery
+completes interrupted moves without reviving a deleted receipt as a download
+candidate. Restore revalidates the original source/hash and does not recreate
+automatic processing requests. UI conversion and deletion share the Dart file
+publication lock. A late cache publication is retained inside trash without
+overwriting the removed copy. Recently deleted data remains retained until
+restored; permanent purge/storage reclamation is not implemented in this
+checkpoint. No watch-delete protocol command is sent.
+
+Earlier app database rows have a separate local view with search, existing
+archive filtering, transcript copy/text export, verified playback and audio
+export. Their filename is never adopted as a native watch identity. Unsupported
+or unavailable audio remains retained. Editing/processing earlier rows through
+the new owner still requires a verified migration path.
+
+Verification: 39 affected Flutter tests pass; targeted analysis of ten affected
+Dart files is clean. Swift host tests pass for actual source-file removal,
+interrupted/repeated moves, late cache publication, restore, immutable edits,
+stale result rejection, selected-only job fencing and reanalysis. Export tests
+check integrity, cleanup after a failed share and original-file retention.
+Ordinary signed Release builds pass. Interactive phone controls, actual sharing,
+speech playback, native BLE downloads and scheduled background execution remain
+physical acceptance work. Firmware/resources/filesystem-browser work remains
+open, and the overall goal is not complete.

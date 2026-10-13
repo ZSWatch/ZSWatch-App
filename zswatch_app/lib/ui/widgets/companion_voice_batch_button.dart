@@ -10,10 +10,12 @@ import '../../services/voice_memo/transcription_engine.dart';
 class CompanionVoiceBatchButton extends ConsumerStatefulWidget {
   final String operation;
   final String label;
+  final Set<String>? identities;
   const CompanionVoiceBatchButton({
     super.key,
     required this.operation,
     required this.label,
+    this.identities,
   });
 
   @override
@@ -30,6 +32,9 @@ class _BatchState extends ConsumerState<CompanionVoiceBatchButton> {
         .whereType<Map<Object?, Object?>>();
     final items = all.where((recording) {
       if (!recording.hasCommittedReceipt ||
+          (recording.archived && widget.identities == null) ||
+          (widget.identities != null &&
+              !widget.identities!.contains(recording.identity)) ||
           recording.watchId !=
               (snapshot?.isIos == true
                   ? snapshot?.fields['address']

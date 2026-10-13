@@ -36,10 +36,35 @@ import Foundation
     let accepted = try reopened.acknowledge(analysis, ack: ack, filename: "memo_1"); precondition(accepted)
     let delivered = try reopened.detail(analysis); precondition(delivered["state"] as? String == "delivered")
     let retry = try reopened.start(identity:"watch:memo",receipt:receipt,stt:"whisperTinyEn",llm:"qwen",correct:false,operation:"retranscribe")
-    let cancelled = try reopened.claim(retry)!; try reopened.cancel(retry)
+    let cancelled = try reopened.claim(retry)!
+    _ = try reopened.checkpoint(cancelled, transcript: "Load my watch 🔋")
+    try reopened.cancel(retry)
     let late = try reopened.complete(cancelled, result: only); precondition(!late)
+    // Editing a checkpoint while an older inference attempt runs creates a
+    // durable selected generation; neither its checkpoint nor result can win.
+    let editing = try reopened.start(identity:"watch:memo", receipt:receipt, stt:"whisperTinyEn", llm:"qwen", correct:false, operation:"reanalyze")
+    let oldAttempt = try reopened.claim(editing)!
+    let edited = try reopened.editTranscript(editing, transcript: "Corrected 🔋 speech")
+    precondition(!reopened.owns(oldAttempt))
+    let ignored = try reopened.complete(oldAttempt, result: full); precondition(!ignored)
+    let manual = try reopened.detail(edited)
+    precondition(manual["transcript"] as? String == "Corrected 🔋 speech")
+    precondition(manual["state"] as? String == "transcribed")
+    precondition((manual["result"] as? [String:Any])?["summary"] as? String == "")
+    do { _ = try reopened.editTranscript(editing, transcript:"stale dialog"); fatalError("Stale edit admitted") } catch {}
+    precondition(reopened.search("corrected").contains("watch:memo"))
+    precondition(!reopened.search("old callback").contains("watch:memo"))
+    let editedAnalysis = try reopened.start(identity:"watch:memo", receipt:receipt, stt:"whisperTinyEn", llm:"qwen", correct:false, operation:"reanalyze")
+    let editedDetail = try reopened.detail(editedAnalysis); precondition(editedDetail["transcript"] as? String == "Corrected 🔋 speech")
+    let beforeDelete = try reopened.claim(editedAnalysis)!
+    let untouched = try reopened.start(identity:"watch:other", receipt:receipt, stt:"whisperTinyEn", llm:"qwen", correct:false, operation:"transcribe")
+    try reopened.cancelRecordings(["watch:memo"])
+    precondition(!reopened.owns(beforeDelete))
+    let unaffected = try reopened.detail(untouched); precondition(unaffected["state"] as? String == "ready")
+    let reopenedAgain = try CompanionVoiceJobs(journal: CompanionJournal(url: journal.url))
+    let persisted = try reopenedAgain.detail(edited); precondition(persisted["transcript"] as? String == "Corrected 🔋 speech")
     let canonical = try CompanionVoiceJobs.canonical(["z":"é🔋/", "a":false])
     precondition(canonical == "{\"a\":false,\"z\":\"é🔋/\"}")
-    print("PASS: voice checkpoint recovery, stale attempt fencing, analysis reuse and application ACK matching")
+    print("PASS: checkpoints, immutable edits/reanalysis, selected-only deletion fences, private search and ACKs")
   }
 }

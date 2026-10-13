@@ -48,6 +48,49 @@ final class CompanionRecordingFiles {
   }
   func destination(_ identity: String) -> URL { directory.appendingPathComponent(Self.sha(Data(identity.utf8)) + ".zsw_opus") }
   func partial(_ identity: String) -> URL { destination(identity).appendingPathExtension("partial") }
+  private func trashDirectory(_ identity: String) -> URL {
+    directory.appendingPathComponent("recently-deleted", isDirectory: true).appendingPathComponent(Self.sha(Data(identity.utf8)), isDirectory: true)
+  }
+  private func localCopies(_ identity: String, metadata: [String: Any]) throws -> [URL] {
+    guard let hash = metadata["sha256"] as? String, hash.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw CompanionFailure.invalid("Verified recording required") }
+    let key = Self.sha(Data(identity.utf8))
+    let playbackRoot = directory.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("companion-recording-imports-v1", isDirectory: true)
+    guard playbackRoot.resolvingSymlinksInPath().path == playbackRoot.path else { throw CompanionFailure.storage("Playback directory is not canonical") }
+    return [destination(identity), partial(identity), playbackRoot.appendingPathComponent("\(key)-\(hash)-ogg-v1.ogg")]
+  }
+  /// Journal tombstone precedes this idempotent move; no watch command is sent.
+  func removeLocal(_ identity: String, metadata: [String: Any]) throws {
+    try prepareDirectory()
+    let trash = trashDirectory(identity)
+    guard trash.resolvingSymlinksInPath().path == trash.path else { throw CompanionFailure.storage("Deleted recording directory is not canonical") }
+    try FileManager.default.createDirectory(at: trash, withIntermediateDirectories: true)
+    guard trash.resolvingSymlinksInPath().path == trash.path else { throw CompanionFailure.storage("Deleted recording directory is not canonical") }
+    for source in try localCopies(identity, metadata: metadata) {
+      guard FileManager.default.fileExists(atPath: source.path) else { continue }
+      _ = try read(source, limit: 32 * 1024 * 1024)
+      var target = trash.appendingPathComponent(source.lastPathComponent)
+      // Retain a late converter publication inside trash without overwriting
+      // the original removed copy. Native never edits the Dart import ledger.
+      if FileManager.default.fileExists(atPath: target.path) {
+        target = trash.appendingPathComponent(source.lastPathComponent + ".recovered-" + UUID().uuidString)
+      }
+      try FileManager.default.moveItem(at: source, to: target)
+    }
+  }
+  func restoreLocal(_ identity: String, metadata: [String: Any]) throws -> [String: Any] {
+    try prepareDirectory()
+    let trash = trashDirectory(identity)
+    guard trash.resolvingSymlinksInPath().path == trash.path else { throw CompanionFailure.storage("Deleted recording directory is not canonical") }
+    for target in try localCopies(identity, metadata: metadata) {
+      let source = trash.appendingPathComponent(target.lastPathComponent)
+      guard FileManager.default.fileExists(atPath: source.path) else { continue }
+      _ = try read(source, limit: 32 * 1024 * 1024)
+      guard !FileManager.default.fileExists(atPath: target.path) else { throw CompanionFailure.storage("Restored copy already exists; both files retained") }
+      try FileManager.default.moveItem(at: source, to: target)
+    }
+    guard let recovered = try recover(identity, metadata: metadata) else { throw CompanionFailure.storage("Deleted source cannot be verified") }
+    return recovered
+  }
   private func prepareDirectory() throws {
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     guard directory.resolvingSymlinksInPath() == directory else { throw CompanionFailure.storage("Recording directory is not canonical") }

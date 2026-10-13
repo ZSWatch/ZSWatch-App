@@ -1,5 +1,11 @@
 /// A native receipt identity, not a Drift row or an inference result.
-enum CompanionRecordingState { pending, downloading, downloaded, failed }
+enum CompanionRecordingState {
+  pending,
+  downloading,
+  downloaded,
+  failed,
+  deleted,
+}
 
 class CompanionRecording {
   final String identity;
@@ -12,6 +18,8 @@ class CompanionRecording {
   final String? localPath;
   final String? sha256;
   final String? error;
+  final String title;
+  final bool archived;
 
   const CompanionRecording._({
     required this.identity,
@@ -24,6 +32,8 @@ class CompanionRecording {
     this.localPath,
     this.sha256,
     this.error,
+    required this.title,
+    required this.archived,
   });
 
   /// This reflects the committed journal. It does not read/validate the file,
@@ -58,15 +68,21 @@ class CompanionRecording {
       'downloading' => CompanionRecordingState.downloading,
       'downloaded' => CompanionRecordingState.downloaded,
       'failed' => CompanionRecordingState.failed,
+      'deleted' => CompanionRecordingState.deleted,
       _ => throw const FormatException('Unknown native recording state'),
     };
     final path = value['local_path'];
     final hash = value['sha256'];
     final error = value['error'];
+    final title = value['title'] ?? '';
+    final archived = value['archived'] ?? false;
     if ((path != null && (path is! String || !path.startsWith('/'))) ||
         (hash != null &&
             (hash is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(hash))) ||
         (error != null && error is! String) ||
+        title is! String ||
+        title.length > 256 ||
+        archived is! bool ||
         (state == CompanionRecordingState.downloaded &&
             (path == null || hash == null))) {
       throw const FormatException('Invalid native recording receipt');
@@ -85,6 +101,8 @@ class CompanionRecording {
       localPath: path as String?,
       sha256: hash as String?,
       error: error as String?,
+      title: title.trim().isEmpty ? filename : title,
+      archived: archived,
     );
   }
 }

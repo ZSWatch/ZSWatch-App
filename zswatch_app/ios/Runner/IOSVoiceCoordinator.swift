@@ -45,7 +45,7 @@ final class IOSVoiceCoordinator {
   func start(_ args: [String: Any]) throws -> String {
     guard let identity = args["identity"] as? String, let stt = args["transcription_model"] as? String,
           let llm = args["analysis_model"] as? String, let correct = args["correct_transcription"] as? Bool,
-          let owner, let metadata = (owner.journal.fields["recordings"] as? [String: [String: Any]])?[identity],
+          let owner, let metadata = (owner.journal.fields["recordings"] as? [String: [String: Any]])?[identity], metadata["state"] as? String == "downloaded",
           let receipt = try files.recover(identity, metadata: metadata), receipt["sha256"] as? String == metadata["sha256"] as? String else {
       throw CompanionFailure.invalid("Verified local recording required")
     }
@@ -55,6 +55,16 @@ final class IOSVoiceCoordinator {
   }
   func cancel(_ id: String) throws {
     try jobs.cancel(id); fenceObsoleteWorker(); owner?.journalChanged(); advance()
+  }
+  func removeRecordings(_ identities: Set<String>) throws {
+    try jobs.cancelRecordings(identities); fenceObsoleteWorker(); owner?.journalChanged()
+  }
+  func editTranscript(_ id: String, transcript: String) throws -> String {
+    guard let identity = (jobs.jobs[id]?["spec"] as? [String: Any])?["recording_id"] as? String,
+          let record = (owner?.journal.fields["recordings"] as? [String: [String: Any]])?[identity],
+          record["state"] as? String != "deleted" else { throw CompanionFailure.invalid("Restore this recording before editing") }
+    let next = try jobs.editTranscript(id, transcript: transcript)
+    fenceObsoleteWorker(); owner?.journalChanged(); return next
   }
   private func fenceObsoleteWorker() {
     if let claim, !jobs.owns(claim) { self.claim = nil; worker.cancel(claim.id) }

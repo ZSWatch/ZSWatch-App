@@ -132,6 +132,31 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
         case "processRecording":
           guard let voice = owner.voice else { throw CompanionFailure.unavailable("Voice job storage unavailable") }
           reply(["version": 1, "job_id": try voice.start(args)])
+        case "editVoiceTranscript":
+          guard let voice = owner.voice, let id = args["job_id"] as? String,
+                let text = args["transcript"] as? String else { throw CompanionFailure.invalid("Current transcript required") }
+          reply(["version": 1, "job_id": try voice.editTranscript(id, transcript: text)])
+        case "updateRecording", "restoreRecording":
+          guard let inbox = owner.inbox, let identity = args["identity"] as? String else { throw CompanionFailure.invalid("Recording identity required") }
+          if call.method == "restoreRecording" { try inbox.restore(identity) }
+          else {
+            guard args["title"] == nil || args["title"] is String,
+                  args["archived"] == nil || CompanionRecordingFiles.boolean(args["archived"]) != nil else { throw CompanionFailure.invalid("Invalid recording changes") }
+            try inbox.update(identity, title: args["title"] as? String, archived: CompanionRecordingFiles.boolean(args["archived"]))
+          }
+          reply(owner.snapshot())
+        case "removeRecordings":
+          guard let inbox = owner.inbox, let identities = args["identities"] as? [String] else { throw CompanionFailure.invalid("Selected recordings required") }
+          try inbox.remove(identities); reply(owner.snapshot())
+        case "searchRecordings":
+          guard let query = args["query"] as? String, query.utf8.count <= 512 else { throw CompanionFailure.invalid("Search query too long") }
+          var matches = owner.voice?.jobs.search(query) ?? []
+          let records = owner.journal.fields["recordings"] as? [String: [String: Any]] ?? [:]
+          for (key, record) in records {
+            if [record["title"] as? String ?? "", record["filename"] as? String ?? ""].contains(where: { $0.localizedCaseInsensitiveContains(query) }) { matches.insert(key) }
+          }
+          matches.formIntersection(records.keys)
+          reply(["version": 1, "identities": matches.sorted()])
         case "voiceJob", "cancelVoiceJob":
           guard let voice = owner.voice, let id = args["job_id"] as? String,
                 id.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw CompanionFailure.invalid("Voice job required") }

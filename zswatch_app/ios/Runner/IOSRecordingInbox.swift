@@ -19,12 +19,53 @@ final class IOSRecordingInbox {
   func recover() {
     for (key, metadata) in records {
       do {
+        if metadata["state"] as? String == "deleted" {
+          try owner?.voice?.removeRecordings([key])
+          try files.removeLocal(key, metadata: metadata)
+          continue
+        }
         if let recovered = try files.recover(key, metadata: metadata) { try put(key, recovered) }
         else if ["downloading", "downloaded"].contains(metadata["state"] as? String ?? "") {
           var next = metadata; next["state"] = "pending"; next.removeValue(forKey: "local_path"); next.removeValue(forKey: "sha256"); try put(key, next)
         }
-      } catch { var failed = metadata; failed["state"] = "failed"; failed["error"] = "receipt_unavailable"; try? put(key, failed) }
+      } catch {
+        var failed = metadata
+        // Never turn a durable deletion tombstone back into a sync candidate.
+        if metadata["state"] as? String != "deleted" { failed["state"] = "failed" }
+        failed["error"] = "receipt_unavailable"; try? put(key, failed)
+      }
     }
+  }
+  func update(_ identity: String, title: String?, archived: Bool?) throws {
+    guard var record = records[identity], title != nil || archived != nil,
+          title == nil || (title!.utf8.count <= 256 && !title!.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })) else {
+      throw CompanionFailure.invalid("Recording title/archive change required")
+    }
+    if let title { record["title"] = title.trimmingCharacters(in: .whitespacesAndNewlines) }
+    if let archived { record["archived"] = archived }
+    try put(identity, record)
+  }
+  func remove(_ identities: [String]) throws {
+    let selected = Set(identities)
+    guard !selected.isEmpty, selected.count == identities.count, selected.count <= 100,
+          selected.allSatisfy({ ["downloaded", "deleted"].contains(records[$0]?["state"] as? String ?? "") }), let owner else {
+      throw CompanionFailure.invalid("Select up to 100 saved recordings")
+    }
+    try owner.voice?.removeRecordings(selected)
+    var next = records
+    for key in selected {
+      next[key]?["state"] = "deleted"; next[key]?["deleted_at"] = CompanionJournal.now
+      next[key]?.removeValue(forKey: "processing_request")
+    }
+    try owner.publish("recordings_removed_locally", ["recordings": next])
+    // A lost process after the durable tombstone is repaired by recover().
+    for key in selected { try files.removeLocal(key, metadata: next[key]!) }
+  }
+  func restore(_ identity: String) throws {
+    guard let record = records[identity], record["state"] as? String == "deleted" else { throw CompanionFailure.invalid("Deleted recording required") }
+    var restored = try files.restoreLocal(identity, metadata: record)
+    restored.removeValue(forKey: "deleted_at")
+    try put(identity, restored)
   }
   @discardableResult func receive(_ message: [String: Any]) -> Bool {
     guard let owner, message["t"] as? String == "voice_memo" else { return false }
@@ -92,6 +133,7 @@ final class IOSRecordingInbox {
       guard self.active == token else { return }
       self.active = nil; self.lease.end()
       do {
+        let metadata = self.records[key] ?? metadata
         if let error {
           var next = metadata; next["state"] = interrupted ? "pending" : "failed"
           next["error"] = String(error.localizedDescription.prefix(160)); try self.put(key, next)

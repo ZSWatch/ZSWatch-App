@@ -376,6 +376,74 @@ class CompanionPrototypeClient {
     return Map<String, Object?>.from(result['job'] as Map);
   }
 
+  Future<String> editVoiceTranscript(String id, String transcript) async {
+    final result = await methods.invokeMethod<Object?>('editVoiceTranscript', {
+      'version': 1,
+      'job_id': id,
+      'transcript': transcript,
+    });
+    if (result is! Map ||
+        result['version'] != 1 ||
+        result['job_id'] is! String ||
+        !RegExp(r'^[a-f0-9]{64}$').hasMatch(result['job_id'] as String)) {
+      throw const FormatException('Transcript edit was not saved');
+    }
+    return result['job_id'] as String;
+  }
+
+  Future<void> updateRecording(
+    String identity, {
+    String? title,
+    bool? archived,
+  }) async {
+    CompanionPrototypeSnapshot.decode(
+      await methods.invokeMethod<Object?>('updateRecording', {
+        'version': 1,
+        'identity': identity,
+        if (title != null) 'title': title,
+        if (archived != null) 'archived': archived,
+      }),
+    );
+  }
+
+  Future<void> removeRecordings(List<String> identities) async {
+    if (identities.isEmpty ||
+        identities.length > 100 ||
+        identities.toSet().length != identities.length) {
+      throw const FormatException('Select up to 100 recordings');
+    }
+    CompanionPrototypeSnapshot.decode(
+      await methods.invokeMethod<Object?>('removeRecordings', {
+        'version': 1,
+        'identities': identities,
+      }),
+    );
+  }
+
+  Future<void> restoreRecording(String identity) async {
+    CompanionPrototypeSnapshot.decode(
+      await methods.invokeMethod<Object?>('restoreRecording', {
+        'version': 1,
+        'identity': identity,
+      }),
+    );
+  }
+
+  Future<Set<String>> searchRecordings(String query) async {
+    final result = await methods.invokeMethod<Object?>('searchRecordings', {
+      'version': 1,
+      'query': query,
+    });
+    if (result is! Map ||
+        result['version'] != 1 ||
+        result['identities'] is! List ||
+        (result['identities'] as List).length > 4096 ||
+        (result['identities'] as List).any((id) => id is! String)) {
+      throw const FormatException('Invalid recording search');
+    }
+    return (result['identities'] as List).cast<String>().toSet();
+  }
+
   Future<CompanionPrototypeSnapshot> configureVoiceProcessing({
     required String watchId,
     required bool enabled,

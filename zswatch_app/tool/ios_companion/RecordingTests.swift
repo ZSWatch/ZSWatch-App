@@ -20,6 +20,28 @@ import Foundation
     precondition(receipt["state"] as? String == "downloaded")
     precondition(receipt["sha256"] as? String == CompanionRecordingFiles.sha(bytes))
     precondition(!FileManager.default.fileExists(atPath: store.partial(key).path))
+    let playbackRoot = root.appendingPathComponent("companion-recording-imports-v1")
+    try FileManager.default.createDirectory(at: playbackRoot, withIntermediateDirectories: true)
+    let playback = playbackRoot.appendingPathComponent("\(CompanionRecordingFiles.sha(Data(key.utf8)))-\(receipt["sha256"]!).ogg")
+    // Use the exact importer filename; unrelated recordings/files survive.
+    let exactPlayback = playbackRoot.appendingPathComponent("\(CompanionRecordingFiles.sha(Data(key.utf8)))-\(receipt["sha256"]!)-ogg-v1.ogg")
+    try bytes.write(to: exactPlayback)
+    try bytes.write(to: playback)
+    try store.removeLocal(key, metadata: receipt)
+    precondition(!FileManager.default.fileExists(atPath: store.destination(key).path))
+    precondition(!FileManager.default.fileExists(atPath: exactPlayback.path))
+    precondition(FileManager.default.fileExists(atPath: playback.path))
+    // A lost process after a tombstone/file move can repeat it safely.
+    try store.removeLocal(key, metadata: receipt)
+    // Repair a late converter publication without overwriting the removed copy.
+    try bytes.write(to: exactPlayback)
+    try store.removeLocal(key, metadata: receipt)
+    precondition(!FileManager.default.fileExists(atPath: exactPlayback.path))
+    let restored = try store.restoreLocal(key, metadata: receipt)
+    precondition(restored["sha256"] as? String == receipt["sha256"] as? String)
+    precondition(FileManager.default.fileExists(atPath: exactPlayback.path))
+    let restoredAgain = try store.restoreLocal(key, metadata: receipt)
+    precondition(restoredAgain["state"] as? String == "downloaded")
     var bad = bytes; bad[32] = 255; precondition(!CompanionRecordingFiles.valid(bad, metadata: metadata))
     var wrong = raw; wrong["timestamp"] = true; precondition(CompanionRecordingFiles.metadata(wrong, address: address) == nil)
     wrong = raw; wrong["filename"] = "../memo"; precondition(CompanionRecordingFiles.metadata(wrong, address: address) == nil)
@@ -27,6 +49,6 @@ import Foundation
     let (other, _) = CompanionRecordingFiles.metadata(raw.merging(["filename":"other"]) { _, new in new }, address: address)!
     try FileManager.default.createSymbolicLink(at: store.partial(other), withDestinationURL: store.destination(key))
     do { _ = try store.prefix(other, expected: 36); fatalError("Symlink accepted") } catch {}
-    print("PASS: durable partial/source receipt recovery, container integrity and path/metadata bounds")
+    print("PASS: partial/source recovery, selected-only local removal/restore, integrity and path bounds")
   }
 }
