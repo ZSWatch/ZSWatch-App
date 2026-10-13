@@ -259,3 +259,10 @@ routing, UI disposal and reattachment to terminal/progress snapshots. Signed
 Release builds pass. No physical image was applied/reset without encrypted
 Ready, so actual appearance and transfer throughput remain pending. Firmware
 image/resources transfers are still unfinished.
+
+SDK firmware-input review also found unchecked header/TLV reads that could trap
+on a selected truncated file. The same Nordic image parser now checks its bounds
+and uses aligned integer copies. Host tests compile that actual parser/read
+method and pass valid-envelope, short-header, malformed-table/entry and unaligned
+read cases. The signed normal Release build with these SDK changes passes. This
+is preparation for the firmware adapter; no firmware transfer/flash is claimed.
