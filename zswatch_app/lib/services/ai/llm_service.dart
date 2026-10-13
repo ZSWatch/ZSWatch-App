@@ -1173,7 +1173,7 @@ class LlmService {
       debugPrint(
         '[LlmService] Classify done at ${totalStopwatch.elapsedMilliseconds}ms',
       );
-      debugPrint('[LlmService] Raw AI response: $raw');
+      debugPrint('[LlmService] AI response received (${raw.length} characters)');
 
       // --- Parse JSON from output ---
       final result = structuredResult.result;
@@ -1436,7 +1436,7 @@ JSON:
       final raw = structuredResult.raw;
       final classifyMetrics = structuredResult.metrics;
 
-      debugPrint('[LlmService] Raw brain dump response: $raw');
+      debugPrint('[LlmService] Brain dump response received (${raw.length} characters)');
 
       // Parse using the same JSON extraction logic
       final result = structuredResult.result;

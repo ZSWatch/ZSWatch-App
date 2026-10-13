@@ -136,3 +136,39 @@ final class CompanionFirmwareOperation {
     try commit("firmware_terminal", next)
   }
 }
+
+
+/// Conservative image-0 measurement from acknowledged SDK progress. Initial
+/// offsets may be resumed data, so only subsequent confirmed byte deltas count.
+struct CompanionFirmwareTransferMeter {
+  private let imageBytes: Int?
+  private var first: (count: Int, time: UInt64)?
+  private var lastCount = 0
+  private var retired = false
+  private(set) var measurement: [String: Any]?
+  init(targets: [CompanionFirmwareContract.Target], transferExpected: Bool, hasResources: Bool) {
+    let primary = targets.first { $0.index == 0 }
+    imageBytes = transferExpected && !hasResources && primary != nil &&
+      targets.filter { $0.bytes == primary!.bytes }.count == 1 ? primary!.bytes : nil
+  }
+  mutating func progress(_ count: Int, total: Int, now: UInt64) {
+    guard !retired, let imageBytes, total == imageBytes else { return }
+    guard (0...total).contains(count), count >= lastCount else { retired = true; measurement = nil; return }
+    if let first {
+      guard now >= first.time else { retired = true; return }
+      if count == total {
+        retired = true
+        let bytes = count - first.count, nanoseconds = now - first.time
+        guard bytes > 0, nanoseconds > 0 else { return }
+        let seconds = Double(nanoseconds) / 1_000_000_000
+        measurement = ["bytes": bytes, "image_bytes": imageBytes, "from_offset": first.count,
+          "seconds": seconds, "kib_per_second": Double(bytes) / 1024 / seconds,
+          "scope": "image_0_acknowledged_after_first_progress"]
+      }
+    } else {
+      first = (count, now)
+      if count == total { retired = true } // Already uploaded/validated, no observed byte delta.
+    }
+    lastCount = count
+  }
+}

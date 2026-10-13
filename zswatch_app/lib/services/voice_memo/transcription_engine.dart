@@ -485,7 +485,7 @@ class WhisperEngine implements TranscriptionEngine {
       }
 
       final text = result.transcription.text.trim();
-      debugPrint('[WhisperEngine] Result: $text');
+      debugPrint('[WhisperEngine] Transcription completed (${text.length} characters)');
       return text;
     } catch (e) {
       debugPrint('[WhisperEngine] Error: $e');
@@ -813,7 +813,7 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
       );
 
       final text = response.text.trim();
-      debugPrint('[CustomGgmlWhisperEngine] Result: $text');
+      debugPrint('[CustomGgmlWhisperEngine] Transcription completed (${text.length} characters)');
       return text;
     } catch (e) {
       debugPrint('[CustomGgmlWhisperEngine] Error: $e');

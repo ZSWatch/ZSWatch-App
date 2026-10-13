@@ -574,3 +574,58 @@ owned by this test. The original 26 files are retained. Its AI confirmation was
 interrupted by the navigation bug; transcription is pending the corrected image.
 The selected analysis model download is still in progress; the original model
 selection must be restored after inference acceptance.
+
+
+### Real local transcript, analysis and watch acceptance (2026-10-14)
+
+On signed normal app 02c7ed6, a watch microphone capture of audible owned Mac
+speech (20261013_235832, 7.67 seconds, 31181 bytes) downloaded automatically over
+BLE. Transcribe-only with Whisper Tiny English saved a 116-character transcript
+in about four seconds after confirmation. The subsequent explicit Re-analyze
+used that checkpoint with local Qwen2.5 1.5B Q4_K_M; the 39-second UI test passed
+Processed / Accepted by watch. Native selected voice-v1 job is delivered, with
+no error, one attempt and a saved transcript. UART reports durable result new,
+ACK=0. The older transcription revision remains stored and is retired from
+selection; no re-transcription was needed for analysis. One reminder suggestion
+was produced; no external reminder/calendar action was created by this test.
+
+The first acoustic attempt, 20261013_234746, ran with the Mac output muted, so it
+cannot be attributed to audible speech. A second capture temporarily used volume
+55 and unmuted output; volume 71 / muted=true was restored immediately afterward
+and verified. There are 26 original watch files plus these two owned captures.
+The long cached fixture's earlier No speech result remains separately recorded.
+
+Normal Whisper Tiny and Qwen downloads completed. The original Whisper Small
+English selection was restored by a passing 13-second UI test; the Qwen selection
+was unchanged. Automatic processing remains off. Private result snapshots, source
+hashes, screenshots and UART evidence are under unlocked-acceptance; no transcript
+or result payload is included in source-controlled logs.
+
+The reusable read-only shell test also passed end to end on 02c7ed6: actual
+app-state response, preserved Shell screen through SDK work, then connected Home.
+This closes the earlier incomplete shell UI test, not its historical failure.
+
+### Matched firmware transfer preparation
+
+USB image state reports active confirmed indices 0 and 2, with no reported
+network-core index 1. The locally built app internal/external images are kept
+together; a two-image bundle excludes the unreported network image. Its external
+image hash differs from the installed external image, so isolated internal
+replacement would be inappropriate. The owned bundle downloaded through Safari
+over the actual shared Wi-Fi LAN for the normal file-picker flow. No firmware
+update has been started yet.
+
+Transfer metering now recognizes primary image 0 within a matched bundle only
+when its size identifies it unambiguously. It excludes the initial reported
+offset, which may be resumed data, and counts subsequent acknowledged deltas.
+Monotonic timing is captured at the SDK callback before owner-queue persistence.
+Cached completion, equal-sized ambiguous images, regression and invalid/zero
+timing cannot establish a measurement. Only the existing fresh NUS/active-image
+hash verification publishes the completed measurement and opens the same-watch
+large-resource gate. Actual transfer acceptance remains pending.
+
+Actual-source Swift tests pass these cases alongside the existing boot/hash,
+resource, cancellation and recovery checks. The 26 affected firmware/voice Flutter
+tests and two-file analysis pass. The final normal signed Release build passes,
+including deep/strict codesign. Shared STT/LLM diagnostic messages now report
+character counts instead of complete transcripts or raw AI responses.

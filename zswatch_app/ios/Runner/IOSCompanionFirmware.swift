@@ -21,8 +21,7 @@ final class IOSCompanionFirmware {
   private var checkAttempts = 0
   private var activationSent = false
   private var verificationDeadline: Date?
-  private var uploadStarted: UInt64?
-  private var uploadedSeconds: Double?
+  private var transferMeter: CompanionFirmwareTransferMeter?
   private var transferExpected = false
   private var lastProgress: (phase: String, count: Int, total: Int)?
   private var pipelineDepth = 1
@@ -74,7 +73,7 @@ final class IOSCompanionFirmware {
       let id = try operation.begin(address: owner.journal.address, generation: generation + 1, targets: targets, resources: resources)
       self.transport = sdk; self.images = parsed; self.targets = targets; self.resources = resources
       token = UUID(); finishing = false; holdsLink = true; checking = false; activationSent = false; checkAttempts = 0
-      uploadStarted = nil; uploadedSeconds = nil
+      transferMeter = nil
       transferExpected = false; lastProgress = nil
       pipelineDepth = 1; sarBuffer = 0
       try owner.suspendForFirmware(generation)
@@ -107,10 +106,11 @@ final class IOSCompanionFirmware {
       guard self.current(token) else { return }
       guard error == nil, response?.getError() == nil, let reported = response?.images, reported.count <= 16 else { self.abort("image_state_rejected"); return }
       guard self.targets.allSatisfy({ target in reported.contains { $0.image == UInt64(target.index) } }) else { self.abort("boot_check_unavailable"); return }
-      if self.targets.count == 1, let target = self.targets.first {
+      if let target = self.targets.first(where: { $0.index == 0 }) {
         self.transferExpected = !reported.contains { $0.image == UInt64(target.index) && $0.active &&
           $0.hash.map { String(format: "%02x", $0) }.joined() == target.hash }
       }
+      self.transferMeter = CompanionFirmwareTransferMeter(targets: self.targets, transferExpected: self.transferExpected, hasResources: self.resources != nil)
       if self.resources != nil { self.uploadResources() } else { self.upgrade() }
     } } }
   }
@@ -173,20 +173,18 @@ final class IOSCompanionFirmware {
     guard publish({ try operation.phase("validating"); try operation.admitted() }) else { return }
     let token = self.token; let images = self.images
     sdk { sdk in
-      let delegate = IOSFirmwareDelegate { event, state, count, total in owner.queue.async {
+      let delegate = IOSFirmwareDelegate { event, state, count, total in
+        let observedAt = DispatchTime.now().uptimeNanoseconds // Capture before journal/owner-queue delay.
+        owner.queue.async {
         guard self.current(token) else { return }
         switch event {
         case "state":
           let phase: String
           switch state { case .upload: phase = "uploading"; case .test, .confirm, .eraseAppSettings: phase = "applying"
           case .reset: phase = "rebooting"; case .success, .none: return; default: phase = "validating" }
-          if phase == "uploading", self.uploadStarted == nil { self.uploadStarted = DispatchTime.now().uptimeNanoseconds }
           _ = self.publish { try self.operation.phase(phase) }
         case "progress":
-          if self.transferExpected, self.targets.count == 1, count == total, total == self.targets.first?.bytes,
-             self.uploadedSeconds == nil, let started = self.uploadStarted {
-            self.uploadedSeconds = Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000_000
-          }
+          self.transferMeter?.progress(count, total: total, now: observedAt)
           self.progress(count, total: total)
         case "finished": self.postflight()
         case "cancelled": self.finish("cancelled", error: "cancelled", unknown: false)
@@ -282,11 +280,11 @@ final class IOSCompanionFirmware {
           (owner.journal.fields["watch_info"] as? [String: Any])?["status_generation"] as? Int == owner.journal.generation else {
       abort("boot_check_failed"); return
     }
-    if targets.count == 1, targets.first?.index == 0, resources == nil,
-       let seconds = uploadedSeconds, seconds > 0, let bytes = targets.first?.bytes {
+    if var measurement = transferMeter?.measurement, let target = targets.first(where: { $0.index == 0 }) {
+      measurement["address"] = owner.journal.address; measurement["hash"] = target.hash
+      measurement["pipeline_depth"] = pipelineDepth; measurement["server_buffer_bytes"] = sarBuffer
       do { try owner.publish("firmware_transfer_verified", ["ios_firmware_transfer_verified": true,
-        "ios_firmware_transfer_measurement": ["address": owner.journal.address, "hash": targets.first!.hash, "bytes": bytes, "seconds": seconds, "kib_per_second": Double(bytes) / 1024 / seconds,
-          "pipeline_depth": pipelineDepth, "server_buffer_bytes": sarBuffer]]) }
+        "ios_firmware_transfer_measurement": measurement]) }
       catch { abort("storage_unavailable"); return }
     }
     finish("completed")
