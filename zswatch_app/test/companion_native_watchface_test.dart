@@ -72,6 +72,16 @@ void main() {
   });
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+  test('iOS watchface receipts retain the CoreBluetooth UUID', () {
+    final value = operation('uploading')
+      ..['address'] = 'FE88C737-593F-DB9B-732D-E11FF4C463F5';
+    final status = CompanionWatchfaceStatus.decode({
+      'watchface_operation': value,
+    });
+    expect(status!.address, value['address']);
+    expect(status.busy, isTrue);
+  });
+
   test(
     'all existing built-in backgrounds satisfy the native image contract',
     () async {

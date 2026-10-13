@@ -32,9 +32,9 @@ the rows below is closed by an unsigned build or a USB probe.
 | Media play/pause/next | Firmware AMS commands | Retain firmware path | Depends on active player/AMS support | Pending physical controls |
 | Find watch | Developer Find toggle and Gadgetbridge find command | Native generation-checked queued Find commands | Respect Stop/session fencing | Pending watch vibration/stop |
 | Find phone | Existing iOS support must be checked against firmware find event | Pending inventory closure in implementation | Audio/notification execution policy differs from Android | Pending source contract and phone test |
-| GPS request | GpsService handles watch gps_power request | Pending native CoreLocation relay | Foreground/always permission and background policy required | Pending watch Weather request and denied permission |
-| Weather | Watch triggers GPS and HTTP from Weather app | Pending native GPS/HTTP | Stale locations must carry age/precision policy | Pending actual weather display |
-| HTTP relay | HttpService handles request id, URL and response | Pending bounded URLSession relay | Short background opportunity; no permanent HTTP service | Pending request/error/session-fence tests |
+| GPS request | GpsService handles watch gps_power request | Native request-scoped CoreLocation relay and sharing policy | Foreground/always permission and background policy required | Pending watch Weather request and denied permission |
+| Weather | Watch triggers GPS and HTTP from Weather app | Native GPS and bounded HTTP; physical display pending | Stale locations must carry age/precision policy | Pending actual weather display |
+| HTTP relay | HttpService handles request id, URL and response | Bounded native URLSession/XPath relay with deadline and session fences | Short background opportunity; no permanent HTTP service | Pending request/error/session-fence tests |
 | Activity/steps collection | HealthSyncService stores act messages in Drift | Native receipt journal with transactional Dart projection and watermark | Establish one SQLite writer before collection | Pending no-UI collection and deduplication |
 | Heart rate | Current pulse, history and HeartRateScreen | Native act receipt/transactional history projection | Existing data model retained | Pending actual pulse and history |
 | Health Today/Week/Month | StepsHistory/activity breakdown/heart-rate views | Existing UI retained; collection pending | Historical placeholders are not new requirements | Pending three ranges and refresh |
@@ -56,7 +56,7 @@ the rows below is closed by an unsigned build or a USB probe.
 | Firmware file selection and slots | FirmwareManager and modified Nordic fork | Pending coordinator-owned update adapter | Only SDK-supported image variants may be labeled supported | Pending selected image/slot and real update |
 | Firmware progress/error/retry/reconnect | Existing update UI, SDK callbacks | Pending exclusive operation owner | Use negotiated write length; safe pause/expiration | Pending installed version, throughput and retry |
 | Filesystem resources | FileSystemService and filesystem image UI | Pending coordinated Nordic upload | Measure ordinary firmware before large images | Pending representative verified upload |
-| Watchface select/crop/upload/apply/reset | Existing watchface UI and protocol | Pending native transfer/status integration | Preserve existing image format and firmware checks | Pending actual applied image/reset |
+| Watchface select/crop/upload/apply/reset | Existing watchface UI and protocol | Exclusive native Nordic upload, full readback, NUS apply/reset and durable status | Preserve existing image format and firmware checks | Pending actual applied image/reset |
 | Shell | Developer shell using Nordic ShellManager | Exclusive native Nordic preparation/shell with signed Zephyr return code | No custom SMP | Pending actual response and timeout |
 | Filesystem browser/download/upload | Developer File System | Pending coordinated SDK access | No competing per-UI transports | Pending file listing and verified transfer |
 | Sensors | Sensor GATT service and debug UI | Native discovered sensor CCCDs; view-close unsubscribe and session fences | Use actual CoreBluetooth characteristic lengths | Pending sample and unsubscribe |

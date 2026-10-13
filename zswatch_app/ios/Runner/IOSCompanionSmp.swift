@@ -12,6 +12,9 @@ final class IOSCompanionSmp {
   private var attempt = UUID()
   private var preparing = false
   private var constructing = false
+  private var watchfaceID: UUID?
+  private var watchfaceAdmitted = false
+  private var fileUploadDelegate: CompanionFileUploadDelegate?
   private var downloadManager: FileSystemManager?
   private struct Pending {
     let id: UUID
@@ -198,6 +201,110 @@ final class IOSCompanionSmp {
     }
   }
 
+  func startWatchface(_ generation: Int, bytes: Data?, name: String) throws -> [String: Any] {
+    guard let owner else { throw CompanionFailure.unavailable("Watch owner unavailable") }
+    let action = bytes == nil ? "reset" : "apply"
+    guard !name.isEmpty, name.utf16.count <= 64, !name.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { throw CompanionFailure.invalid("Invalid background name") }
+    let header: [UInt8] = [0x19, 0x12, 0, 0, 0xf0, 0, 0xf0, 0, 0xe0, 1, 0, 0]
+    if let bytes { guard bytes.count == 115212, bytes.prefix(12) == Data(header) else { throw CompanionFailure.invalid("Expected 240x240 RGB565 background") } }
+    if let old = owner.journal.fields["watchface_operation"] as? [String: Any], old["address"] as? String == owner.journal.address,
+       old["generation"] as? Int == generation, old["action"] as? String == action, old["application_uncertain"] as? Bool == true {
+      throw CompanionFailure.unavailable("Reconnect before retrying an uncertain watchface result")
+    }
+    let sdk = try bytes.map { _ in try prepared(generation) }
+    let id = try begin(generation, timeout: bytes == nil ? 12 : 180) { [weak self] result in
+      guard let self, let owner = self.owner else { return }
+      var state = owner.journal.fields["watchface_operation"] as? [String: Any] ?? [:]
+      state["phase"] = "completed"; state["error"] = NSNull(); state["application_uncertain"] = false
+      if case .failure = result {
+        state["phase"] = "failed"; state["error"] = "operation_interrupted"
+        state["application_uncertain"] = self.watchfaceAdmitted
+      }
+      self.watchfaceID = nil; self.fileUploadDelegate = nil
+      try? owner.publish("watchface_finished", ["watchface_operation": state])
+    }
+    watchfaceID = id; watchfaceAdmitted = false
+    do { try owner.publish("watchface_started", ["watchface_operation": ["id": id.uuidString, "address": owner.journal.address,
+      "generation": generation, "action": action, "phase": bytes == nil ? "resetting" : "uploading", "current": 0,
+      "total": bytes?.count ?? 0, "name": name, "error": NSNull(), "application_uncertain": false]]) }
+    catch { finish(.failure(error)); throw error }
+    if let bytes, let sdk {
+      let manager = FileSystemManager(transport: sdk); downloadManager = manager
+      let delegate = CompanionFileUploadDelegate { [weak self] event, count, total in owner.queue.async {
+        guard let self, self.current(id, generation), self.watchfaceID == id else { return }
+        if event == "progress" {
+          guard total == bytes.count, (0...total).contains(count) else { self.finish(.failure(CompanionFailure.invalid("Invalid SDK upload progress"))); return }
+          var state = owner.journal.fields["watchface_operation"] as? [String: Any] ?? [:]
+          guard count >= (state["current"] as? Int ?? 0) else { self.finish(.failure(CompanionFailure.invalid("SDK upload regressed"))); return }
+          if count == total || count - (state["current"] as? Int ?? 0) >= max(1, total / 20) {
+            state["current"] = count; try? owner.publish("watchface_progress", ["watchface_operation": state])
+          }
+        } else if event == "finished" {
+          var state = owner.journal.fields["watchface_operation"] as? [String: Any] ?? [:]
+          state["phase"] = "verifying"; state["current"] = bytes.count
+          try? owner.publish("watchface_verifying", ["watchface_operation": state])
+          DispatchQueue.main.async {
+            manager.status(name: "/user/bg_new.bin") { response, error in owner.queue.async {
+              guard self.current(id, generation) else { return }
+              guard error == nil, response?.getError() == nil, response?.len == UInt64(bytes.count) else {
+                self.finish(.failure(CompanionFailure.unavailable("Watchface size mismatch"))); return
+              }
+              self.verifyWatchface(id, generation, manager, expected: bytes, offset: 0)
+            } }
+          }
+        } else { self.finish(.failure(CompanionFailure.unavailable("Watchface upload failed"))) }
+      } }
+      fileUploadDelegate = delegate
+      DispatchQueue.main.async {
+        let config = FirmwareUpgradeConfiguration(pipelineDepth: 1)
+        if !manager.upload(name: "/user/bg_new.bin", data: bytes, using: config, delegate: delegate) {
+          owner.queue.async { if self.current(id, generation) { self.finish(.failure(CompanionFailure.unavailable("SDK rejected upload"))) } }
+        }
+      }
+    } else { applyWatchface(id, generation, action: action) }
+    return ["version": 1, "accepted": true, "id": id.uuidString, "generation": generation]
+  }
+  private func verifyWatchface(_ id: UUID, _ generation: Int, _ manager: FileSystemManager, expected: Data, offset: Int) {
+    guard let owner, current(id, generation) else { return }
+    if offset == expected.count { applyWatchface(id, generation, action: "apply"); return }
+    DispatchQueue.main.async {
+      manager.download(name: "/user/bg_new.bin", offset: UInt(offset)) { response, error in owner.queue.async {
+        guard self.current(id, generation) else { return }
+        guard error == nil, response?.getError() == nil, let response, response.off == UInt64(offset),
+              response.len == nil || response.len == UInt64(expected.count), let chunk = response.data,
+              !chunk.isEmpty, offset + chunk.count <= expected.count,
+              Data(chunk) == expected.subdata(in: offset..<offset + chunk.count) else {
+          self.finish(.failure(CompanionFailure.unavailable("Watchface readback mismatch"))); return
+        }
+        self.verifyWatchface(id, generation, manager, expected: expected, offset: offset + chunk.count)
+      } }
+    }
+  }
+  private func applyWatchface(_ id: UUID, _ generation: Int, action: String) {
+    guard let owner, current(id, generation) else { return }
+    var state = owner.journal.fields["watchface_operation"] as? [String: Any] ?? [:]
+    state["phase"] = action == "apply" ? "applying" : "resetting"
+    do {
+      try owner.publish("watchface_applying", ["watchface_operation": state])
+      try owner.send("GB({\"t\":\"watchface_bg\",\"action\":\"\(action)\"})", admission: {
+        guard self.current(id, generation) else { return false }
+        self.watchfaceAdmitted = true; return true
+      })
+      owner.queue.asyncAfter(deadline: .now() + 10) {
+        if self.current(id, generation), self.watchfaceID == id { self.finish(.failure(CompanionFailure.unavailable("Watchface result timed out"))) }
+      }
+    } catch { finish(.failure(error)) }
+  }
+  @discardableResult func receiveWatchface(_ message: [String: Any]) -> Bool {
+    guard message["t"] as? String == "watchface_bg" else { return false }
+    guard let owner, let id = watchfaceID, current(id, owner.journal.generation), watchfaceAdmitted,
+          let state = owner.journal.fields["watchface_operation"] as? [String: Any], let action = state["action"] as? String,
+          message["action"] as? String == action + "_result", let ok = CompanionRecordingFiles.boolean(message["ok"]) else { return true }
+    if !ok { watchfaceAdmitted = false }
+    finish(ok ? .success(["completed": true]) : .failure(CompanionFailure.unavailable("Watch rejected background")))
+    return true
+  }
+
   var isIdle: Bool { pending == nil }
   func cancelActive(_ reason: String) {
     transport?.invalidate(); transport = nil; preparedGeneration = nil
@@ -315,4 +422,13 @@ final class IOSCompanionSmp {
   static func validLogPath(_ path: String) -> Bool {
     path.range(of: "^/user/logs/log000[0-7]$", options: .regularExpression) != nil
   }
+}
+
+private final class CompanionFileUploadDelegate: FileUploadDelegate {
+  let event: (String, Int, Int) -> Void
+  init(_ event: @escaping (String, Int, Int) -> Void) { self.event = event }
+  func uploadProgressDidChange(bytesSent: Int, fileSize: Int, timestamp: Date) { event("progress", bytesSent, fileSize) }
+  func uploadDidFail(with error: Error) { event("failed", 0, 0) }
+  func uploadDidCancel() { event("cancelled", 0, 0) }
+  func uploadDidFinish() { event("finished", 0, 0) }
 }

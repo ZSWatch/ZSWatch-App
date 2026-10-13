@@ -43,6 +43,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   func uiForegrounded() { inbox?.foregrounded(); voice?.foregrounded() }
   func uiInactive() { voice?.inactive() }
   func journalChanged() {
+    if journal.loadError != nil { storageFailedIfNeeded(); return }
     let value = snapshot()
     for observer in observers.values { observer(value) }
   }
@@ -121,6 +122,12 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     journal = CompanionJournal(url: root.appendingPathComponent("ios-companion/state.json"))
     super.init()
     queue.async {
+      if var old = self.journal.fields["watchface_operation"] as? [String: Any],
+         ["uploading", "verifying", "applying", "resetting"].contains(old["phase"] as? String ?? "") {
+        old["application_uncertain"] = ["applying", "resetting"].contains(old["phase"] as? String ?? "")
+        old["phase"] = "failed"; old["error"] = "interrupted"
+        try? self.publish("watchface_process_interrupted", ["watchface_operation": old])
+      }
       self.inbox = IOSRecordingInbox(owner: self, root: root)
       self.inbox?.recover()
       do { self.voice = try IOSVoiceCoordinator(owner: self, root: root) }
@@ -535,6 +542,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       return
     }
     if http.receive(value, generation: journal.generation) { return }
+    if smpOwner?.receiveWatchface(value) == true { return }
     if voice?.receiveAck(value) == true { return }
     if inbox?.receive(value) == true { voice?.deliverResults(); return }
     if type == "ver" {

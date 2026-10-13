@@ -241,3 +241,21 @@ expiration/restoration, encrypted BLE downloads and original-file comparisons
 remain physical acceptance work. Search/archive/local deletion/edit/export and
 legacy recording presentation still need integration into the native receipt
 view. Firmware/resources/watchface work remains open; the goal is not complete.
+
+## 2026-10-13: watchface operation integration
+
+The existing gallery/crop/upload/reset UI now has a native backend. The exclusive
+Nordic owner retains payloads and the upload delegate after UI disposal. SDK
+upload progress is bounded and monotonic, then file status and complete byte
+readback verify /user/bg_new.bin before sending the existing NUS apply command.
+Reset uses the existing NUS-only command. Matching action/result and current
+Ready generation establish completion. Lost replies remain uncertain; retry of
+the same uncertain action requires reconnect, since this firmware reply has no
+operation identifier. Process loss leaves an explicit interrupted status.
+
+iOS UUIDs are accepted by the shared watchface status decoder. Ten affected
+Flutter tests pass, including all built-in image headers, native-only gallery
+routing, UI disposal and reattachment to terminal/progress snapshots. Signed
+Release builds pass. No physical image was applied/reset without encrypted
+Ready, so actual appearance and transfer throughput remain pending. Firmware
+image/resources transfers are still unfinished.

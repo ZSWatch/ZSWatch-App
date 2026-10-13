@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'companion_watch_identity.dart';
 
 class CompanionWatchfaceStatus {
   final String id, address, action, phase, name;
@@ -44,9 +45,7 @@ class CompanionWatchfaceStatus {
         (value['id'] as String).isEmpty ||
         (value['id'] as String).length > 64 ||
         value['address'] is! String ||
-        !RegExp(
-          r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$',
-        ).hasMatch(value['address'] as String) ||
+        !isCompanionWatchAddress(value['address'] as String) ||
         value['generation'] is! int ||
         (value['generation'] as int) < 0 ||
         !{'apply', 'reset'}.contains(value['action']) ||

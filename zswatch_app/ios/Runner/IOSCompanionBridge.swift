@@ -115,6 +115,12 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
             if args["path"] != nil && !(args["path"] is String) { throw CompanionFailure.invalid("Invalid log path") }
             try owner.smp.inspectLogs(generation, path: args["path"] as? String, complete: completed)
           }
+        case "startWatchface", "resetWatchface":
+          guard let generation = args["generation"] as? Int else { throw CompanionFailure.invalid("Watchface session required") }
+          if call.method == "startWatchface" {
+            guard let bytes = args["bytes"] as? FlutterStandardTypedData, let name = args["name"] as? String else { throw CompanionFailure.invalid("Background image required") }
+            reply(try owner.smp.startWatchface(generation, bytes: bytes.data, name: name))
+          } else { reply(try owner.smp.startWatchface(generation, bytes: nil, name: "Default")) }
         case "verifyWorkerRuntime":
           guard let voice = owner.voice else { throw CompanionFailure.unavailable("Voice owner unavailable") }
           try voice.verifyWorker { answer in

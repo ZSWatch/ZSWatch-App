@@ -7,6 +7,10 @@ final class CompanionRecordingFiles {
   let directory: URL
   init(root: URL) { directory = root.resolvingSymlinksInPath().appendingPathComponent("companion-prototype/recordings", isDirectory: true) }
   static func sha(_ bytes: Data) -> String { SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined() }
+  static func boolean(_ value: Any?) -> Bool? {
+    guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
+    return number.boolValue
+  }
   static func integer(_ value: Any?) -> Int? {
     guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
           number.doubleValue.isFinite, number.doubleValue >= 0, number.doubleValue <= Double(Int.max - 1024),
