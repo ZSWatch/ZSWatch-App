@@ -268,6 +268,17 @@ void main() {
       return saved;
     });
   });
+  testWidgets('native connection error ends spinner and exposes cancellation failure', (tester) async {
+    final failed = {...snapshot(active: true), 'phase': 'error', 'last_error': 'Previous Bluetooth session has not finished disconnecting. Cancel connection and try again.'};
+    await mount(tester, failed); await tester.pumpAndSettle();
+    expect(find.text(failed['last_error'] as String), findsOneWidget);
+    expect(find.text('Cancel connection'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    await tester.tap(find.text('Cancel connection')); await tester.pumpAndSettle();
+    expect(calls.where((c) => c.method == 'stop'), hasLength(1));
+    expect(calls.where((c) => c.method == 'start'), isEmpty);
+  });
+
   testWidgets('native settings enters isolated demo and all six entrances remain usable', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.binding.setSurfaceSize(const Size(1000, 2400));

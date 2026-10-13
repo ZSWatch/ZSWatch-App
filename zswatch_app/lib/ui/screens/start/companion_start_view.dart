@@ -84,6 +84,7 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
     final persistence = ref.watch(companionWatchPersistenceStateProvider);
     final active = snapshot?.runtimeActive == true;
     final ready = snapshot?.protocolReady == true;
+    final linkError = snapshot?.fields['last_error'];
     final busy =
         changingConnection || ref.watch(watchNotifierProvider).isLoading;
     return Scaffold(
@@ -107,13 +108,17 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
           if (watch != null) Text(watch.id),
           const SizedBox(height: 16),
           if (active) ...[
-            if (!ready) ...[
+            if (!ready && snapshot?.phase != 'error') ...[
               const LinearProgressIndicator(),
               const SizedBox(height: 16),
             ],
             Text(snapshot!.connection.state.statusText),
           ] else
             const Text('Watch disconnected'),
+          if (!ready && linkError is String && linkError.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(linkError),
+          ],
           const SizedBox(height: 16),
           FilledButton.icon(
             icon: Icon(active ? Icons.close : Icons.bluetooth),

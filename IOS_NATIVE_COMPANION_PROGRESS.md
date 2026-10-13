@@ -433,3 +433,34 @@ clean. The actual Inbox/file/voice host executables pass. Signed release compile
 with the permanent phone deletion controls. USB status after the firmware/demo
 checkpoint reports 26 recordings, 9464 KB free, and recording=no; the watch is
 still in Settings. No phone recording has been purged by these tests.
+
+
+### Fresh BLE probe and bounded connection waits (2026-10-13)
+
+A fresh signed probe found UUID FE88C737-593F-DB9B-732D-E11FF4C463F5.
+The first attempt remained Connecting with a restored pending cancellation and
+no pair dialog. Native now bounds the initial connection wait at 30 seconds,
+retries a warming-central cancellation twice, and reports a retained cancellation
+fence as a visible error. It does not clear that fence on timeout. Polling and
+terminal callbacks require the exact tracked peripheral handle. Existing native
+Stop remains available; error screens stop animating and show the saved reason.
+Apple documents that pending connections have no intrinsic timeout:
+[CoreBluetooth connect](https://developer.apple.com/documentation/corebluetooth/cbcentralmanager/connect(_:options:)).
+The signed build and 23 native app-shell tests pass, including the new visible
+error/Stop case (95 distinct affected Flutter tests across this checkpoint).
+
+A second probe with the bounded native wait reached Discovering, Subscribing and
+Bonding. UART confirms Pairable enabled, a BLE connection, LE 2M PHY, data length
+251 and MTU 244. USB screenshot/accessibility inspection captured the real iOS
+Bluetooth Pairing Request for ZSWatch. The exact Pair accessibility element was
+activated once; no verified bond or encrypted Ready followed. UART records SMP
+security timeout and Pairing Failed (9). The probe ended protocol_ready timeout
+and persisted Stop without a cleanup error. Physical NUS/SMP/firmware/AI acceptance
+is still pending. This security SMP failure is Bluetooth pairing, not a firmware
+transfer attempt. No image/resource was uploaded or reset-replayed.
+
+Local evidence: `.companion-hil-runs/20261013-ios-companion/fresh-ble-proof/`.
+The USB bootstrap now backs out of nested Settings pages with bounded Close/State
+checks before applying the previously verified touch coordinates. It never
+touches the bond-deletion row. The normal signed app is restored after probes;
+XCTest and accessibility control limitations remain as observed above.

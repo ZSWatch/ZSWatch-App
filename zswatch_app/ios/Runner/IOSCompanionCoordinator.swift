@@ -223,6 +223,19 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
 
   private func setPhase(_ value: String, error: String? = nil) {
     phase = value
+    if value == "connecting" {
+      let generation = journal.generation, address = journal.address
+      queue.asyncAfter(deadline: .now() + 30) { [weak self] in
+        guard let self, self.phase == "connecting", self.journal.owns(generation, address) else { return }
+        if let id = UUID(uuidString: address), self.cancellations.contains(id) {
+          self.setPhase("error", error: "Previous Bluetooth session has not finished disconnecting. Cancel connection and try again.")
+        } else {
+          // CoreBluetooth connection attempts have no intrinsic timeout. Keep
+          // normal reconnect intent, but fence this pending attempt first.
+          self.lost("Bluetooth connection timed out; retrying")
+        }
+      }
+    }
     var fields: [String: Any] = ["phase": value, "last_error": error.map { $0 as Any } ?? NSNull()]
     if value == "ready" {
       fields["last_ready"] = ["address": journal.address, "generation": journal.generation,
@@ -371,20 +384,32 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     // Cancelling an already-disconnected restored handle produces no disconnect
     // callback. Do not wait forever for a callback CoreBluetooth will not emit.
     guard item.state != .disconnected else {
-      cancellations.remove(item.identifier); cancellationHandles.removeValue(forKey: item.identifier); return
+      if cancellationHandles[item.identifier] == nil || cancellationHandles[item.identifier] === item {
+        cancellations.remove(item.identifier); cancellationHandles.removeValue(forKey: item.identifier)
+      }
+      return
     }
     cancellations.insert(item.identifier); cancellationHandles[item.identifier] = item
     if central?.state == .poweredOn { central?.cancelPeripheralConnection(item) }
     NSLog("[iOSCompanion] cancellation pending peripheral=%ld central=%ld", item.state.rawValue, central?.state.rawValue ?? 0)
     pollCancellation(item)
   }
-  private func pollCancellation(_ item: CBPeripheral) {
+  private func pollCancellation(_ item: CBPeripheral, retries: Int = 2) {
     queue.asyncAfter(deadline: .now() + 2) { [weak self] in
-      guard let self, self.cancellations.contains(item.identifier) else { return }
+      guard let self, self.cancellations.contains(item.identifier), self.cancellationHandles[item.identifier] === item else { return }
       if item.state == .disconnected {
         self.cancellations.remove(item.identifier); self.cancellationHandles.removeValue(forKey: item.identifier)
         if self.journal.desired, self.peripheral == nil { self.connectSelected() }
-      } else { self.pollCancellation(item) }
+      } else {
+        // A restored cancellation can be submitted while the central is still
+        // warming up. Retry the idempotent cancellation twice after poweredOn;
+        // never lift its fence just because a deadline elapsed.
+        if retries > 0, self.central?.state == .poweredOn {
+          self.central?.cancelPeripheralConnection(item)
+          NSLog("[iOSCompanion] retry cancellation peripheral=%ld remaining=%ld", item.state.rawValue, retries)
+        }
+        self.pollCancellation(item, retries: self.central?.state == .poweredOn ? max(0, retries - 1) : retries)
+      }
     }
   }
 
@@ -660,15 +685,17 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     discover(item)
   }
   func centralManager(_ central: CBCentralManager, didDisconnectPeripheral item: CBPeripheral, error: Error?) {
-    if cancellations.remove(item.identifier) != nil {
-      cancellationHandles.removeValue(forKey: item.identifier)
+    if cancellations.contains(item.identifier) {
+      guard cancellationHandles[item.identifier] === item else { return }
+      cancellations.remove(item.identifier); cancellationHandles.removeValue(forKey: item.identifier)
       if journal.desired, peripheral == nil { connectSelected() }; return
     }
     if peripheral === item, journal.desired { lost("Watch disconnected") }
   }
   func centralManager(_ central: CBCentralManager, didFailToConnect item: CBPeripheral, error: Error?) {
-    if cancellations.remove(item.identifier) != nil {
-      cancellationHandles.removeValue(forKey: item.identifier)
+    if cancellations.contains(item.identifier) {
+      guard cancellationHandles[item.identifier] === item else { return }
+      cancellations.remove(item.identifier); cancellationHandles.removeValue(forKey: item.identifier)
       if journal.desired, peripheral == nil { connectSelected() }; return
     }
     if peripheral === item, journal.desired { lost("Watch connection failed") }
