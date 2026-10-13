@@ -697,6 +697,19 @@ void main() {
       }
     },
   );
+  test('Nordic default WatchDK manifest matches revision 1 but rejects other revisions', () async {
+    final c = container(Stream.value(snapshot()));
+    addTearDown(c.dispose);
+    await c.read(companionSnapshotProvider.future);
+    final notifier = c.read(dfuNotifierProvider.notifier);
+    final original = manager.images.single;
+    manager.images = [original.copyWith(board: 'watchdk')];
+    await notifier.loadLocalFile(original.filePath);
+    await notifier.startUpdate();
+    expect(c.read(dfuNotifierProvider).hasError, false);
+    expect(calls.map((call) => call.method), ['prepareShell', 'startFirmware']);
+  });
+
   test(
     'board mismatch, duplicate indices, ambiguous package and changed file reject before preparing SMP',
     () async {
@@ -707,6 +720,8 @@ void main() {
       final original = manager.images.single;
       for (final images in [
         [original.copyWith(board: 'zswatch@5/nrf5340/cpuapp')],
+        [original.copyWith(board: 'watchdk@2/nrf5340/cpuapp')],
+        [original.copyWith(board: 'zswatch')],
         [original, original],
         [original.copyWith(slot: null), original.copyWith(slot: null)],
         [original.copyWith(size: 4)],

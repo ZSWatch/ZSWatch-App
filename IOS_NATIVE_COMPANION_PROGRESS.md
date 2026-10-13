@@ -629,3 +629,22 @@ resource, cancellation and recovery checks. The 26 affected firmware/voice Flutt
 tests and two-file analysis pass. The final normal signed Release build passes,
 including deep/strict codesign. Shared STT/LLM diagnostic messages now report
 character counts instead of complete transcripts or raw AI responses.
+
+
+### WatchDK manifest default revision (2026-10-14)
+
+The normal document picker selected the owned matched 0/2 package from iCloud
+Drive / Downloads. The first FW Update attempt was rejected in Dart preparation
+before native firmware admission or byte transfer: the generated NCS manifest
+uses board watchdk, while the device reports watchdk@1. The firmware's board.yml
+defines revision 1 as the default. Firmware board comparison now resolves only
+that bare WatchDK name to revision 1; explicit other revisions and other board
+families remain distinct. The regression reproduces rejection before the fix;
+21 firmware tests and three-file targeted analysis pass afterward.
+
+No cancellation, firmware write or reboot is claimed by the rejected attempt.
+The watch remains Ready and reports 28 recordings (26 originals and two owned
+captures). Before update, all 28 raw sources were copied back to local evidence
+and SHA256 matched their native committed receipts. The package contains exactly
+the internally/external paired binaries built above; network image 1 is omitted
+because the current watch does not report that index.

@@ -460,13 +460,10 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
             'Firmware package needs distinct image indices',
           );
         }
-        final board = FirmwareManager.boardPrefixFromHardwareVersion(
+        if (!FirmwareManager.firmwareBoardMatches(
           prepared.board,
-        );
-        final selectedBoard = FirmwareManager.boardPrefixFromHardwareVersion(
           snapshot.watch?.hardwareVersion,
-        );
-        if (board != null && selectedBoard != null && board != selectedBoard) {
+        )) {
           throw const FormatException(
             'Firmware package is for another watch board',
           );
