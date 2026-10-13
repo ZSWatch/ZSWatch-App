@@ -65,6 +65,16 @@ import Foundation
     let persisted = try reopenedAgain.detail(edited); precondition(persisted["transcript"] as? String == "Corrected 🔋 speech")
     let canonical = try CompanionVoiceJobs.canonical(["z":"é🔋/", "a":false])
     precondition(canonical == "{\"a\":false,\"z\":\"é🔋/\"}")
+    let beforePurge = reopened.jobs
+    try reopened.purgeRecordings(["watch:memo"])
+    precondition(!reopened.jobs.values.contains { ($0["spec"] as? [String: Any])?["recording_id"] as? String == "watch:memo" })
+    precondition(!reopened.owns(oldAttempt))
+    let afterPurge = try reopened.complete(oldAttempt, result: full); precondition(!afterPurge)
+    for (key, job) in beforePurge where (job["spec"] as? [String: Any])?["recording_id"] as? String != "watch:memo" {
+      let unchanged = try CompanionVoiceJobs.canonical(reopened.jobs[key]!) == CompanionVoiceJobs.canonical(job); precondition(unchanged)
+    }
+    let afterRestart = try CompanionVoiceJobs(journal: CompanionJournal(url: journal.url))
+    precondition(afterRestart.jobs.count == reopened.jobs.count)
     print("PASS: checkpoints, immutable edits/reanalysis, selected-only deletion fences, private search and ACKs")
   }
 }

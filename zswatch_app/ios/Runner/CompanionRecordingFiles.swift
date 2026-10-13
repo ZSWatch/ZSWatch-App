@@ -77,6 +77,34 @@ final class CompanionRecordingFiles {
       try FileManager.default.moveItem(at: source, to: target)
     }
   }
+  /// Explicit purge removes only this receipt's generated copies, including
+  /// late converter publications retained under its private trash directory.
+  func purgeLocal(_ identity: String, metadata: [String: Any]) throws {
+    try prepareDirectory()
+    let copies = try localCopies(identity, metadata: metadata)
+    let trash = trashDirectory(identity)
+    guard trash.resolvingSymlinksInPath().path == trash.path else { throw CompanionFailure.storage("Deleted recording directory is not canonical") }
+    var candidates = copies
+    if FileManager.default.fileExists(atPath: trash.path) {
+      for file in try FileManager.default.contentsOfDirectory(at: trash, includingPropertiesForKeys: nil) {
+        let name = file.lastPathComponent
+        guard copies.contains(where: { source in
+          if name == source.lastPathComponent { return true }
+          let prefix = source.lastPathComponent + ".recovered-"
+          return name.hasPrefix(prefix) && UUID(uuidString: String(name.dropFirst(prefix.count))) != nil
+        }) else { throw CompanionFailure.storage("Unknown deleted recording file retained") }
+        candidates.append(trash.appendingPathComponent(name))
+      }
+    }
+    // Validate the complete selection before removing any file. Neither a
+    // symlink nor an unexpected directory may broaden an explicit selection.
+    for file in candidates {
+      guard file.resolvingSymlinksInPath().path == file.path else { throw CompanionFailure.storage("Invalid deleted recording path") }
+      if FileManager.default.fileExists(atPath: file.path) { _ = try read(file, limit: 32 * 1024 * 1024) }
+    }
+    for file in candidates where FileManager.default.fileExists(atPath: file.path) { try FileManager.default.removeItem(at: file) }
+    if FileManager.default.fileExists(atPath: trash.path) { try FileManager.default.removeItem(at: trash) }
+  }
   func restoreLocal(_ identity: String, metadata: [String: Any]) throws -> [String: Any] {
     try prepareDirectory()
     let trash = trashDirectory(identity)

@@ -49,6 +49,20 @@ import Foundation
     let (other, _) = CompanionRecordingFiles.metadata(raw.merging(["filename":"other"]) { _, new in new }, address: address)!
     try FileManager.default.createSymbolicLink(at: store.partial(other), withDestinationURL: store.destination(key))
     do { _ = try store.prefix(other, expected: 36); fatalError("Symlink accepted") } catch {}
-    print("PASS: partial/source recovery, selected-only local removal/restore, integrity and path bounds")
+    try store.removeLocal(key, metadata: receipt)
+    try bytes.write(to: exactPlayback) // A late converter publication is included.
+    let deleted = store.directory.appendingPathComponent("recently-deleted").appendingPathComponent(CompanionRecordingFiles.sha(Data(key.utf8)))
+    let unknown = deleted.appendingPathComponent("unrelated-user-file")
+    try bytes.write(to: unknown)
+    do { try store.purgeLocal(key, metadata: receipt); fatalError("Unknown trash file purged") } catch {}
+    precondition(FileManager.default.fileExists(atPath: exactPlayback.path))
+    try FileManager.default.removeItem(at: unknown)
+    try store.purgeLocal(key, metadata: receipt)
+    precondition(!FileManager.default.fileExists(atPath: store.destination(key).path))
+    precondition(!FileManager.default.fileExists(atPath: exactPlayback.path))
+    precondition(!FileManager.default.fileExists(atPath: deleted.path))
+    precondition(FileManager.default.fileExists(atPath: playback.path))
+    try store.purgeLocal(key, metadata: receipt) // Recovery may repeat cleanup.
+    print("PASS: partial/source recovery, selected-only local removal/restore/purge, integrity and path bounds")
   }
 }

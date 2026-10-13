@@ -59,6 +59,9 @@ final class IOSVoiceCoordinator {
   func removeRecordings(_ identities: Set<String>) throws {
     try jobs.cancelRecordings(identities); fenceObsoleteWorker(); owner?.journalChanged()
   }
+  func purgeRecordings(_ identities: Set<String>) throws {
+    try jobs.purgeRecordings(identities); fenceObsoleteWorker(); owner?.journalChanged()
+  }
   func editTranscript(_ id: String, transcript: String) throws -> String {
     guard let identity = (jobs.jobs[id]?["spec"] as? [String: Any])?["recording_id"] as? String,
           let record = (owner?.journal.fields["recordings"] as? [String: [String: Any]])?[identity],

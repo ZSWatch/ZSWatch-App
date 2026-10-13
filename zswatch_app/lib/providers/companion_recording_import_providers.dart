@@ -8,6 +8,7 @@ import '../data/models/companion_recording.dart';
 import '../services/voice_memo/companion_recording_importer.dart';
 import '../services/voice_memo/companion_recording_exporter.dart';
 import 'companion_runtime_providers.dart';
+import 'demo_mode_provider.dart';
 
 final companionRecordingExporterProvider = Provider<CompanionRecordingExporter>(
   (ref) => const CompanionRecordingExporter(
@@ -47,7 +48,9 @@ final companionRecordingDatabaseProvider = Provider<CompanionRecordingDatabase>(
 
 final companionRecordingImportsProvider =
     StreamProvider<List<ImportedRecording>>(
-      (ref) => ref.watch(companionRecordingDatabaseProvider).watchImports(),
+      (ref) => ref.watch(demoModeProvider)
+          ? Stream.value([])
+          : ref.watch(companionRecordingDatabaseProvider).watchImports(),
     );
 
 final companionPreparePlaybackProvider =

@@ -20,6 +20,8 @@ class CompanionRecording {
   final String? error;
   final String title;
   final bool archived;
+  final bool purged;
+  final bool purgePending;
 
   const CompanionRecording._({
     required this.identity,
@@ -34,6 +36,8 @@ class CompanionRecording {
     this.error,
     required this.title,
     required this.archived,
+    required this.purged,
+    required this.purgePending,
   });
 
   /// This reflects the committed journal. It does not read/validate the file,
@@ -76,6 +80,8 @@ class CompanionRecording {
     final error = value['error'];
     final title = value['title'] ?? '';
     final archived = value['archived'] ?? false;
+    final purged = value['purged'] ?? false;
+    final purgePending = value['purge_pending'] ?? false;
     if ((path != null && (path is! String || !path.startsWith('/'))) ||
         (hash != null &&
             (hash is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(hash))) ||
@@ -83,6 +89,10 @@ class CompanionRecording {
         title is! String ||
         title.length > 256 ||
         archived is! bool ||
+        purged is! bool ||
+        purgePending is! bool ||
+        (purged && state != CompanionRecordingState.deleted) ||
+        (purgePending && !purged) ||
         (state == CompanionRecordingState.downloaded &&
             (path == null || hash == null))) {
       throw const FormatException('Invalid native recording receipt');
@@ -103,6 +113,8 @@ class CompanionRecording {
       error: error as String?,
       title: title.trim().isEmpty ? filename : title,
       archived: archived,
+      purged: purged,
+      purgePending: purgePending,
     );
   }
 }

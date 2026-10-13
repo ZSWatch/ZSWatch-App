@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
+import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
 import 'package:zswatch_app/providers/demo_mode_provider.dart';
 import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/providers/ios_telemetry_providers.dart';
@@ -104,6 +105,22 @@ void main() {
       );
     },
   );
+  test('preview recording imports never open the real local ledger', () async {
+    final isolated = ProviderContainer(
+      overrides: [
+        demoModeProvider.overrideWith((ref) => true),
+        companionRecordingDatabaseProvider.overrideWith(
+          (ref) =>
+              throw StateError('Private import ledger opened in Demo Mode'),
+        ),
+      ],
+    );
+    addTearDown(isolated.dispose);
+    expect(
+      await isolated.read(companionRecordingImportsProvider.future),
+      isEmpty,
+    );
+  });
   test('a stopped watch stays stopped after preview', () async {
     state = realState(active: false);
     final controller = container.read(demoModeControllerProvider);

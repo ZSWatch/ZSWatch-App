@@ -420,6 +420,22 @@ class CompanionPrototypeClient {
     );
   }
 
+  Future<void> purgeRecordings(List<String> identities) async {
+    if (identities.isEmpty ||
+        identities.length > 100 ||
+        identities.toSet().length != identities.length) {
+      throw const FormatException(
+        'Select up to 100 Recently deleted recordings',
+      );
+    }
+    CompanionPrototypeSnapshot.decode(
+      await methods.invokeMethod<Object?>('purgeRecordings', {
+        'version': 1,
+        'identities': identities,
+      }),
+    );
+  }
+
   Future<void> restoreRecording(String identity) async {
     CompanionPrototypeSnapshot.decode(
       await methods.invokeMethod<Object?>('restoreRecording', {

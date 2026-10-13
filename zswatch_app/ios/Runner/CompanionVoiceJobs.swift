@@ -144,6 +144,10 @@ final class CompanionVoiceJobs {
     }
     try commit("voice_recordings_removed", next)
   }
+  func purgeRecordings(_ identities: Set<String>) throws {
+    let next = jobs.filter { !identities.contains(($0.value["spec"] as? [String: Any])?["recording_id"] as? String ?? "") }
+    if next.count != jobs.count { try commit("voice_recordings_purged", next) }
+  }
   func editTranscript(_ id: String, transcript: String) throws -> String {
     guard let original = jobs[id], original["selected"] as? Bool == true,
           let spec = original["spec"] as? [String: Any], let identity = spec["recording_id"] as? String,

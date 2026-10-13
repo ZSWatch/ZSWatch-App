@@ -405,3 +405,31 @@ Validation: 64 affected Flutter tests pass (firmware, native app shell, demo,
 shared runtime, telemetry, catalogue); 12-file targeted analysis is clean. Actual
 Swift firmware/resource state tests and the entire vendored SDK abort proof pass.
 The signed release build passes; no physical firmware/resource transfer is claimed.
+
+
+### Permanent local recording cleanup (2026-10-13)
+
+Recently deleted now includes an explicitly confirmed permanent phone deletion.
+Native persists the purge intent before removing selected job revisions, raw/partial
+audio, converted Ogg, and recovered copies inside that identity's trash directory.
+It retains a minimal source tombstone to prevent automatic watch redownload.
+Already-created calendar entries and scheduled alerts are retained. No watch
+delete or other BLE command is sent. Cleanup failure remains visible with Retry;
+startup repairs the intent, including process loss before file/job cleanup.
+Unavailable job storage cannot report cleanup complete or leave retained private
+job text hidden behind a completed purge. Unknown files and symlinks are retained,
+and the full generated file selection is validated before removal.
+
+Actual Swift Inbox/file/journal/job source checks pass: interruption after durable
+intent, unavailable job storage, restart cleanup, unselected data preservation,
+refused restore, and rediscovery without download. File checks cover late converter
+publication and unknown-trash refusal. Widget checks cover Cancel, selected-only
+confirmation, completed/pending visibility and malformed purge flags. Demo now
+also avoids opening the private recording import ledger. These are host checks;
+permanent deletion has not been exercised on the user's phone data.
+
+Final affected regression: 94 Flutter tests pass; six-file purge/demo analysis is
+clean. The actual Inbox/file/voice host executables pass. Signed release compiles
+with the permanent phone deletion controls. USB status after the firmware/demo
+checkpoint reports 26 recordings, 9464 KB free, and recording=no; the watch is
+still in Settings. No phone recording has been purged by these tests.

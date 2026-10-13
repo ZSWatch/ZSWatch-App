@@ -20,6 +20,7 @@ final class IOSRecordingInbox {
     for (key, metadata) in records {
       do {
         if metadata["state"] as? String == "deleted" {
+          if metadata["purged"] as? Bool == true { try finishPurge(key); continue }
           try owner?.voice?.removeRecordings([key])
           try files.removeLocal(key, metadata: metadata)
           continue
@@ -32,12 +33,13 @@ final class IOSRecordingInbox {
         var failed = metadata
         // Never turn a durable deletion tombstone back into a sync candidate.
         if metadata["state"] as? String != "deleted" { failed["state"] = "failed" }
+        if metadata["purged"] as? Bool == true { failed["purge_pending"] = true }
         failed["error"] = "receipt_unavailable"; try? put(key, failed)
       }
     }
   }
   func update(_ identity: String, title: String?, archived: Bool?) throws {
-    guard var record = records[identity], title != nil || archived != nil,
+    guard var record = records[identity], record["purged"] as? Bool != true, title != nil || archived != nil,
           title == nil || (title!.utf8.count <= 256 && !title!.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })) else {
       throw CompanionFailure.invalid("Recording title/archive change required")
     }
@@ -48,7 +50,7 @@ final class IOSRecordingInbox {
   func remove(_ identities: [String]) throws {
     let selected = Set(identities)
     guard !selected.isEmpty, selected.count == identities.count, selected.count <= 100,
-          selected.allSatisfy({ ["downloaded", "deleted"].contains(records[$0]?["state"] as? String ?? "") }), let owner else {
+          selected.allSatisfy({ records[$0]?["purged"] as? Bool != true && ["downloaded", "deleted"].contains(records[$0]?["state"] as? String ?? "") }), let owner else {
       throw CompanionFailure.invalid("Select up to 100 saved recordings")
     }
     try owner.voice?.removeRecordings(selected)
@@ -61,8 +63,35 @@ final class IOSRecordingInbox {
     // A lost process after the durable tombstone is repaired by recover().
     for key in selected { try files.removeLocal(key, metadata: next[key]!) }
   }
+  func purge(_ identities: [String]) throws {
+    let selected = Set(identities)
+    guard !selected.isEmpty, selected.count == identities.count, selected.count <= 100,
+          selected.allSatisfy({ records[$0]?["state"] as? String == "deleted" }), let owner else {
+      throw CompanionFailure.invalid("Select up to 100 Recently deleted recordings")
+    }
+    // Durable intent first. Startup retries cleanup; the recording can never be
+    // restored, automatically imported or downloaded after this confirmation.
+    var next = records
+    for key in selected {
+      next[key]?["purged"] = true; next[key]?["purge_pending"] = true
+      next[key]?.removeValue(forKey: "title"); next[key]?.removeValue(forKey: "processing_request")
+      next[key]?.removeValue(forKey: "local_path")
+    }
+    try owner.publish("recordings_purge_requested", ["recordings": next])
+    for key in selected { try finishPurge(key) }
+  }
+  private func finishPurge(_ identity: String) throws {
+    guard var record = records[identity] else { return }
+    guard let voice = owner?.voice else { throw CompanionFailure.unavailable("Voice job storage required for permanent deletion") }
+    try voice.purgeRecordings([identity])
+    try files.purgeLocal(identity, metadata: record)
+    if record["purge_pending"] as? Bool == true || record["error"] != nil {
+      record["purge_pending"] = false; record.removeValue(forKey: "error")
+      try put(identity, record)
+    }
+  }
   func restore(_ identity: String) throws {
-    guard let record = records[identity], record["state"] as? String == "deleted" else { throw CompanionFailure.invalid("Deleted recording required") }
+    guard let record = records[identity], record["state"] as? String == "deleted", record["purged"] as? Bool != true else { throw CompanionFailure.invalid("Deleted recording required") }
     var restored = try files.restoreLocal(identity, metadata: record)
     restored.removeValue(forKey: "deleted_at")
     try put(identity, restored)

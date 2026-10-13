@@ -130,6 +130,36 @@ class _CompanionVoiceMemosViewState
     }
   }
 
+  Future<void> purge(CompanionRecording recording) async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete permanently from phone?'),
+        content: const Text(
+          'Permanently remove this local audio, saved notes and action history. You cannot restore them. The watch original, calendar entries and scheduled alerts remain.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete permanently'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    await modify(
+      () => VoiceMemoFileStore.exclusive(
+        () => ref.read(companionClientProvider).purgeRecordings([
+          recording.identity,
+        ]),
+      ),
+    );
+  }
+
   Future<void> remove(List<String> identities) async {
     final accepted = await showDialog<bool>(
       context: context,
@@ -738,6 +768,7 @@ class _CompanionVoiceMemosViewState
               .length;
           final items = watchItems
               .where((item) {
+                if (item.purged && !item.purgePending) return false;
                 if (filter == _RecordingFilter.deleted) {
                   return item.state == CompanionRecordingState.deleted;
                 }
@@ -833,7 +864,7 @@ class _CompanionVoiceMemosViewState
                   ),
                 if (filter == _RecordingFilter.deleted)
                   const Text(
-                    'Restore deleted recordings here. Originals on the watch are retained.',
+                    'Restore recordings or delete them permanently to free phone storage. Watch originals remain.',
                   ),
                 if (selecting && selection.isNotEmpty) ...[
                   Text('${selection.length} selected'),
@@ -961,11 +992,24 @@ class _CompanionVoiceMemosViewState
                   ),
                   isThreeLine: true,
                   trailing: ios && item.state == CompanionRecordingState.deleted
-                      ? TextButton(
-                          onPressed: modifying
-                              ? null
-                              : () => recordingAction('restore', item),
-                          child: const Text('Restore'),
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!item.purged)
+                              TextButton(
+                                onPressed: modifying
+                                    ? null
+                                    : () => recordingAction('restore', item),
+                                child: const Text('Restore'),
+                              ),
+                            IconButton(
+                              tooltip: item.purgePending
+                                  ? 'Retry permanent deletion'
+                                  : 'Delete permanently from phone',
+                              onPressed: modifying ? null : () => purge(item),
+                              icon: const Icon(Icons.delete_forever),
+                            ),
+                          ],
                         )
                       : item.hasCommittedReceipt
                       ? Row(
@@ -1067,6 +1111,9 @@ class _CompanionVoiceMemosViewState
               : ready
               ? 'Queued for download'
               : 'Waiting for connection',
-        CompanionRecordingState.deleted => 'Recently deleted',
+        CompanionRecordingState.deleted =>
+          item.purgePending
+              ? 'Deletion awaiting cleanup'
+              : 'Recently deleted',
       };
 }

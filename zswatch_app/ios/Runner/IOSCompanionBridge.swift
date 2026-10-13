@@ -157,9 +157,10 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
             try inbox.update(identity, title: args["title"] as? String, archived: CompanionRecordingFiles.boolean(args["archived"]))
           }
           reply(owner.snapshot())
-        case "removeRecordings":
+        case "removeRecordings", "purgeRecordings":
           guard let inbox = owner.inbox, let identities = args["identities"] as? [String] else { throw CompanionFailure.invalid("Selected recordings required") }
-          try inbox.remove(identities); reply(owner.snapshot())
+          if call.method == "purgeRecordings" { try inbox.purge(identities) } else { try inbox.remove(identities) }
+          reply(owner.snapshot())
         case "searchRecordings":
           guard let query = args["query"] as? String, query.utf8.count <= 512 else { throw CompanionFailure.invalid("Search query too long") }
           var matches = owner.voice?.jobs.search(query) ?? []
