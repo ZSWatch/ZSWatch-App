@@ -100,6 +100,34 @@ void main() {
   );
 
   test(
+    'iOS When In Use location remains usable with an honest background label',
+    () {
+      final status = CompanionGpsStatus.decode({
+        ...fields(enabled: true),
+        'owner': 'ios_companion_native',
+        'gps_permissions': {
+          'foreground': true,
+          'background': false,
+          'services': true,
+        },
+      });
+      expect(status.foregroundPermission, isTrue);
+      expect(status.description, contains('while this app is open'));
+      expect(status.description, contains('Always'));
+      final denied = CompanionGpsStatus.decode({
+        ...fields(enabled: true),
+        'owner': 'ios_companion_native',
+        'gps_permissions': {
+          'foreground': false,
+          'background': false,
+          'services': true,
+        },
+      });
+      expect(denied.description, 'Allow location access in iPhone settings');
+    },
+  );
+
+  test(
     'configure uses native policy confirmation and cannot invent a commit',
     () async {
       final calls = <MethodCall>[];

@@ -110,3 +110,61 @@ protection uses first-unlock protection; unreadable/corrupt storage fails closed
 Relevant platform references remain Apple's
 [CoreBluetooth restoration guidance](https://developer.apple.com/library/archive/qa/qa1962/_index.html)
 and [Core Location background setting](https://developer.apple.com/documentation/corelocation/cllocationmanager/allowsbackgroundlocationupdates).
+
+## 2026-10-13: native everyday services and coordinated Nordic operations
+
+Bluetooth authorization is now granted on the iPhone. The first release probe
+found ZSWatch UUID FE88C737-593F-DB9B-732D-E11FF4C463F5 (RSSI -49), connected,
+discovered NUS and began its encrypted notification subscription. Simultaneous
+UART evidence shows MTU 244, data PDU 251 and 2M PHY. Pairing timed out after
+about 31 seconds (firmware SMP reason 9); this is not protocol Ready evidence.
+Firmware requires Settings > Bluetooth > Pairable > Enable, a 60-second window,
+then iPhone pairing confirmation. No bond deletion is used to bypass that step.
+
+The discovery deadline now allows an encrypted CCCD subscription to wait for
+pairing. Picker results are restricted to ZSWatch and throttled rather than
+persisting every nearby advertisement. A second probe exposed a disconnected
+restored peripheral being retained in the cancellation set; cancellation now
+ignores disconnected handles and observes pending cancellation completion.
+The actual CoreBluetooth restoration delegate was called during the explicitly
+terminated/relaunched probe, and respected Stop. That does not prove a genuine
+system termination/background-triggered restoration case.
+
+Implemented modules, with physical acceptance still pending:
+- Native GPS serves only explicit watch requests after sharing opt-in. Cached
+  fixes expire after 30 seconds, invalid/coarse fixes are rejected and packet
+  units retain the existing firmware contract. When In Use permits foreground
+  operation; Always is required for background requests. Watch-off, Stop,
+  disconnect, disabled sharing and permission loss fence pending packets.
+- Native HTTP has four concurrent requests, bounded streaming response size,
+  an eight-second total delivery deadline, duplicate suppression, session-bound
+  NUS admission and bounded XML XPath. Request data is not journaled. A short
+  UIKit background task expires by cancelling the requests; it is not a
+  permanent process guarantee. Explicit per-request insecure TLS remains
+  supported without changing other requests' TLS policy.
+- One process-owned Nordic adapter coordinates preparation, shell execution,
+  known log downloads, coredump summary/download/explicit erase and acknowledged
+  Restart Watch. Mutating commands are never automatically replayed. Shell
+  results use Zephyr's signed `ret`, distinct from SMP's `rc`.
+- Ephemeral sensor subscriptions use the existing NUS peripheral and expose
+  only discovered characteristics. Closing the view unsubscribes. Subscription
+  timeout fences the session rather than assigning a late CCCD response to a
+  newer request. Diagnostic streams do not create BLE connections.
+
+The existing Nordic fork now contains the same upstream iOS SDK 1.10.1 source,
+license and original-file SHA256 manifest, with four modified upstream files
+and one small admission helper. This makes the fixes reproducible through a
+local CocoaPods path while retaining the SDK's SMP/file/DFU implementations.
+Fixes include correct service discovery, real without-response flow control,
+terminal cancellation of queued work, poweredOn retrieval and signed shell
+return values. Flutter plugin registration creates no Bluetooth manager.
+Nordic local commit: caa1650, branch codex/ios-companion. No push performed.
+
+Validation: four host Swift executables pass (SDK lifetime, HTTP, GPS and
+coredump), 19 affected Flutter tests pass and analysis of the five changed Dart
+implementation/probe files is clean. Signed normal and probe Release builds
+pass (about 80.6 MB). Evidence is retained under the ignored
+.companion-hil-runs/20261013-ios-companion directory; Release-iphoneos/Runner.app
+is used explicitly. Tests of sensors, shell, GPS/Weather, reset, and crash files
+on BLE remain pending encrypted Ready. Firmware/resources/watchface transfers,
+recording receipts/jobs and shared Dart worker integration remain unfinished.

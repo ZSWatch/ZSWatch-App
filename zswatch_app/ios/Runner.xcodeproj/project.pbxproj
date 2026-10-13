@@ -20,6 +20,12 @@
 		A10000000000000000000004 /* CompanionNusFramer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* CompanionNusFramer.swift */; };
 		A10000000000000000000006 /* IOSCompanionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* IOSCompanionCoordinator.swift */; };
 		A10000000000000000000008 /* IOSCompanionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* IOSCompanionBridge.swift */; };
+		A1000000000000000000000A /* IOSCompanionSmp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000009 /* IOSCompanionSmp.swift */; };
+		A1000000000000000000000C /* CompanionHttpRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000B /* CompanionHttpRelay.swift */; };
+		A1000000000000000000000E /* CompanionLocationRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000D /* CompanionLocationRelay.swift */; };
+		A10000000000000000000010 /* CompanionSensors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000F /* CompanionSensors.swift */; };
+		A10000000000000000000012 /* CompanionCoredump.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* CompanionCoredump.swift */; };
+		A10000000000000000000014 /* CompanionBackgroundLease.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* CompanionBackgroundLease.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -73,6 +79,12 @@
 		A10000000000000000000003 /* CompanionNusFramer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionNusFramer.swift; sourceTree = "<group>"; };
 		A10000000000000000000005 /* IOSCompanionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSCompanionCoordinator.swift; sourceTree = "<group>"; };
 		A10000000000000000000007 /* IOSCompanionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSCompanionBridge.swift; sourceTree = "<group>"; };
+		A10000000000000000000009 /* IOSCompanionSmp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSCompanionSmp.swift; sourceTree = "<group>"; };
+		A1000000000000000000000B /* CompanionHttpRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionHttpRelay.swift; sourceTree = "<group>"; };
+		A1000000000000000000000D /* CompanionLocationRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionLocationRelay.swift; sourceTree = "<group>"; };
+		A1000000000000000000000F /* CompanionSensors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionSensors.swift; sourceTree = "<group>"; };
+		A10000000000000000000011 /* CompanionCoredump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionCoredump.swift; sourceTree = "<group>"; };
+		A10000000000000000000013 /* CompanionBackgroundLease.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionBackgroundLease.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -145,6 +157,12 @@
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
+				A10000000000000000000013 /* CompanionBackgroundLease.swift */,
+				A10000000000000000000011 /* CompanionCoredump.swift */,
+				A1000000000000000000000F /* CompanionSensors.swift */,
+				A1000000000000000000000D /* CompanionLocationRelay.swift */,
+				A1000000000000000000000B /* CompanionHttpRelay.swift */,
+				A10000000000000000000009 /* IOSCompanionSmp.swift */,
 				A10000000000000000000007 /* IOSCompanionBridge.swift */,
 				A10000000000000000000005 /* IOSCompanionCoordinator.swift */,
 				A10000000000000000000003 /* CompanionNusFramer.swift */,
@@ -422,6 +440,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
+				A10000000000000000000014 /* CompanionBackgroundLease.swift in Sources */,
+				A10000000000000000000012 /* CompanionCoredump.swift in Sources */,
+				A10000000000000000000010 /* CompanionSensors.swift in Sources */,
+				A1000000000000000000000E /* CompanionLocationRelay.swift in Sources */,
+				A1000000000000000000000C /* CompanionHttpRelay.swift in Sources */,
+				A1000000000000000000000A /* IOSCompanionSmp.swift in Sources */,
 				A10000000000000000000008 /* IOSCompanionBridge.swift in Sources */,
 				A10000000000000000000006 /* IOSCompanionCoordinator.swift in Sources */,
 				A10000000000000000000004 /* CompanionNusFramer.swift in Sources */,

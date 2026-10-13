@@ -20,7 +20,7 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
     super.init()
     methods.setMethodCallHandler { [weak self] call, result in self?.handle(call, result) }
     events.setStreamHandler(self)
-    diagnosticStreams = ["logs", "traffic"].map {
+    diagnosticStreams = ["logs", "traffic", "sensors"].map {
       CompanionDiagnosticStream(messenger: messenger, owner: owner, kind: $0)
     }
   }
@@ -92,6 +92,47 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
         case "forgetWatch":
           guard let id = args["address"] as? String else { throw CompanionFailure.invalid("Watch identifier required") }
           try owner.forget(id); reply(owner.snapshot())
+        case "prepareShell", "executeShell", "inspectLogs", "restartWatch", "inspectCoredump", "downloadCoredump":
+          guard let generation = args["generation"] as? Int else { throw CompanionFailure.invalid("Session generation required") }
+          let completed: (Result<[String: Any], Error>) -> Void = { answer in
+            switch answer {
+            case .success(var fields):
+              if let bytes = fields["bytes"] as? Data { fields["bytes"] = FlutterStandardTypedData(bytes: bytes) }
+              reply(fields)
+            case .failure(let error): reply(FlutterError(code: "SMP_FAILED", message: error.localizedDescription, details: nil))
+            }
+          }
+          if call.method == "restartWatch" { try owner.smp.restart(generation, complete: completed) }
+          else if call.method == "inspectCoredump" {
+            guard let erase = args["erase"] as? Bool else { throw CompanionFailure.invalid("Erase policy required") }
+            try owner.smp.inspectCoredump(generation, erase: erase, complete: completed)
+          } else if call.method == "downloadCoredump" { try owner.smp.downloadCoredump(generation, complete: completed) }
+          else if call.method == "prepareShell" { try owner.smp.prepare(generation, complete: completed) }
+          else if call.method == "executeShell" {
+            guard let command = args["command"] as? String else { throw CompanionFailure.invalid("Shell command required") }
+            try owner.smp.shell(generation, command: command, complete: completed)
+          } else {
+            if args["path"] != nil && !(args["path"] is String) { throw CompanionFailure.invalid("Invalid log path") }
+            try owner.smp.inspectLogs(generation, path: args["path"] as? String, complete: completed)
+          }
+        case "sensorState": reply(owner.sensors.state)
+        case "setSensor":
+          guard let generation = args["generation"] as? Int, owner.isReadySession(generation),
+                let sensor = args["sensor"] as? String, let enabled = args["enabled"] as? Bool else {
+            throw CompanionFailure.invalid("Current sensor session required")
+          }
+          try owner.sensors.request(sensor, enabled: enabled) { answer in
+            switch answer {
+            case .success: reply(["version": 1, "completed": true])
+            case .failure(let error): reply(FlutterError(code: "SENSOR_FAILED", message: error.localizedDescription, details: nil))
+            }
+          }
+        case "configureGps":
+          guard let enabled = args["enabled"] as? Bool else { throw CompanionFailure.invalid("Location sharing policy required") }
+          try owner.configureGps(enabled); reply(owner.snapshot())
+        case "configureHttp":
+          guard let enabled = args["enabled"] as? Bool else { throw CompanionFailure.invalid("HTTP policy required") }
+          try owner.configureHttp(enabled); reply(owner.snapshot())
         case "setLogStreaming":
           guard let enabled = args["enabled"] as? Bool else { throw CompanionFailure.invalid("Log policy required") }
           try owner.send("GB({\"t\":\"log\",\"status\":\(enabled ? "true" : "false")})")
@@ -146,6 +187,7 @@ private final class CompanionDiagnosticStream: NSObject, FlutterStreamHandler {
   let channel: FlutterEventChannel
   private var token = UUID()
   private var sink: FlutterEventSink?
+  private var registeredToken: UUID?
   init(messenger: FlutterBinaryMessenger, owner: IOSCompanionCoordinator, kind: String) {
     self.owner = owner; self.kind = kind
     channel = FlutterEventChannel(name: "dev.zswatch.app/companion_\(kind)_v1", binaryMessenger: messenger)
@@ -160,21 +202,29 @@ private final class CompanionDiagnosticStream: NSObject, FlutterStreamHandler {
     let callback: ([String: Any]) -> Void = { [weak self] value in
       DispatchQueue.main.async {
         guard let self, self.token == stream else { return }
-        self.sink?(value)
+        var fields = value
+        if let bytes = fields["bytes"] as? Data { fields["bytes"] = FlutterStandardTypedData(bytes: bytes) }
+        self.sink?(fields)
       }
     }
     owner.queue.async {
+      self.registeredToken = stream
       if self.kind == "logs" {
         self.owner.logObserver = callback
         callback(["version": 1, "kind": "state", "generation": self.owner.journal.generation])
+      } else if self.kind == "sensors" {
+        self.owner.sensors.observer = callback; self.owner.sensors.attached()
       } else { self.owner.trafficObserver = callback }
     }
     return nil
   }
   func onCancel(withArguments arguments: Any?) -> FlutterError? {
-    token = UUID(); sink = nil
+    let cancelled = token; token = UUID(); sink = nil
     owner.queue.async {
+      guard self.registeredToken == cancelled else { return }
+      self.registeredToken = nil
       if self.kind == "logs" { self.owner.logObserver = nil }
+      else if self.kind == "sensors" { self.owner.sensors.observer = nil; self.owner.sensors.stopAll() }
       else { self.owner.trafficObserver = nil }
     }
     return nil

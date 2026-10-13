@@ -37,7 +37,7 @@ import UserNotifications
   }
 
   override func applicationDidEnterBackground(_ application: UIApplication) {
-    companion.queue.async { [companion] in companion?.scanStop() }
+    companion.queue.async { [companion] in companion?.uiBackgrounded() }
     super.applicationDidEnterBackground(application)
   }
 

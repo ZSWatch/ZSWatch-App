@@ -9,6 +9,82 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   static let transmit = CBUUID(string: "6E400002-B5A3-F393-E0A9-E50E24DCCA9E")
   let queue = DispatchQueue(label: "dev.zswatch.companion", qos: .userInitiated)
   let journal: CompanionJournal
+  lazy var sensors = CompanionSensors(
+    later: { [weak self] delay, work in self?.queue.asyncAfter(deadline: .now() + delay, execute: work) },
+    notify: { [weak self] characteristic, enabled in self?.peripheral?.setNotifyValue(enabled, for: characteristic) },
+    failed: { [weak self] in self?.lost("Sensor subscription timed out") })
+  private var smpOwner: IOSCompanionSmp?
+  private var gpsRequested = false
+  private var gpsToken = UUID()
+  private lazy var gps = CompanionLocationRelay(
+    send: { [weak self] generation, token, fix, done in
+      self?.queue.async {
+        guard let self, self.gpsToken == token, self.gpsRequested, self.isReadySession(generation), self.journal.fields["gps_enabled"] as? Bool == true,
+              let packet = CompanionLocationPacket.encode(fix) else { return }
+        try? self.send(packet, admission: { self.gpsToken == token && self.gpsRequested && self.isReadySession(generation) &&
+          self.journal.fields["gps_enabled"] as? Bool == true && CompanionLocationPacket.encode(fix) != nil }, done: done)
+      }
+    },
+    observe: { [weak self] generation, token, state, requested in
+      self?.queue.async {
+        guard let self, self.gpsToken == token, self.isReadySession(generation) else { return }
+        self.gpsRequested = requested
+        try? self.publish("gps_state", ["gps_runtime": ["generation": generation, "state": state, "requested": requested]])
+      }
+    })
+  func configureGps(_ enabled: Bool) throws {
+    guard journal.fields["gps_enabled"] as? Bool != enabled else { return }
+    gpsRequested = false; gpsToken = UUID(); gps.close()
+    try publish("gps_configuration", ["gps_enabled": enabled,
+      "gps_runtime": ["generation": journal.generation, "state": enabled ? "idle" : "disabled", "requested": false]])
+  }
+  func uiBackgrounded() {
+    scanStop()
+    if gpsRequested, CompanionLocationRelay.permissions["background"] != true {
+      gpsRequested = false; gpsToken = UUID()
+      try? publish("gps_background_paused", ["gps_runtime": ["generation": journal.generation, "state": "permission_required", "requested": false]])
+    }
+    gps.backgrounded()
+  }
+  private var httpBatch = UUID()
+  private let httpLease = CompanionBackgroundLease()
+  private lazy var http: CompanionHttpRelay = CompanionHttpRelay(
+    later: { [weak self] delay, work in self?.queue.asyncAfter(deadline: .now() + delay, execute: work) },
+    fetch: { [weak self] request, done in
+      let work = CompanionHttpRequest(request: request) { result in self?.queue.async { done(result) } }
+      return { work.cancel() }
+    },
+    enabled: { [weak self] in self?.journal.fields["http_enabled"] as? Bool == true },
+    send: { [weak self] packet, generation, admit, done in
+      guard let self, self.isReadySession(generation) else { return false }
+      do { try self.send(packet, admission: admit, done: done); return true } catch { return false }
+    },
+    observe: { [weak self] generation, outcome, count in
+      guard let self else { return }
+      if count == 0 { self.httpBatch = UUID(); self.httpLease.end() }
+      else { let batch = self.httpBatch; self.httpLease.hold("ZSWatch HTTP response") { [weak self] in
+        self?.queue.async {
+          guard let self, self.httpBatch == batch, self.isReadySession(generation) else { return }
+          self.http.close()
+          try? self.publish("http_background_expired", ["http_pending_count": 0,
+            "last_http": ["generation": generation, "outcome": "background_expired", "utc_ms": CompanionJournal.now]])
+        }
+      } }
+      try? self.publish("http_state", ["http_pending_count": count,
+        "last_http": ["generation": generation, "outcome": outcome, "utc_ms": CompanionJournal.now]])
+    })
+  func configureHttp(_ enabled: Bool) throws {
+    try publish("http_configuration", ["http_enabled": enabled])
+    if !enabled { http.disable() }
+  }
+  var smp: IOSCompanionSmp {
+    if let smpOwner { return smpOwner }
+    let created = IOSCompanionSmp(owner: self); smpOwner = created; return created
+  }
+  func isReadySession(_ generation: Int) -> Bool {
+    journal.desired && journal.generation == generation && phase == "ready" && peripheral != nil
+  }
+  func publish(_ event: String, _ fields: [String: Any] = [:]) throws { try changed(event, fields) }
   private var central: CBCentralManager?
   private var peripheral: CBPeripheral?
   private var linkDelegate: CompanionLinkDelegate?
@@ -16,11 +92,12 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   private var tx: CBCharacteristic?
   private var phase = "stopped"
   private var cancellations = Set<UUID>()
-  private var writes: [(data: Data, offset: Int, chunks: Int, generation: Int, done: () -> Void)] = []
+  private var writes: [(data: Data, offset: Int, chunks: Int, generation: Int, admission: () -> Bool, done: () -> Void)] = []
   private var awaitingWrite = false
   private let framer = CompanionNusFramer()
   private var scans: [UUID: [String: Any]] = [:]
   private var scanToken = 0
+  private var scanSeenAt: [UUID: TimeInterval] = [:]
   private var scanning = false
   private var retryToken = 0
   private var discoveryToken = 0
@@ -34,6 +111,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     journal = CompanionJournal(url: root.appendingPathComponent("ios-companion/state.json"))
     super.init()
     queue.async {
+      if (self.journal.fields["http_pending_count"] as? Int ?? 0) > 0 {
+        try? self.publish("http_process_interrupted", ["http_pending_count": 0,
+          "last_http": ["generation": self.journal.generation, "outcome": "process_interrupted", "utc_ms": CompanionJournal.now]])
+      }
       if self.journal.desired || restoredLaunch {
         self.ensureCentral()
       }
@@ -62,6 +143,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     let firstEvent = (journal.fields["events"] as? [[String: Any]])?.first?["seq"] as? Int ?? 1
     fields["event_gap"] = firstEvent > (journal.fields["acked_cursor"] as? Int ?? 0) + 1
     fields["telemetry_pending_count"] = (journal.fields["telemetry"] as? [[String: Any]] ?? []).count
+    fields["gps_permissions"] = CompanionLocationRelay.permissions
     fields.merge([
       "version": 1, "owner": "ios_companion_native", "platform": "ios",
       "runtime_active": journal.desired, "protocol_ready": journal.desired && phase == "ready",
@@ -178,7 +260,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     }
     ensureCentral()
     guard central?.state == .poweredOn else { throw CompanionFailure.unavailable("Turn on Bluetooth") }
-    scans.removeAll(); scanning = true; scanToken += 1
+    scans.removeAll(); scanSeenAt.removeAll(); scanning = true; scanToken += 1
     let token = scanToken
     for item in central!.retrieveConnectedPeripherals(withServices: [Self.nus]) {
       cacheScan(item, name: item.name, rssi: -127)
@@ -193,9 +275,14 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     if scanning { central?.stopScan(); scanning = false; try? changed("scan_stopped") }
   }
 
-  private func cacheScan(_ peripheral: CBPeripheral, name: String?, rssi: Int) {
-    guard let name, name.localizedCaseInsensitiveContains("ZSWatch") else { return }
+  @discardableResult private func cacheScan(_ peripheral: CBPeripheral, name: String?, rssi: Int) -> Bool {
+    guard let name, name.localizedCaseInsensitiveContains("ZSWatch") else { return false }
+    let now = Date.timeIntervalSinceReferenceDate
+    if let seen = scanSeenAt[peripheral.identifier], now - seen < 1 { return false }
+    guard scans[peripheral.identifier] != nil || scans.count < 32 else { return false }
+    scanSeenAt[peripheral.identifier] = now
     scans[peripheral.identifier] = ["address": peripheral.identifier.uuidString, "name": String(name.prefix(160)), "rssi": rssi]
+    return true
   }
 
   private func connectSelected() {
@@ -213,6 +300,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
 
   private func discover(_ item: CBPeripheral) {
     guard owns(item, journal.generation) else { return }
+    sensors.reset(journal.generation)
     rx = nil; tx = nil; framer.reset()
     setPhase("discovering")
     item.discoverServices(nil)
@@ -220,7 +308,16 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     let discovery = discoveryToken
     let generation = journal.generation
     queue.asyncAfter(deadline: .now() + 15) {
-      if self.discoveryToken == discovery, self.owns(item, generation), self.phase != "ready" { self.lost("Service setup timed out") }
+      guard self.discoveryToken == discovery, self.owns(item, generation), self.phase != "ready" else { return }
+      if self.phase == "subscribing" {
+        // An encrypted CCCD can be held while the user answers iOS pairing.
+        self.setPhase("bonding", error: "Confirm ZSWatch pairing on the iPhone")
+        self.queue.asyncAfter(deadline: .now() + 75) {
+          if self.discoveryToken == discovery, self.owns(item, generation), self.phase != "ready" {
+            self.lost("Pairing or service setup timed out; confirm pairing on the iPhone")
+          }
+        }
+      } else { self.lost("Service setup timed out") }
     }
   }
 
@@ -228,15 +325,34 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     peripheral === item && journal.owns(generation, item.identifier.uuidString)
   }
 
+  private func cancel(_ item: CBPeripheral) {
+    // Cancelling an already-disconnected restored handle produces no disconnect
+    // callback. Do not wait forever for a callback CoreBluetooth will not emit.
+    guard item.state != .disconnected else { cancellations.remove(item.identifier); return }
+    cancellations.insert(item.identifier)
+    central?.cancelPeripheralConnection(item)
+    pollCancellation(item)
+  }
+  private func pollCancellation(_ item: CBPeripheral) {
+    queue.asyncAfter(deadline: .now() + 2) { [weak self] in
+      guard let self, self.cancellations.contains(item.identifier) else { return }
+      if item.state == .disconnected {
+        self.cancellations.remove(item.identifier)
+        if self.journal.desired, self.peripheral == nil { self.connectSelected() }
+      } else { self.pollCancellation(item) }
+    }
+  }
+
   private func closeLink() {
+    gpsRequested = false; gpsToken = UUID()
+    http.close(); gps.close()
+    smpOwner?.sessionClosed()
+    sensors.reset(journal.generation)
     discoveryToken += 1
     writes.removeAll(); awaitingWrite = false; rx = nil; tx = nil; framer.reset()
     if let peripheral {
       peripheral.delegate = nil
-      if peripheral.state != .disconnected {
-        cancellations.insert(peripheral.identifier)
-        central?.cancelPeripheralConnection(peripheral)
-      }
+      cancel(peripheral)
     }
     peripheral = nil; linkDelegate = nil
   }
@@ -257,7 +373,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     retryDelay = min(60, retryDelay * 2)
   }
 
-  func send(_ command: String, done: @escaping () -> Void = {}) throws {
+  func send(_ command: String, admission: @escaping () -> Bool = { true }, done: @escaping () -> Void = {}) throws {
     guard journal.desired, phase == "ready", let item = peripheral, let tx else {
       throw CompanionFailure.unavailable("Connect the watch first")
     }
@@ -267,7 +383,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     }
     let type: CBCharacteristicWriteType = tx.properties.contains(.writeWithoutResponse) ? .withoutResponse : .withResponse
     guard item.maximumWriteValueLength(for: type) > 0 else { throw CompanionFailure.unavailable("Bluetooth write size unavailable") }
-    writes.append((data, 0, 0, journal.generation, done))
+    writes.append((data, 0, 0, journal.generation, admission, done))
     pump()
   }
 
@@ -276,6 +392,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     let type: CBCharacteristicWriteType = tx.properties.contains(.writeWithoutResponse) ? .withoutResponse : .withResponse
     while let first = writes.first {
       guard first.generation == journal.generation else { writes.removeFirst(); continue }
+      if first.offset == 0 && !first.admission() { writes.removeFirst(); continue }
       if type == .withoutResponse && !item.canSendWriteWithoutResponse { return }
       let end = min(first.data.count, first.offset + item.maximumWriteValueLength(for: type))
       item.writeValue(first.data.subdata(in: first.offset..<end), for: tx, type: type)
@@ -305,10 +422,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       throw CompanionFailure.unavailable("Time command exceeds negotiated write size")
     }
     try send(packets[0])
-    try send(packets[1]) { [weak self] in
+    try send(packets[1], done: { [weak self] in
       try? self?.changed("time_written", ["last_time_write_utc_ms": CompanionJournal.now,
                                         "last_time_zone_offset_hours": offset])
-    }
+    })
   }
 
   private func ready() {
@@ -327,6 +444,9 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     if error != nil { lost("Service discovery failed"); return }
     guard let nus = item.services?.first(where: { $0.uuid == Self.nus }) else { lost("Watch protocol service missing"); return }
     item.discoverCharacteristics(nil, for: nus)
+    for service in item.services ?? [] where CompanionSensors.specs.contains(where: { $0.service == service.uuid }) {
+      item.discoverCharacteristics(nil, for: service)
+    }
     for service in item.services ?? [] where service.uuid == CBUUID(string: "180F") {
       item.discoverCharacteristics([CBUUID(string: "2A19")], for: service)
     }
@@ -335,6 +455,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   fileprivate func characteristics(_ item: CBPeripheral, _ generation: Int, _ service: CBService, _ error: Error?) {
     guard owns(item, generation) else { return }
     if error != nil { if service.uuid == Self.nus { lost("Characteristic discovery failed") }; return }
+    sensors.discovered(service)
     for characteristic in service.characteristics ?? [] {
       if characteristic.uuid == Self.transmit { tx = characteristic }
       if characteristic.uuid == Self.receive { rx = characteristic }
@@ -352,12 +473,15 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   }
 
   fileprivate func notification(_ item: CBPeripheral, _ generation: Int, _ characteristic: CBCharacteristic, _ error: Error?) {
-    guard owns(item, generation), characteristic === rx else { return }
+    guard owns(item, generation) else { return }
+    if sensors.notification(characteristic, error: error) { return }
+    guard characteristic === rx else { return }
     if error != nil || !characteristic.isNotifying { lost("Watch subscription failed") } else { ready() }
   }
 
   fileprivate func value(_ item: CBPeripheral, _ generation: Int, _ characteristic: CBCharacteristic, _ error: Error?) {
     guard owns(item, generation), error == nil, let data = characteristic.value else { return }
+    if sensors.receive(characteristic, bytes: data) { return }
     if characteristic.uuid == CBUUID(string: "2A19"), let battery = data.first, battery <= 100 {
       updateInfo(["battery_level": Int(battery), "status_generation": generation,
                   "status_observed_ms": CompanionJournal.now]); return
@@ -382,6 +506,12 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
 
   private func receiveMessage(_ value: [String: Any]) {
     guard phase == "ready", journal.desired, let type = value["t"] as? String else { return }
+    if type == "gps_power", let wanted = value["status"] as? Bool {
+      gpsRequested = wanted; gpsToken = UUID()
+      gps.request(journal.generation, token: gpsToken, wanted: wanted, enabled: journal.fields["gps_enabled"] as? Bool == true)
+      return
+    }
+    if http.receive(value, generation: journal.generation) { return }
     if type == "ver" {
       var info: [String: Any] = ["version_generation": journal.generation]
       for (wire, field) in [("fw", "firmware_version"), ("hw", "hardware_version"), ("sha", "firmware_sha")] {
@@ -416,6 +546,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     guard owns(item, generation) else { return }
     do { try changed("services_fenced", ["generation": journal.generation + 1]) }
     catch { return }
+    gpsRequested = false; gpsToken = UUID()
+    http.close(); gps.close()
+    smpOwner?.sessionClosed()
+    sensors.reset(journal.generation)
     writes.removeAll(); awaitingWrite = false
     linkDelegate = CompanionLinkDelegate(owner: self, generation: journal.generation)
     item.delegate = linkDelegate
@@ -447,7 +581,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     try? changed("core_bluetooth_restore_callback", ["restoration_callback_utc_ms": CompanionJournal.now])
     for item in restored {
       guard journal.desired, item.identifier.uuidString == journal.address else {
-        cancellations.insert(item.identifier); central.cancelPeripheralConnection(item); continue
+        cancel(item); continue
       }
       try? changed("restored_peripheral_attached", ["generation": journal.generation + 1])
       peripheral = item; linkDelegate = CompanionLinkDelegate(owner: self, generation: journal.generation)
@@ -458,8 +592,9 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   }
   func centralManager(_ central: CBCentralManager, didDiscover item: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
     guard scanning else { return }
-    cacheScan(item, name: advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? item.name, rssi: RSSI.intValue)
-    try? changed("watch_discovered")
+    if cacheScan(item, name: advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? item.name, rssi: RSSI.intValue) {
+      try? changed("watch_discovered")
+    }
   }
   func centralManager(_ central: CBCentralManager, didConnect item: CBPeripheral) {
     if cancellations.contains(item.identifier) || !journal.desired || item.identifier.uuidString != journal.address {

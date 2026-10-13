@@ -5,14 +5,16 @@ class CompanionGpsStatus {
   final bool backgroundPermission;
   final bool servicesEnabled;
   final String state;
+  final bool isIos;
 
   const CompanionGpsStatus(
     this.enabled,
     this.foregroundPermission,
     this.backgroundPermission,
     this.servicesEnabled,
-    this.state,
-  );
+    this.state, {
+    this.isIos = false,
+  });
 
   factory CompanionGpsStatus.decode(Map<String, Object?> fields) {
     final enabled = fields.containsKey('gps_enabled')
@@ -51,15 +53,26 @@ class CompanionGpsStatus {
         state = runtime['state'] as String;
       }
     }
-    return CompanionGpsStatus(enabled, access[0], access[1], access[2], state);
+    return CompanionGpsStatus(
+      enabled,
+      access[0],
+      access[1],
+      access[2],
+      state,
+      isIos: fields['owner'] == 'ios_companion_native',
+    );
   }
 
   String get description => !enabled
       ? 'Location sharing off'
-      : !foregroundPermission || !backgroundPermission
-      ? 'Allow location all the time in Android permissions'
+      : !foregroundPermission || (!isIos && !backgroundPermission)
+      ? isIos
+            ? 'Allow location access in iPhone settings'
+            : 'Allow location all the time in Android permissions'
       : !servicesEnabled
       ? 'Turn on phone location services'
+      : isIos && !backgroundPermission
+      ? 'Location works while this app is open. Allow Always for background watch requests.'
       : states[state]!;
 
   static const states = {

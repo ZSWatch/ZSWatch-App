@@ -76,7 +76,8 @@ final companionGpsPermissionsProvider = Provider<Future<void> Function()>((
     if (!(await Permission.locationWhenInUse.request()).isGranted) {
       throw StateError('Location permission required');
     }
-    if (!(await Permission.locationAlways.request()).isGranted) {
+    final background = await Permission.locationAlways.request();
+    if (!background.isGranted && defaultTargetPlatform != TargetPlatform.iOS) {
       throw StateError('Background location permission required');
     }
   };

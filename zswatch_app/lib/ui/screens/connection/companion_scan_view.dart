@@ -120,7 +120,7 @@ class _CompanionScanViewState extends ConsumerState<CompanionScanView> {
           const SizedBox(height: 24),
           Text(
             isIos
-                ? 'Keep your ZSWatch nearby and enable Bluetooth on your iPhone. Find your watch, then select it below.'
+                ? 'On ZSWatch, open Settings > Bluetooth > Pairable > Enable. Keep it nearby, find it below, and accept the pairing request on your iPhone.'
                 : 'Keep your ZSWatch nearby and enable Bluetooth on your phone. Choose your watch in the Android dialog to connect.',
           ),
           const SizedBox(height: 24),

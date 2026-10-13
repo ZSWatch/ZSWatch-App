@@ -135,6 +135,7 @@ DEPENDENCIES:
   - geolocator_apple (from `.symlinks/plugins/geolocator_apple/darwin`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
+  - iOSMcuManagerLibrary (from `../../Flutter-nRF-Connect-Device-Manager/ios/Vendor/iOSMcuManagerLibrary`)
   - just_audio (from `.symlinks/plugins/just_audio/darwin`)
   - mcumgr_flutter (from `.symlinks/plugins/mcumgr_flutter/ios`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
@@ -153,7 +154,6 @@ SPEC REPOS:
   trunk:
     - DKImagePickerController
     - DKPhotoGallery
-    - iOSMcuManagerLibrary
     - SDWebImage
     - sqlite3
     - SwiftCBOR
@@ -182,6 +182,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/image_picker_ios/ios"
   integration_test:
     :path: ".symlinks/plugins/integration_test/ios"
+  iOSMcuManagerLibrary:
+    :path: "../../Flutter-nRF-Connect-Device-Manager/ios/Vendor/iOSMcuManagerLibrary"
   just_audio:
     :path: ".symlinks/plugins/just_audio/darwin"
   mcumgr_flutter:
@@ -243,6 +245,6 @@ SPEC CHECKSUMS:
   whisper_ggml_plus: a01d7b6bf1208c76137032b9d6c91b1d202038e4
   ZIPFoundation: b8c29ea7ae353b309bc810586181fd073cb3312c
 
-PODFILE CHECKSUM: 4a55499ef79fab095c1a5074933e913842ce1f67
+PODFILE CHECKSUM: fb1957328d75a198612e54a0e009f4f1022971d2
 
 COCOAPODS: 1.16.2

@@ -6,7 +6,7 @@ proof of the installed image. See `IOS_MAC_BASELINE.md` for build and rig eviden
 
 Implementation checkpoint: see `IOS_NATIVE_COMPANION_PROGRESS.md`. Native BLE,
 UUID selection and durable telemetry projection are implemented and host-tested;
-physical Bluetooth consent and the remaining product integration are pending.
+Bluetooth consent is granted; pairing and the remaining physical/product acceptance are pending.
 
 The inventory combines the current UI with the dashboard/start/settings and
 service flows before Android's native shell (`0a8f430^`). Android's unfinished
@@ -17,13 +17,13 @@ the rows below is closed by an unsigned build or a USB probe.
 | Feature | Previous behavior / source | New implementation | iOS difference | Verification |
 | --- | --- | --- | --- | --- |
 | Onboarding and permissions | Permission onboarding; Bluetooth/location explanations | Native Bluetooth request/status contract and existing permission UI | CoreBluetooth authorization; no Android battery exemption | Pending first-install phone flow |
-| Nearby scan and selection | ScanScreen / BleScanner, signal strength and selection | Native foreground discovery in existing Add Watch route | Peripheral UUID, not MAC | Pending phone scan |
-| Pairing | Encrypted GATT operation triggers OS pairing | Pending native discovery/subscriptions | Pairing and Share System Notifications are system decisions | Pending ordinary pairing |
+| Nearby scan and selection | ScanScreen / BleScanner, signal strength and selection | Native foreground discovery in existing Add Watch route | Peripheral UUID, not MAC | Phone found one ZSWatch UUID/RSSI; encrypted Ready remains pending |
+| Pairing | Encrypted GATT operation triggers OS pairing | Encrypted subscription with pairing grace deadline | Pairing and Share System Notifications are system decisions | Pending ordinary pairing |
 | Saved watch and reconnect | Start page and watch repository | Native persisted intent; Dart Ready catalogue projection | Stable CoreBluetooth identifier | Pending cold launch and out-of-range reconnect |
 | Rename / primary watch / selection | Saved-watch menu and database | Existing catalogue projection accepts iOS UUIDs | UUIDs and MACs validated against native owner | Pending phone flows |
 | Forget watch | Delete app metadata and Android unbond where supported | Durable native Stop/Forget fence and Settings explanation | App cannot delete an iOS system bond; explain Settings step | Pending stale-callback and phone checks |
 | Start / Stop | Connect / disconnect and persistent-connection setting | Native session controller with restoration identifier and fenced delegates | Force-quit requires reopening; Stop must suppress restoration | Pending persistence and physical lifecycle |
-| Restart Watch | Dashboard restart via SMP | Pending coordinator-owned Nordic reset | Do not automatically replay reset | Pending confirmed restart/reconnect |
+| Restart Watch | Dashboard restart via SMP | Exclusive Nordic reset with acknowledged result and no replay | Do not automatically replay reset | Pending confirmed restart/reconnect |
 | Home summary and six entrances | Battery, version, steps, pulse; Health, Notifications, Analytics, Watchface, Developer, Voice | Existing UI retained; native snapshots pending | Live versus cached data must be explicit | Pending all six routes |
 | ANCS notifications | iOS notification screen explains firmware ANCS | Retain firmware ANCS; native link/pairing integration pending | No third-party app notification listener or Android package filters | Pending system notification and reconnect |
 | Notification actions | Firmware ANCS action support | Retain firmware path | Only actions exposed by ANCS | Pending actual actionable notification |
@@ -57,12 +57,12 @@ the rows below is closed by an unsigned build or a USB probe.
 | Firmware progress/error/retry/reconnect | Existing update UI, SDK callbacks | Pending exclusive operation owner | Use negotiated write length; safe pause/expiration | Pending installed version, throughput and retry |
 | Filesystem resources | FileSystemService and filesystem image UI | Pending coordinated Nordic upload | Measure ordinary firmware before large images | Pending representative verified upload |
 | Watchface select/crop/upload/apply/reset | Existing watchface UI and protocol | Pending native transfer/status integration | Preserve existing image format and firmware checks | Pending actual applied image/reset |
-| Shell | Developer shell using Nordic ShellManager | Pending same native SDK owner | No custom SMP | Pending actual response and timeout |
+| Shell | Developer shell using Nordic ShellManager | Exclusive native Nordic preparation/shell with signed Zephyr return code | No custom SMP | Pending actual response and timeout |
 | Filesystem browser/download/upload | Developer File System | Pending coordinated SDK access | No competing per-UI transports | Pending file listing and verified transfer |
-| Sensors | Sensor GATT service and debug UI | Pending native sensor subscriptions | Use actual CoreBluetooth characteristic lengths | Pending sample and unsubscribe |
+| Sensors | Sensor GATT service and debug UI | Native discovered sensor CCCDs; view-close unsubscribe and session fences | Use actual CoreBluetooth characteristic lengths | Pending sample and unsubscribe |
 | Firmware logs | Log Viewer and firmware BLE log framing | Bounded native NUS log framing and observation channel | Logs should avoid routine private payload dumps | Pending fragmented frames and unsubscribe |
 | Communication log | Developer BLE traffic screen | Native completed-write/reassembled-message observation channel | Diagnostic subscribers cannot own link lifetime | Pending attach/detach |
-| Crash summaries/history/download | Existing crash UI, protocol and coredump filesystem | Pending native protocol/SDK operations | Keep server URL setting and existing decode flow | Pending actual available summary/file |
+| Crash summaries/history/download | Existing crash UI, protocol and coredump filesystem | Native summary parser, bounded known file download and explicit erase | Keep server URL setting and existing decode flow | Pending actual available summary/file |
 | Settings/about/licenses | Persistent connection, AI, permissions, version, sources, licenses, coredump URL | Existing UI retained; platform capabilities pending | Android-only settings cannot be presented as working iOS controls | Pending complete settings walk-through |
 | Demo mode | Existing fake data and settings switch | Pending native branch isolation | Demo must send no real watch command | Pending offline demo and exit |
 

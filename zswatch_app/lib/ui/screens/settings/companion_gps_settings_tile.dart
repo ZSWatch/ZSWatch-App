@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -51,10 +52,12 @@ class _CompanionGpsSettingsTileState
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Share location with your watch?'),
-            content: const Text(
-              'Allow your watch to request phone location for weather and other location features, '
-              'including when this app is closed. In Android permissions, allow location all the time. '
-              'You can turn sharing off here whenever you want.',
+            content: Text(
+              defaultTargetPlatform == TargetPlatform.iOS
+                  ? 'Share phone location for watch weather and GPS. Allow Always for requests while the app is in the background, and enable Precise Location. You can turn sharing off here.'
+                  : 'Allow your watch to request phone location for weather and other location features, '
+                        'including when this app is closed. In Android permissions, allow location all the time. '
+                        'You can turn sharing off here whenever you want.',
             ),
             actions: [
               TextButton(

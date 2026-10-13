@@ -27,13 +27,13 @@ void main() async {
     String stage,
     bool Function(CompanionPrototypeSnapshot) accepts,
   ) async {
-    final deadline = DateTime.now().add(const Duration(seconds: 35));
+    final deadline = DateTime.now().add(
+      Duration(seconds: stage == 'discovery' ? 35 : 100),
+    );
     while (DateTime.now().isBefore(deadline)) {
       final state = await client.snapshot();
       if (accepts(state)) return state;
-      {
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-      }
+      await Future<void>.delayed(const Duration(milliseconds: 500));
     }
     final last = await client.snapshot();
     result['failed_stage'] = stage;
@@ -47,9 +47,7 @@ void main() async {
   try {
     initial = await client.snapshot();
     if (!initial.isIos) throw StateError('Wrong native owner');
-    {
-      await client.command('stop');
-    }
+    await client.command('stop');
     result['permissions'] = await client.permissionStatus();
     print('HIL_STAGE permissions ${jsonEncode(result['permissions'])}');
     await client.requestIosConnectionPermissions();
