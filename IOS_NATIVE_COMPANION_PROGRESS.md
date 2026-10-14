@@ -683,3 +683,35 @@ but that does not satisfy this separate authentication. Desktop control also
 reported the Mac locked. No retry or firmware admission occurred in this run;
 the user has been asked to enter the on-device XCTest passcode. Source work and
 USB probes remain available. USB app state succeeded without a reset or flash.
+
+### Actual watch reboot recovery (2026-10-14)
+
+The normal signed retention release 28eeb0b was installed and reached Ready at
+generation 47. Before the targeted reboot, USB image reads showed only active,
+confirmed indices 0 and 2, with no pending image. One USB SMP reset was
+acknowledged; no image was admitted or flashed. The existing iOS app autonomously
+reconnected at generation 48. Fresh version/status receipts matched generation
+48, and the fresh 28-file catalogue arrived 7.99 seconds after the reset ACK.
+Telemetry continued and was projected/acknowledged with zero journal drops.
+The delivered local AI job retained its single attempt and delivered state; the
+cancelled firmware receipt remained cancelled and was not replayed.
+
+Both active firmware hashes remain identical to the pre-reboot hashes. All 28
+individual watch files exist with unchanged lengths. A read-only USB download
+then SHA256 matched all 636,176 bytes against their pre-update committed native
+receipts: 26 originals and two owned microphone captures. The shell list itself
+was truncated by its response buffer, so individual file checks were used rather
+than interpreting the missing tail as deleted recordings. No file was changed.
+
+A read-only copied phone database passed integrity_check with 10,275 health
+samples, 6,885 battery readings, 49 connection events and watermark 10,359; all
+three history tables had zero rows older than 60 days at that capture. Host
+regressions separately establish expiry and replay behavior. The 45-second UART
+capture contains 4,679 bytes of real boot/2M PHY/244-byte payload/recording-list
+evidence. Private snapshots, hashes, database and UART logs are retained in the
+ignored continued-retention-and-cancellation / watch-reboot-recovery folders.
+
+This proves actual watch reboot recovery and source preservation. It does not
+prove the dashboard's Restart action, OS restoration, suspended Dart collection,
+out-of-range recovery, or completed firmware update. The next normal firmware
+UI retry still requires on-device XCTest authentication.
