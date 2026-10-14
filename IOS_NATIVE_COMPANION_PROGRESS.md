@@ -648,3 +648,19 @@ captures). Before update, all 28 raw sources were copied back to local evidence
 and SHA256 matched their native committed receipts. The package contains exactly
 the internally/external paired binaries built above; network image 1 is omitted
 because the current watch does not report that index.
+
+### Physical firmware upload cancellation (2026-10-14)
+
+The normal FW Update / Cancel flow on 25a59a8 admitted the matched 0/2 bundle,
+uploaded 70,832 of 838,604 primary-image bytes, then recorded cancellation during
+the safe upload phase. Native state returned to Ready at generation 42, with no
+reboot, unknown result, or applied-image claim. The UI test failed on its terminal
+label check: the old screen instead showed an idle FW Update button, while the
+retained cancellation receipt correctly prevented another admission.
+
+Cancelled updates now display Update Cancelled and an explicit Reset action,
+which dismisses the UI receipt and allows fresh selection. A widget regression
+checks the terminal view, dismissal, and absence of native commands from Reset.
+All 22 firmware tests, targeted analysis, and the normal signed release build
+pass, including deep/strict codesign. Physical retry and fresh boot/image-hash
+verification remain pending.

@@ -831,4 +831,21 @@ void main() {
       expect(calls, isEmpty);
     },
   );
+  testWidgets('native upload cancellation remains visible until explicit UI dismissal', (tester) async {
+    final c = container(Stream.value(snapshot(operation: firmware('cancelled', cancelled: true))));
+    addTearDown(c.dispose);
+    await c.read(companionSnapshotProvider.future);
+    await tester.pumpWidget(UncontrolledProviderScope(container: c, child: const MaterialApp(home: FirmwareUpdateScreen())));
+    await tester.pumpAndSettle();
+    expect(find.text('Update Cancelled'), findsOneWidget);
+    expect(find.text('Reset'), findsOneWidget);
+    expect(find.text('FW Update'), findsNothing);
+    await tester.tap(find.text('Reset'));
+    await tester.pumpAndSettle();
+    expect(c.read(dfuStateProvider).status, DfuStatus.idle);
+    expect(calls, isEmpty);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
+
 }

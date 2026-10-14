@@ -1610,8 +1610,8 @@ class _ActionButtons extends ConsumerWidget {
     }
 
     // Failed state - show retry/reset buttons
-    if (dfuState.status == DfuStatus.failed || isFsFailed) {
-      final errorMessage = dfuState.status == DfuStatus.failed
+    if (dfuState.status == DfuStatus.failed || dfuState.status == DfuStatus.cancelled || isFsFailed) {
+      final errorMessage = (dfuState.status == DfuStatus.failed || dfuState.status == DfuStatus.cancelled)
           ? dfuState.errorMessage
           : fsUploadState.errorMessage;
       return Column(
@@ -1619,7 +1619,9 @@ class _ActionButtons extends ConsumerWidget {
           const Icon(Icons.error, color: AppTheme.errorColor, size: 64),
           const SizedBox(height: AppTheme.spacingMd),
           Text(
-            native && nativeStatus?.resultUnknown == true
+            dfuState.status == DfuStatus.cancelled
+                ? 'Update Cancelled'
+                : native && nativeStatus?.resultUnknown == true
                 ? 'Update Result Unverified'
                 : 'Update Failed',
             style: Theme.of(
