@@ -1166,3 +1166,28 @@ produced written at the same Ready generation, UTC-ms 1792002523339, again zero
 pending. All 33 sources remain and GPS sharing is off. Private snapshots and the
 summary are in network-recovery-acceptance; the watch is returned to its original
 watchface. No HTTP URL or coordinates are printed into the evidence summary.
+
+
+### Short background firmware failure under investigation (2026-10-14)
+
+The final logging-only 5df4b8ed package became available in normal Files after a
+real Safari page-link download (the earlier external-URL confirmation did not
+save it). Exact owned file selection passed. Normal update operation
+59A3D486-CDA5-4DFA-BDD6-FDC9B4E5A7DE entered upload, Home/background for ten seconds,
+and returned to foreground. Both native background snapshots retained current
+2400 / total 839156; the acknowledgement-progress assertion failed. The SDK then
+reported upgrade failure; the operation is failed/result_unknown. The whole UI
+completion check failed and is not background-continuation acceptance.
+
+Independent USB ImageStatesRead confirms the preceding e63e86b6 application and
+reported index-two hashes remain active and confirmed. The CDC never disappeared,
+so the bootstrap observer timed out without opening/restarting/resetting anything.
+No reboot or activation is claimed. The failed receipt is preserved before retry.
+
+The native delegate previously discarded the SDK Error. It now stores bounded
+failure state/domain/code and a known transport-case identifier; localized error
+userInfo and payloads are excluded. This diagnostic change leaves update ownership,
+replay fencing and user-facing status intact. The normal root-workspace signed
+release build passes in 123.5 seconds with strict signature verification, rather
+than requiring the staging checkout for this build. Foreground retry will separate
+a package/transport problem from the background transition.

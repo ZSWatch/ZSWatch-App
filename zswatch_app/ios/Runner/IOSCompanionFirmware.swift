@@ -173,7 +173,7 @@ final class IOSCompanionFirmware {
     guard publish({ try operation.phase("validating"); try operation.admitted() }) else { return }
     let token = self.token; let images = self.images
     sdk { sdk in
-      let delegate = IOSFirmwareDelegate { event, state, count, total in
+      let delegate = IOSFirmwareDelegate { event, state, count, total, error in
         let observedAt = DispatchTime.now().uptimeNanoseconds // Capture before journal/owner-queue delay.
         owner.queue.async {
         guard self.current(token) else { return }
@@ -188,6 +188,19 @@ final class IOSCompanionFirmware {
           self.progress(count, total: total)
         case "finished": self.postflight()
         case "cancelled": self.finish("cancelled", error: "cancelled", unknown: false)
+        case "failed":
+          if let error {
+            let native = error as NSError
+            var details: [String: Any] = ["state": String(describing: state),
+              "domain": String(native.domain.prefix(120)), "code": native.code]
+            // Transport cases contain only identifiers/numeric MTU, never raw
+            // payloads or potentially private localized NSError userInfo.
+            if let transportError = error as? McuMgrTransportError {
+              details["reason"] = String(describing: transportError)
+            }
+            try? owner.publish("firmware_sdk_failure", ["last_firmware_sdk_failure": details])
+          }
+          self.abort("sdk_upgrade_failed")
         default: self.abort("sdk_upgrade_failed")
         }
       } }
@@ -335,14 +348,14 @@ final class IOSCompanionFirmware {
 }
 
 private final class IOSFirmwareDelegate: FirmwareUpgradeDelegate {
-  let callback: (String, FirmwareUpgradeState, Int, Int) -> Void
-  init(_ callback: @escaping (String, FirmwareUpgradeState, Int, Int) -> Void) { self.callback = callback }
+  let callback: (String, FirmwareUpgradeState, Int, Int, Error?) -> Void
+  init(_ callback: @escaping (String, FirmwareUpgradeState, Int, Int, Error?) -> Void) { self.callback = callback }
   func upgradeDidStart(controller: FirmwareUpgradeController) {}
-  func upgradeStateDidChange(from previousState: FirmwareUpgradeState, to newState: FirmwareUpgradeState) { callback("state", newState, 0, 0) }
-  func upgradeDidComplete() { callback("finished", .none, 0, 0) }
-  func upgradeDidFail(inState state: FirmwareUpgradeState, with error: Error) { callback("failed", state, 0, 0) }
-  func upgradeDidCancel(state: FirmwareUpgradeState) { callback("cancelled", state, 0, 0) }
-  func uploadProgressDidChange(bytesSent: Int, imageSize: Int, timestamp: Date) { callback("progress", .upload, bytesSent, imageSize) }
+  func upgradeStateDidChange(from previousState: FirmwareUpgradeState, to newState: FirmwareUpgradeState) { callback("state", newState, 0, 0, nil) }
+  func upgradeDidComplete() { callback("finished", .none, 0, 0, nil) }
+  func upgradeDidFail(inState state: FirmwareUpgradeState, with error: Error) { callback("failed", state, 0, 0, error) }
+  func upgradeDidCancel(state: FirmwareUpgradeState) { callback("cancelled", state, 0, 0, nil) }
+  func uploadProgressDidChange(bytesSent: Int, imageSize: Int, timestamp: Date) { callback("progress", .upload, bytesSent, imageSize, nil) }
 }
 private final class IOSResourceDelegate: FileUploadDelegate {
   let callback: (String, Int, Int) -> Void
