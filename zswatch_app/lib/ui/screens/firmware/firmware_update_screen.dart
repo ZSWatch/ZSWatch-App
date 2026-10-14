@@ -1581,7 +1581,9 @@ class _ActionButtons extends ConsumerWidget {
 
     // Completed state - show reset button
     if (dfuState.status == DfuStatus.completed || showFsOnlyComplete) {
-      final isFullComplete = dfuState.status == DfuStatus.completed;
+      final isFullComplete = native
+          ? nativeStatus?.indices.isNotEmpty == true
+          : dfuState.status == DfuStatus.completed;
       return Column(
         children: [
           const Icon(

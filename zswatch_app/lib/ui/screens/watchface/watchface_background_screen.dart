@@ -87,7 +87,12 @@ class _WatchfaceBackgroundScreenState
 
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppTheme.spacingMd),
+              padding: EdgeInsets.fromLTRB(
+                AppTheme.spacingMd,
+                AppTheme.spacingMd,
+                AppTheme.spacingMd,
+                AppTheme.spacingMd + MediaQuery.viewPaddingOf(context).bottom,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

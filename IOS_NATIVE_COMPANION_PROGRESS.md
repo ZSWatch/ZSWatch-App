@@ -746,3 +746,32 @@ contains 6,771 bytes; complete test logs and native receipts are retained locall
 Preparing the representative resource flow uses a verified backup of the
 existing /S/full_fs and an owned image generated from checked-in firmware assets.
 No resource upload or watchface acceptance is claimed at this checkpoint.
+
+### Physical large-resource upload and UI corrections (2026-10-14)
+
+The normal file picker selected the owned 5,919,608-byte resource image generated
+from the checked-in 690 firmware assets. Its header, trailer, names, spans and
+every source asset were validated before admission. SHA256 is
+5b060daa49707f1f621a4d6ba1817d6f1032fd1def2fb18e38c5abade388d1a0.
+The previous 5,932,208-byte /S/full_fs (696 entries) was backed up and validated
+locally. It has six additional stock category icons and 19 differing assets;
+the original image remains preserved in resource-preflight.
+
+Native operation E0392B5D-E2BA-4951-BE73-337768527E6E completed in 779.724 seconds,
+with full byte-for-byte readback before reset and again after fresh boot. Its
+complete normal UI test passed in 789.988 seconds. Ready generation 58 had fresh
+version/status and a fresh 28-recording catalogue. This is foreground large-file
+acceptance, not background continuation or an endurance test.
+
+The resource-only terminal UI incorrectly used the generic firmware Update
+Complete title. It now says Filesystem Upload Complete, based on the receipt's
+empty image-target list. The regression fails on the old implementation and all
+23 firmware tests pass after the fix. Three-file analysis and the normal signed
+Release build/deep-strict signature pass.
+
+Aurora background upload, complete staging readback and firmware apply ACK passed
+on the normal app. Reset initially received no native admission when the test
+tapped the bottom of the screen; tapping higher within the same button passed
+with an actual reset ACK. Bottom padding now includes the iPhone gesture inset.
+The existing background was backed up and SHA256 matched the bundled Retro
+Sunburst image; restoring that original appearance is still in progress.

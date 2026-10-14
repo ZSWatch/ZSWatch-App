@@ -848,4 +848,22 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('resource-only completion names the filesystem outcome', (tester) async {
+    final operation = firmware('completed')
+      ..['targets'] = <Object?>[]
+      ..['resource'] = {'bytes': 64, 'hash': 'b' * 64}
+      ..['resource_verified'] = true;
+    final c = container(Stream.value(snapshot(operation: operation)));
+    addTearDown(c.dispose);
+    await c.read(companionSnapshotProvider.future);
+    await tester.pumpWidget(UncontrolledProviderScope(container: c, child: const MaterialApp(home: FirmwareUpdateScreen())));
+    await tester.pumpAndSettle();
+    expect(find.text('Filesystem Upload Complete!'), findsOneWidget);
+    expect(find.text('Update Complete!'), findsNothing);
+    expect(find.text('Done'), findsOneWidget);
+    expect(calls, isEmpty);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
+
 }
