@@ -785,7 +785,7 @@ class CompanionPrototypeClient {
       await methods.invokeMethod<Object?>('inspectLogs', {
         'version': 1,
         'generation': generation,
-        'path': path,
+        if (path != null) 'path': path,
       }),
       generation,
       path: path,

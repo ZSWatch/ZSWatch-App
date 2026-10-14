@@ -51,6 +51,22 @@ void main() {
     });
   });
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  test('listing omits optional path instead of encoding a native null', () async {
+    const client = CompanionPrototypeClient();
+    final result = await client.inspectLogs(8);
+    expect(result.files.single.path, '/user/logs/log0000');
+    expect(calls.single.arguments, {'version': 1, 'generation': 8});
+  });
+  test('download sends the selected validated path', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return reply(bytes: Uint8List.fromList([1, 2]));
+    });
+    const client = CompanionPrototypeClient();
+    final result = await client.inspectLogs(8, path: '/user/logs/log0000');
+    expect(result.bytes, [1, 2]);
+    expect((calls.single.arguments as Map)['path'], '/user/logs/log0000');
+  });
   test(
     'fixed paths and generation are validated before native access',
     () async {

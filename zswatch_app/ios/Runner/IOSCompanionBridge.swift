@@ -112,7 +112,7 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
             guard let command = args["command"] as? String else { throw CompanionFailure.invalid("Shell command required") }
             try owner.smp.shell(generation, command: command, complete: completed)
           } else {
-            if args["path"] != nil && !(args["path"] is String) { throw CompanionFailure.invalid("Invalid log path") }
+            if let path = args["path"], !(path is NSNull), !(path is String) { throw CompanionFailure.invalid("Invalid log path") }
             try owner.smp.inspectLogs(generation, path: args["path"] as? String, complete: completed)
           }
         case "startWatchface", "resetWatchface":
