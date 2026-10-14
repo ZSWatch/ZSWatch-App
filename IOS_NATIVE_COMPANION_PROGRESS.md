@@ -775,3 +775,34 @@ tapped the bottom of the screen; tapping higher within the same button passed
 with an actual reset ACK. Bottom padding now includes the iPhone gesture inset.
 The existing background was backed up and SHA256 matched the bundled Retro
 Sunburst image; restoring that original appearance is still in progress.
+
+### Physical watchface, sensors and dashboard restart (2026-10-14)
+
+The original Retro Sunburst background is restored on normal signed db39ff9.
+Native apply operation 381DB7E4-D2AF-49BE-B3F9-DE6FD9394171 completed at generation
+65, with all 115,212 bytes verified and firmware apply acknowledged. The normal
+resource-only completion label also passed on this build. All 334 Flutter tests
+passed. Generic XCTest taps missed some Flutter image/button activation points;
+observed within-control coordinate taps admitted the real apply/reset operations.
+The missed taps are retained as harness failures, not successful product checks.
+
+The accelerometer delivered real approximately 2 Hz samples through the native
+sensor channel. The explicit off toggle returned the UI to zero streaming and the
+normal UI test passed in 14.130 seconds. The sensor card expands with sample data,
+so its off-toggle test targets the heading's switch rather than the whole card's
+center. Other sensor types and physical unsubscribe on view close remain open.
+
+Normal Developer Sync Time passed and the native receipt recorded UTC plus +2
+hours for Stockholm. Dashboard Restart Watch and its explicit confirmation caused
+a real UART boot and fresh Ready generation 68, with status/version generation 68
+and the same watch UUID. A prepared read-only USB client observed fresh boot
+enumeration and 28 recordings; no debugger reset was needed. The UI test failed
+its transient success-toast assertion, so the whole XCTest is not marked passed.
+
+A new owned two-second microphone recording after that boot had a timestamp
+approximately 7,200.9 seconds ahead of the probe's directory creation time. After
+explicit app time sync, a second owned recording differed from its measured host
+start by -0.390 seconds. Both new sources were downloaded, and originals remain
+untouched. This isolates a firmware RTC startup timezone bug; the successful RTC
+branch skipped the retained timezone that the software fallback restores. A
+focused firmware correction and CTS local-calendar/UTC handling are in progress.
