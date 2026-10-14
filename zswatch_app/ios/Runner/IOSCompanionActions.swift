@@ -1,17 +1,23 @@
 import EventKit
+import EventKitUI
 import Flutter
 import Foundation
+import UIKit
 import UserNotifications
 
 /// User-confirmed actions only. Journal confirmation precedes external mutation.
-final class IOSCompanionActions {
+final class IOSCompanionActions: NSObject, EKEventViewDelegate {
   private let owner: IOSCompanionCoordinator
   private let store = EKEventStore()
+  private let presenter: () -> UIViewController?
+  private var eventViewer: EKEventViewController?
   private var inFlight = Set<String>() // Main-owned; two callers cannot create one action concurrently.
-  init(owner: IOSCompanionCoordinator) { self.owner = owner }
+  init(owner: IOSCompanionCoordinator, presenter: @escaping () -> UIViewController?) {
+    self.owner = owner; self.presenter = presenter; super.init()
+  }
   func handle(_ args: [String: Any], result: @escaping FlutterResult) {
     guard let id = args["jobId"] as? String, let index = CompanionRecordingFiles.integer(args["index"]),
-          let operation = args["operation"] as? String, ["create", "dismiss", "undo"].contains(operation) else {
+          let operation = args["operation"] as? String, ["create", "dismiss", "undo", "open"].contains(operation) else {
       result(FlutterError(code: "INVALID_ARGUMENT", message: "Confirmed voice action required", details: nil)); return
     }
     let key = "\(id).\(index)"
@@ -21,6 +27,17 @@ final class IOSCompanionActions {
       do {
         guard let jobs = self.owner.voice?.jobs else { throw CompanionFailure.unavailable("Voice journal unavailable") }
         if operation == "dismiss" { try jobs.dismissAction(id, index: index); self.owner.journalChanged(); reply(nil); return }
+        if operation == "open" {
+          let detail = try jobs.detail(id)
+          guard let states = detail["action_states"] as? [String: [String: Any]],
+                let state = states[String(index)], state["state"] as? String == "created",
+                let response = state["response"] as? [String: Any], response["targetType"] as? String == "calendar_event",
+                let identifier = response["platformId"] as? String else {
+            throw CompanionFailure.unavailable("Created calendar event required")
+          }
+          DispatchQueue.main.async { self.openEvent(identifier, key, reply) }
+          return
+        }
         let action: [String: Any]
         if operation == "undo" { action = try jobs.beginUndo(id, index: index) }
         else {
@@ -34,6 +51,29 @@ final class IOSCompanionActions {
         }
       } catch { reply(FlutterError(code: "ACTION_FAILED", message: error.localizedDescription, details: nil)) }
     }
+  }
+  private func openEvent(_ identifier: String, _ key: String, _ reply: @escaping (Any?) -> Void) {
+    authorize("calendar_event") { granted in
+      guard granted else { reply(FlutterError(code: "PERMISSION_DENIED", message: "Calendar access is required to open this event", details: nil)); return }
+      guard let event = self.store.calendarItem(withIdentifier: identifier) as? EKEvent,
+            event.url == URL(string: "zswatch-action://" + key) else {
+        reply(FlutterError(code: "EVENT_UNAVAILABLE", message: "The created event is no longer available in Calendar", details: nil)); return
+      }
+      guard UIApplication.shared.applicationState == .active, let presenter = self.presenter(),
+            presenter.presentedViewController == nil else {
+        reply(FlutterError(code: "UI_UNAVAILABLE", message: "Open this event while ZSWatch is in the foreground", details: nil)); return
+      }
+      let viewer = EKEventViewController(); viewer.event = event
+      viewer.allowsEditing = false; viewer.allowsCalendarPreview = false; viewer.delegate = self
+      viewer.navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .done, target: self, action: #selector(self.closeEventViewer))
+      self.eventViewer = viewer
+      presenter.present(UINavigationController(rootViewController: viewer), animated: true)
+      reply(nil)
+    }
+  }
+  @objc private func closeEventViewer() { eventViewer?.dismiss(animated: true); eventViewer = nil }
+  func eventViewController(_ controller: EKEventViewController, didCompleteWith action: EKEventViewAction) {
+    controller.dismiss(animated: true); eventViewer = nil
   }
   private func complete(_ id: String, _ index: Int, _ response: [String: Any], _ reply: @escaping (Any?) -> Void) {
     owner.queue.async {

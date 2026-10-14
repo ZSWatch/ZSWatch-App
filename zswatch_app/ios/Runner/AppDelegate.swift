@@ -19,7 +19,7 @@ import UserNotifications
     let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
     let restored = (launchOptions?[.bluetoothCentrals] as? [String])?.contains(IOSCompanionCoordinator.restorationID) == true
     companion = IOSCompanionCoordinator(root: root, restoredLaunch: restored)
-    companionActions = IOSCompanionActions(owner: companion)
+    companionActions = IOSCompanionActions(owner: companion, presenter: { [weak self] in self?.window?.rootViewController })
     BGTaskScheduler.shared.register(forTaskWithIdentifier: IOSVoiceCoordinator.backgroundID, using: companion.queue) { [weak self] task in
       guard let task = task as? BGProcessingTask, let owner = self?.companion else { task.setTaskCompleted(success: false); return }
       guard let voice = owner.voice else { task.setTaskCompleted(success: false); return }

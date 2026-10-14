@@ -397,12 +397,26 @@ class ExtractedActionCreationService {
     });
   }
 
-  Future<void> openCompanionCalendarEntry(String id, DateTime? scheduledAt) =>
-      _openCreatedCalendarEntryIfSupported(
-        platformId: id,
-        targetType: 'calendar_event',
-        scheduledAtMillis: scheduledAt?.millisecondsSinceEpoch,
-      );
+  Future<void> openCompanionCalendarEntry(
+    String id,
+    DateTime? scheduledAt, {
+    required String jobId,
+    required int index,
+  }) async {
+    if (Platform.isIOS) {
+      await _channel.invokeMethod<void>('companionAction', {
+        'jobId': jobId,
+        'index': index,
+        'operation': 'open',
+      });
+      return;
+    }
+    await _openCreatedCalendarEntryIfSupported(
+      platformId: id,
+      targetType: 'calendar_event',
+      scheduledAtMillis: scheduledAt?.millisecondsSinceEpoch,
+    );
+  }
 
   Future<List<PlatformCalendar>> listWritableCalendars() async {
     if (!Platform.isAndroid) {

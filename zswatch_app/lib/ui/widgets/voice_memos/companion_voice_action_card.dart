@@ -195,7 +195,9 @@ class _CompanionVoiceActionCardState
                           ),
                     child: const Text('Recover creation'),
                   ),
-                if (state == 'created')
+                if (state == 'created' &&
+                    (defaultTargetPlatform != TargetPlatform.iOS ||
+                        widget.action['type'] == 'calendar_event'))
                   TextButton(
                     onPressed: busy
                         ? null
@@ -205,6 +207,8 @@ class _CompanionVoiceActionCardState
                               ActionCreationDraft.fromVoiceResult(
                                 widget.action,
                               ).scheduledAt,
+                              jobId: widget.jobId,
+                              index: widget.index,
                             ),
                           ),
                     child: const Text('Open calendar'),

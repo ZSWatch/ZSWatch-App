@@ -12,6 +12,17 @@ class FakeActions extends ExtractedActionCreationService {
   final identities = <(String, int)>[];
   final pending = Completer<void>();
   int undos = 0;
+  final opened = <(String, int)>[];
+  @override
+  Future<void> openCompanionCalendarEntry(
+    String id,
+    DateTime? scheduledAt, {
+    required String jobId,
+    required int index,
+  }) async {
+    opened.add((jobId, index));
+  }
+
   @override
   Future<List<PlatformCalendar>> prepareCompanionAction(
     ActionCreationDraft draft,
@@ -288,6 +299,49 @@ void main() {
       await tester.pumpAndSettle();
       expect(service.undos, 1);
       expect(service.identities.single, ('owned-job', 2));
+    },
+  );
+
+  testWidgets(
+    'iOS opens only created calendar events by saved action identity',
+    (tester) async {
+      final original = debugDefaultTargetPlatformOverride;
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        final service = FakeActions();
+        const state = {
+          'state': 'created',
+          'response': {'platformId': 'owned-platform-id'},
+        };
+        await mount(
+          tester,
+          service,
+          action: {
+            'type': 'reminder',
+            'title': 'Owned reminder',
+            'due_date': '2099-10-05T10:00:00+02:00',
+          },
+          state: state,
+        );
+        expect(find.text('Open calendar'), findsNothing);
+        expect(find.text('Undo creation'), findsOneWidget);
+        await mount(
+          tester,
+          service,
+          action: {
+            'type': 'calendar_event',
+            'title': 'Owned event',
+            'start_time': '2099-10-05T10:00:00+02:00',
+          },
+          state: state,
+        );
+        await tester.tap(find.text('Open calendar'));
+        await tester.pumpAndSettle();
+        expect(service.opened, [('owned-job', 2)]);
+        expect(service.undos, 0);
+      } finally {
+        debugDefaultTargetPlatformOverride = original;
+      }
     },
   );
 
