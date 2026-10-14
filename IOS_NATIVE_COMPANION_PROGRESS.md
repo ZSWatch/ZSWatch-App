@@ -1105,3 +1105,30 @@ Connect: Ready/status/version all reach fresh generation 105, all 33 sources
 remain, and the error clears. The physical Settings toggle is restored on.
 /tmp/zswatch-radio-recovery-20261014.xcresult and ignored radio-recovery-acceptance
 contain the short check. This is radio availability, not permission denial.
+
+
+Normal owned playback seek passed: an observed playback-bar tap moved its
+position from 0:00 to 0:05 / 0:07, then Close returned to connected Home. The
+first harness queried a native Slider role that Flutter did not expose; it
+loaded the correct audio but failed that selector. The corrected observed UI
+check passed in /tmp/zswatch-playback-observed-seek-20261014.xcresult. This changes
+no source audio or transcript.
+
+
+The empty-name/default helper in Watch Settings was inconsistent with Save:
+blank input disabled it and the save handler rejected blanks. The shared dialog
+now maps empty/advertised names to no custom name, enabling Save only when this
+changes the saved metadata. Two widget regressions pass (custom reset with the
+same UUID, and no-op default reset); targeted analysis is clean. Native BLE and
+selection ownership are unchanged. Signed installation/physical rename follows.
+
+The Instruments 100%-loss attempt still returned a successful Weather relay and
+is not network-failure acceptance. The induced profile was explicitly cleared.
+An initial Airplane Mode harness failed its Wi-Fi selector and restored mode off;
+Wi-Fi remained on. iOS exposes that switch with a non-breaking hyphen; the
+selector is corrected. Later attempts never started because Xcode's CoreDevice
+notification subscription was stale, although the phone was visibly unlocked
+and DDI enabled. Restarting the Mac user CoreDevice service restored a normal
+XCTest run: location sharing was successfully returned off. No new human
+permission or passcode was requested. Network failure remains pending until an
+actual error response is observed.

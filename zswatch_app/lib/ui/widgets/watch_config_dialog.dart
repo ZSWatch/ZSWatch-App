@@ -76,21 +76,24 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
 
   bool get _hasChanges {
     final newName = _nameController.text.trim();
-    final currentName = widget.watch.customName ?? widget.watch.name;
-    return newName != currentName && newName.isNotEmpty;
+    final customName = newName.isEmpty || newName == widget.watch.name
+        ? null
+        : newName;
+    return customName != widget.watch.customName;
   }
 
   Future<void> _handleSave() async {
     if (_isSaving || _isForgetting) return;
 
     final newName = _nameController.text.trim();
-    if (newName.isEmpty) return;
 
     setState(() => _isSaving = true);
 
     try {
-      // If new name equals the original advertised name, clear customName
-      final customName = newName == widget.watch.name ? null : newName;
+      // An empty field restores the advertised name, as the helper explains.
+      final customName = newName.isEmpty || newName == widget.watch.name
+          ? null
+          : newName;
       await widget.onRename(widget.watch.id, customName);
 
       if (mounted) {
