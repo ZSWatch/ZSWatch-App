@@ -806,3 +806,39 @@ start by -0.390 seconds. Both new sources were downloaded, and originals remain
 untouched. This isolates a firmware RTC startup timezone bug; the successful RTC
 branch skipped the retained timezone that the software fallback restores. A
 focused firmware correction and CTS local-calendar/UTC handling are in progress.
+
+### RTC correction and explicit Stop persistence (2026-10-14)
+
+Firmware e63e86b6 restores the retained timezone before choosing hardware/software
+clock and converts CTS local calendar fields using a fresh Local Time Information
+read. It publishes UTC and the effective standard/DST offset together; unknown
+or unavailable offsets preserve the existing clock. CTS discovery retries now
+retain the actual connection and cancel on disconnect. Signed quarter-hour/DST
+and unknown/reserved-offset host regressions pass, as does WatchDK@1 full sysbuild
+on NCS v3.3.0-preview1. The CTS contract follows the Bluetooth specification linked
+in firmware app/tests/clock_timezone/README.md. Subsequent 67bd6ad4 only corrects a
+misleading security-error log when discovery is not ready; that source also builds.
+
+Normal file-picker update of matched indices 0/2 passed in 132.204 UI seconds.
+Native operation 6FB572A3-1126-486D-8EB3-04D663AB0DD3 completed in 123.567 seconds
+with both installed hashes verified and fresh Ready/status/version generation 74.
+Installed hashes are 0b09a7a7d4ecee4542d7a322e7bfda9568ea307d075010f1e077f80dc59e41e8
+(index 0) and 20a4c70e7f4e66b18bdbb835dd032f0e18fa670b9150d28bc1a4fa34c36eaf11
+(index 2). Radio index 1 remains excluded/unverified. This installed functional
+candidate predates the logging-only 67bd6ad4; the distinction is retained locally.
+
+All 30 sources then present (28 pre-update plus two owned clock probes) were read
+back over USB and SHA256 matched their native receipts: 651,375 bytes. After the
+corrected firmware boot, a new two-second microphone probe's header timestamp
+was +0.303 seconds from measured host start. A subsequent normal dashboard reboot
+and another probe measured -0.329 seconds. Neither followed another app time sync;
+last_time_write_utc_ms remained 1791964626495. Sources remain intact. The second
+reboot's UI check passed and fresh status/version generation 77 was observed.
+Manual phone timezone/DST changes and missing Local Time Information remain
+separate acceptance cases.
+
+Explicit Disconnect/Stop, XCTest process termination/relaunch, and explicit
+Connect passed. On relaunch, Connect remained available and Disconnect absent;
+only the later user-equivalent Connect action returned to connected Home. This
+is explicit Stop persistence across an injected test process relaunch, not an
+OS restoration or user force-quit claim.
