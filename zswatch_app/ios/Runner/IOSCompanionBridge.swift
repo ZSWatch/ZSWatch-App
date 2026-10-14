@@ -205,8 +205,7 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
           try owner.configureHttp(enabled); reply(owner.snapshot())
         case "setLogStreaming":
           guard let enabled = args["enabled"] as? Bool else { throw CompanionFailure.invalid("Log policy required") }
-          try owner.send("GB({\"t\":\"log\",\"status\":\(enabled ? "true" : "false")})")
-          try owner.journal.update("log_policy", ["log_streaming": enabled])
+          try owner.setLogStreaming(enabled)
           reply(nil)
         case "syncTime": try owner.syncTime(); reply(owner.snapshot())
         case "requestDeviceInfo": try owner.send("GB({\"t\":\"ver\"})"); reply(owner.snapshot())
@@ -281,7 +280,7 @@ private final class CompanionDiagnosticStream: NSObject, FlutterStreamHandler {
       self.registeredToken = stream
       if self.kind == "logs" {
         self.owner.logObserver = callback
-        callback(["version": 1, "kind": "state", "generation": self.owner.journal.generation])
+        callback(self.owner.logStreamingState)
       } else if self.kind == "sensors" {
         self.owner.sensors.observer = callback; self.owner.sensors.attached()
       } else { self.owner.trafficObserver = callback }

@@ -118,6 +118,37 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   private var observers: [UUID: ([String: Any]) -> Void] = [:]
   private var permissionWaiters: [UUID: (Result<Bool, Error>) -> Void] = [:]
   var logObserver: (([String: Any]) -> Void)?
+  private var logWriteToken = UUID()
+  private var logWritePending = false
+  private var logWritten = false
+  var logStreamingState: [String: Any] {
+    ["version": 1, "kind": "state", "generation": journal.generation,
+     "requested": journal.fields["log_streaming"] as? Bool == true,
+     "pending": logWritePending, "written": logWritten]
+  }
+  func setLogStreaming(_ enabled: Bool) throws {
+    guard isReadySession(journal.generation), !logWritePending else {
+      throw CompanionFailure.unavailable("Wait for the watch log operation")
+    }
+    let previous = journal.fields["log_streaming"] as? Bool == true
+    try journal.update("log_policy", ["log_streaming": enabled])
+    let token = UUID(); logWriteToken = token
+    let generation = journal.generation
+    logWritePending = true
+    logObserver?(logStreamingState)
+    do {
+      try send("GB({\"t\":\"log\",\"status\":\(enabled ? "true" : "false")})", done: { [weak self] in
+        guard let self, self.logWriteToken == token, self.isReadySession(generation) else { return }
+        self.logWritePending = false; self.logWritten = enabled
+        self.logObserver?(self.logStreamingState)
+      })
+    } catch {
+      logWritePending = false
+      try? journal.update("log_policy_rejected", ["log_streaming": previous])
+      logObserver?(logStreamingState)
+      throw error
+    }
+  }
   var trafficObserver: (([String: Any]) -> Void)?
 
   init(root: URL, restoredLaunch: Bool) {
@@ -415,6 +446,8 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
 
   private func closeLink() {
     phase = "disconnected"
+    logWriteToken = UUID(); logWritePending = false; logWritten = false
+    logObserver?(logStreamingState)
     gpsRequested = false; gpsToken = UUID()
     http.close(); gps.close()
     smpOwner?.sessionClosed()
@@ -510,6 +543,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     // CTS supplies iOS system time; app sync is explicit or responds to the watch's request.
     try? send("GB({\"t\":\"ver\"})")
     try? send("GB({\"t\":\"voice_memo\",\"action\":\"list\"})")
+    if journal.fields["log_streaming"] as? Bool == true { try? setLogStreaming(true) }
     // Firmware publishes current battery/status after the connection event.
   }
 
