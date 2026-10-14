@@ -927,3 +927,89 @@ Latest firmware 5df4b8ed builds; its logging-only corrections are not installed.
 The final owned ZIP remains absent from visible Files after the Safari download
 prompt. Failed exact-file guards admitted no update. Physically verified RTC
 firmware e63e86b6 remains installed. Short background firmware acceptance is open.
+
+### Default iOS action destination and owned reminder (2026-10-14)
+
+04c7016 fixes a real iOS review blocker: the shared dialog required an Android
+calendar ID, although iOS uses EventKit's writable default Calendar/Reminders
+list. iOS event and reminder confirmation now proceeds without that ID; Android
+still rejects a missing writable calendar. Nine action-review tests, all 339
+Flutter tests, targeted analysis and a signed Release build pass. The normal
+04c7016 app is installed, with deep/strict signature verification.
+
+Only owned microphone source 20261013_235832 was edited to an explicit dated HIL
+reminder instruction and re-analyzed locally. Normal Review requested Reminders
+access, created an explicitly named owned entry and persisted its platform ID in
+job 7ddbc397a46082213df7854cb9438cfd300a431b4759d348a7bb1da327ad59cb.
+The initial test's exact accessibility-label assertion failed after creation;
+the screenshot and native created receipt confirm the actual outcome. Corrected
+normal Undo/Remove passed, and the persisted action is now undone. No unrelated
+Calendar/Reminders entries were changed. Private evidence is in
+productivity-actions. Calendar, alerts and restoration of this test transcript
+are being completed separately.
+
+A separate owned calendar instruction produced a calendar_event. The first
+permission-driver attempt failed while enumerating an OS alert's changing
+accessibility children and created no entry. Continuing the observed Calendar
+full-access prompt, Create and Undo/Remove passed in 13 seconds. Native job
+2f9f62d095635f716308d4c6feaf4e536c0f18bb90d451b3107b2f4d3f1310c2 retains its
+calendar_event platform ID and final undone receipt. Original user events were
+not modified.
+
+Normal review/scheduling of an owned 20-second timer passed, including the
+notification banner while the app was in the background. Job
+831d4b89ae2fd9b9e28b6bde1b773ef698c670eb7488280ff2e43750bc766002 retains its
+dispatched receipt, stable timer notification ID and fire UTC-ms 1791986777869.
+The short UI test passed in 36 seconds (43 seconds including runner overhead).
+This verifies an app notification, not a system Clock timer. The INFO-level UART
+does not establish watch ANCS delivery; its attribute prints are DEBUG-level.
+
+### ANCS enrollment, dated alerts and remaining UI authentication (2026-10-14)
+
+The phone's connected-watch Bluetooth page shows Share System Notifications
+already on, although the app reported unauthorized. Native connections used nil
+options and the authorization callback was incorrectly on CBPeripheralDelegate.
+7d38255 requests ANCS on normal and restored connections and implements the
+CBCentralManager callback documented by [Apple](https://developer.apple.com/documentation/corebluetooth/cbperipheral/ancsauthorized).
+Restoration before poweredOn defers its connection request; Stop clears that
+pending request. d9c962b removes Android Clock's next-occurrence restriction from
+iOS dated app alerts and rejects an expired iOS alert before dispatch.
+Ten action-review tests, all 340 Flutter tests, targeted analysis and a signed
+Release build pass; deep/strict signature verification passes.
+
+The normal signed 7d38255 app is installed. A supported command-line launch
+observed a fresh CoreBluetooth restoration callback UTC-ms 1791994446126 and
+fresh Ready/status/version generation 94. All preceding recording identities
+remain. This confirms the updated restored-connection path reaches Ready; it
+does not establish the ANCS UI status or notification delivery yet.
+
+A fresh iOS Enter iPhone Passcode for XCTest / Enable UI Automation screen is
+observed. The attempted transcript restoration/export test never initialized,
+so it changed no transcript and is not a pass. The human must enter this device
+passcode to resume UI automation. Source/build/native work continues meanwhile.
+The owned test transcript still contains the timer fixture; its exact original
+text and saved revision history are preserved for restoration through normal UI.
+
+Independent USB readback after the productivity checks verified all 33 watch
+sources, 673009 bytes, against their phone receipt hashes. All 28 original
+pre-firmware sources additionally match the preserved baseline. Private audio
+and receipts are in final-source-integrity.
+
+3b4df83 implements the previously missing iOS Open calendar path for created
+calendar events. The native action looks up the saved job/action receipt,
+checks its app-owned EventKit marker and presents Apple's event viewer. It
+requires a foreground UI and reports an unavailable/deleted event without
+recreating it. Reminders retain Create and Undo; their unsupported Open calendar
+button is hidden on iOS. Eleven action-review tests, all 341 Flutter tests,
+targeted analysis, native journal/framing and native voice-job tests pass.
+The signed Release build and deep/strict signature verification pass.
+
+The normal signed 3b4df83 app is installed with fresh Ready/status/version
+generation 96 and all 33 sources retained. Calendar viewer, ANCS status/delivery,
+owned transcript restoration/export, media, photo/model import and short
+background firmware acceptance still need their normal UI checks. Native
+accessibility inspection can read the app, but attempted inspector activation
+was not verified to change its route and is not UI acceptance. XCTest's fresh
+passcode authentication remains required; no passcode was entered or bypassed.
+The owned generated two-track media fixture is prepared under the existing local
+artifact server for the AMS check; no user media is used. The goal is not complete.
