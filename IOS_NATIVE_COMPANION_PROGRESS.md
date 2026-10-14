@@ -1013,3 +1013,59 @@ was not verified to change its route and is not UI acceptance. XCTest's fresh
 passcode authentication remains required; no passcode was entered or bypassed.
 The owned generated two-track media fixture is prepared under the existing local
 artifact server for the AMS check; no user media is used. The goal is not complete.
+
+### Resolved device authentication, ANCS, calendar viewer and AMS (2026-10-14)
+
+The human completed the fresh XCTest device authentication. Normal UI automation
+runs again; the preceding authentication notes describe earlier failed attempts.
+The installed app remains signed 3b4df83, with all 33 watch sources retained.
+
+An explicit normal Stop, process relaunch (still Stopped), and Connect passed.
+The ANCS page then reported authorized. An owned twenty-second app alert used
+review title `ZSWatch HIL ANCS 20261014_1918`; the title was deliberately changed
+after analysis and is absent from the already-delivered voice result packet.
+It was absent from a private 512-KiB watch RAM capture before firing and present
+in three copies afterward. The exact owned phone banner also passed. This
+establishes physical ANCS delivery, without claiming a photograph of its watch
+presentation. Both read-only SWD captures reported the CPU not halted before and
+after; no reset or halt was requested. Raw RAM remains private and ignored.
+
+Normal Create → Open calendar presented Apple's event viewer for owned job
+89d44eaad505bff149ee2463780797d8e3bc90b0a32eac8513786cdf343f9d06. The screenshot
+shows the October 16, 16:00–16:30 event and matching app-owned marker. Done and
+Undo/Remove succeeded; the final receipt is undone. The whole XCTest failed only
+its assumed HIL title: existing local AI normalized that title to “schedule a
+meeting.” This is preserved as a failed assertion, not relabeled a whole-test
+pass; classification changes are excluded from this task.
+
+Text export opened the native share sheet. A copied 116-byte cache export exactly
+matched the preserved original transcript (SHA256
+5d070df34a177296e07feda064885e815c663356d18b56d30d3bcef3fce9662e). The sheet was
+dismissed without sending externally. Subsequent fixtures were restored again
+through Edit/Save after the AMS check; the combined final-state/restore test
+passed in 23.6 seconds. Source audio and original recordings were not modified.
+
+AMS used two generated quiet WAV tones in an owned local Safari page. Exact
+track-title/artist tokens were absent from baseline watch RAM and present in four
+copies after playback. Normal watch Music UI touches at the source-derived button
+centers generated phone remote-pause, remote-play, remote-next (track two), and
+final remote-pause callbacks. Safari's final track-two paused state was verified
+by XCTest, and the watch returned to its original watchface. The initial start
+test failed its text assertion because this temporary page lacked UTF-8 metadata;
+the actual start receipt and screenshot show playback. The fixture encoding was
+corrected; no production media code was changed. Private evidence uses
+/tmp/zswatch-AMS-restore-20261014.xcresult and owned HTTP callback receipts.
+
+Source inventory also corrects the notification-actions row: current firmware
+has local notification removal but no ANCS positive/negative action dispatch.
+Physical safe dismissal of only the owned alert remains a separate check.
+The goal remains incomplete: remaining physical checks stay explicit in parity.
+
+
+Normal Copy transcript → paste into the editor matched all 116 original characters;
+Cancel left the saved original unchanged. Export audio opened the native share
+sheet. The combined test passed in 24.4 seconds; no external share was sent.
+A private copied 30,588-byte export is a complete Opus/Ogg container with
+7.6675-second final granule duration. Evidence and exact owned AMS callbacks are
+summarized in the ignored ams-acceptance/manifest.json. A reusable standard-library
+fixture generator now preserves the owned media check without user audio.

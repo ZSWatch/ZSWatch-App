@@ -47,3 +47,25 @@ The original six-route phone check passed on iPhone 11 / iOS 26.1 with app
 8ee84dd. The reusable runner's build and subsequent evidence are documented in
 IOS_NATIVE_COMPANION_PROGRESS.md; shell response/navigation acceptance is separate
 from the successful route check. Run tests sequentially against one phone.
+
+
+### Owned AMS media fixture
+
+Generate a new directory with:
+
+```sh
+python3 scripts/companion_hil/ios_media_fixture.py /tmp/owned-ams-fixture
+```
+
+Serve its parent through the existing local HTTP
+fixture/server and open the page in iPhone Safari. Tap Start owned audio through
+the normal UI. The two quiet generated tones publish unique track titles and
+artist through MediaSession; the page supplies play/pause/next/previous handlers.
+Watch Music UI controls should produce `remote-play`, `remote-pause`,
+`remote-next` and `remote-previous` GET receipts, including track and paused state.
+A simple file server returns 404 for these marker URLs; its request log still
+records the callback. Do not treat a download or watch-USB command alone as AMS
+acceptance. Verify the phone player state and watch metadata, stop the owned audio
+and return the watch to its preceding page afterward. Keep captures of unrelated
+notification/media content private. The HTML declares UTF-8 for reliable iOS
+accessibility labels.
