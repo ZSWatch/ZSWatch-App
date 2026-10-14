@@ -842,3 +842,61 @@ Connect passed. On relaunch, Connect remained available and Disconnect absent;
 only the later user-equivalent Connect action returned to connected Home. This
 is explicit Stop persistence across an injected test process relaunch, not an
 OS restoration or user force-quit claim.
+
+### Native diagnostics, Weather and recording controls (2026-10-14)
+
+Normal File System listing exposed a real null-path bridge bug. Dart now omits an
+absent path and Swift also accepts an explicit NSNull optional value. Nine native
+file tests, analysis and the full 336-test Flutter suite passed. Signed Release
+build and deep/strict verification pass. iOS location error guidance now names
+iPhone permissions; seven existing GPS-setting tests and analysis pass.
+
+Real logs reached the phone, but the log switch stayed pending because the iOS
+bridge never emitted requested/written/pending completion state. a1d54cb publishes
+that state after the CoreBluetooth write finishes, fences old callbacks and
+reapplies the retained policy on Ready. Its signed Release build and 24 app-shell
+tests pass. Normal enable/receive/disable passed in 20.616 seconds, and persisted
+log_streaming is restored false. This write receipt is not a separate watch ACK;
+actual firmware log packets demonstrate the enabled path.
+
+Normal crash-summary and filesystem routes passed in 20.802 seconds. An existing
+stored crash summary was displayed and preserved. Eight known log paths returned
+no files in this UART-debug build. No crash erase or remote analysis was performed.
+Find Watch delivered the real firmware command and the UART recorded its bounded
+10-second stop. These product checks use the existing UI and command paths.
+
+Normal location opt-in passed. Launching Weather on the watch delivered fresh
+phone GPS, completed the native HTTP response and caused the firmware's successful
+response branch to release GPS. last_http outcome was written at generation 84,
+with no pending HTTP requests afterward; the Weather UART contains no error.
+Communication UI showed 12 entries with actual TX/RX counts, and its corrected
+normal UI check passed. The watch returned to its original watchface and location
+sharing was restored off. A literal watch-screen photograph and background
+location permission remain unverified. Firmware 5df4b8ed removes routine raw
+coordinates from Weather debug logs; the updated WatchDK sysbuild passes.
+
+Search restricted the normal Voice screen to exactly one owned microphone source.
+Archive/unarchive, recoverable Delete from phone, Recently deleted and Restore
+passed in 26.177 seconds. Its original active/unarchived state is restored; the
+watch original and unrelated user recordings were retained.
+
+### Observed OS BLE relaunch after injected process death (2026-10-14)
+
+The normal signed a1d54cb app was left in the background through the Home action.
+Developer DVT then sent SIGKILL to only companion PID 1647. A new owned two-second
+watch microphone recording provided a real notification. No app activation or
+launch command followed before verification. Read-only DVT found new PID 1676;
+CoreBluetooth restoration callback UTC-ms 1791977252395 and restored-peripheral
+attachment were persisted. Fresh Ready/status/version generation 88 followed.
+The new 7,223-byte source was downloaded in the background and its receipt SHA256
+125356c272a9ddc7f1ec140052e8d2db6c4dd8030550f5a3f2cac93b33fa1927
+matched independent USB readback before any explicit UI reopen. All 32 preceding
+source identities remained present. Local evidence is in
+observed-background-restoration.
+
+This is debugger-injected process death followed by an actually observed OS BLE
+relaunch and callback. It is not a genuine jetsam/memory-pressure termination,
+user app-switcher force-quit or first-unlock-after-phone-reboot test. Apple describes
+those as distinct conditions in [QA1962](https://developer.apple.com/library/archive/qa/qa1962/_index.html).
+Automatic AI was off; the verified result is securing the recording, not immediate
+background inference.
