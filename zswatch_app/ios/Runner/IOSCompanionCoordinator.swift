@@ -99,6 +99,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   func publish(_ event: String, _ fields: [String: Any] = [:]) throws { try changed(event, fields) }
   private var central: CBCentralManager?
   private var peripheral: CBPeripheral?
+  private var restoredConnectionWaitingForPower = false
   private var linkDelegate: CompanionLinkDelegate?
   private var rx: CBCharacteristic?
   private var tx: CBCharacteristic?
@@ -369,8 +370,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     peripheral = found
     linkDelegate = CompanionLinkDelegate(owner: self, generation: journal.generation)
     found.delegate = linkDelegate
-    if found.state == .connected { discover(found) }
-    else { setPhase("connecting"); central?.connect(found, options: nil) }
+    // Enroll this central in ANCS authorization even when iOS already has the
+    // peripheral connected. didConnect owns service discovery in either case.
+    setPhase("connecting")
+    central?.connect(found, options: [CBConnectPeripheralOptionRequiresANCS: true])
   }
   func suspendForFirmware(_ generation: Int) throws {
     guard isReadySession(generation), firmware.isActive else { throw CompanionFailure.unavailable("Firmware session expired") }
@@ -446,6 +449,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
 
   private func closeLink() {
     phase = "disconnected"
+    restoredConnectionWaitingForPower = false
     logWriteToken = UUID(); logWritePending = false; logWritten = false
     logObserver?(logStreamingState)
     gpsRequested = false; gpsToken = UUID()
@@ -666,7 +670,9 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     item.delegate = linkDelegate
     discover(item)
   }
-  fileprivate func ancsChanged(_ item: CBPeripheral, _ generation: Int) { if owns(item, generation) { try? changed("ancs_authorization_changed") } }
+  func centralManager(_ central: CBCentralManager, didUpdateANCSAuthorizationFor item: CBPeripheral) {
+    if owns(item, journal.generation) { try? changed("ancs_authorization_changed") }
+  }
 
   func centralManagerDidUpdateState(_ central: CBCentralManager) {
     let waiters = permissionWaiters; permissionWaiters.removeAll()
@@ -679,6 +685,11 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       if journal.desired && peripheral == nil {
         try? changed("runtime_restored", ["generation": journal.generation + 1])
         connectSelected()
+      } else if restoredConnectionWaitingForPower, let item = peripheral,
+                owns(item, journal.generation), !firmware.holdsLink,
+                !cancellations.contains(item.identifier) {
+        restoredConnectionWaitingForPower = false
+        central.connect(item, options: [CBConnectPeripheralOptionRequiresANCS: true])
       }
     } else {
       firmware.abort("radio_unavailable")
@@ -701,8 +712,13 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       try? changed("restored_peripheral_attached", ["generation": journal.generation + 1])
       peripheral = item; linkDelegate = CompanionLinkDelegate(owner: self, generation: journal.generation)
       item.delegate = linkDelegate
-      if item.state == .connected { discover(item) }
-      else { setPhase("connecting"); central.connect(item, options: nil) }
+      setPhase("connecting")
+      if central.state == .poweredOn {
+        central.connect(item, options: [CBConnectPeripheralOptionRequiresANCS: true])
+      } else {
+        // CoreBluetooth delivers restoration before its initial power state.
+        restoredConnectionWaitingForPower = true
+      }
     }
   }
   func centralManager(_ central: CBCentralManager, didDiscover item: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
@@ -748,5 +764,4 @@ private final class CompanionLinkDelegate: NSObject, CBPeripheralDelegate {
   func peripheral(_ p: CBPeripheral, didWriteValueFor c: CBCharacteristic, error: Error?) { owner?.writeCompleted(p, generation, c, error) }
   func peripheralIsReady(toSendWriteWithoutResponse p: CBPeripheral) { owner?.pump(p, generation) }
   func peripheral(_ p: CBPeripheral, didModifyServices invalidatedServices: [CBService]) { owner?.modified(p, generation) }
-  func peripheral(_ p: CBPeripheral, didUpdateANCSAuthorization isAuthorized: Bool) { owner?.ancsChanged(p, generation) }
 }
