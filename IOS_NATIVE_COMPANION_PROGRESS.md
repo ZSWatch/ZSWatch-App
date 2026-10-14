@@ -715,3 +715,34 @@ This proves actual watch reboot recovery and source preservation. It does not
 prove the dashboard's Restart action, OS restoration, suspended Dart collection,
 out-of-range recovery, or completed firmware update. The next normal firmware
 UI retry still requires on-device XCTest authentication.
+
+### Physical firmware retry and verification (2026-10-14)
+
+After the user unlocked the devices, phone automation initialized normally.
+The real retained cancellation displayed Update Cancelled, and its explicit
+Reset passed on the installed normal app. The normal iCloud Drive / Downloads
+picker then reselected the owned matched 0/2 package. The actual FW Update retry
+passed its complete UI test in 98.167 seconds.
+
+Native operation BE2D0E7C-F058-4CF2-9616-85C74AD39F1A completed without error or
+unknown outcome. Both target images were verified active after reboot: index 0
+56ed66be93a43cc1ddd9eb66362b2ddee6aa57bc83a106444930e37f947b9fe2 and index 2
+1d2e2c8a30ef304fad3746625338064768ac3a908e0f849d0d8306ce6efe13ca.
+Fresh NUS version and status receipts matched Ready generation 52. UART confirms
+permanent swaps of images 0/2 and boot of the built 0.8.1-e9fcd5b5e231 artifact;
+that configured version string predates the later source/build-document commit.
+The hashes identify the actual binaries. Unreported network index 1 was excluded
+from the bundle and remains untested.
+
+Primary-image metering observed 836,204 acknowledged bytes after initial offset
+2,400 in 24.364237042 seconds: 33.5166 KiB/s. It excludes the initial progress
+offset and does not represent aggregate two-image throughput. SDK configuration
+used pipeline depth 3 and reported reassembly buffer size 2,475. The measurement
+was published only after the fresh boot/hash checks and enables the same-watch
+large-resource gate. Native operation elapsed time was 89.323 seconds, including
+transfer, application, reconnect and verification. The 180-second UART capture
+contains 6,771 bytes; complete test logs and native receipts are retained locally.
+
+Preparing the representative resource flow uses a verified backup of the
+existing /S/full_fs and an owned image generated from checked-in firmware assets.
+No resource upload or watchface acceptance is claimed at this checkpoint.
