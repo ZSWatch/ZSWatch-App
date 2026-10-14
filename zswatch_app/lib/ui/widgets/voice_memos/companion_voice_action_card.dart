@@ -296,7 +296,11 @@ class _ActionReviewDialogState extends State<_ActionReviewDialog> {
 
   void confirm() {
     try {
-      if (!clock && calendarId == null) {
+      // iOS selects its writable default Calendar/Reminders list in EventKit.
+      // Only Android requires a calendar ID from the review picker.
+      if (!clock &&
+          defaultTargetPlatform == TargetPlatform.android &&
+          calendarId == null) {
         throw StateError('No writable calendar is available.');
       }
       final draft = widget.draft.copyWith(

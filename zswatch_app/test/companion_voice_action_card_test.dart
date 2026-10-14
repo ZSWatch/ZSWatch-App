@@ -175,6 +175,69 @@ void main() {
     expect(service.created, isEmpty);
   });
 
+  for (final type in ['calendar_event', 'reminder']) {
+    testWidgets('iOS $type confirms without an Android calendar ID', (
+      tester,
+    ) async {
+      final original = debugDefaultTargetPlatformOverride;
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      try {
+        final service = FakeActions();
+        await mount(
+          tester,
+          service,
+          action: {
+            'type': type,
+            'title': 'Owned action',
+            if (type == 'calendar_event')
+              'start_time': '2099-10-05T10:00:00+02:00',
+            if (type == 'reminder') 'due_date': '2099-10-05T10:00:00+02:00',
+          },
+        );
+        await tester.tap(find.text('Review & create'));
+        await tester.pump(const Duration(seconds: 1));
+        await tester.tap(find.text('Create'));
+        await tester.pump(const Duration(seconds: 1));
+        expect(service.created, hasLength(1));
+        expect(service.created.single.platformCalendarId, isNull);
+        expect(service.identities.single, ('owned-job', 2));
+        service.pending.complete();
+        await tester.pumpAndSettle();
+      } finally {
+        debugDefaultTargetPlatformOverride = original;
+      }
+    });
+  }
+
+  testWidgets('Android keeps review open without a writable calendar', (
+    tester,
+  ) async {
+    final original = debugDefaultTargetPlatformOverride;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      final service = FakeActions();
+      await mount(
+        tester,
+        service,
+        action: {
+          'type': 'calendar_event',
+          'title': 'Owned action',
+          'start_time': '2099-10-05T10:00:00+02:00',
+        },
+      );
+      await tester.tap(find.text('Review & create'));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(find.text('Create'));
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.textContaining('No writable calendar'), findsOneWidget);
+      expect(service.created, isEmpty);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+    } finally {
+      debugDefaultTargetPlatformOverride = original;
+    }
+  });
+
   testWidgets(
     'calendar undo requires confirmation and uses the original action identity',
     (tester) async {
