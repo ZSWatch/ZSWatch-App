@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/database/app_database.dart';
@@ -8,7 +7,7 @@ import 'package:zswatch_app/services/background/ios_telemetry_projector.dart';
 void main() {
   const watch = 'F31A05BD-1C30-4B66-AAC0-157004320111';
   const journal = 'F31A05BD-1C30-4B66-AAC0-157004320222';
-  const now = 1791830000000;
+  final now = DateTime.now().millisecondsSinceEpoch;
   late AppDatabase db;
   late IosTelemetryProjector projector;
   Map<String, Object?> receipt(
@@ -34,8 +33,8 @@ void main() {
     'phase': 'ready',
     'generation': 3,
     'event_cursor': 4,
-    'events': [],
-    'recordings': {},
+    'events': <Object?>[],
+    'recordings': <String, Object?>{},
     'address': watch,
     'journal_id': journal,
     'telemetry': receipts,
@@ -97,6 +96,36 @@ void main() {
     );
     expect(await db.select(db.batteryReadings).get(), isEmpty);
     expect(await db.select(db.companionTelemetryCursors).get(), isEmpty);
+  });
+  test('60-day retention and replay watermark commit together', () async {
+    final expired = now - const Duration(days: 61).inMilliseconds;
+    final recent = now - const Duration(days: 59).inMilliseconds;
+    final batch = snapshot([
+      receipt(1, 'connection', {'event_type': 'connected'})
+        ..['utc_ms'] = expired,
+      receipt(2, 'battery', {'level': 85, 'is_charging': false})
+        ..['utc_ms'] = expired,
+      receipt(3, 'health', {'stp': 100, 'hrm': 70})
+        ..['utc_ms'] = expired,
+      receipt(4, 'connection', {'event_type': 'connected'})
+        ..['utc_ms'] = recent,
+      receipt(5, 'battery', {'level': 87, 'is_charging': false})
+        ..['utc_ms'] = recent,
+      receipt(6, 'health', {'stp': 200, 'hrm': 72})
+        ..['utc_ms'] = recent,
+    ]);
+    expect(await projector.project(batch), 6);
+    expect(await projector.project(batch), 6);
+    expect(await db.select(db.connectionEvents).get(), hasLength(1));
+    expect(await db.select(db.batteryReadings).get(), hasLength(1));
+    final samples = await db.select(db.healthSamples).get();
+    expect(samples, hasLength(2));
+    expect(samples.map((sample) => sample.value), containsAll([200, 72]));
+    expect(await db.select(db.watches).get(), hasLength(1));
+    expect(
+      (await db.select(db.companionTelemetryCursors).get()).single.sequence,
+      6,
+    );
   });
   test(
     'missing watch waits for catalogue without acknowledgement loop or resurrection',

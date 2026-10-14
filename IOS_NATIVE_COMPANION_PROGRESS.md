@@ -664,3 +664,22 @@ checks the terminal view, dismissal, and absence of native commands from Reset.
 All 22 firmware tests, targeted analysis, and the normal signed release build
 pass, including deep/strict codesign. Physical retry and fresh boot/image-hash
 verification remain pending.
+
+### History retention and current authentication gate (2026-10-14)
+
+Native telemetry projection now applies the existing 60-day history cleanup
+inside its data/cursor transaction. This removes expired health, battery and
+connection rows while preserving the replay watermark and saved watch. The new
+regression fails on the previous implementation, then passes for expired/recent
+rows and lost-ACK replay after the fix. All five telemetry tests, targeted
+analysis and the complete 333-test Flutter suite pass. The normal signed Release
+build and deep/strict codesign pass.
+
+The cancellation UI release d07b70c was installed normally and reconnected at
+generation 45 with the original cancelled firmware receipt intact. Its physical
+UI test could not initialize: iOS displayed Enter iPhone Passcode for XCTest /
+Enable UI Automation and timed out. The phone lock-state API reported unlocked,
+but that does not satisfy this separate authentication. Desktop control also
+reported the Mac locked. No retry or firmware admission occurred in this run;
+the user has been asked to enter the on-device XCTest passcode. Source work and
+USB probes remain available. USB app state succeeded without a reset or flash.

@@ -156,6 +156,9 @@ class IosTelemetryProjector {
         consumed = true;
       }
       if (!consumed || cursor == 0) return null;
+      // Keep the existing 60-day history policy in the same transaction as the
+      // receipt cursor. A lost native ACK must not resurrect expired samples.
+      await db.cleanupOldData();
       await db
           .into(db.companionTelemetryCursors)
           .insertOnConflictUpdate(
