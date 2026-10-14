@@ -912,3 +912,18 @@ desired_running true. The corrected continuation UI test passed in about 29
 seconds. The initial entry test looked for a watch name hidden in the collapsed
 information card; the visible Demo firmware label is the actual entry assertion.
 No original recordings were imported into or mutated by the preview.
+
+### Owned transcript revision and restoration (2026-10-14)
+
+Normal Copy and Edit controls were exercised only for owned microphone source
+20261013_235832. Native storage confirms the exact requested 132-character edited
+revision. After a test caret-selection failure, normal UI editing restored all
+116 original characters exactly in selected job 7daf54e0fee0cabc86eeb35d68efa36b82fd42ae76b9421605f2a297344e5de9.
+The earlier delivered result remains in saved revision history. Audio and unrelated
+recordings are unchanged. UI displayed-text assertions failed, so whole-test passes
+are not claimed. Export/share and clipboard roundtrip remain separate checks.
+
+Latest firmware 5df4b8ed builds; its logging-only corrections are not installed.
+The final owned ZIP remains absent from visible Files after the Safari download
+prompt. Failed exact-file guards admitted no update. Physically verified RTC
+firmware e63e86b6 remains installed. Short background firmware acceptance is open.
