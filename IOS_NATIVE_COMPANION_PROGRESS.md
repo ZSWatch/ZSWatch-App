@@ -1069,3 +1069,39 @@ A private copied 30,588-byte export is a complete Opus/Ogg container with
 7.6675-second final granule duration. Evidence and exact owned AMS callbacks are
 summarized in the ignored ams-acceptance/manifest.json. A reusable standard-library
 fixture generator now preserves the owned media check without user audio.
+
+
+### Normal gallery crop and sensor view cleanup (2026-10-14)
+
+Safari saved only the generated four-color image to Photos. The system private
+picker displayed that unique new image; no unrelated photo was selected.
+Normal Crop Background → Done → upload/apply passed. Native operation
+18C4D6DC-F57E-4D47-827E-C0BDBA266E33 completed 115212 bytes at generation 99.
+Independent USB readback of applied /user/bg.bin had SHA256
+788324fd05e39f08d1ec1f0048451ca22be81907c8c5e614de769396e2e09e88; decoded RGB565
+samples verify the four colors, white center cross and black circular mask.
+
+Retro Sunburst was restored through the normal image control. The first generic
+restore tap admitted no native operation and its wait was interrupted; the
+observed image-center check passed in 21.5 seconds. Full restored readback is
+115212 bytes, SHA256
+979df7661e05c5a9caa4ac04c46c8147f1a909571c0b7b04370bcb594f547842, exactly the
+preserved original. Private receipts are in photo-crop-acceptance. Initial picker
+harness failures involved merged Flutter labels and PHPicker isHittable; they
+are not counted as whole passes and required no product change.
+
+Normal accelerometer enable received real samples. Leaving its view without
+explicitly disabling it, then reopening after two seconds, showed zero sensors
+streaming and its switch off. The whole view-close check passed. All eight
+advertised sensor controls were available and off afterward; that inventory does
+not establish samples from the other seven sensors. Evidence:
+/tmp/zswatch-sensor-view-close-20261014.xcresult.
+
+
+Normal iPhone Settings Bluetooth off/on passed in 18.4 seconds. The off snapshot
+is disconnected at generation 103, reports “Bluetooth is off,” retains desired
+Start and has zero telemetry drops. Switching back on recovers without pressing
+Connect: Ready/status/version all reach fresh generation 105, all 33 sources
+remain, and the error clears. The physical Settings toggle is restored on.
+/tmp/zswatch-radio-recovery-20261014.xcresult and ignored radio-recovery-acceptance
+contain the short check. This is radio availability, not permission denial.
