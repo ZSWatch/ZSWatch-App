@@ -1191,3 +1191,28 @@ replay fencing and user-facing status intact. The normal root-workspace signed
 release build passes in 123.5 seconds with strict signature verification, rather
 than requiring the staging checkout for this build. Foreground retry will separate
 a package/transport problem from the background transition.
+
+
+Foreground retry of the final 5df4b8ed package passed on f961adc in 174.7 seconds
+including the runner. Native C23CD961-7A99-45B2-A683-8C4D79644EB4 completed, verified
+both target hashes, and reached Ready/status/version generation 116 with all 33
+sources. Targets are index 0: 01ac603c2d20852c32d408a259a6258347392414103688d4269d89c8a6fcb111,
+index 2: e237882217b54593b4afdd4dd87d7c885b404f6004b9ba62a2734d6681a073f8.
+The old throughput record remains historical; no fresh benchmark is claimed from
+this retry of a partially uploaded image.
+
+A separate ten-second background attempt used the previously verified e63e86b6
+clock-fix package, rather than the old timezone-buggy firmware. It again failed
+at 2400 bytes and the diagnostic identifies iOSMcuManagerLibrary.McuMgrTransportError,
+code 5, reason sendFailed, state upload. SDK source shows this is retry exhaustion.
+No reset was observed. The final 5df image remains the installed active baseline.
+
+Source review finds the SDK's already-connected branch discovers services without
+registering its own central's connection; a globally connected peripheral is not
+proof of local ownership. Apple's installed iOS 26.1 CBCentralManager.h documents
+that system-connected peripherals require a local connect before use. The pinned
+SDK now explicitly connects before discovery when it lacks a local connection;
+pending system connections also register locally. Disconnect/failure clears the
+local flag. Terminal lifetime fences remain, and the complete pinned SDK plus
+real abort proof compile/pass after the change. Background acceptance follows;
+this ownership correction is not yet claimed to resolve the physical failure.
