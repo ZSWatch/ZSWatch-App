@@ -82,7 +82,9 @@ class _CompanionGpsSettingsTileState
       if (mounted) {
         setState(
           () => error = enabled
-              ? 'Allow location all the time and turn on phone location services, then try again.'
+              ? defaultTargetPlatform == TargetPlatform.iOS
+                    ? 'Allow location access and turn on iPhone Location Services, then try again.'
+                    : 'Allow location all the time and turn on phone location services, then try again.'
               : 'Could not turn off location sharing',
         );
       }
@@ -136,7 +138,11 @@ class _CompanionGpsSettingsTileState
                         ),
                         TextButton(
                           onPressed: () => openAppSettings(),
-                          child: const Text('Android app permissions'),
+                          child: Text(
+                            defaultTargetPlatform == TargetPlatform.iOS
+                                ? 'iPhone app permissions'
+                                : 'Android app permissions',
+                          ),
                         ),
                       ],
                     ),
