@@ -900,3 +900,15 @@ user app-switcher force-quit or first-unlock-after-phone-reboot test. Apple desc
 those as distinct conditions in [QA1962](https://developer.apple.com/library/archive/qa/qa1962/_index.html).
 Automatic AI was off; the verified result is securing the recording, not immediate
 background inference.
+
+### Physical Demo preview and intent restoration (2026-10-14)
+
+Normal Settings enabled Demo on signed a1d54cb. The native journal independently
+showed generation 90, phase stopped and desired_running false while the UI showed
+synthetic Demo firmware and placeholder battery/heart-rate data. Health,
+Notifications, Analytics, Watchface, Developer and Voice routes all passed.
+Exiting preview restored the same saved UUID with fresh Ready generation 91 and
+desired_running true. The corrected continuation UI test passed in about 29
+seconds. The initial entry test looked for a watch name hidden in the collapsed
+information card; the visible Demo firmware label is the actual entry assertion.
+No original recordings were imported into or mutated by the preview.
