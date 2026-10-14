@@ -1132,3 +1132,37 @@ and DDI enabled. Restarting the Mac user CoreDevice service restored a normal
 XCTest run: location sharing was successfully returned off. No new human
 permission or passcode was requested. Network failure remains pending until an
 actual error response is observed.
+
+
+The normal signed 5259194 release is installed. All 343 Flutter tests, targeted
+analysis, signed build and strict signature verification pass. Before install,
+all 33 sources and the exact restored owned transcript were retained, GPS/logs
+off. After installation, the first UI harness encountered empty Flutter
+semantics; a temporary read-only accessibility inspection enabled test visibility
+without changing VoiceOver or adding a product flag.
+
+Normal saved-watch rename persisted across process relaunch while the native
+owner remained Stopped. Clearing the custom name enabled Save and restored
+ZSWatch. The Forget confirmation displayed the iOS Settings bond explanation;
+Cancel preserved metadata/history/bond. Connect restored the same UUID and fresh
+Ready. The whole test passed in 28.2 seconds:
+/tmp/zswatch-watch-name-reset-inspected-20261014.xcresult. Installed artifact and
+private final-state summary are in signed-watch-name-reset. Additional-watch
+selection and actual Forget remain separate unverified cases.
+
+
+### Physical offline HTTP error and recovery (2026-10-14)
+
+The corrected normal Settings check held Airplane Mode on / Wi-Fi off for thirty
+seconds with Bluetooth on and the watch Ready. Reopening normal watch Weather
+used its preceding cached location and generated a real HTTP request. Native
+relay outcome was error_written at generation 108, UTC-ms 1792002440927, with no
+pending requests. This is actual phone offline-error delivery, not the earlier
+ineffective Instruments loss profile or a synthetic native callback.
+
+The whole UI check passed in 55.1 seconds, restored Airplane Mode off / Wi-Fi on,
+and returned to connected Home. Reopening Weather after network restoration
+produced written at the same Ready generation, UTC-ms 1792002523339, again zero
+pending. All 33 sources remain and GPS sharing is off. Private snapshots and the
+summary are in network-recovery-acceptance; the watch is returned to its original
+watchface. No HTTP URL or coordinates are printed into the evidence summary.
