@@ -113,6 +113,28 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  test('iOS alarms accept a future date and reject an expired alert', () {
+    final original = debugDefaultTargetPlatformOverride;
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      final alarm = ActionCreationDraft.fromVoiceResult({
+        'type': 'alarm',
+        'title': 'Owned future alert',
+        'due_date': '2026-10-16T09:00:00',
+      });
+      expect(
+        () => alarm.validateForCreation(now: DateTime(2026, 10, 14, 10)),
+        returnsNormally,
+      );
+      expect(
+        () => alarm.validateForCreation(now: DateTime(2026, 10, 16, 9)),
+        throwsStateError,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = original;
+    }
+  });
+
   testWidgets(
     'opening and cancelling review have no effects; double tap dispatches once',
     (tester) async {

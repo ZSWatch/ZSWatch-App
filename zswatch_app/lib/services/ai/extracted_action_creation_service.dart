@@ -159,6 +159,12 @@ class ActionCreationDraft {
     }
     if (actionType == ExtractedActionType.alarm) {
       final current = now ?? DateTime.now();
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        if (!scheduledAt!.isAfter(current)) {
+          throw StateError('Alert time must be in the future.');
+        }
+        return;
+      }
       var next = DateTime(
         current.year,
         current.month,
