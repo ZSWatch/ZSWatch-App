@@ -49,7 +49,7 @@ No PR, push or publication is included.
 - Final independent USB checks: 33 original recordings / 673,009 bytes, every hash
   unchanged; original 115,212-byte watchface hash unchanged; full resource image
   SHA256 `5b060daa49707f1f621a4d6ba1817d6f1032fd1def2fb18e38c5abade388d1a0`.
-  Both installed firmware image hashes are active/confirmed. Final Ready 186 on app cea2517 has
+  Both installed firmware image hashes are active/confirmed. Final Ready 189 on app cea2517 has
   all 33 recordings downloaded, no error, GPS/logs off and automatic processing off.
 
 Firmware 26c59c8a fixes the shared system-workqueue/ATT buffer deadlock using a
@@ -88,8 +88,14 @@ system bond was retained; no new system pairing/unpair is claimed. The owned tes
 installation was stopped and removed. Original Ready 186 and all 33 saved recording
 hash/size receipts are unchanged.
 
+Actual user force-quit also passed through the app switcher: the focused card
+was swiped away, an independent process snapshot found the app absent, twelve
+seconds stayed notRunning, and explicit reopening recovered fresh Ready 189 with
+all33 original downloaded receipts unchanged. The whole UI check passed in 27.890 seconds.
+This is separate evidence from the injected-kill OS restoration check.
+
 Other unverified variants stay explicit in `IOS_FEATURE_PARITY.md`: first unlock
-after phone reboot, actual user force-quit, literal out-of-range recovery, denied
+after phone reboot, literal out-of-range recovery, denied
 location/EventKit permissions, manual DST changes, interruption inside STT, and
 system-scheduled AI execution. These must not be inferred from ordinary relaunch,
 a short Home interval or host tests. Long endurance testing is left to the user.

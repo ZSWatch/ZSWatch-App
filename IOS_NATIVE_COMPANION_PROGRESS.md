@@ -1625,3 +1625,21 @@ original app resumed Ready 186; all 33 original downloaded hash/size receipts ar
 unchanged. The owned test installation was then uninstalled. Evidence is retained
 locally under first-launch-and-bluetooth-recovery. Prior authentication timeouts
 are historical limitations, not the current blocker.
+
+### 2026-10-15 — actual user force-quit and reopen PASS
+
+Normal iPhone app-switcher dismissal now has separate physical evidence from the
+older debugger-kill restoration check. The focused ZSWatch card was swiped away;
+XCTest observed notRunning and an independent devicectl process snapshot found
+its exact executable absent. It remained notRunning for twelve seconds, then an
+explicit reopen recovered fresh Ready 189 with all 33 original downloaded hash/size
+receipts unchanged, no error, GPS/logs/automatic processing off, and the completed
+resource receipt retained. The complete UI test passed in 27.890 seconds.
+
+Initial unfocused card swipes did not terminate the app and are not acceptance.
+After focusing the card, a first real dismissal/reopen succeeded independently
+but its suite failed a pre-swipe assertion that excluded XCTest's foreground
+app-switcher state. The corrected full sequence passed. No debugger/process-kill
+command was used for this acceptance. The twelve-second window is a bounded
+observation, not proof of every possible post-force-quit BLE trigger or endurance.
+Evidence is retained locally under user-forcequit-reopen.
