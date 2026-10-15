@@ -54,6 +54,7 @@ final class IOSCompanionSmp {
   }
   private func finish(_ result: Result<[String: Any], Error>) {
     let old = pending; pending = nil; preparing = false; constructing = false
+    preparationLog = nil
     downloadManager = nil
     old?.complete(result)
     owner?.queue.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.owner?.inbox?.downloadNext() }
@@ -116,7 +117,8 @@ final class IOSCompanionSmp {
           }
           self.constructing = false
           self.transport = created
-          let logger = IOSPreparationLog { [weak self] stage in
+          let logger = IOSPreparationLog { [weak self, weak owner] stage in
+            guard let owner else { return }
             owner.queue.async {
               guard let self, self.pending?.id == id, self.attempt == token, self.preparing else { return }
               self.preparationReceipt(stage)
