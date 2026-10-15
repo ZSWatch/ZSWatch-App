@@ -125,7 +125,10 @@ final class IOSCompanionFirmware {
       let manager = FileSystemManager(transport: sdk)
       let delegate = IOSResourceDelegate { event, count, total in owner.queue.async {
         guard self.current(token) else { return }
-        if event == "progress" { self.progress(count, total: total) }
+        if event == "progress" {
+          self.progress(count, total: total)
+          if count > 0, !self.foreground { self.pauseUpload() }
+        }
         else if event == "finished" {
           guard self.publish({ try self.operation.phase("resource_verifying"); try self.operation.progress(0, total: bytes.count) }) else { return }
           self.verifyResources(postBoot: false)
@@ -330,7 +333,7 @@ final class IOSCompanionFirmware {
     transport?.invalidate(); transport = nil; token = UUID(); holdsLink = false; verificationDeadline = nil
     self.manager = nil; fileManager = nil; images = []; resources = nil; lease.end()
     DispatchQueue.main.async {
-      files?.cancelTransfer()
+      files?.cancelTransfer(error: phase == "completed" ? nil : CompanionFailure.unavailable(error ?? "interrupted"))
       if phase != "completed" { manager?.abort(with: CompanionFailure.unavailable(error ?? "interrupted")) }
     }
     do { try operation.terminal(phase, error: error, unknown: unknown) } catch { owner?.storageFailedIfNeeded() }
@@ -355,7 +358,11 @@ final class IOSCompanionFirmware {
     foreground = true; backgroundEpoch = UUID(); lease.end()
     executionReceipt("foreground")
     let manager = self.manager
-    sdk { _ in if manager?.isPaused() == true { manager?.resume() } }
+    let files = operation.state?["phase"] as? String == "resource_uploading" ? fileManager : nil
+    sdk { _ in
+      if manager?.isPaused() == true { manager?.resume() }
+      files?.continueTransfer()
+    }
   }
   func inactive() {
     foreground = false
@@ -364,9 +371,12 @@ final class IOSCompanionFirmware {
   }
   private func pauseUpload() {
     let manager = self.manager
-    // Stop issuing new upload packets before UIKit enters background. Keep
-    // Nordic's acknowledged offset and resume through its supported controller.
-    sdk { _ in manager?.pauseUploadIfActive() }
+    let files = operation.state?["phase"] as? String == "resource_uploading" ? fileManager : nil
+    // Keep Nordic's acknowledged offset; neither manager may pause discovery.
+    sdk { _ in
+      manager?.pauseUploadIfActive()
+      files?.pauseUploadIfActive()
+    }
   }
   func backgrounded() {
     foreground = false
