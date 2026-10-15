@@ -870,7 +870,16 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
     if (!shouldDelete) return;
 
     try {
-      await ref.read(llmServiceProvider).deleteModel();
+      final service = ref.read(llmServiceProvider);
+      final selectedId = ref.read(selectedAiModelIdProvider);
+      await service.deleteModel(modelId: selectedId);
+      if (mounted &&
+          ref.read(selectedAiModelIdProvider) == selectedId &&
+          service.selectedModelId != selectedId) {
+        ref
+            .read(selectedAiModelIdProvider.notifier)
+            .setModelId(service.selectedModelId);
+      }
       if (mounted) {
         ScaffoldMessenger.of(
           context,

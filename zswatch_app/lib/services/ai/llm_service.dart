@@ -612,15 +612,23 @@ class LlmService {
 
   /// Delete the local model file.
   Future<void> deleteModel({String? modelId}) async {
-    final model =
-        await _resolveModelById(modelId ?? _selectedModelId) ??
-        catalogModels.first;
+    final deletingId = modelId ?? _selectedModelId;
+    final model = await _resolveModelById(deletingId);
+    if (model == null) {
+      throw StateError(
+        'Selected model is no longer available. Select another model.',
+      );
+    }
     final f = File(await _modelFilePathFor(model));
     if (f.existsSync()) {
       f.deleteSync();
     }
-    if ((modelId ?? _selectedModelId) == _selectedModelId) {
-      _modelPath = null;
+    if (deletingId == _selectedModelId) {
+      if (model.userProvided) {
+        selectModel(defaultModelId);
+      } else {
+        _modelPath = null;
+      }
     }
     _stateSubject.add(const LlmServiceState());
     debugPrint('[LlmService] Model deleted');
