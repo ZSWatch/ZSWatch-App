@@ -10,11 +10,11 @@ not a claim that every physical acceptance case has passed.
 
 | Component | Revision / location |
 | --- | --- |
-| Signed app executable | App `736551a`; subsequent commits document acceptance |
+| Signed app executable | App `cea2517`; subsequent commits document acceptance |
 | Nordic fork | `06644b17bec8202605afba2065ba8b5f7ef00fcb` |
 | fllama fork | `115e7991e78de446ed44858ebe0a8dbc82769d8e` |
 | Installed WatchDK firmware | `26c59c8a`, nested `ZSWatch/`, branch `codex/ios-companion` |
-| Signed development app | `.companion-hil-runs/20261015-ios-companion/signed-resource-rewind/Runner.app` |
+| Signed development app | `.companion-hil-runs/20261015-ios-companion/signed-permission-recovery/Runner.app` |
 | Local evidence | `.companion-hil-runs/20261015-ios-companion/` |
 
 The app is signed for team `28L8XH4G9T` and the connected iPhone 11, iOS 26.1.
@@ -60,7 +60,7 @@ firmware simulation; chart acceptance does not establish physiological accuracy.
 
 ## Validation and reproducibility
 
-All 346 Flutter tests pass and full Flutter analysis is clean. Native core,
+All 347 Flutter tests pass and full Flutter analysis is clean. Native core,
 recording purge, voice-job and firmware-contract host checks pass. Actual Nordic
 SDK fake-transport tests pass encoded ACK pause/drain/resume, offset rewind,
 parameter cancellation/reuse, late replies and terminal self-retention.
@@ -82,6 +82,9 @@ The owned first-launch installation has separate app storage and the same releas
 executable. It is waiting on iOS's fresh “Enter iPhone Passcode for XCTest — Enable
 UI Automation” prompt before its Bluetooth denial/recovery test can execute.
 No pass is claimed for that case. The production installation remains preserved.
+Native first launch uses No Watches Paired → Add Watch → Find watch, with no
+startup permission prompt. Bluetooth denial now gives a clear explanation and an
+explicit Open iPhone Settings action; retry after granting access is host-tested.
 
 Other unverified variants stay explicit in `IOS_FEATURE_PARITY.md`: first unlock
 after phone reboot, actual user force-quit, literal out-of-range recovery, denied

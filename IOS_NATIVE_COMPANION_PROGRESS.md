@@ -1570,3 +1570,22 @@ display name and signature differ; production app storage stays intact. The firs
 XCTest attempt timed out before entering the test because iOS displayed a fresh
 Enter iPhone Passcode for XCTest / Enable UI Automation prompt. The on-device
 passcode is required; no denial/recovery or first-launch pass is claimed yet.
+
+### 2026-10-15 — explicit Bluetooth denial recovery
+
+The fresh XCTest retry again timed out before test entry at the on-device
+Enable UI Automation passcode screen. Source review identified a real usability
+hole: native Bluetooth denial reached Add Watch as a generic connection error
+without a recovery action. App cea2517 now reports the denial clearly and offers
+Open iPhone Settings. It never opens Settings automatically; after granting access,
+Find watch requests authorization again and starts only the native scan. No legacy
+Flutter BLE owner is introduced. The native first-launch route is No Watches
+Paired → Add Watch → Find watch; the old permission wizard is not used.
+
+A widget regression drives the real Dart bridge's denied/granted replies, verifies
+no scan/Start on denial, explicit Settings opening, and native scan on retry.
+All347 Flutter tests pass and full analysis is clean. The signed release rebuild
+and deep/strict signature checks pass. Tracked app and both submodule source
+files were compared byte-for-byte with the isolated build workspace before
+archiving signed-permission-recovery/Runner.app. Physical denial/recovery is
+still pending XCTest authentication; no phone UI pass is inferred from host tests.
