@@ -136,6 +136,8 @@ class CompanionFirmwareStatus {
       'resource_reset_timeout' ||
       'resource_reset_failed' => 'The resource reset could not be confirmed.',
       'interrupted' => 'The firmware operation was interrupted.',
+      'background_expired' =>
+        'The update stopped after the app stayed in the background. Keep the app open when retrying.',
       'cancelled' => 'The firmware upload was cancelled.',
       _ => 'The firmware operation did not complete.',
     };

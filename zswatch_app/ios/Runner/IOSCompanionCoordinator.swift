@@ -42,7 +42,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       "gps_runtime": ["generation": journal.generation, "state": enabled ? "idle" : "disabled", "requested": false]])
   }
   func uiForegrounded() { firmware.foregrounded(); inbox?.foregrounded(); voice?.foregrounded() }
-  func uiInactive() { voice?.inactive() }
+  func uiInactive() { firmware.inactive(); voice?.inactive() }
   func journalChanged() {
     if journal.loadError != nil { storageFailedIfNeeded(); return }
     let value = snapshot()

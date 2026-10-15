@@ -1,4 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -600,6 +601,19 @@ class _StatusCard extends ConsumerWidget {
                 Text(percentText, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
+
+            if (ref.watch(nativeCompanionRuntimeProvider) &&
+                defaultTargetPlatform == TargetPlatform.iOS &&
+                isDfuInProgress &&
+                !isFsUploading)
+              Padding(
+                padding: const EdgeInsets.only(top: AppTheme.spacingSm),
+                child: Text(
+                  'Keep the app open until the update finishes. Firmware uploads '
+                  'pause when you leave briefly and resume when you return.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
 
             // Speed and time remaining
             if (speedText != null && timeRemainingText != null)

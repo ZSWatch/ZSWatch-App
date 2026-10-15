@@ -186,6 +186,7 @@ final class IOSCompanionFirmware {
           switch state { case .upload: phase = "uploading"; case .test, .confirm, .eraseAppSettings: phase = "applying"
           case .reset: phase = "rebooting"; case .success, .none: return; default: phase = "validating" }
           _ = self.publish { try self.operation.phase(phase) }
+          if state == .upload, !self.foreground { self.pauseUpload() }
         case "progress":
           self.transferMeter?.progress(count, total: total, now: observedAt)
           self.progress(count, total: total)
@@ -213,6 +214,7 @@ final class IOSCompanionFirmware {
       manager.start(images: images, using: FirmwareUpgradeConfiguration(eraseAppSettings: false,
         pipelineDepth: self.pipelineDepth, byteAlignment: .fourByte,
         reassemblyBufferSize: self.sarBuffer, upgradeMode: .confirmOnly))
+      if !owner.queue.sync(execute: { self.foreground }) { manager.pauseUploadIfActive() }
     }
   }
   private func resetResources() {
@@ -352,6 +354,19 @@ final class IOSCompanionFirmware {
   func foregrounded() {
     foreground = true; backgroundEpoch = UUID(); lease.end()
     executionReceipt("foreground")
+    let manager = self.manager
+    sdk { _ in if manager?.isPaused() == true { manager?.resume() } }
+  }
+  func inactive() {
+    foreground = false
+    pauseUpload()
+    executionReceipt("inactive_pause_requested")
+  }
+  private func pauseUpload() {
+    let manager = self.manager
+    // Stop issuing new upload packets before UIKit enters background. Keep
+    // Nordic's acknowledged offset and resume through its supported controller.
+    sdk { _ in manager?.pauseUploadIfActive() }
   }
   func backgrounded() {
     foreground = false

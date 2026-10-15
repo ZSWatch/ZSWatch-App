@@ -1253,3 +1253,37 @@ fence tests pass. The normal signed release build passes in 24.1 seconds (88.5 M
 and deep/strict codesign verification passes. The diagnostic app installed over
 the existing app successfully; physical background acceptance remains pending.
 No Dart product code changed, so the previous 343-test Flutter result is retained.
+
+
+### Measured short firmware pause/resume (2026-10-15)
+
+Diagnostic operation D2D62DB1-984A-4540-A41F-CA326CA3C960 confirms iOS granted a
+background task before the upload stalled. Flow-control retries exhausted:
+65 pauses, 55 resumes, seven flow retries, 296 written chunks and 32 responses.
+No complete-image progression was observed in either background snapshot. This
+is evidence of the failing transport path, not evidence that iOS denied time.
+
+The coordinator now pauses Nordic uploads when UIKit becomes inactive, before
+DidEnterBackground, and resumes through the SDK when active again. The narrow
+SDK pause API accepts only the actual upload stage; discovery, confirm/reset and
+terminal managers are excluded. Native session/terminal fences are retained.
+An upload entered while inactive also requests this pause. The existing bounded
+20-second background expiration remains; prolonged absence requires explicit
+retry, without replaying an admitted reset. Resource transfers retain their
+previous bounded behavior and have not gained background acceptance here.
+
+Physical operation 3AE93B36-C389-418D-9C15-67445BCB69B6 passed a ten-second Home
+interval with the known e63e86b6 clock-fix package. Background snapshots stayed at
+73,276 / 839,288 acknowledged bytes. Foreground resume advanced past 806,476,
+finished both uploads, rebooted, verified both active target hashes, and reached
+Ready/status/version generation 133, 33 sources, result_unknown false. The whole
+UI test passed in 112.561 seconds including runner; the USB observer saw reset,
+opened CDC on return and held DTR through startup. This closes the short firmware
+pause/resume case, not unattended background transfer or prolonged suspension.
+
+The full SDK abort proof also verifies that lifecycle pause cannot park parameter
+discovery or revive a terminal manager. All 23 firmware Dart tests and targeted
+two-file analysis pass. iOS UI now describes brief upload pause/resume and asks
+users to keep the app open; background-expiration errors explain explicit retry.
+Final 5df4b8ed firmware will be restored before subsequent acceptance.
+Private evidence: .companion-hil-runs/20261015-ios-companion/upload-pause-resume.
