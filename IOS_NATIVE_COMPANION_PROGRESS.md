@@ -1478,3 +1478,22 @@ Read-only debugger captures after Apple service callbacks and SMP report RX
 no halt/reset was requested. New-candidate UART has zero ATT response-buffer
 allocation failures, stack overflows, or unexpected resets. Full original-source
 integrity remains to be repeated after owned fixture cleanup.
+
+
+### 2026-10-15 — chart refresh and telemetry projection
+
+Normal Analytics → Home ten seconds → reopen/pull refresh → Connection → Health
+refresh → Heart Rate completed in 41.252 seconds on signed app 224d6ae and
+firmware26c59c8a. Screenshots show populated 24-hour battery data, uptime/counts
+and connection timeline, activity split, zero steps while the watch is not worn,
+4,688 daily heart-rate readings and a fresh live chart point. Initial test guards
+used exact card labels, but Flutter merges card accessibility text; correcting
+the harness to match contained headings completed the walkthrough. No product
+change was needed.
+
+The WatchDK board enables BT_HRS and existing zsw_health_data_get_heart_rate
+returns simulated 70±20 values. This verifies delivery/history/live chart
+plumbing, not physiological measurement. Fresh copied SQLite/WAL quick_check
+is ok:41,130 health samples,27,583 battery readings,278 connection events.
+Native CoreTests were rerun successfully, including durable Stop/Forget and
+late-session fences. Destructive system unpair remains untested.
