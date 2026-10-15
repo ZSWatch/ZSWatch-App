@@ -95,13 +95,20 @@ all33 original downloaded receipts unchanged. The whole UI check passed in 27.89
 This is separate evidence from the injected-kill OS restoration check.
 
 Other unverified variants stay explicit in `IOS_FEATURE_PARITY.md`: first unlock
-after phone reboot, literal out-of-range recovery, denied
+after phone reboot, independently timed out-of-range recovery, denied
 location/EventKit permissions, manual DST changes, interruption inside STT, and
 system-scheduled AI execution. These must not be inferred from ordinary relaunch,
 a short Home interval or host tests. Long endurance testing is left to the user.
 
 CoreBluetooth restoration needs an eligible BLE event; it is not a periodic
-restart service. User force-quit requires opening the app again. AI waits when iOS
+restart service. With this build's CoreBluetooth-only setup, user force-quit
+requires opening the app again. Apple's current iOS 26 rules add force-quit
+relaunch eligibility for accessories authorized through AccessorySetupKit, which
+this build does not implement. The older blanket force-quit limitation must not
+be interpreted as an unavoidable restriction on all iOS 26 apps. See
+[Apple TN3115](https://developer.apple.com/documentation/technotes/tn3115-bluetooth-state-restoration-app-relaunch-rules)
+and [Apple's clarification](https://developer.apple.com/forums/thread/806013).
+AI waits when iOS
 has not granted execution; no permanent background process or immediate locked
 phone inference is promised. Phone Clock alarms are not created: actions use
 local notifications. The existing firmware has local notification dismissal,

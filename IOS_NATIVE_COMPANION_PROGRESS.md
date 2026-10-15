@@ -1643,3 +1643,31 @@ app-switcher state. The corrected full sequence passed. No debugger/process-kill
 command was used for this acceptance. The twelve-second window is a bounded
 observation, not proof of every possible post-force-quit BLE trigger or endurance.
 Evidence is retained locally under user-forcequit-reopen.
+
+### 2026-10-15 — user range test and corrected iOS26 force-quit guidance
+
+The user reports automatic reconnection after the requested physical range test,
+then separately swiping away the app and resetting the watch. The watch reconnects
+to iOS but Weather does not respond. At inspection the exact app executable is
+absent from the phone process list. Watch UART shows successful AMS and ANCS
+discovery after the user's resets. The persisted Ready193 is a historical receipt,
+not proof of a live companion. Location sharing is also disabled; the latest HTTP
+receipt predates these tests. This separates the system Bluetooth link from the
+app-owned GPS/HTTP relay; a clean Home/locked Weather test needs sharing enabled
+and Always location authorization. No new background Weather pass is claimed.
+
+The previous blanket statement that user force-quit always requires reopening
+was incomplete for iOS26. Apple's current TN3115 Note5, clarified by an Apple
+engineer, adds relaunch eligibility for accessories set up through
+AccessorySetupKit. This build contains no AccessorySetupKit integration, so its
+observed force-quit behavior is expected for its current setup, but it is an
+implementation improvement available on iOS26, not a universal platform barrier.
+The ordinary suspended/system-terminated CoreBluetooth restoration path remains
+separate. References:
+https://developer.apple.com/documentation/technotes/tn3115-bluetooth-state-restoration-app-relaunch-rules
+https://developer.apple.com/forums/thread/806013
+
+Range reconnection is user-observed; latency was not measured. Subsequent resets
+and force-quits prevent treating the entire log window as one isolated range
+experiment. The original app's33 recording receipts remain present. No app launch,
+new transfer, permission change or watch reset was performed during this diagnosis.
