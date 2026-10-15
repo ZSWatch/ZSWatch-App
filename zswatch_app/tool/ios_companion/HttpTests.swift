@@ -54,6 +54,9 @@ import Foundation
     let extracted = try CompanionHttpRelay.xpath("<root><n>one</n><n>två</n></root>", expression: "/root/n")
     precondition(extracted == "one\ntvå")
     do { _ = try CompanionHttpRelay.xpath("<!DOCTYPE a [<!ENTITY x SYSTEM 'file:///private/secret'>]><a>&x;</a>", expression: "/a"); preconditionFailure("DTD accepted") } catch {}
+    precondition(CompanionHttpRequest.diagnostic(.success("☔"))["response_bytes"] as? Int == 3)
+    precondition(CompanionHttpRequest.diagnostic(.failure(CompanionFailure.unavailable("HTTP status 429")))["reason"] as? String == "HTTP status 429")
+    precondition(CompanionHttpRequest.diagnostic(.failure(CompanionFailure.unavailable("private URL and response")))["reason"] as? String == "Response rejected")
     print("PASS: HTTP deadline/session cancellation, duplicate suppression, bounded UTF8 replies and XPath")
   }
 }

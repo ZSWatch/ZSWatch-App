@@ -122,6 +122,20 @@ final class CompanionHttpRelay {
 
 /// URLSession delegate bounds streamed bytes and redirects before decoding.
 final class CompanionHttpRequest: NSObject, URLSessionDataDelegate {
+  /// Control metadata only; never persist a URL, body or an NSError description.
+  static func diagnostic(_ result: Result<String, Error>) -> [String: Any] {
+    switch result {
+    case .success(let body): return ["outcome": "received", "response_bytes": body.utf8.count]
+    case .failure(let error):
+      let text = error.localizedDescription
+      let reason: String
+      if text.range(of: "^HTTP status [0-9]{3}$", options: .regularExpression) != nil { reason = text }
+      else if ["Response too large", "Network request timed out", "Network, TLS or response error",
+               "XPath error", "XPath returned no results", "XPath response too large"].contains(text) { reason = text }
+      else { reason = "Response rejected" }
+      return ["outcome": "failed", "reason": reason]
+    }
+  }
   private let request: CompanionHttpRelay.Request
   private let deliver: (Result<String, Error>) -> Void
   private var session: URLSession!
@@ -146,8 +160,14 @@ final class CompanionHttpRequest: NSObject, URLSessionDataDelegate {
   func cancel() { session.invalidateAndCancel() }
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                   completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-    guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode), response.expectedContentLength <= 65536 else {
-      rejection = "HTTP error or response too large"; completionHandler(.cancel); return
+    guard let http = response as? HTTPURLResponse else {
+      rejection = "Network, TLS or response error"; completionHandler(.cancel); return
+    }
+    guard (200..<300).contains(http.statusCode) else {
+      rejection = "HTTP status \(http.statusCode)"; completionHandler(.cancel); return
+    }
+    guard response.expectedContentLength <= 65536 else {
+      rejection = "Response too large"; completionHandler(.cancel); return
     }
     if http.textEncodingName?.lowercased() == "iso-8859-1" { encoding = .isoLatin1 }
     completionHandler(.allow)
@@ -177,7 +197,8 @@ final class CompanionHttpRequest: NSObject, URLSessionDataDelegate {
     guard !finished else { return }; finished = true
     defer { session.finishTasksAndInvalidate() }
     guard rejection == nil, error == nil, let body = String(data: bytes, encoding: encoding), !body.isEmpty else {
-      deliver(.failure(CompanionFailure.unavailable(rejection ?? "Network, TLS or response error"))); return
+      let failure = (error as? URLError)?.code == .timedOut ? "Network request timed out" : "Network, TLS or response error"
+      deliver(.failure(CompanionFailure.unavailable(rejection ?? failure))); return
     }
     do {
       let value = try request.xpath.map { $0.isEmpty ? body : try CompanionHttpRelay.xpath(body, expression: $0) } ?? body

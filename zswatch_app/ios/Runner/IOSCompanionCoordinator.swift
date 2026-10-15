@@ -63,7 +63,18 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   private lazy var http: CompanionHttpRelay = CompanionHttpRelay(
     later: { [weak self] delay, work in self?.queue.asyncAfter(deadline: .now() + delay, execute: work) },
     fetch: { [weak self] request, done in
-      let work = CompanionHttpRequest(request: request) { result in self?.queue.async { done(result) } }
+      let generation = self?.journal.generation ?? -1
+      let started = ProcessInfo.processInfo.systemUptime
+      let work = CompanionHttpRequest(request: request) { result in self?.queue.async {
+        if let self, self.isReadySession(generation) {
+          var control = CompanionHttpRequest.diagnostic(result)
+          control["generation"] = generation
+          control["elapsed_ms"] = Int((ProcessInfo.processInfo.systemUptime - started) * 1000)
+          control["utc_ms"] = CompanionJournal.now
+          try? self.publish("http_fetch_finished", ["last_http_fetch": control])
+        }
+        done(result)
+      } }
       return { work.cancel() }
     },
     enabled: { [weak self] in self?.journal.fields["http_enabled"] as? Bool == true },
