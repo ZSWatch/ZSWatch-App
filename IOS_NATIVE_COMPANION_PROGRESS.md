@@ -1309,3 +1309,29 @@ for temperature/humidity in the existing GATT implementation: these are proven
 transport/sample paths, not newly claimed physical climate measurements. No
 orientation reset, calibration, persistent stream or new firmware sensor feature
 was introduced. Evidence is in final-restoration-and-sensors under today's run.
+
+
+### Actual voice deferral/recovery and Settings (2026-10-15)
+
+On the normal signed app, reanalysis of the existing owned 20261013_235832
+transcript created job 0ac18b07…c41841. Before Home it held fence 1, attempt 1 and
+an execution lease. During the ten-second background interval the native policy
+released the lease, advanced to fence 2 and saved background_deferred. After UI
+return it claimed fence 3/attempt 2, completed local analysis, and reached delivered
+with the watch's native ACK. The original 116-byte transcript SHA256
+5d070df34a177296e07feda064885e815c663356d18b56d30d3bcef3fce9662e matched every
+snapshot. This proves actual claimed-work deferral, resumed local processing and
+watch delivery from the saved transcript; exact token-level interruption was not
+instrumented. No immediate locked-phone inference or system-scheduled grant is
+claimed. The transition UI test passed in 30.624 seconds, and the independent
+journal observer confirmed the final ACK afterward.
+
+A normal Settings walkthrough passed in 27.301 seconds: iOS permission summary,
+version dialog, open-source licenses, coredump URL dialog with Cancel, then Home.
+No Android notification-access/battery-exemption controls appeared. The first
+walkthrough missed the version row while the list was still scrolling; the
+settled-row test passed without product changes. Settings values were preserved.
+The copied phone database passed quick_check with 37,365 health samples, 25,043
+battery readings, 212 connection events and one committed telemetry cursor at
+sequence 37,710. Dedicated chart refresh is still a separate physical check.
+Private evidence is in voice-recovery-and-settings under today's run.
