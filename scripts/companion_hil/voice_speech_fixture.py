@@ -3,6 +3,8 @@
 
 Uses installed eSpeak NG and libopus, and optionally the existing USB SMP client.
 Never replaces or deletes a watch recording. Keep the manifest for later cleanup.
+Stop the phone companion before USB upload: a recording can be listed while it
+is still being written, causing automatic BLE download to compete with USB SMP.
 """
 import argparse
 import asyncio
@@ -16,7 +18,7 @@ import time
 import uuid
 import wave
 
-from smpclient.requests.file_management import FileStatus, FileUpload
+from smpclient.requests.file_management import FileDownload, FileStatus, FileUpload
 from watch_file_probe import checked, client, missing, shell
 from hil import resource_locks
 
@@ -103,10 +105,22 @@ async def upload(port, output, manifest, payload):
                                                         data=part, len=len(payload)))
             if reply.off != offset + len(part):
                 raise RuntimeError('Unexpected upload offset')
+            # Pace the Mac CDC fixture path; this is separate from measured
+            # production BLE transfers through the Nordic SDK.
+            await asyncio.sleep(0.02)
         reply = await checked(connection, FileStatus(name=name))
         if reply.len != len(payload):
             raise RuntimeError('Fixture upload size differs')
-        manifest['usb_upload_verified_size'] = reply.len
+        readback = bytearray()
+        while len(readback) < len(payload):
+            reply = await checked(connection, FileDownload(name=name, off=len(readback)))
+            if reply.off != len(readback) or not reply.data:
+                raise RuntimeError('Fixture readback offset or chunk differs')
+            readback.extend(reply.data)
+        if bytes(readback) != payload:
+            raise RuntimeError('Fixture upload readback differs')
+        manifest['usb_upload_verified_size'] = len(readback)
+        manifest['usb_upload_verified_sha256'] = hashlib.sha256(readback).hexdigest()
         (output / 'manifest.json').write_text(json.dumps(manifest, indent=2))
 
 

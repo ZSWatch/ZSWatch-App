@@ -629,3 +629,15 @@ native SMP preparation reconnects; that is a pending operation to observe, not
 evidence of a secure lock screen or a reason to resubmit its command. Keep failed
 observers separate from later scoped evidence and report the actual phase/error
 observed rather than treating all operation-conflict cases as interchangeable.
+
+### Owned speech fixture upload on the Mac
+
+Stop the phone companion before using `voice_speech_fixture.py` with USB, then
+reconnect it after the upload and full readback verification complete. The watch
+can list a file while USB is still writing it; automatic BLE retrieval can then
+adopt incomplete metadata and compete with the USB filesystem operation. The
+installed firmware has no general shell rename command for atomic fixture
+publication. The helper paces Mac CDC writes and verifies the entire uploaded
+body before recording its verified size and SHA256 in the manifest. These gaps
+are fixture pacing, not a BLE firmware-throughput measurement. Keep the manifest
+and remove only its uniquely owned file when acceptance and cleanup finish.
