@@ -1,7 +1,8 @@
 # Native iOS companion progress
 
-2026-10-12; branch `codex/ios-companion`. This is a development checkpoint,
-not completion of IOS_COMPANION_IMPLEMENTATION_PLAN.md.
+Started 2026-10-12; branch `codex/ios-companion`. This is a chronological
+development log. Later dated entries supersede the early checkpoints; current
+feature evidence and outstanding acceptance are in IOS_FEATURE_PARITY.md.
 
 ## Implemented foundation
 
@@ -1522,3 +1523,50 @@ regressions drive encoded SDK ACKs, pause/drain/resume, rewind/restart, cancelle
 parameter replies and terminal self-retention; all pass. Root736551a pins this
 SDK. Resource upload-only lifecycle pause and failed-transfer teardown remain
 in dd01da6. Signed rebuild and physical retry are in progress.
+
+### 2026-10-15 — resource background retry and full verification PASS
+
+Signed app 736551a with Nordic 06644b1 and firmware 26c59c8a completed the
+ordinary resource-only retry after ten seconds on Home. Acknowledged progress
+remained 245,224 bytes at two and seven seconds in the background. The watch's
+10-second idle file close required a restart from its authoritative offset zero;
+the repaired SDK drained old requests and then progressed normally. This is a
+safe restart of the upload, not a promise of offset-preserving resume after the
+watch closes its special resource writer.
+
+Operation F007D25F-27DD-44EC-9BCA-68FA5940CBFD completed in 830.686 seconds.
+The phone UI test passed in 861.387 seconds and displayed Filesystem Upload
+Complete. A fresh independently copied native journal records all 5,919,608 bytes,
+resource_verified and images_verified true, result_unknown false, Ready generation
+182 and 33 recordings. Completion requires full byte comparisons before and after
+the acknowledged watch reset; source SHA256 is
+5b060daa49707f1f621a4d6ba1817d6f1032fd1def2fb18e38c5abade388d1a0.
+
+The external progress observer stopped on a transient devicectl copy error after
+capturing background pause and resumed progress above 1 MB. It did not run its
+planned USB reset guard. Native verification and the phone UI continued to
+completion independently; no continuous external observation is claimed. USB
+closed after the normal boot window. A separate explicit debugger bootstrap is
+being used only after completion for independent resource/source readback.
+Evidence is retained locally under resource-background-recovery in the ignored
+20261015 HIL directory. The prior prolonged-background failure remains an honest
+background_expired/unknown result requiring explicit Reset and file reselection.
+
+Independent final checks after USB bootstrap also pass: all 5,919,608 resource
+bytes match the source (110.895 seconds), all 33 original recordings match their
+saved full SHA256 values (673,009 bytes; 28 pre-firmware sources), and the
+115,212-byte original Retro watchface matches SHA256
+979df7661e05c5a9caa4ac04c46c8147f1a909571c0b7b04370bcb594f547842.
+Both firmware26c59c8a image hashes remain active/confirmed. A fresh native
+snapshot is Ready183 with all33 downloaded, no error, GPS/log streaming off,
+and the completed resource receipt retained. Read-only J-Link checks report CPU
+not halted before/after and unchanged measured stack usage: RX4936/9504,
+system work4848/6144. No stack/ATT-allocation fault is present in this final UART
+capture. Original Small English and Qwen Q4 selections remain in phone preferences.
+
+First-launch/permission-denial acceptance is being checked with a separate owned
+bundle installation copied from the exact signed release. Only its bundle ID,
+display name and signature differ; production app storage stays intact. The first
+XCTest attempt timed out before entering the test because iOS displayed a fresh
+Enter iPhone Passcode for XCTest / Enable UI Automation prompt. The on-device
+passcode is required; no denial/recovery or first-launch pass is claimed yet.
