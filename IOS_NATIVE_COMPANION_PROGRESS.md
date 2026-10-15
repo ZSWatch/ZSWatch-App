@@ -1558,7 +1558,7 @@ saved full SHA256 values (673,009 bytes; 28 pre-firmware sources), and the
 115,212-byte original Retro watchface matches SHA256
 979df7661e05c5a9caa4ac04c46c8147f1a909571c0b7b04370bcb594f547842.
 Both firmware26c59c8a image hashes remain active/confirmed. A fresh native
-snapshot is Ready183 with all33 downloaded, no error, GPS/log streaming off,
+snapshot is Ready183 with all 33 downloaded, no error, GPS/log streaming off,
 and the completed resource receipt retained. Read-only J-Link checks report CPU
 not halted before/after and unchanged measured stack usage: RX4936/9504,
 system work4848/6144. No stack/ATT-allocation fault is present in this final UART
@@ -1591,10 +1591,37 @@ archiving signed-permission-recovery/Runner.app. Physical denial/recovery is
 still pending XCTest authentication; no phone UI pass is inferred from host tests.
 
 The signed cea2517 build is now installed and launched on the original phone
-container. Native Ready184 has all33 original downloaded identities, with every
+container. Native Ready184 has all 33 original downloaded identities, with every
 size/hash receipt unchanged, no error, GPS/logs/automatic processing off and the
 completed resource receipt retained. The owned isolated installation is updated
 too. The corrected native-route XCTest again timed out before test entry at the
 fresh on-device passcode prompt; no permission dialog was acted on. A read-only
 check found the alternative universal HID service unavailable on this device.
 Physical denial/recovery remains pending; no repeated UI pass is claimed.
+
+### 2026-10-15 — fresh-install permission and connection acceptance PASS
+
+XCTest authentication succeeded on the next user-requested retry. The first
+entered test exposed a harness-only case mismatch (Add Watch versus actual
+Add watch); read-only screenshot/AX inspection confirmed the native start screen.
+The corrected ordinary UI test passed in 9.257 seconds: no startup Bluetooth
+prompt, Add watch → Find watch, explicit Don't Allow on the iOS prompt, clear
+Bluetooth denial message and Open iPhone Settings navigating to the owned app's
+settings. Its Bluetooth switch was independently observed off.
+
+Normal Settings grant and return passed in 19.617 seconds. Find watch showed
+Finding nearby watches and discovered ZSWatch; leaving the route stopped the scan.
+Independent native journal copies prove desired_running false/address empty with
+no scan_started before consent, then scan_started/watch_discovered/scan_stopped
+after consent, without starting a connection. The same release executable used
+an isolated owned bundle ID/storage; no original app data was reset.
+
+A fresh first selection also passed in 24.620 seconds. The original app was
+explicitly stopped first, the owned installation selected the discovered UUID,
+and encrypted Ready 2 with live metadata and 33 source identities was independently
+copied. The existing iOS system bond was retained, so this is new app onboarding
+and selection, not new system pairing. The owned owner was stopped before the
+original app resumed Ready 186; all 33 original downloaded hash/size receipts are
+unchanged. The owned test installation was then uninstalled. Evidence is retained
+locally under first-launch-and-bluetooth-recovery. Prior authentication timeouts
+are historical limitations, not the current blocker.
