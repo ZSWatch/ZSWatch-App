@@ -925,6 +925,35 @@ class _CompanionVoiceMemosViewState
                     ? 'Downloads paused'
                     : 'Downloads enabled',
               ),
+              if (ios)
+                Wrap(
+                  children: [
+                    TextButton(
+                      onPressed: !modifying
+                          ? () => modify(() async {
+                              await ref
+                                  .read(companionClientProvider)
+                                  .setRecordingSync(paused);
+                            })
+                          : null,
+                      child: Text(paused ? 'Resume downloads' : 'Pause downloads'),
+                    ),
+                    if (watchItems.any(
+                      (item) => !item.purged &&
+                          item.state == CompanionRecordingState.failed,
+                    ))
+                      TextButton(
+                        onPressed: ready && !modifying
+                            ? () => modify(() async {
+                                await ref
+                                    .read(companionClientProvider)
+                                    .command('retryRecordings');
+                              })
+                            : null,
+                        child: const Text('Retry failed downloads'),
+                      ),
+                  ],
+                ),
               if (imports.hasError) ...[
                 const Text('Playback imports are unavailable'),
                 TextButton(

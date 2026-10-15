@@ -41,6 +41,7 @@ final class IOSCompanionSmp {
     pending = next
     owner.queue.asyncAfter(deadline: .now() + timeout) { [weak self] in
       guard let self, self.pending?.id == next.id else { return }
+      if self.preparing { self.preparationReceipt("timeout") }
       self.transport?.invalidate(); self.transport = nil; self.preparedGeneration = nil
       self.finish(.failure(CompanionFailure.unavailable("Watch operation timed out; check the device before retrying an admitted command")))
     }
@@ -65,9 +66,27 @@ final class IOSCompanionSmp {
     }
     let id = try begin(generation, timeout: 25, complete: complete)
     preparing = true
+    preparationReceipt("admitted")
     do { try owner.send("GB({\"t\":\"smp\",\"status\":true})") }
     catch { finish(.failure(error)); return }
     pollPreparation(id)
+  }
+  private func preparationReceipt(_ stage: String, error: Error? = nil) {
+    guard let owner, let pending else { return }
+    var receipt: [String: Any] = ["operation_id": pending.id.uuidString,
+      "generation": owner.journal.generation, "stage": stage,
+      "constructing": constructing,
+      "transport_state": transport.map { String(describing: $0.state) } ?? "absent",
+      "utc_ms": CompanionJournal.now]
+    if let error {
+      let native = error as NSError
+      receipt["error_domain"] = String(native.domain.prefix(120))
+      receipt["error_code"] = native.code
+    }
+    var history = owner.journal.fields["smp_preparation_history"] as? [[String: Any]] ?? []
+    history.append(receipt)
+    try? owner.publish("smp_preparation", ["last_smp_preparation": receipt,
+      "smp_preparation_history": Array(history.suffix(8))])
   }
   /// Move the prepared SDK transport into the reboot-spanning update owner.
   func takePrepared(_ generation: Int) throws -> McuMgrBleTransport {
@@ -96,6 +115,7 @@ final class IOSCompanionSmp {
           }
           self.constructing = false
           self.transport = created
+          self.preparationReceipt("transport_created")
           let echo = "ZSWatch-\(id.uuidString.prefix(8))"
           DispatchQueue.main.async {
             DefaultManager(transport: created).echo(echo) { response, error in
@@ -103,10 +123,12 @@ final class IOSCompanionSmp {
                 guard self.pending?.id == id, self.attempt == token else { return }
                 if !owner.isReadySession(generation) { self.sessionClosed(); return }
                 guard error == nil, response?.getError() == nil, response?.response == echo else {
+                  self.preparationReceipt("echo_failed", error: error)
                   created.invalidate(); self.transport = nil
                   self.finish(.failure(error ?? CompanionFailure.unavailable("Nordic SMP did not acknowledge preparation"))); return
                 }
                 self.preparedGeneration = generation
+                self.preparationReceipt("echo_acknowledged")
                 try? owner.publish("smp_prepared", ["smp_prepared_generation": generation])
                 self.finish(.success(["version": 1, "prepared_from_generation": pending.generation, "generation": generation]))
               }
