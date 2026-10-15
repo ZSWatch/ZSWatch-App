@@ -1357,3 +1357,29 @@ a fresh microphone capture. The UI restored automatic processing off, analysis
 on and Small English selection afterward; the restore test passed in 27.589 s.
 Owned extra fixture cleanup is still pending. Private evidence: today's
 run/automatic-transcription directory.
+
+
+### Normal model import/delete and selection repair (2026-10-15)
+
+The large owned Qwen-copy download remained a partial .download. The first
+picker-only test falsely treated an existing picker Back button as success;
+container verification rejected that claim. It is not import acceptance.
+A small complete GGUF from ggml-org's upstream test assets was then downloaded
+through a normal Safari page link and imported through Files. The 1,185,376-byte
+phone readback matches upstream SHA256
+270cba1bd5109f42d03350f60406024560464db173c0e387d91f0426d3bd256d.
+Source: https://huggingface.co/ggml-org/models-moved/blob/main/tinyllamas/stories260K.gguf.
+This is import/delete path evidence, not a replacement recommendation or a
+classification/inference-quality claim for the test model.
+
+Physical testing exposed a real selection bug: deleting the selected import left
+custom::filename in preferences while the picker displayed the first catalog
+model. c52d84b resets a deleted selected import to default Qwen, persists that
+selection, preserves later explicit choices and preserves catalog selection when
+only its downloaded file is deleted. An unknown model ID now fails rather than
+deleting an unrelated catalog file. Filesystem regression covers these cases.
+All 344 Flutter tests, targeted three-file analysis, signed release build (62.8 s)
+and strict/deep signature verification pass. The corrected normal import/delete
+round trip passed physically; saved preferences are qwen25_1_5b_q4_k_m and
+whisperSmallEn afterward. The owned imported copy is gone; original model files
+were not removed. Evidence: today's run/model-import-delete directory.
