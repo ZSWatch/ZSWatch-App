@@ -1442,10 +1442,39 @@ Permanent purge is the next check; no purge acceptance is claimed here.
 ### 2026-10-15 — permanent phone purge verified
 
 Normal Recently deleted → Delete permanently passed for the same two owned
-automatic-processing fixtures (UI 30.921 seconds). Independent phone-container
+automatic-processing fixtures (UI 31.211 seconds). Independent phone-container
 readback confirms durable purged tombstones, cleanup complete, corresponding
 local audio/receipt files absent and both owned jobs removed. Every other native
 recording receipt is unchanged. Full phone audio readback verifies all 33 other
 downloaded recordings against their committed SHA256 values. Watch source files
 were untouched by local purge. The separate large resume fixture remains for the
 pending interrupted-download test.
+
+
+### 2026-10-15 — SMP recovery and interrupted recording download PASS
+
+Corrected firmware 26c59c8a boots with both application images active and
+confirmed; independent USB ImageStatesRead matches index0
+b8ae71484fc278cbc4267ffe3ab8886d3659ce84971b8805d510c9bd228ce0a4
+and index2 c0b480771fbc1863dcb87bbd4d3fe2d4922043004db679c16da5ceb6203206ab.
+The install helper's redundant hash-specific confirm was denied after the
+application had already confirmed both images; a fresh read proves both flags
+and hashes. It is not an upload/boot failure and no second upload was attempted.
+
+With iPhone Bluetooth restored, CTS/AMS/ANCS callbacks and native Ready passed.
+Normal Retry failed downloads first rejects the known obsolete 52,992-byte
+fixture identity as Recording size changed, then prepares SMP successfully across
+service invalidation and downloads the complete 620,412-byte owned fixture.
+The ordinary Home/reopen test passed in 40.850 seconds. Independent background
+observation shows pending/paused after expiration, with a 421,950-byte retained
+prefix exactly matching the USB source. On foreground return, native rechecks
+that prefix, resumes, and publishes the completed phone file. Full phone readback
+matches source SHA256 c9061eb1741754566ae29b282534edc0833c95a8ce17876d309ff397bc722732.
+Automatic processing remained off and no job was created for this fixture.
+This repeated-container fixture is transfer evidence, not microphone evidence.
+
+Read-only debugger captures after Apple service callbacks and SMP report RX
+4,936/9,504 bytes used, system work 4,848/6,144. CPU was running before/after;
+no halt/reset was requested. New-candidate UART has zero ATT response-buffer
+allocation failures, stack overflows, or unexpected resets. Full original-source
+integrity remains to be repeated after owned fixture cleanup.
