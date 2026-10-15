@@ -1287,3 +1287,25 @@ two-file analysis pass. iOS UI now describes brief upload pause/resume and asks
 users to keep the app open; background-expiration errors explain explicit retry.
 Final 5df4b8ed firmware will be restored before subsequent acceptance.
 Private evidence: .companion-hil-runs/20261015-ios-companion/upload-pause-resume.
+
+
+### Final firmware restored; remaining sensor paths (2026-10-15)
+
+Signed normal app 34eecf0 / Nordic 88ad5f2 installed with the iOS pause guidance.
+The ordinary final-package foreground update passed in 90.650 seconds including
+runner. Native boot/hash proof passed; independent USB reads confirm final
+5df4b8ed hashes 01ac603c…cb111 (index 0) and e2378822…a073f8 (index 2), both active
+and confirmed. CDC returned, DTR was held through startup, and watchface state
+and 33-source status were observed. Fresh full source reads again verify all 33
+files (673,009 bytes), including all 28 pre-firmware originals, against saved SHA256.
+
+The normal Sensor Debug UI then passed each remaining path individually: Sensor
+Fusion, Gyroscope, Magnetometer, Temperature, Humidity, Pressure and Ambient
+Light. Quaternion arrival enabled Reset Orientation for fusion; other paths
+produced nonzero sample counts. Closing/reopening each view returned to zero
+streaming. The whole seven-path test passed in 171.721 seconds; accelerometer
+was already verified separately. Firmware source intentionally returns zero
+for temperature/humidity in the existing GATT implementation: these are proven
+transport/sample paths, not newly claimed physical climate measurements. No
+orientation reset, calibration, persistent stream or new firmware sensor feature
+was introduced. Evidence is in final-restoration-and-sensors under today's run.
