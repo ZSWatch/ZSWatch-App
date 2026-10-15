@@ -1424,3 +1424,16 @@ After the failed candidate, full USB readback independently verified all 33
 baseline recordings, including the 28 pre-firmware sources: 673,009 bytes, every
 SHA256 unchanged. Evidence is retained under the ignored dedicated-bluetooth-rx
 HIL directory. The three owned test-source additions remain separate.
+
+
+### 2026-10-15 — ordinary offline batch actions
+
+Signed app 224d6ae passed normal multi-select archive, unarchive, Delete from
+phone and individual Recently deleted Restore for exactly the two owned
+hil_auto_ fixtures, with Bluetooth off and companion Stop. The whole UI test
+passed in 57.529 seconds. Copied native receipts independently show both restored
+as downloaded/unarchived with their original hashes. Their transcribed/no-speech
+job results remain byte-for-byte unchanged, and every other recording receipt
+is unchanged. The initial harness attempt expected the connected Home label
+Voice; the disconnected Home entry is Voice notes. No product change was needed.
+Permanent purge is the next check; no purge acceptance is claimed here.
