@@ -1401,3 +1401,26 @@ UART capture reports ATT response-buffer exhaustion (opcode 0x09) and a
 this firmware explicitly selects that same queue for Bluetooth RX. The dedicated
 Bluetooth RX queue is being evaluated as a targeted firmware fix. No transfer
 completion or background resume is claimed from the successful UI-only retries.
+
+
+### 2026-10-15 — dedicated Bluetooth RX firmware experiment
+
+Firmware 7d076791 separated Bluetooth RX from the system workqueue, but its
+4,096-byte RX stack failed on hardware in CTS publish_time_event. The shared
+ble_data_event union is about 4 KiB before callback stack overhead. UART identifies
+BT RX WQ and the stack-overflow fault; this candidate is explicitly not accepted.
+The paired iOS system connection also reproduced the fault after app Stop, so
+Bluetooth was temporarily disabled through iPhone Settings during repair.
+No pairing, filesystem, recording or resource erasure was performed.
+
+A read-only J-Link stack capture (CPU running before and after) measured 4,592
+bytes already used on the system-work stack. The follow-up therefore retains
+6,144 bytes for system work and 9,500 for Bluetooth RX. Firmware 26c59c8a builds
+with 449,880 of 450,560 bytes of statically reserved RAM; this includes configured
+heap reservations. USB installation and runtime stack validation are in progress.
+No successful download/resume claim is made yet.
+
+After the failed candidate, full USB readback independently verified all 33
+baseline recordings, including the 28 pre-firmware sources: 673,009 bytes, every
+SHA256 unchanged. Evidence is retained under the ignored dedicated-bluetooth-rx
+HIL directory. The three owned test-source additions remain separate.
