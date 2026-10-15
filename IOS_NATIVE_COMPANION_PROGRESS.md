@@ -1437,3 +1437,15 @@ job results remain byte-for-byte unchanged, and every other recording receipt
 is unchanged. The initial harness attempt expected the connected Home label
 Voice; the disconnected Home entry is Voice notes. No product change was needed.
 Permanent purge is the next check; no purge acceptance is claimed here.
+
+
+### 2026-10-15 — permanent phone purge verified
+
+Normal Recently deleted → Delete permanently passed for the same two owned
+automatic-processing fixtures (UI 30.921 seconds). Independent phone-container
+readback confirms durable purged tombstones, cleanup complete, corresponding
+local audio/receipt files absent and both owned jobs removed. Every other native
+recording receipt is unchanged. Full phone audio readback verifies all 33 other
+downloaded recordings against their committed SHA256 values. Watch source files
+were untouched by local purge. The separate large resume fixture remains for the
+pending interrupted-download test.
