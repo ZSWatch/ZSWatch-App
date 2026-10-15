@@ -7,6 +7,7 @@ import iOSMcuManagerLibrary
 final class IOSCompanionSmp {
   private weak var owner: IOSCompanionCoordinator?
   private var transport: McuMgrBleTransport?
+  private var preparationLog: IOSPreparationLog?
   private var preparedGeneration: Int?
   private var pending: Pending?
   private var attempt = UUID()
@@ -86,7 +87,7 @@ final class IOSCompanionSmp {
     var history = owner.journal.fields["smp_preparation_history"] as? [[String: Any]] ?? []
     history.append(receipt)
     try? owner.publish("smp_preparation", ["last_smp_preparation": receipt,
-      "smp_preparation_history": Array(history.suffix(8))])
+      "smp_preparation_history": Array(history.suffix(24))])
   }
   /// Move the prepared SDK transport into the reboot-spanning update owner.
   func takePrepared(_ generation: Int) throws -> McuMgrBleTransport {
@@ -115,6 +116,14 @@ final class IOSCompanionSmp {
           }
           self.constructing = false
           self.transport = created
+          let logger = IOSPreparationLog { [weak self] stage in
+            owner.queue.async {
+              guard let self, self.pending?.id == id, self.attempt == token, self.preparing else { return }
+              self.preparationReceipt(stage)
+            }
+          }
+          self.preparationLog = logger
+          created.logDelegate = logger
           self.preparationReceipt("transport_created")
           let echo = "ZSWatch-\(id.uuidString.prefix(8))"
           DispatchQueue.main.async {
@@ -461,4 +470,27 @@ private final class CompanionFileUploadDelegate: FileUploadDelegate {
   func uploadDidFail(with error: Error) { event("failed", 0, 0) }
   func uploadDidCancel() { event("cancelled", 0, 0) }
   func uploadDidFinish() { event("finished", 0, 0) }
+}
+
+/// Only retain fixed discovery milestones; SDK payloads and response bodies are private.
+private final class IOSPreparationLog: McuMgrLogDelegate {
+  private let milestone: (String) -> Void
+  init(_ milestone: @escaping (String) -> Void) { self.milestone = milestone }
+  func log(_ msg: String, ofCategory category: McuMgrLogCategory, atLevel level: McuMgrLogLevel) {
+    guard category == .transport else { return }
+    let stage: String
+    switch msg {
+    case "Peripheral connected": stage = "connected"
+    case "Discovering services...": stage = "discovering_services"
+    case "Discovering characteristics...": stage = "discovering_characteristics"
+    case "Enabling notifications...": stage = "enabling_notifications"
+    case "Notifications enabled": stage = "notifications_enabled"
+    case "Device ready": stage = "device_ready"
+    default:
+      if msg.hasPrefix("Services discovered:") { stage = "services_discovered" }
+      else if msg.hasPrefix("Characteristics discovered:") { stage = "characteristics_discovered" }
+      else { return }
+    }
+    milestone(stage)
+  }
 }

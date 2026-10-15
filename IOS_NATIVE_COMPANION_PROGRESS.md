@@ -1383,3 +1383,21 @@ and strict/deep signature verification pass. The corrected normal import/delete
 round trip passed physically; saved preferences are qwen25_1_5b_q4_k_m and
 whisperSmallEn afterward. The owned imported copy is gone; original model files
 were not removed. Evidence: today's run/model-import-delete directory.
+
+
+### 2026-10-15 — recording retry controls and SMP discovery diagnosis
+
+Commit 6d78cd2 adds normal iOS Pause/Resume downloads and Retry failed downloads,
+with native command admission and offline pause-intent widget checks. All 346
+Flutter tests passed after these controls; the signed release built and installed.
+The normal Retry button was exercised, but this is not download acceptance.
+The owned 620,412-byte interrupted-download fixture is still blocked before file
+bytes by SMP preparation, including a foreground-only retry.
+
+Payload-free bounded preparation milestones identify discovery reaching the
+SMP service and then waiting for its characteristics. The simultaneous watch
+UART capture reports ATT response-buffer exhaustion (opcode 0x09) and a
+30-second stall. NCS 3.3's att.c returns TX buffers through system work, while
+this firmware explicitly selects that same queue for Bluetooth RX. The dedicated
+Bluetooth RX queue is being evaluated as a targeted firmware fix. No transfer
+completion or background resume is claimed from the successful UI-only retries.
