@@ -144,6 +144,10 @@ final class CompanionHttpRequest: NSObject, URLSessionDataDelegate {
   private var rejection: String?
   private var finished = false
   private var encoding = String.Encoding.utf8
+  private var attempt = 0
+  private let deadline = ProcessInfo.processInfo.systemUptime + 6
+  private let cancellationLock = NSLock()
+  private var cancelled = false
   init(request: CompanionHttpRelay.Request, deliver: @escaping (Result<String, Error>) -> Void) {
     self.request = request; self.deliver = deliver
     super.init()
@@ -152,12 +156,19 @@ final class CompanionHttpRequest: NSObject, URLSessionDataDelegate {
     config.urlCredentialStorage = nil; config.httpCookieStorage = nil; config.urlCache = nil
     let callbacks = OperationQueue(); callbacks.maxConcurrentOperationCount = 1
     session = URLSession(configuration: config, delegate: self, delegateQueue: callbacks)
+    startAttempt()
+  }
+  private func startAttempt() {
     var query = URLRequest(url: request.url); query.httpMethod = "GET"
+    query.timeoutInterval = max(0.1, deadline - ProcessInfo.processInfo.systemUptime)
     query.setValue("ZSWatch-Companion/1.0", forHTTPHeaderField: "User-Agent")
     query.setValue("*/*", forHTTPHeaderField: "Accept")
     session.dataTask(with: query).resume()
   }
-  func cancel() { session.invalidateAndCancel() }
+  func cancel() {
+    cancellationLock.lock(); cancelled = true
+    session.invalidateAndCancel(); cancellationLock.unlock()
+  }
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
                   completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
     guard let http = response as? HTTPURLResponse else {
@@ -194,7 +205,20 @@ final class CompanionHttpRequest: NSObject, URLSessionDataDelegate {
     } else { completionHandler(.performDefaultHandling, nil) }
   }
   func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-    guard !finished else { return }; finished = true
+    guard !finished else { return }
+    // One transient-server retry shares the original six-second fetch budget;
+    // the relay's delivery/session deadline and watch timeout remain unchanged.
+    if attempt == 0, ["HTTP status 502", "HTTP status 503", "HTTP status 504"].contains(rejection ?? ""),
+       deadline - ProcessInfo.processInfo.systemUptime > 1 {
+      cancellationLock.lock()
+      if !cancelled {
+        attempt += 1; rejection = nil; bytes.removeAll(keepingCapacity: true)
+        redirects = 0; encoding = .utf8; startAttempt()
+        cancellationLock.unlock(); return
+      }
+      cancellationLock.unlock()
+    }
+    finished = true
     defer { session.finishTasksAndInvalidate() }
     guard rejection == nil, error == nil, let body = String(data: bytes, encoding: encoding), !body.isEmpty else {
       let failure = (error as? URLError)?.code == .timedOut ? "Network request timed out" : "Network, TLS or response error"
