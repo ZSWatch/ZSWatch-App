@@ -1589,3 +1589,12 @@ and deep/strict signature checks pass. Tracked app and both submodule source
 files were compared byte-for-byte with the isolated build workspace before
 archiving signed-permission-recovery/Runner.app. Physical denial/recovery is
 still pending XCTest authentication; no phone UI pass is inferred from host tests.
+
+The signed cea2517 build is now installed and launched on the original phone
+container. Native Ready184 has all33 original downloaded identities, with every
+size/hash receipt unchanged, no error, GPS/logs/automatic processing off and the
+completed resource receipt retained. The owned isolated installation is updated
+too. The corrected native-route XCTest again timed out before test entry at the
+fresh on-device passcode prompt; no permission dialog was acted on. A read-only
+check found the alternative universal HID service unavailable on this device.
+Physical denial/recovery remains pending; no repeated UI pass is claimed.

@@ -49,7 +49,7 @@ No PR, push or publication is included.
 - Final independent USB checks: 33 original recordings / 673,009 bytes, every hash
   unchanged; original 115,212-byte watchface hash unchanged; full resource image
   SHA256 `5b060daa49707f1f621a4d6ba1817d6f1032fd1def2fb18e38c5abade388d1a0`.
-  Both installed firmware image hashes are active/confirmed. Final Ready 183 has
+  Both installed firmware image hashes are active/confirmed. Final Ready 184 on app cea2517 has
   all 33 recordings downloaded, no error, GPS/logs off and automatic processing off.
 
 Firmware 26c59c8a fixes the shared system-workqueue/ATT buffer deadlock using a
