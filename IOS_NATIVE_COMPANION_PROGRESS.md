@@ -1216,3 +1216,40 @@ pending system connections also register locally. Disconnect/failure clears the
 local flag. Terminal lifetime fences remain, and the complete pinned SDK plus
 real abort proof compile/pass after the change. Background acceptance follows;
 this ownership correction is not yet claimed to resolve the physical failure.
+
+
+### Background retry and independent integrity check (2026-10-15)
+
+The local-connection correction in Nordic 361a0b2 did not resolve background
+upload. On app f01c8c0, operation 7D8E21C0-CBA4-427B-8976-1F28FDEC8296 retained
+46,392 / 839,288 acknowledged bytes in both background snapshots and terminated
+with sendFailed (transport error 5, upload). The UI runner subsequently timed out:
+its failure selector omitted the actual “Update Result Unverified” heading. This
+is failed continuation acceptance, not a successful background update.
+
+Fresh USB reads confirm both final 5df4b8ed target images are still active and
+confirmed with no pending swap. All 33 sources (673,009 bytes), including the 28
+pre-firmware sources, match their saved SHA256 receipts. The restored Retro
+Sunburst image again matches SHA256
+979df7661e05c5a9caa4ac04c46c8147f1a909571c0b7b04370bcb594f547842.
+Private evidence is in .companion-hil-runs/20261015-ios-companion.
+
+The next diagnostic build counts only recognized SDK transport control events:
+write chunks, complete responses, flow-control pauses/resumes and retry classes.
+SDK strings and payloads are never retained or printed. Updating the SDK log
+delegate also updates its existing write buffer, so prepared transports report
+flow control after ownership moves to the update coordinator. A bounded eight-
+receipt execution history records operation identity, background-task admission,
+remaining grant and foreground/background transitions. Failure diagnostics now
+include operation identity and counter snapshot. These diagnostics do not change
+transfer policy or establish a background fix. The complete pinned SDK abort
+proof passes; the revised phone test recognizes the actual unverified result.
+The phone screenshot/debug service currently reports password protection; an
+unlock was requested while source and USB work continue.
+
+Validation for this checkpoint: Nordic 4af72e1 complete-SDK abort proof passes;
+Swift firmware boot/hash/resource/recovery tests and voice checkpoint/edit/ACK
+fence tests pass. The normal signed release build passes in 24.1 seconds (88.5 MB)
+and deep/strict codesign verification passes. The diagnostic app installed over
+the existing app successfully; physical background acceptance remains pending.
+No Dart product code changed, so the previous 343-test Flutter result is retained.

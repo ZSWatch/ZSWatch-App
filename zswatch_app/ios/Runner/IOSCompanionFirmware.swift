@@ -28,6 +28,7 @@ final class IOSCompanionFirmware {
   private var sarBuffer: UInt64 = 0
   private var finishing = false
   private var backgroundEpoch = UUID()
+  private var transportCounters = IOSFirmwareTransportCounters()
   private(set) var holdsLink = false
   var isActive: Bool { operation.busy }
   init(owner: IOSCompanionCoordinator) { self.owner = owner; operation = CompanionFirmwareOperation(journal: owner.journal) }
@@ -72,6 +73,8 @@ final class IOSCompanionFirmware {
     do {
       let id = try operation.begin(address: owner.journal.address, generation: generation + 1, targets: targets, resources: resources)
       self.transport = sdk; self.images = parsed; self.targets = targets; self.resources = resources
+      transportCounters = IOSFirmwareTransportCounters()
+      sdk.logDelegate = transportCounters
       token = UUID(); finishing = false; holdsLink = true; checking = false; activationSent = false; checkAttempts = 0
       transferMeter = nil
       transferExpected = false; lastProgress = nil
@@ -191,7 +194,8 @@ final class IOSCompanionFirmware {
         case "failed":
           if let error {
             let native = error as NSError
-            var details: [String: Any] = ["state": String(describing: state),
+            var details: [String: Any] = ["state": String(describing: state), "operation_id": self.operation.id ?? "",
+              "foreground": self.foreground, "transport": self.transportCounters.snapshot(),
               "domain": String(native.domain.prefix(120)), "code": native.code]
             // Transport cases contain only identifiers/numeric MTU, never raw
             // payloads or potentially private localized NSError userInfo.
@@ -332,19 +336,58 @@ final class IOSCompanionFirmware {
     if owner?.journal.loadError == nil { finishing = false }
     owner?.journalChanged(); owner?.resumeAfterFirmware()
   }
-  func foregrounded() { foreground = true; backgroundEpoch = UUID(); lease.end() }
+  private func executionReceipt(_ event: String, granted: Bool? = nil, remaining: TimeInterval? = nil) {
+    guard let owner, operation.busy else { return }
+    var receipt: [String: Any] = ["operation_id": operation.id ?? "", "event": event,
+      "foreground": foreground, "transport": transportCounters.snapshot(),
+      "timestamp_ms": Int64(Date().timeIntervalSince1970 * 1000)]
+    if let granted { receipt["background_granted"] = granted }
+    if let remaining, remaining.isFinite { receipt["background_seconds_remaining"] = min(3600, remaining) }
+    var receipts = (owner.journal.fields["firmware_execution_receipts"] as? [[String: Any]] ?? [])
+      .filter { $0["operation_id"] as? String == operation.id }
+    receipts.append(receipt)
+    try? owner.publish("firmware_execution", ["last_firmware_execution": receipt,
+      "firmware_execution_receipts": Array(receipts.suffix(8))])
+  }
+  func foregrounded() {
+    foreground = true; backgroundEpoch = UUID(); lease.end()
+    executionReceipt("foreground")
+  }
   func backgrounded() {
     foreground = false
     guard operation.busy, let owner else { return }
     backgroundEpoch = UUID()
     let id = operation.id, epoch = backgroundEpoch
-    lease.hold("ZSWatch firmware update") { owner.queue.async {
+    executionReceipt("background")
+    lease.hold("ZSWatch firmware update", acquired: { granted, remaining in owner.queue.async {
+      if self.operation.id == id, self.backgroundEpoch == epoch { self.executionReceipt("background_lease", granted: granted, remaining: remaining) }
+    } }) { owner.queue.async {
       if self.operation.id == id, self.backgroundEpoch == epoch, self.isActive, !self.foreground { self.abort("background_expired") }
     } }
     owner.queue.asyncAfter(deadline: .now() + 20) {
       if self.operation.id == id, self.backgroundEpoch == epoch, self.isActive, !self.foreground { self.abort("background_expired") }
     }
   }
+}
+
+/// Count only known transport control events. Never retain SDK messages, packet
+/// bytes, filenames, or localized errors in the persistent diagnostic journal.
+private final class IOSFirmwareTransportCounters: McuMgrLogDelegate {
+  private let lock = NSLock()
+  private var counts: [String: Int] = [:]
+  func log(_ msg: String, ofCategory category: McuMgrLogCategory, atLevel level: McuMgrLogLevel) {
+    guard category == .transport else { return }
+    let key: String
+    if msg.hasPrefix("⏸︎ [Seq:") { key = "flow_pauses" }
+    else if msg.hasPrefix("► [Seq:") { key = "flow_resumes" }
+    else if msg.hasPrefix("(Retry ") { key = "flow_retries" }
+    else if msg.hasPrefix("Retry ") { key = "response_retries" }
+    else if msg.hasPrefix("-> [Seq:") { key = "written_chunks" }
+    else if msg.hasPrefix("<- [Seq:") { key = "responses" }
+    else { return }
+    lock.lock(); counts[key, default: 0] += 1; lock.unlock()
+  }
+  func snapshot() -> [String: Int] { lock.lock(); defer { lock.unlock() }; return counts }
 }
 
 private final class IOSFirmwareDelegate: FirmwareUpgradeDelegate {

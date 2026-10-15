@@ -4,7 +4,7 @@ import UIKit
 final class CompanionBackgroundLease {
   private var identifier = UIBackgroundTaskIdentifier.invalid
   private var token = UUID()
-  func hold(_ name: String, expired: @escaping () -> Void) {
+  func hold(_ name: String, acquired: ((Bool, TimeInterval) -> Void)? = nil, expired: @escaping () -> Void) {
     DispatchQueue.main.async {
       guard self.identifier == .invalid else { return }
       let token = UUID(); self.token = token
@@ -12,6 +12,7 @@ final class CompanionBackgroundLease {
         guard let self, self.token == token else { return }
         self.endOnMain(); expired()
       }
+      acquired?(self.identifier != .invalid, UIApplication.shared.backgroundTimeRemaining)
       if self.identifier == .invalid { expired() }
     }
   }
