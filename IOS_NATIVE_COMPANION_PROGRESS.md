@@ -1497,3 +1497,28 @@ plumbing, not physiological measurement. Fresh copied SQLite/WAL quick_check
 is ok:41,130 health samples,27,583 battery readings,278 connection events.
 Native CoreTests were rerun successfully, including durable Stop/Forget and
 late-session fences. Destructive system unpair remains untested.
+
+
+### 2026-10-15 — resource expiration and SDK rewind repair
+
+Signed app dd01da6 + Nordic c372ad0 passed a 26-second Home expiration for
+resource-only upload: published acknowledged progress remained184,524 at2s/12s
+in background, then native failed background_expired/result_unknown with33 sources.
+The app required explicit Reset. USB readback found a211,232-byte partial image,
+exactly a prefix of the retained complete5,919,608-byte source. Completion was
+not claimed; retry must restore and verify the entire resource image.
+
+A ten-second Home retry exposed two existing SDK issues. Watch FS management
+closes an idle file after10,000ms; reopening the special full_fs writer starts
+from zero. The server correctly requested offset0, but Nordic continued sending
+later offsets. Its pipeline refilled invalid outstanding requests after each
+mismatch and FileSystemManager also registered phantom pipeline requests when
+processing ACKs while paused. The stalled attempt was background-expired rather
+than reset/declared complete. Resource restoration remains outstanding here.
+
+Nordic06644b1 now drains invalid requests before accepting the server rewind,
+and paused ACKs no longer refill the file pipeline. Actual-SDK fake-transport
+regressions drive encoded SDK ACKs, pause/drain/resume, rewind/restart, cancelled
+parameter replies and terminal self-retention; all pass. Root736551a pins this
+SDK. Resource upload-only lifecycle pause and failed-transfer teardown remain
+in dd01da6. Signed rebuild and physical retry are in progress.
