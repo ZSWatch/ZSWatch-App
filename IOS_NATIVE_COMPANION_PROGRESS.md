@@ -1335,3 +1335,25 @@ The copied phone database passed quick_check with 37,365 health samples, 25,043
 battery readings, 212 connection events and one committed telemetry cursor at
 sequence 37,710. Dedicated chart refresh is still a separate physical check.
 Private evidence is in voice-recovery-and-settings under today's run.
+
+
+### Automatic transcription-only policy (2026-10-15)
+
+The normal AI Settings UI selected the already installed Tiny English model,
+disabled Analyze after transcription and enabled automatic processing. A newly
+owned 155,127-byte container copied from the older hil_rel_long fixture produced
+no_speech; its complete verified source remained downloaded and no analysis ran.
+This is a retained failure receipt, not successful speech acceptance.
+
+A new uniquely named copy of the previously verified 20261013_235832 microphone
+fixture then passed. Native discovery captured whisperTinyEn / analysis false,
+downloaded all 31,181 bytes with SHA256
+1658fe04ce2633b6f33e2a2e99f14e1bfe39528c720ded96e90d73ff3c3d872d,
+automatically created a transcribe-v1 job and reached transcribed on attempt one.
+The 116-byte transcript matched the previously saved original hash. Summary,
+category and actions were empty, proving optional analysis was skipped. The
+original microphone file was not edited. This copied fixture is not claimed as
+a fresh microphone capture. The UI restored automatic processing off, analysis
+on and Small English selection afterward; the restore test passed in 27.589 s.
+Owned extra fixture cleanup is still pending. Private evidence: today's
+run/automatic-transcription directory.
