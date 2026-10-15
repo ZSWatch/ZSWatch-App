@@ -306,4 +306,61 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'iOS Bluetooth denial offers Settings and retries without Start',
+    (tester) async {
+      const settings = MethodChannel(
+        'flutter.baseflow.com/permissions/methods',
+      );
+      var settingsOpens = 0;
+      messenger.setMockMethodCallHandler(settings, (call) async {
+        expect(call.method, 'openAppSettings');
+        settingsOpens++;
+        return true;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(settings, null));
+      var granted = false;
+      requestPermissions =
+          const CompanionPrototypeClient().requestIosConnectionPermissions;
+      handler = (call) async {
+        if (call.method == 'requestConnectionPermissions') {
+          return {'version': 1, 'bluetooth': granted};
+        }
+        if (call.method == 'scanStart') {
+          return {...state().fields, 'owner': 'ios_companion_native'};
+        }
+        throw StateError('Unexpected command ${call.method}');
+      };
+      await open(tester);
+      expect(calls, isEmpty);
+      await tester.tap(find.text('Find watch'));
+      await tester.pumpAndSettle();
+      expect(calls.map((c) => c.method), ['requestConnectionPermissions']);
+      expect(
+        find.textContaining('Bluetooth access is disabled.'),
+        findsOneWidget,
+      );
+      expect(find.text('Open iPhone Settings'), findsOneWidget);
+      expect(settingsOpens, 0);
+      await tester.tap(find.text('Open iPhone Settings'));
+      await tester.pumpAndSettle();
+      expect(settingsOpens, 1);
+      expect(calls.length, 1);
+      granted = true;
+      await tester.tap(find.text('Find watch'));
+      await tester.pumpAndSettle();
+      expect(calls.map((c) => c.method), [
+        'requestConnectionPermissions',
+        'requestConnectionPermissions',
+        'scanStart',
+      ]);
+      expect(find.text('Open iPhone Settings'), findsNothing);
+      expect(
+        find.textContaining('Bluetooth access is disabled.'),
+        findsNothing,
+      );
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.iOS}),
+  );
 }

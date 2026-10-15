@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../data/models/companion_watch_selection.dart';
 import '../../../providers/companion_runtime_providers.dart';
@@ -22,6 +23,7 @@ class CompanionScanView extends ConsumerStatefulWidget {
 class _CompanionScanViewState extends ConsumerState<CompanionScanView> {
   bool busy = false;
   String? error;
+  bool permissionDenied = false;
   CompanionPrototypeClient? scanningClient;
   bool get isIos => defaultTargetPlatform == TargetPlatform.iOS;
 
@@ -45,6 +47,7 @@ class _CompanionScanViewState extends ConsumerState<CompanionScanView> {
     setState(() {
       busy = true;
       error = null;
+      permissionDenied = false;
     });
     try {
       await ref.read(companionConnectionPermissionsProvider)();
@@ -61,11 +64,12 @@ class _CompanionScanViewState extends ConsumerState<CompanionScanView> {
       }
     } on PlatformException catch (failure) {
       if (mounted && failure.code != 'CANCELLED') {
-        setState(
-          () => error = isIos
+        setState(() {
+          permissionDenied = isIos && failure.code == 'BLUETOOTH_PERMISSION';
+          error = isIos
               ? failure.message ?? 'Could not find or connect to your watch'
-              : 'Could not find or connect to your watch',
-        );
+              : 'Could not find or connect to your watch';
+        });
       }
     } catch (_) {
       if (mounted) {
@@ -165,6 +169,20 @@ class _CompanionScanViewState extends ConsumerState<CompanionScanView> {
                 error!,
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
+            ),
+          if (permissionDenied)
+            OutlinedButton(
+              onPressed: () async {
+                final opened = await openAppSettings();
+                if (!opened && mounted) {
+                  setState(
+                    () => error =
+                        'Open iPhone Settings and allow '
+                        'Bluetooth access for ZSWatch.',
+                  );
+                }
+              },
+              child: const Text('Open iPhone Settings'),
             ),
         ],
       ),

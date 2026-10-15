@@ -295,6 +295,14 @@ class CompanionPrototypeClient {
       'requestConnectionPermissions',
       {'version': 1},
     );
+    if (value is Map && value['version'] == 1 && value['bluetooth'] == false) {
+      throw PlatformException(
+        code: 'BLUETOOTH_PERMISSION',
+        message:
+            'Bluetooth access is disabled. Allow Bluetooth in iPhone Settings, '
+            'then tap Find watch again.',
+      );
+    }
     if (value is! Map || value['version'] != 1 || value['bluetooth'] != true) {
       throw StateError('Bluetooth permission is required to connect');
     }
