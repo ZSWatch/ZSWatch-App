@@ -222,7 +222,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     // willRestoreState can reject/cancel stale peripheral handles.
     if restorationPending, setup.activated, !setup.presenting { ensureCentral() }
     if let id = UUID(uuidString: journal.address) {
-      if previous.contains(id), !authorizedAccessoryIDs.contains(id), journal.desired {
+      if setup.activated, previous.contains(id), !authorizedAccessoryIDs.contains(id), journal.desired {
         // Revocation must fence pending reconnects, writes and relays first.
         try? stop()
         setPhase("error", error: "Watch access was removed. Set up your watch again.")

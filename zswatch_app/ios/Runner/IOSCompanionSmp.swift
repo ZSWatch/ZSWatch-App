@@ -128,23 +128,7 @@ final class IOSCompanionSmp {
           created.logDelegate = logger
           self.preparationReceipt("transport_created")
           let echo = "ZSWatch-\(id.uuidString.prefix(8))"
-          DispatchQueue.main.async {
-            DefaultManager(transport: created).echo(echo) { response, error in
-              owner.queue.async {
-                guard self.pending?.id == id, self.attempt == token else { return }
-                if !owner.isReadySession(generation) { self.sessionClosed(); return }
-                guard error == nil, response?.getError() == nil, response?.response == echo else {
-                  self.preparationReceipt("echo_failed", error: error)
-                  created.invalidate(); self.transport = nil
-                  self.finish(.failure(error ?? CompanionFailure.unavailable("Nordic SMP did not acknowledge preparation"))); return
-                }
-                self.preparedGeneration = generation
-                self.preparationReceipt("echo_acknowledged")
-                try? owner.publish("smp_prepared", ["smp_prepared_generation": generation])
-                self.finish(.success(["version": 1, "prepared_from_generation": pending.generation, "generation": generation]))
-              }
-            }
-          }
+          self.echoPreparation(created, id: id, generation: generation, token: token, echo: echo, retryCentral: true)
         }
       }
       // Mark construction in-flight without admitting another transport.
@@ -152,6 +136,44 @@ final class IOSCompanionSmp {
       return
     }
     owner.queue.asyncAfter(deadline: .now() + 0.25) { self.pollPreparation(id) }
+  }
+
+  private func echoPreparation(_ created: McuMgrBleTransport, id: UUID, generation: Int,
+                               token: UUID, echo: String, retryCentral: Bool) {
+    guard let owner, let pending, pending.id == id, attempt == token,
+          owner.isReadySession(generation) else { return }
+    DispatchQueue.main.async {
+      DefaultManager(transport: created).echo(echo) { response, error in
+        owner.queue.async {
+          guard self.pending?.id == id, self.attempt == token else { return }
+          if !owner.isReadySession(generation) { self.sessionClosed(); return }
+          if retryCentral, let radio = error as? McuMgrBleTransportError {
+            switch radio {
+            case .centralManagerPoweredOff, .centralManagerNotReady:
+              // A newly-created SDK manager can briefly report its initial
+              // state while the NUS owner is already poweredOn/Ready. Retry
+              // only this idempotent preparation echo, once, on the same
+              // transport and within begin()'s original 25-second deadline.
+              self.preparationReceipt("central_initialization_wait", error: error)
+              owner.queue.asyncAfter(deadline: .now() + 0.25) {
+                self.echoPreparation(created, id: id, generation: generation, token: token, echo: echo, retryCentral: false)
+              }
+              return
+            default: break
+            }
+          }
+          guard error == nil, response?.getError() == nil, response?.response == echo else {
+            self.preparationReceipt("echo_failed", error: error)
+            created.invalidate(); self.transport = nil
+            self.finish(.failure(error ?? CompanionFailure.unavailable("Nordic SMP did not acknowledge preparation"))); return
+          }
+          self.preparedGeneration = generation
+          self.preparationReceipt("echo_acknowledged")
+          try? owner.publish("smp_prepared", ["smp_prepared_generation": generation])
+          self.finish(.success(["version": 1, "prepared_from_generation": pending.generation, "generation": generation]))
+        }
+      }
+    }
   }
   private func prepared(_ generation: Int) throws -> McuMgrBleTransport {
     guard preparedGeneration == generation, let transport, let owner, owner.isReadySession(generation) else {
