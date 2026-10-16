@@ -1725,3 +1725,28 @@ process was terminated. The user then clarified that the debugger was intentiona
 disconnected. No further attach/reset attempts are running; final system-stack
 measurement awaits reconnecting the watch debug lead. The app/Weather operation
 does not require that connection.
+
+
+### 2026-10-16 — final installed Weather and stack acceptance COMPLETE
+
+After the user reconnected the watch debug lead, matching-ELF SWD reads succeeded
+on installed ecd78bfc. Live Weather shows15.0 degrees, forecast content visible,
+empty status. All debugger reads confirmed CPU running before/after, with no
+attach reset. A controlled clean boot followed by cached-GPS Weather startup
+(GPS32.796s, Weather UI157.665s) measured system work5216/6144 (928 free), BT RX
+5012/9504 (4492 free), main1360/2048 (688 free). The earlier running-session peak
+5840/6144 is retained separately; the new clean case does not erase that evidence.
+No further stack-budget change was made. The watch USB data lead is absent, so
+bootstrap's CDC-enumeration timeout after the successful reset is a tooling
+precondition, not a failed boot. UART confirms the exact final firmware boot and
+forecast update, with no fatal/assert in that clean interval.
+
+Native Ready218 independently confirms HTTP success161ms/1138 bytes, pending0,
+errornil. Every one of the33 phone source files was recopied and SHA256 compared
+to its original receipt:673009 bytes, all unchanged. Earlier complete physical
+Home-background/cold-reboot UI acceptance (568.183 seconds) and full watch-source /
+watchface hash evidence remain preserved and explicitly versioned in delivery.
+Final build/signature, native HTTP network tests, production C regressions and
+shared347-test/analysis evidence are retained. The original goal's excluded
+endurance/publication work and documented iOS variants remain explicit limits,
+not inferred passes. Local evidence:weather-repair.

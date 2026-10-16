@@ -1,6 +1,8 @@
 # Mac / iOS companion handoff
 
-Updated 2026-10-12. Read this together with `IOS_COMPANION_IMPLEMENTATION_PLAN.md`.
+Original handoff: 2026-10-12. For the implemented branch, installed revisions and
+current acceptance evidence, read [IOS_COMPANION_DELIVERY.md](IOS_COMPANION_DELIVERY.md).
+Read this historical setup handoff together with `IOS_COMPANION_IMPLEMENTATION_PLAN.md`.
 
 ## Repositories and branches
 

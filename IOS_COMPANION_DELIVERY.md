@@ -1,6 +1,6 @@
 # Native iOS companion delivery checkpoint
 
-2026-10-15. The normal Flutter app uses the Swift-owned iOS companion and the
+2026-10-16. The normal Flutter app uses the Swift-owned iOS companion and the
 shared Dart voice processor. Implementation and the physical resource recovery
 are committed locally on `codex/ios-companion`. First-install Bluetooth denial, Settings recovery and new watch selection now
 pass on the phone. Untested variants remain explicit below; this checkpoint is
@@ -101,18 +101,24 @@ the rendering call stack. Both final image hashes are active/confirmed; the
 signed app and firmware/ELF are retained under
 `.companion-hil-runs/20261015-ios-companion/weather-repair/`.
 
-2026-10-16 follow-up: native Ready213 reports another successful real Weather
-fetch (159ms, 1,137 bytes), zero pending requests and no error. Final stack
-remeasurement on ecd78bfc remains pending. The user entered the fresh XCTest
-passcode; normal phone UI and live BLE shell commands now work. The generic
-`kernel thread stacks` response is truncated by the firmware's 1,024-byte dummy
-shell buffer before the system workqueue entry (BT RX is visible:5012/9504).
-Final-firmware UART also confirms a fresh four-forecast UI update. The user
-confirmed the watch debugger was disconnected; adapter enumeration alone does
-not establish a connection to the watch CPU. No additional attach/reset attempts
-will run until the debug lead is reconnected. Earlier full physical UI/hash/stack
-observations above apply to ae9a28d1; final installed hashes, native HTTP receipt
-and current forecast rendering are independently verified.
+2026-10-16 final ecd78bfc acceptance is complete. Matching-ELF SWD reads show
+15.0 degrees, visible forecast content and an empty error label. The CPU remained
+running before/after every read, with no connect-under-reset fallback. After an
+explicit clean boot, GPS arrived at32.796s and Weather opened with that cached
+location at157.665s. System work high-water is5216/6144 (928 unused), BT RX5012/9504
+(4492 unused), main1360/2048 (688 unused). The earlier running-session system
+high-water was5840/6144 (304 unused); that is retained as a separate overall
+observation, not replaced by the lower clean-Weather measurement.
+
+Native Ready218 independently records HTTP success161ms/1138 bytes, no pending
+requests and no error. All33 phone source files were copied and independently
+SHA256 checked again:673009 bytes, every original hash unchanged. The last full
+watch-source and watchface byte/hash readbacks above remain retained. The watch's
+separate USB data cable is absent on Oct16; the final check used phone BLE shell,
+UART and SWD. The generic Bluetooth `kernel thread stacks` report is limited to
+1024 bytes and truncates before the system thread; it is not used as complete
+stack evidence. The temporary phone authentication and disconnected-debug-lead
+blockers are resolved. No additional firmware change was needed after ecd78bfc.
 
 ## Validation and reproducibility
 
