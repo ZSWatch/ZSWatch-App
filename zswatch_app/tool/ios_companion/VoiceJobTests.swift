@@ -75,6 +75,45 @@ import Foundation
     }
     let afterRestart = try CompanionVoiceJobs(journal: CompanionJournal(url: journal.url))
     precondition(afterRestart.jobs.count == reopened.jobs.count)
-    print("PASS: checkpoints, immutable edits/reanalysis, selected-only deletion fences, private search and ACKs")
+    // Expected lifecycle pauses are not failed inference attempts. More than
+    // five app/background switches must preserve the same job and checkpoint.
+    let paused = try reopened.start(identity:"watch:lifecycle", receipt:receipt, stt:"whisperTinyEn", llm:"qwen", correct:false, operation:"process")
+    var previousFence = -1
+    for _ in 0..<8 {
+      guard let attempt = try reopened.claim(paused) else { fatalError("Lifecycle pause exhausted failure budget") }
+      precondition(attempt.fence > previousFence); previousFence = attempt.fence
+      _ = try reopened.checkpoint(attempt, transcript:"The blue bicycle is in the garage.")
+      try reopened.deferClaim(attempt, code:"background_deferred")
+      precondition(!reopened.owns(attempt))
+      let late = try reopened.complete(attempt, result:full); precondition(!late)
+    }
+    let resumedLifecycle = try CompanionVoiceJobs(journal:CompanionJournal(url:journal.url))
+    try resumedLifecycle.recover()
+    let lifecycleDetail = try resumedLifecycle.detail(paused)
+    precondition(lifecycleDetail["transcript"] as? String == "The blue bicycle is in the garage.")
+    let finalLifecycleClaim = try resumedLifecycle.claim(paused)!
+    let lifecycleCompleted = try resumedLifecycle.complete(finalLifecycleClaim, result:full)
+    precondition(lifecycleCompleted)
+    // Explicit retry of a blocked model job resets both counters together.
+    let retryBlocked = try resumedLifecycle.start(identity:"watch:blocked-retry", receipt:receipt, stt:"whisperTinyEn", llm:"qwen", correct:false, operation:"process")
+    let firstBlockedClaim = try resumedLifecycle.claim(retryBlocked)!
+    try resumedLifecycle.deferClaim(firstBlockedClaim, code:"background_expired")
+    _ = try resumedLifecycle.claim(retryBlocked)
+    try resumedLifecycle.fail(retryBlocked, code:"model_missing", blocked:true)
+    let retryBlockedID = try resumedLifecycle.start(identity:"watch:blocked-retry", receipt:receipt, stt:"whisperTinyEn", llm:"qwen", correct:false, operation:"process")
+    precondition(retryBlockedID == retryBlocked)
+    let reset = try resumedLifecycle.detail(retryBlockedID)
+    precondition(reset["attempts"] as? Int == 0 && reset["deferred_attempts"] as? Int == 0)
+    // Unclean process deaths still consume the bounded failure budget.
+    let crashing = try resumedLifecycle.start(identity:"watch:crash", receipt:receipt, stt:"whisperTinyEn", llm:"qwen", correct:false, operation:"process")
+    for _ in 0..<5 {
+      let crashClaim = try resumedLifecycle.claim(crashing); precondition(crashClaim != nil)
+      try resumedLifecycle.recover()
+    }
+    let excessiveCrash = try resumedLifecycle.claim(crashing)
+    precondition(excessiveCrash == nil)
+    let crashDetail = try resumedLifecycle.detail(crashing)
+    precondition(crashDetail["last_error"] as? String == "execution_attempt_limit")
+    print("PASS: checkpoints, immutable edits/reanalysis, selected-only deletion fences, private search, ACKs, repeated lifecycle deferrals and bounded crash recovery")
   }
 }

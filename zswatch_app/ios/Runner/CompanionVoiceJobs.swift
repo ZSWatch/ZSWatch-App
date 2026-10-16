@@ -40,7 +40,7 @@ final class CompanionVoiceJobs {
         result["category"] = body["category"] ?? ""
         result["action_types"] = (body["actions"] as? [[String: Any]] ?? []).compactMap { $0["type"] as? String }
       }
-      for key in ["attempts", "next_attempt", "last_error", "action_revision"] { result[key] = item[key] ?? NSNull() }
+      for key in ["attempts", "deferred_attempts", "next_attempt", "last_error", "action_revision"] { result[key] = item[key] ?? NSNull() }
       return result
     }
   }
@@ -75,7 +75,7 @@ final class CompanionVoiceJobs {
         spec?["input_sha256"] as? String == hash && !["failed", "cancelled"].contains($0.value["state"] as? String ?? "")
     }) {
       select(existing.key)
-      if next[existing.key]?["state"] as? String == "blocked" { next[existing.key]?["state"] = "ready"; next[existing.key]?["last_error"] = NSNull(); next[existing.key]?["attempts"] = 0 }
+      if next[existing.key]?["state"] as? String == "blocked" { next[existing.key]?["state"] = "ready"; next[existing.key]?["last_error"] = NSNull(); next[existing.key]?["attempts"] = 0; next[existing.key]?["deferred_attempts"] = 0 }
       try commit("voice_job_selected", next); return existing.key
     }
     guard next.count < 100 else { throw CompanionFailure.unavailable("Voice job capacity reached") }
@@ -91,7 +91,7 @@ final class CompanionVoiceJobs {
       }
     }
     var item: [String: Any] = ["spec": spec, "state": "ready", "fence": 0, "lease_until": NSNull(),
-      "attempts": 0, "next_attempt": 0, "last_error": NSNull(), "remote_id": NSNull(), "selected": true]
+      "attempts": 0, "deferred_attempts": 0, "next_attempt": 0, "last_error": NSNull(), "remote_id": NSNull(), "selected": true]
     if reuseTranscript { item["transcript"] = transcript }
     next[id] = item; try commit("voice_job_created", next); return id
   }
@@ -99,7 +99,10 @@ final class CompanionVoiceJobs {
     guard var item = jobs[id], item["state"] as? String == "ready", (item["lease_until"] as? Int ?? 0) <= CompanionJournal.now,
           let spec = item["spec"] as? [String: Any] else { return nil }
     let attempts = (item["attempts"] as? Int ?? 0) + 1
-    guard attempts <= 5 else { try fail(id, code: "execution_attempt_limit"); return nil }
+    // Deliberate lifecycle pauses fence/cancel work but are not inference
+    // failures. Keep total claim telemetry while bounding unclean restarts.
+    let deferred = min(CompanionRecordingFiles.integer(item["deferred_attempts"]) ?? 0, attempts - 1)
+    guard attempts - deferred <= 5 else { try fail(id, code: "execution_attempt_limit"); return nil }
     let fence = (item["fence"] as? Int ?? 0) + 1
     item["fence"] = fence; item["attempts"] = attempts; item["lease_until"] = CompanionJournal.now + 900000; item["last_error"] = NSNull()
     var next = jobs; next[id] = item; try commit("voice_job_claimed", next)
@@ -119,6 +122,7 @@ final class CompanionVoiceJobs {
   func deferClaim(_ claim: Claim, code: String) throws {
     guard jobs[claim.id]?["state"] as? String == "ready", jobs[claim.id]?["fence"] as? Int == claim.fence else { return }
     var next = jobs; next[claim.id]?["fence"] = claim.fence + 1; next[claim.id]?["lease_until"] = NSNull(); next[claim.id]?["last_error"] = code
+    next[claim.id]?["deferred_attempts"] = (jobs[claim.id]?["deferred_attempts"] as? Int ?? 0) + 1
     try commit("voice_execution_deferred", next)
   }
   func fail(_ id: String, code: String, blocked: Bool = false) throws {
@@ -167,7 +171,7 @@ final class CompanionVoiceJobs {
       if ["ready", "blocked", "result_ready"].contains(item["state"] as? String ?? "") { next[key]?["state"] = "cancelled" }
     }
     next[editedID] = ["spec": changedSpec, "state": "transcribed", "selected": true, "fence": 0,
-      "lease_until": NSNull(), "attempts": 0, "next_attempt": 0, "last_error": NSNull(),
+      "lease_until": NSNull(), "attempts": 0, "deferred_attempts": 0, "next_attempt": 0, "last_error": NSNull(),
       "transcript": transcript, "result": ["version": 1, "transcript": transcript, "summary": "", "category": "", "actions": [[String: Any]]()]]
     try commit("voice_transcript_edited", next); return editedID
   }
