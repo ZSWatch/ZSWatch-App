@@ -109,6 +109,14 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   }
   func publish(_ event: String, _ fields: [String: Any] = [:]) throws { try changed(event, fields) }
   private var central: CBCentralManager?
+  private var restorationPending: Bool
+  private var accessorySetup: CompanionAccessorySetup?
+  private var authorizedAccessoryIDs = Set<UUID>()
+  var usesAccessorySetup: Bool { if #available(iOS 18.0, *) { return true }; return false }
+  var bluetoothAuthorized: Bool {
+    if usesAccessorySetup { return accessorySetup?.activated == true && !authorizedAccessoryIDs.isEmpty }
+    return CBCentralManager.authorization == .allowedAlways
+  }
   private var peripheral: CBPeripheral?
   private var restoredConnectionWaitingForPower = false
   private var linkDelegate: CompanionLinkDelegate?
@@ -164,6 +172,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   var trafficObserver: (([String: Any]) -> Void)?
 
   init(root: URL, restoredLaunch: Bool) {
+    restorationPending = restoredLaunch
     journal = CompanionJournal(url: root.appendingPathComponent("ios-companion/state.json"))
     super.init()
     queue.async {
@@ -182,18 +191,100 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
         try? self.publish("http_process_interrupted", ["http_pending_count": 0,
           "last_http": ["generation": self.journal.generation, "outcome": "process_interrupted", "utc_ms": CompanionJournal.now]])
       }
-      if self.journal.desired || restoredLaunch {
+      if #available(iOS 18.0, *) {
+        self.accessorySetup = IOSAccessorySetup(queue: self.queue) { [weak self] in self?.accessoriesChanged() }
+      } else if self.journal.desired || restoredLaunch {
         self.ensureCentral()
       }
     }
   }
 
   private func ensureCentral() {
+    // ASK migration fails if any CBCentralManager has already been created.
+    if usesAccessorySetup {
+      guard accessorySetup?.activated == true, !authorizedAccessoryIDs.isEmpty,
+            accessorySetup?.presenting == false else { return }
+    }
     if central == nil {
       central = CBCentralManager(delegate: self, queue: queue, options: [
         CBCentralManagerOptionRestoreIdentifierKey: Self.restorationID,
         CBCentralManagerOptionShowPowerAlertKey: true,
       ])
+      restorationPending = false
+    }
+  }
+
+  private func accessoriesChanged() {
+    guard let setup = accessorySetup else { return }
+    let previous = authorizedAccessoryIDs
+    authorizedAccessoryIDs = setup.identifiers
+    // Even stopped intent must recreate a system-restored manager so
+    // willRestoreState can reject/cancel stale peripheral handles.
+    if restorationPending, setup.activated, !setup.presenting { ensureCentral() }
+    if let id = UUID(uuidString: journal.address) {
+      if previous.contains(id), !authorizedAccessoryIDs.contains(id), journal.desired {
+        // Revocation must fence pending reconnects, writes and relays first.
+        try? stop()
+        setPhase("error", error: "Watch access was removed. Set up your watch again.")
+      } else if setup.activated, !setup.presenting, journal.desired {
+        if authorizedAccessoryIDs.contains(id) { ensureCentral() }
+        else { setPhase("error", error: "Enable background reconnection to finish iPhone watch setup.") }
+      }
+    }
+    journalChanged()
+  }
+
+  /// An existing UUID migrates without unpairing or replacing stored data.
+  func authorizeAccessory(_ completion: @escaping (Result<[String: Any], Error>) -> Void) {
+    guard let id = UUID(uuidString: journal.address) else {
+      completion(.failure(CompanionFailure.invalid("Choose a watch first"))); return
+    }
+    selectAccessory(existing: id) { result in completion(result.map { _ in self.snapshot() }) }
+  }
+
+  func discoverAccessory(_ completion: @escaping (Result<[String: Any], Error>) -> Void) {
+    guard !journal.desired else { completion(.failure(CompanionFailure.unavailable("Stop before choosing another watch"))); return }
+    selectAccessory(existing: nil, completion: completion)
+  }
+
+  private func selectAccessory(existing: UUID?, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+    guard let setup = accessorySetup else {
+      completion(.failure(CompanionFailure.unavailable("iPhone accessory setup is unavailable"))); return
+    }
+    if let existing, !setup.identifiers.contains(existing), central != nil {
+      completion(.failure(CompanionFailure.unavailable("Reopen ZSWatch before migrating this watch"))); return
+    }
+    let generation = journal.generation
+    setup.choose(existing: existing) { [weak self] result in
+      guard let self else { return }
+      guard self.journal.generation == generation else {
+        completion(.failure(CompanionFailure.unavailable("Watch setup changed; choose again"))); return
+      }
+      switch result {
+      case .success(let id):
+        guard existing == nil || id == existing, setup.identifiers.contains(id) else {
+          completion(.failure(CompanionFailure.invalid("Unexpected watch selected"))); return
+        }
+        self.authorizedAccessoryIDs = setup.identifiers
+        self.scans[id] = ["address": id.uuidString, "name": "ZSWatch", "rssi": -127]
+        if self.journal.desired, self.journal.address == id.uuidString { self.ensureCentral() }
+        try? self.changed("accessory_authorized")
+        completion(.success(["version": 1, "platform": "ios", "selected": true,
+                             "address": id.uuidString, "generation": generation]))
+      case .failure(let error): completion(.failure(error))
+      }
+    }
+  }
+
+  func startWithSetup(_ id: String, expected: Int?, completion: @escaping (Result<Void, Error>) -> Void) {
+    guard usesAccessorySetup, let uuid = UUID(uuidString: id), !authorizedAccessoryIDs.contains(uuid) else {
+      do { try start(id, expected: expected); completion(.success(())) } catch { completion(.failure(error)) }; return
+    }
+    // A discovered selection cannot silently turn into another migration.
+    guard expected == nil else { completion(.failure(CompanionFailure.unavailable("Watch access changed; choose again"))); return }
+    selectAccessory(existing: uuid) { result in
+      do { _ = try result.get(); try self.start(id); completion(.success(())) }
+      catch { completion(.failure(error)) }
     }
   }
 
@@ -212,6 +303,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     fields["telemetry_pending_count"] = (journal.fields["telemetry"] as? [[String: Any]] ?? []).count
     fields["gps_permissions"] = CompanionLocationRelay.permissions
     fields["bluetooth_state"] = central?.state.rawValue ?? CBManagerState.unknown.rawValue
+    fields["accessory_setup_available"] = usesAccessorySetup
+    fields["accessory_setup_required"] = accessorySetup?.activated == true &&
+      UUID(uuidString: journal.address).map { !authorizedAccessoryIDs.contains($0) } == true
+    fields["accessory_authorized"] = UUID(uuidString: journal.address).map { authorizedAccessoryIDs.contains($0) } == true
     fields["pending_cancellations"] = cancellationHandles.values.map { ["address": $0.identifier.uuidString, "state": $0.state.rawValue] }
     fields.merge([
       "version": 1, "owner": "ios_companion_native", "platform": "ios",
@@ -289,6 +384,9 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   }
 
   func requestPermission(_ completion: @escaping (Result<Bool, Error>) -> Void) {
+    // ASK grants per-accessory access in its picker; creating a central here
+    // would break migration and broad Bluetooth permission is unnecessary.
+    if usesAccessorySetup { completion(.success(true)); return }
     ensureCentral()
     if let central, central.state != .unknown && central.state != .resetting {
       completion(.success(CBCentralManager.authorization == .allowedAlways)); return
@@ -302,6 +400,11 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   }
 
   func start(_ id: String, expected: Int? = nil) throws {
+    if usesAccessorySetup {
+      guard let uuid = UUID(uuidString: id), authorizedAccessoryIDs.contains(uuid), accessorySetup?.presenting == false else {
+        throw CompanionFailure.unavailable("Set up your watch with iPhone first")
+      }
+    }
     guard !firmware.isActive else { throw CompanionFailure.unavailable("Wait for the firmware operation or stop it first") }
     if let expected {
       guard let selected = UUID(uuidString: id), scans[selected] != nil,

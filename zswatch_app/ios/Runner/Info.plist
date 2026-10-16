@@ -28,6 +28,13 @@
 	<true/>
 	<key>MinimumOSVersion</key>
 	<string>14.0</string>
+	<!-- System accessory authorization; identifiers must match the ASK descriptor. -->
+	<key>NSAccessorySetupKitSupports</key>
+	<array><string>Bluetooth</string></array>
+	<key>NSAccessorySetupBluetoothNames</key>
+	<array><string>ZSWatch</string></array>
+	<key>NSAccessorySetupBluetoothServices</key>
+	<array><string>6E400001-B5A3-F393-E0A9-E50E24DCCA9E</string></array>
 	<!-- Bluetooth Permissions -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>ZSWatch needs Bluetooth to communicate with your smartwatch for syncing data, notifications, and firmware updates.</string>

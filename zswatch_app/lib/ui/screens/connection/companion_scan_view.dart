@@ -53,7 +53,14 @@ class _CompanionScanViewState extends ConsumerState<CompanionScanView> {
       await ref.read(companionConnectionPermissionsProvider)();
       if (!mounted) return;
       final client = ref.read(companionClientProvider);
-      if (isIos) {
+      final systemSetup =
+          ref
+              .read(companionSnapshotProvider)
+              .asData
+              ?.value
+              .fields['accessory_setup_available'] ==
+          true;
+      if (isIos && !systemSetup) {
         scanningClient = client;
         await client.scan(start: true);
       } else {
@@ -124,7 +131,7 @@ class _CompanionScanViewState extends ConsumerState<CompanionScanView> {
           const SizedBox(height: 24),
           Text(
             isIos
-                ? 'On ZSWatch, open Settings > Bluetooth > Pairable > Enable. Keep it nearby, find it below, and accept the pairing request on your iPhone.'
+                ? 'On ZSWatch, open Settings > Bluetooth > Pairable > Enable. Keep it nearby, tap Find watch, and complete setup on your iPhone.'
                 : 'Keep your ZSWatch nearby and enable Bluetooth on your phone. Choose your watch in the Android dialog to connect.',
           ),
           const SizedBox(height: 24),

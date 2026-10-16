@@ -268,6 +268,13 @@ class CompanionPrototypeClient {
         await methods.invokeMethod<Object?>('discoverWatch', {'version': 1}),
       );
 
+  Future<void> authorizeAccessory() async {
+    final reply = await methods.invokeMethod<Object?>('authorizeAccessory', {
+      'version': 1,
+    });
+    CompanionPrototypeSnapshot.decode(reply);
+  }
+
   Future<void> startDiscovered(CompanionWatchSelection selection) async {
     // Validate even when a caller constructed the value rather than decoding it.
     CompanionWatchSelection.decode(selection.fields);

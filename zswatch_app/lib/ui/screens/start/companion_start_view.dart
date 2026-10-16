@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +25,28 @@ class CompanionStartView extends ConsumerStatefulWidget {
 
 class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
   bool changingConnection = false;
+
+  Future<void> enableBackgroundReconnection() async {
+    if (changingConnection) return;
+    setState(() => changingConnection = true);
+    try {
+      await ref.read(companionClientProvider).authorizeAccessory();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is PlatformException && error.code == 'ACCESSORY_SETUP'
+                  ? error.message ?? 'Watch setup was not completed. Try again.'
+                  : 'Watch setup was not completed. Try again.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => changingConnection = false);
+    }
+  }
 
   Future<void> changeConnection(String? id) async {
     if (changingConnection) return;
@@ -115,6 +138,19 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
             Text(linkError),
           ],
           const SizedBox(height: 16),
+          if (snapshot?.fields['accessory_setup_required'] == true) ...[
+            const Text(
+              'Complete iPhone watch setup to allow background reconnection. '
+              'On iOS 26 and later, this also lets iOS relaunch ZSWatch after '
+              'you swipe the app away.',
+            ),
+            FilledButton.icon(
+              onPressed: busy ? null : enableBackgroundReconnection,
+              icon: const Icon(Icons.bluetooth_connected),
+              label: const Text('Enable background reconnection'),
+            ),
+            const SizedBox(height: 16),
+          ],
           FilledButton.icon(
             icon: Icon(active ? Icons.close : Icons.bluetooth),
             label: Text(

@@ -68,7 +68,7 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
           }
         case "permissionStatus":
           let location = CLLocationManager.authorizationStatus()
-          let bluetooth = CBCentralManager.authorization == .allowedAlways
+          let bluetooth = owner.bluetoothAuthorized
           let ancs = owner.snapshot()["ancs_authorized"] as? Bool ?? false
           UNUserNotificationCenter.current().getNotificationSettings { settings in
             reply(["version": 1, "bluetooth": bluetooth,
@@ -77,6 +77,15 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
                    "location": location == .authorizedAlways || location == .authorizedWhenInUse,
                    "background_location": location == .authorizedAlways, "battery_exemption": false])
           }
+        case "discoverWatch", "authorizeAccessory":
+          let completed: (Result<[String: Any], Error>) -> Void = { answer in
+            switch answer {
+            case .success(let fields): reply(fields)
+            case .failure(let error): reply(FlutterError(code: "ACCESSORY_SETUP", message: error.localizedDescription, details: nil))
+            }
+          }
+          if call.method == "discoverWatch" { owner.discoverAccessory(completed) }
+          else { owner.authorizeAccessory(completed) }
         case "scanStart": try owner.scanStart(); reply(owner.snapshot())
         case "scanStop": owner.scanStop(); reply(owner.snapshot())
         case "start", "startDiscovered":
@@ -86,8 +95,12 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
             guard let generation = args["generation"] as? Int else { throw CompanionFailure.invalid("Selection generation required") }
             expected = generation
           }
-          try owner.start(id, expected: expected)
-          reply(["version": 1, "accepted": true])
+          owner.startWithSetup(id, expected: expected) { answer in
+            switch answer {
+            case .success: reply(["version": 1, "accepted": true])
+            case .failure(let error): reply(FlutterError(code: "CONNECTION", message: error.localizedDescription, details: nil))
+            }
+          }
         case "stop": try owner.stop(); reply(owner.snapshot())
         case "forgetWatch":
           guard let id = args["address"] as? String else { throw CompanionFailure.invalid("Watch identifier required") }

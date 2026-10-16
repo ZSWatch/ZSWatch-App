@@ -63,6 +63,7 @@ void main() {
     WidgetTester tester, {
     bool active = false,
     bool running = false,
+    bool accessorySetup = false,
   }) async {
     final router = GoRouter(
       initialLocation: '/scan',
@@ -80,7 +81,16 @@ void main() {
         overrides: [
           nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith(
-            (ref) => Stream.value(state(active: active, running: running)),
+            (ref) => Stream.value(
+              CompanionPrototypeSnapshot.decode({
+                ...state(active: active, running: running).fields,
+                if (accessorySetup) ...{
+                  'owner': 'ios_companion_native',
+                  'platform': 'ios',
+                  'accessory_setup_available': true,
+                },
+              }),
+            ),
           ),
           companionConnectionPermissionsProvider.overrideWithValue(
             () => requestPermissions(),
@@ -305,6 +315,39 @@ void main() {
         throwsStateError,
       );
     },
+  );
+
+  testWidgets(
+    'iOS accessory picker replaces raw scanning and starts only after selection',
+    (tester) async {
+      const uuid = 'FE88C737-593F-DB9B-732D-E11FF4C463F5';
+      final picked = Completer<Object?>();
+      handler = (call) async => call.method == 'discoverWatch'
+          ? await picked.future
+          : {'version': 1, 'accepted': true};
+      await open(tester, accessorySetup: true);
+      expect(calls, isEmpty);
+      await tester.tap(find.text('Find watch'));
+      await tester.pump();
+      expect(calls.map((c) => c.method), ['discoverWatch']);
+      expect(permissions, 1);
+      picked.complete({
+        'version': 1,
+        'platform': 'ios',
+        'selected': true,
+        'address': uuid,
+        'generation': 7,
+      });
+      await tester.pumpAndSettle();
+      expect(calls.map((c) => c.method), ['discoverWatch', 'startDiscovered']);
+      expect(calls.last.arguments, {
+        'version': 1,
+        'address': uuid,
+        'generation': 7,
+      });
+      expect(find.text('Home'), findsOneWidget);
+    },
+    variant: const TargetPlatformVariant({TargetPlatform.iOS}),
   );
 
   testWidgets(
