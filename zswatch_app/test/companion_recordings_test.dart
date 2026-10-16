@@ -53,7 +53,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'reused saved result remains visible after a newer failed model; old journals show the latest job',
+    'saved result stays selected; latest failed or missing-model job shows its own recovery status',
     (tester) async {
       const savedId =
           'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -64,7 +64,9 @@ void main() {
         'local_path': '/private/raw.zsw_opus',
         'sha256': hash,
       };
-      for (final preferSaved in [true, false]) {
+      for (final mode in ['saved', 'failed', 'blocked']) {
+        final preferSaved = mode == 'saved';
+        final blocked = mode == 'blocked';
         final requested = <String>[];
         final state = CompanionPrototypeSnapshot.decode({
           ...snapshot({identity(saved): saved}).fields,
@@ -82,7 +84,7 @@ void main() {
               'watch_id': watchId,
               'recording_id': identity(saved),
               'generation': 2,
-              'state': 'failed',
+              'state': blocked ? 'blocked' : 'failed',
               'last_error': 'model_missing',
             },
           ],
@@ -109,7 +111,10 @@ void main() {
                           'actions': <Object?>[],
                         },
                       }
-                    : {'state': 'failed', 'last_error': 'model_missing'};
+                    : {
+                        'state': blocked ? 'blocked' : 'failed',
+                        'last_error': 'model_missing',
+                      };
               }),
               database.databaseProvider.overrideWith(
                 (ref) => throw StateError('Unexpected DB'),
@@ -127,7 +132,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           find.textContaining(
-            preferSaved ? 'Processed • Accepted by watch' : 'Processing failed',
+            preferSaved
+                ? 'Processed • Accepted by watch'
+                : blocked
+                ? 'Selected model not downloaded'
+                : 'Processing failed',
           ),
           findsOneWidget,
         );
@@ -141,6 +150,10 @@ void main() {
         expect(
           find.text('Reason: model_missing'),
           preferSaved ? findsNothing : findsOneWidget,
+        );
+        expect(
+          find.text('Download models'),
+          blocked ? findsOneWidget : findsNothing,
         );
         await tester.pumpWidget(const SizedBox());
         await tester.pumpAndSettle();

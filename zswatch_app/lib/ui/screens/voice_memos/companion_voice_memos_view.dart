@@ -502,6 +502,19 @@ class _CompanionVoiceMemosViewState
                               'blocked',
                             ].contains(job['state']))
                           Text('Reason: ${job['last_error']}'),
+                        if (job['state'] == 'blocked' &&
+                            job['last_error'] == 'model_missing') ...[
+                          const Text(
+                            'Download the selected models in Voice memo models, then retry processing.',
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              this.context.push(AppRoutes.aiModels);
+                            },
+                            child: const Text('Download models'),
+                          ),
+                        ],
                         if (text is String) ...[
                           const SizedBox(height: 16),
                           const Text('Transcript'),
@@ -650,7 +663,10 @@ class _CompanionVoiceMemosViewState
       job['last_error'] == 'no_speech'
           ? 'No speech detected'
           : 'Processing failed',
-    'blocked' => 'Waiting for processing permission',
+    'blocked' =>
+      job['last_error'] == 'model_missing'
+          ? 'Selected model not downloaded'
+          : 'Waiting for processing permission',
     _ => 'Processing',
   };
 
@@ -936,10 +952,13 @@ class _CompanionVoiceMemosViewState
                                   .setRecordingSync(paused);
                             })
                           : null,
-                      child: Text(paused ? 'Resume downloads' : 'Pause downloads'),
+                      child: Text(
+                        paused ? 'Resume downloads' : 'Pause downloads',
+                      ),
                     ),
                     if (watchItems.any(
-                      (item) => !item.purged &&
+                      (item) =>
+                          !item.purged &&
                           item.state == CompanionRecordingState.failed,
                     ))
                       TextButton(
@@ -1141,8 +1160,6 @@ class _CompanionVoiceMemosViewState
               ? 'Queued for download'
               : 'Waiting for connection',
         CompanionRecordingState.deleted =>
-          item.purgePending
-              ? 'Deletion awaiting cleanup'
-              : 'Recently deleted',
+          item.purgePending ? 'Deletion awaiting cleanup' : 'Recently deleted',
       };
 }

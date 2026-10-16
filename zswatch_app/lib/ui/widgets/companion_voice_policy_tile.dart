@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../providers/ai_providers.dart';
 import '../../providers/companion_runtime_providers.dart';
 import '../../providers/settings_providers.dart';
+import '../../providers/voice_memo_providers.dart';
+import '../navigation/app_router.dart';
 
 /// Explicit opt-in. Saving preferences never starts inference in this isolate.
 class CompanionVoicePolicyTile extends ConsumerStatefulWidget {
@@ -19,23 +23,51 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
     final snapshot = ref.read(companionSnapshotProvider).asData?.value;
     final watch = snapshot?.watch;
     if (watch == null) return;
+    final stt = ref.read(transcriptionEngineTypeProvider);
+    final llm = ref.read(selectedAiModelIdProvider);
+    final correct = ref.read(aiCorrectionEnabledProvider);
+    final analyzeEnabled =
+        analyze ??
+        (snapshot?.fields['voice_processing_policy'] is Map
+            ? (snapshot!.fields['voice_processing_policy']
+                      as Map)['analysis_enabled'] !=
+                  false
+            : true);
     setState(() => _saving = true);
     try {
+      if (enabled) {
+        final speech = await ref.read(
+          transcriptionModelStatusProvider(stt).future,
+        );
+        final missing = !speech.downloaded
+            ? 'Download the selected speech model before enabling automatic processing.'
+            : analyzeEnabled &&
+                  !await ref.read(llmModelDownloadedProvider.future)
+            ? 'Download the selected analysis model before enabling automatic processing.'
+            : null;
+        if (!mounted) return;
+        if (missing != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(missing),
+              action: SnackBarAction(
+                label: 'Download models',
+                onPressed: () => context.push(AppRoutes.aiModels),
+              ),
+            ),
+          );
+          return;
+        }
+      }
       await ref
           .read(companionClientProvider)
           .configureVoiceProcessing(
             watchId: watch.id,
             enabled: enabled,
-            transcriptionModel: ref.read(transcriptionEngineTypeProvider).name,
-            analysisModel: ref.read(selectedAiModelIdProvider),
-            correctTranscription: ref.read(aiCorrectionEnabledProvider),
-            analyze:
-                analyze ??
-                (snapshot?.fields['voice_processing_policy'] is Map
-                    ? (snapshot!.fields['voice_processing_policy']
-                              as Map)['analysis_enabled'] !=
-                          false
-                    : true),
+            transcriptionModel: stt.name,
+            analysisModel: llm,
+            correctTranscription: correct,
+            analyze: analyzeEnabled,
           );
     } catch (error) {
       if (mounted) {
