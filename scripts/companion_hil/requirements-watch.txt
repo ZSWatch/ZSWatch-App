@@ -2,3 +2,6 @@
 -r requirements.txt
 smpclient==7.3.0
 smp==4.2.0
+
+# macOS owned speech fixtures use the bundled libopus encoder/decoder.
+av==19.0.1; sys_platform == "darwin"

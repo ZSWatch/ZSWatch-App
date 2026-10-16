@@ -641,3 +641,22 @@ publication. The helper paces Mac CDC writes and verifies the entire uploaded
 body before recording its verified size and SHA256 in the manifest. These gaps
 are fixture pacing, not a BLE firmware-throughput measurement. Keep the manifest
 and remove only its uniquely owned file when acceptance and cleanup finish.
+
+
+On macOS, speech generation uses the installed `Alva` Swedish and `Samantha`
+English voices through `say`, converts with `afconvert`, and encodes mono 16 kHz
+10 ms Opus packets with PyAV/libopus (`av==19.0.1` in the tested environment).
+The actual packets are locally decoded and their duration checked before upload.
+The manifest labels these as synthesized speech, never microphone recordings.
+Linux retains its eSpeak NG/libopus path. For example:
+
+```sh
+.venv-watch/bin/python scripts/companion_hil/voice_speech_fixture.py \
+  --output /tmp/owned-swedish-speech --language sv \
+  --text 'Den blå cykeln står i garaget.'
+```
+
+A 128-byte file payload with 150 ms between USB writes was verified on the Mac
+CDC path; larger bursts timed out. An interrupted upload is not accepted evidence.
+Keep its manifest and verify the exact owned prefix before resuming, then verify
+all bytes before reconnecting the companion.
