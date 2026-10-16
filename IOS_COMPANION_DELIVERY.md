@@ -12,12 +12,12 @@ not a claim that every physical acceptance case has passed.
 
 | Component | Revision / location |
 | --- | --- |
-| Signed app executable | App `a6f5314` (AccessorySetupKit migration/relaunch and bounded SMP initialization recovery); includes `d2e0ba7` Weather HTTP diagnostics and bounded transient retry |
+| Signed app executable | App `95df44f` (voice-model readiness and clear blocked-job recovery; includes `a6f5314` ASK/SMP fixes); includes `d2e0ba7` Weather HTTP diagnostics and bounded transient retry |
 | Nordic fork | `06644b17bec8202605afba2065ba8b5f7ef00fcb` |
 | fllama fork | `115e7991e78de446ed44858ebe0a8dbc82769d8e` |
 | Installed WatchDK firmware | `ecd78bfc`, nested `ZSWatch/`, branch `codex/ios-companion` |
-| Signed development app | `.companion-hil-runs/20261016-ios-companion/accessory-setup/Runner.app` |
-| Local evidence | `.companion-hil-runs/20261015-ios-companion/` and `.companion-hil-runs/20261016-ios-companion/accessory-setup/` |
+| Signed development app | `.companion-hil-runs/20261016-ios-companion/voice-model-readiness/Runner.app` |
+| Local evidence | `.companion-hil-runs/20261015-ios-companion/` and `.companion-hil-runs/20261016-ios-companion/` |
 
 The app is signed for team `28L8XH4G9T` and the connected iPhone 11, iOS 26.1.
 It is a development-signed installation, not an App Store package. Raw evidence,
@@ -234,3 +234,29 @@ watch fixtures and native fixture receipts have been removed; cleanup journal
 maintenance is distinguished from normal product acceptance in the progress log.
 Some explicitly owned test downloads may remain in Files/Safari until UI access
 is available. No user files are scheduled for deletion.
+
+
+## 2026-10-16 — missing speech model and automatic-job recovery
+
+The user's latest recording did capture the enabled automatic policy and create
+and claim a job, but failed before transcription with `model_missing`: selected
+Whisper Small English was absent, while Qwen was present. Restoring a model
+selection in earlier acceptance did not establish that model's local availability.
+The generic blocked label incorrectly suggested processing permission was needed.
+
+App `95df44f` checks downloaded speech/analysis models before automatic opt-in
+or applying a running policy, skips the analysis-model requirement for
+transcription-only use, and leaves disabling unrestricted. A blocked missing-model
+job now shows the cause and a Download models route alongside Retry processing.
+The selected 487,614,201-byte speech model was downloaded through normal phone UI.
+Only the affected job was retried, retaining its original spec/identity: transcript
+saved after32.483s, analysis after another38.279s, watch ACK after900ms, final
+state delivered. The entire UI check passed in82.056s. Other19 jobs and the user's
+automatic policy are unchanged; all35 audio source sizes/SHA256 were checked.
+An earlier recording was discovered before opt-in and intentionally remains manual.
+
+All349 Flutter tests and analysis pass; signed Release build, strict signature
+verification and build-input comparison pass. Evidence and final Runner.app are
+in ignored `voice-model-readiness/` alongside the previous ASK artifacts. This
+is foreground recovery of the already-created automatic job, not evidence of a
+system-scheduled background AI grant or a new post-download automatic recording.

@@ -1820,3 +1820,37 @@ tracked production Swift/plist/assets/Dart inputs match the build copy byte for
 byte. The earlier Weather15.0° measurement used the first signed ASK build,
 before these final invalidation/stale-restore/SMP hardenings. The final binary,
 versioned receipts and both passing/failing results remain in ignored evidence.
+
+
+### 2026-10-16 — automatic voice job blocked by missing model: recovered
+
+User report: recording downloaded/plays, automatic AI enabled, processing appears
+not to start. Phone journal proves the newest recording captured enabled analysis
+policy and automatically created/claimed a job; it stopped with model_missing
+before a transcript. Selected whisperSmallEn file was absent (empty whisper_models)
+and existing Qwen Q4 was present. The previous Tiny-model acceptance plus restored
+Small-model preference did not prove Small was downloaded. Another recent note
+was discovered before opt-in and has no processing_request; it is left untouched.
+
+`95df44f` validates selected local speech/analysis availability before automatic
+opt-in/Apply, requires no LLM for transcription-only, and never blocks disabling.
+Missing-model blocked jobs display an accurate status and a Download models link;
+the existing Retry processing action remains explicit. Widget regressions cover
+missing speech, missing analysis, transcription-only without an LLM, and selected
+saved results versus latest blocked attempts.
+
+Normal phone model download completed: ggml-small.en.bin,487,614,201 bytes. The
+same affected job/spec was retried through its detail UI, with no change to the
+user's policy or other19 jobs. Real transcript checkpoint at32.483s, result at
+70.762s, watch ACK at71.662s, delivered; whole UI test82.056s. No transcript or
+summary is copied into source-control evidence. All35 raw audio sources were
+copied and size/SHA256 checked; the earlier unrequested note remains manual.
+The phone was returned to connected Home/background afterward.
+
+All349 Flutter tests, analysis, signed build(76.3s), strict signature and byte-for-
+byte production-source/build-input comparison pass. Final app and private device
+receipts/results are ignored under
+`.companion-hil-runs/20261016-ios-companion/voice-model-readiness/`.
+A queued BGProcessing schedule receipt is historical; current per-job state/error
+establishes this failure and recovery. No fresh automatic recording or real
+system-scheduled background grant is claimed by this foreground retry.
