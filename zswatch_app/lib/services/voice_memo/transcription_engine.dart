@@ -47,6 +47,10 @@ enum TranscriptionEngineType {
   /// Whisper Large-v3-Turbo q5_0 quantised (~547 MB). Near cloud-level
   /// accuracy, optimised for speed. Needs ~1 GB RAM — modern flagships only.
   whisperLargeV3TurboQ5,
+
+  /// Quantized multilingual Small with automatic language detection (~190 MB).
+  /// Separate from the English-only and forced-German Small preferences.
+  whisperSmallMultilingualQ5,
 }
 
 /// Static metadata for a selectable transcription model.
@@ -180,6 +184,18 @@ abstract final class TranscriptionModelCatalog {
         'Multilingual (547 MB, slow) — near cloud-level accuracy for any language. Needs ~1 GB RAM.',
   );
 
+  static const _smallMultilingualQ5 = TranscriptionModelInfo(
+    type: TranscriptionEngineType.whisperSmallMultilingualQ5,
+    name: 'Whisper Small · Q5_1 (Multilingual)',
+    language: 'auto',
+    sourceUrl:
+        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin',
+    fileName: 'ggml-small-q5_1.bin',
+    expectedSizeBytes: 190 * 1000 * 1000,
+    description:
+        'Multilingual (190 MB) — automatically detects the spoken language, including Swedish and English.',
+  );
+
   // Models grouped by language: English → Swedish → German → Multilingual,
   // ordered best→worst within each group.
   static const List<TranscriptionModelInfo> all = [
@@ -192,6 +208,7 @@ abstract final class TranscriptionModelCatalog {
     _smallMultiDe,
     _baseMultiDe,
     _whisperLargeV3TurboQ5,
+    _smallMultilingualQ5,
   ];
 
   static TranscriptionModelInfo info(TranscriptionEngineType type) {
@@ -214,6 +231,8 @@ abstract final class TranscriptionModelCatalog {
         return _smallMultiDe;
       case TranscriptionEngineType.whisperLargeV3TurboQ5:
         return _whisperLargeV3TurboQ5;
+      case TranscriptionEngineType.whisperSmallMultilingualQ5:
+        return _smallMultilingualQ5;
     }
   }
 }
@@ -262,6 +281,14 @@ TranscriptionEngine createTranscriptionEngine(TranscriptionEngineType type) {
       );
     case TranscriptionEngineType.whisperLargeV3TurboQ5:
       return KbWhisperEngines.largeV3TurboQ5();
+    case TranscriptionEngineType.whisperSmallMultilingualQ5:
+      final info = TranscriptionModelCatalog.info(type);
+      return CustomGgmlWhisperEngine(
+        modelUrl: info.sourceUrl,
+        modelFileName: info.fileName,
+        languageCode: info.language,
+        displayName: info.name,
+      );
   }
 }
 
@@ -485,7 +512,9 @@ class WhisperEngine implements TranscriptionEngine {
       }
 
       final text = result.transcription.text.trim();
-      debugPrint('[WhisperEngine] Transcription completed (${text.length} characters)');
+      debugPrint(
+        '[WhisperEngine] Transcription completed (${text.length} characters)',
+      );
       return text;
     } catch (e) {
       debugPrint('[WhisperEngine] Error: $e');
@@ -813,7 +842,9 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
       );
 
       final text = response.text.trim();
-      debugPrint('[CustomGgmlWhisperEngine] Transcription completed (${text.length} characters)');
+      debugPrint(
+        '[CustomGgmlWhisperEngine] Transcription completed (${text.length} characters)',
+      );
       return text;
     } catch (e) {
       debugPrint('[CustomGgmlWhisperEngine] Error: $e');
