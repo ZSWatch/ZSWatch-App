@@ -1671,3 +1671,42 @@ Range reconnection is user-observed; latency was not measured. Subsequent resets
 and force-quits prevent treating the entire log window as one isolated range
 experiment. The original app's33 recording receipts remain present. No app launch,
 new transfer, permission change or watch reset was performed during this diagnosis.
+
+
+### 2026-10-15/16 — reported Weather failure reproduced and repaired
+
+The user's literal "Failed" report reopened Weather acceptance. Native HTTP
+write receipts were insufficient to establish the watch UI. UART caught an LVGL
+render-in-progress assertion in the Bluetooth RX workqueue. Firmware c5ca2226 /
+fe958aa0 clears stale error text on successful retry and copies borrowed GPS/HTTP
+data into bounded queues for processing on the rendering/app-lifecycle system
+workqueue. It also validates JSON fields/forecast counts and stops modifying the
+GPS timestamp while reading its age. Actual production-function ASan/UBSan tests
+cover success/error replacement, deferred response ownership, invalid arrays and
+fields, timeout, allocation/queue failure and closed UI.
+
+A cold-reboot test caught an independent input-thread assertion before power
+manager initialization. ae9a28d1 ignores input until UI initialization completes;
+the real callback's before/after-startup regression passes. Signed app d2e0ba7
+adds payload-free status/timing diagnostics and one 502/503/504 retry inside the
+original six-second budget. Real URLSession local-server tests verify successful
+503 retry, terminal 503, late-response budget, no 429 retry and cancellation.
+Intermittent HTTP503 was actually observed; it is never counted as a forecast pass.
+
+On app d2e0ba7 / firmware ae9a28d1, actual watch label/visibility memory reads show
+13.2 degrees, four forecasts and empty error text in foreground and Home
+background. Every SWD operation verified CPU running before/after. A complete
+cold-reboot background case acquired fresh GPS and updated Weather twice,
+Ready209 / HTTP324ms / 1141 bytes, after 568.183 seconds without reopening the phone
+app. A separate XCTest state assertion confirmed it still background/suspended.
+All33 original sources / 673009 bytes and the original watchface hash matched.
+
+Cached-GPS reopening reached system-stack high-water5840/6144; new firmware
+ecd78bfc queues that HTTP request outside LVGL startup to remove its 512-byte URL
+buffer from the rendering call stack. Final images are installed active/confirmed
+with independent expected hashes. On Oct16 Ready213 additionally records a real
+successful Weather fetch159ms/1137 bytes, no error/HTTP pending. Final physical
+stack remeasurement remains pending because watch USB is disconnected and the
+Bluetooth-shell XCTest route requires fresh iPhone passcode authentication.
+The delivery note distinguishes the accepted ae9a28d1 hardware cases from the
+last installed stack adjustment. Local evidence: weather-repair.

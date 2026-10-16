@@ -10,11 +10,11 @@ not a claim that every physical acceptance case has passed.
 
 | Component | Revision / location |
 | --- | --- |
-| Signed app executable | App `cea2517`; subsequent commits document acceptance |
+| Signed app executable | App `d2e0ba7` (Weather HTTP diagnostics and bounded transient retry) |
 | Nordic fork | `06644b17bec8202605afba2065ba8b5f7ef00fcb` |
 | fllama fork | `115e7991e78de446ed44858ebe0a8dbc82769d8e` |
-| Installed WatchDK firmware | `26c59c8a`, nested `ZSWatch/`, branch `codex/ios-companion` |
-| Signed development app | `.companion-hil-runs/20261015-ios-companion/signed-permission-recovery/Runner.app` |
+| Installed WatchDK firmware | `ecd78bfc`, nested `ZSWatch/`, branch `codex/ios-companion` |
+| Signed development app | `.companion-hil-runs/20261015-ios-companion/weather-repair/Runner.app` |
 | Local evidence | `.companion-hil-runs/20261015-ios-companion/` |
 
 The app is signed for team `28L8XH4G9T` and the connected iPhone 11, iOS 26.1.
@@ -49,14 +49,64 @@ No PR, push or publication is included.
 - Final independent USB checks: 33 original recordings / 673,009 bytes, every hash
   unchanged; original 115,212-byte watchface hash unchanged; full resource image
   SHA256 `5b060daa49707f1f621a4d6ba1817d6f1032fd1def2fb18e38c5abade388d1a0`.
-  Both installed firmware image hashes are active/confirmed. Final Ready 189 on app cea2517 has
-  all 33 recordings downloaded, no error, GPS/logs off and automatic processing off.
+  The previous complete feature checkpoint was Ready 189 on app cea2517, with
+  all 33 recordings downloaded, no error and automatic processing off. The newer
+  Weather repair and its physical evidence are recorded below.
 
 Firmware 26c59c8a fixes the shared system-workqueue/ATT buffer deadlock using a
 separate RX queue and measured stack budgets. Read-only captures show RX 4936/9504
 and system work 4848/6144 bytes used, with CPU not halted before/after. The failed
 4 KiB RX candidate is explicitly rejected. WatchDK heart-rate values are existing
 firmware simulation; chart acceptance does not establish physiological accuracy.
+
+## Weather failure and repair — 2026-10-15
+
+The user's reported "Failed" reopened Weather acceptance. A real UART capture
+caught an LVGL rendering assertion in the Bluetooth RX workqueue. Weather was
+updating LVGL directly from its HTTP callback after BLE RX moved off the system
+queue. Successful retries also left the old "Failed" label visible. Firmware
+`fe958aa0` copies borrowed HTTP responses and GPS fixes into bounded queues, then
+parses and updates Weather on the same system workqueue as rendering and app
+start/stop. It clears the error label on success, validates response fields and
+forecast array bounds, and reads GPS age without modifying its timestamp.
+
+A separate reboot check caught an input-thread assertion before the power manager
+was initialized. Firmware `ae9a28d1` ignores hardware input until UI initialization
+has completed. Both failures have tests against the actual production functions;
+ASan/UBSan checks cover response ownership, malformed/missing/oversized forecasts,
+timeouts, queue/allocation failure, closed UI and input before/after startup.
+
+App `d2e0ba7` records payload-free HTTP status/timing diagnostics and retries one
+HTTP 502/503/504 within the original six-second fetch budget. Real local URLSession
+server tests independently verify request counts, successful 503 recovery,
+terminal 503, late response without budget extension, no 429 retry and cancellation.
+The physical phone also returned HTTP 503 intermittently; this remains a real
+upstream failure and must not be reported as a successful forecast.
+
+Physical display readback on the watch shows 13.2 degrees, visible forecast
+content and an empty error label in both foreground and normal Home background
+checks. SWD captures verify the CPU remained running before and after every read.
+The complete app d2e0ba7 / firmware ae9a28d1 background case passed after an
+explicit cold watch reboot: fresh GPS, two four-day UI updates and Ready209 with
+zero pending HTTP/no error (324ms, 1,141 response bytes). The phone had remained
+in Home background for 568.183 seconds; a separate XCTest assertion subsequently
+confirmed background/suspended state without activating it. All 33 original
+sources / 673,009 bytes matched their full hashes and the original 115,212-byte
+watchface hash was unchanged.
+
+Reopening Weather with cached GPS exposed system-stack high-water 5840/6144,
+versus 5216/6144 after the fresh-GPS path. Firmware `ecd78bfc` also queues the
+cached-GPS request outside LVGL app startup, avoiding its 512-byte URL buffer on
+the rendering call stack. Both final image hashes are active/confirmed; the
+signed app and firmware/ELF are retained under
+`.companion-hil-runs/20261015-ios-companion/weather-repair/`.
+
+2026-10-16 follow-up: native Ready213 reports another successful real Weather
+fetch (159ms, 1,137 bytes), zero pending requests and no error. Final stack
+remeasurement on ecd78bfc remains pending: watch debug USB is disconnected and the
+Bluetooth-shell UI test has reached a fresh iPhone XCTest passcode prompt. Earlier
+physical UI/hash/stack observations above apply to ae9a28d1; the final package's
+installed hashes and native HTTP receipt are independently verified.
 
 ## Validation and reproducibility
 
