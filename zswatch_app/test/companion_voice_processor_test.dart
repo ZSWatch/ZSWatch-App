@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/services/ai/companion_voice_processor.dart';
 import 'support/companion_recording_fixture.dart';
+import 'package:zswatch_app/services/ai/llm_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -188,4 +189,120 @@ void main() {
     requireCompanionSpeech('Påminn mig att köpa mjölk i morgon.');
     requireCompanionSpeech('Start a timer for three minutes.');
   });
+  for (final emptyAnalysis in [false, true]) {
+    test(
+      emptyAnalysis
+          ? 'empty analysis of valid speech is not reported as silent audio'
+          : 'validated bilingual checkpoints continue past an uncertain router',
+      () async {
+        final root = await Directory.systemTemp.createTemp('voice-analysis-');
+        final recording = await seedCompanionRecording(root);
+        final original = await File(recording.localPath!).readAsBytes();
+        const paths = MethodChannel('plugins.flutter.io/path_provider');
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(paths, (call) async {
+          expect(call.method, 'getApplicationSupportDirectory');
+          return root.path;
+        });
+        addTearDown(() async {
+          messenger.setMockMethodCallHandler(paths, null);
+          await root.delete(recursive: true);
+        });
+        for (final text in [
+          'Den blå cykeln står i garaget. Kaffebönorna ligger på den översta hyllan.',
+          'The blue bicycle is in the garage. The coffee beans are on the top shelf.',
+        ]) {
+          final analyzer = _UncertainRouterAnalyzer(emptyAnalysis);
+          final processing = processCompanionVoiceRecording(
+            {
+              'version': 1,
+              'spec': {
+                'provider': 'dart-voice-v1',
+                'backend': 'local',
+                'upload_authorized': false,
+                'pipeline_revision': 'voice-v1',
+                'recording_id': recording.identity,
+                'input_sha256': recording.sha256,
+                'watch_id': recording.watchId,
+                'model': 'whisperSmallMultilingualQ5|fixture-analysis|false',
+              },
+              'recording': {
+                'address': recording.watchId,
+                'filename': recording.filename,
+                'timestamp':
+                    recording.timestampUtc.millisecondsSinceEpoch ~/ 1000,
+                'duration_ms': recording.durationMs,
+                'size_bytes': recording.sizeBytes,
+                'state': 'downloaded',
+                'local_path': recording.localPath,
+                'sha256': recording.sha256,
+              },
+              'transcript': text,
+            },
+            saveTranscript: (_) async => fail('Saved speech was retranscribed'),
+            analyzerFactory: () => analyzer,
+          );
+          if (emptyAnalysis) {
+            await expectLater(
+              processing,
+              throwsA(
+                isA<PlatformException>().having(
+                  (error) => error.code,
+                  'phase',
+                  'ANALYSIS_EMPTY',
+                ),
+              ),
+            );
+          } else {
+            final result = await processing;
+            expect(result['transcript'], text);
+            expect(result['summary'], isNotEmpty);
+          }
+          expect(analyzer.discardValidatedSpeech, isFalse);
+          expect(analyzer.disposed, isTrue);
+          expect(await File(recording.localPath!).readAsBytes(), original);
+        }
+      },
+    );
+  }
+}
+
+/// Simulates the actual failing router: "none" discards the text unless the
+/// caller requests normal analysis of independently validated speech.
+class _UncertainRouterAnalyzer extends Fake implements LlmService {
+  _UncertainRouterAnalyzer(this.emptyAnalysis);
+  final bool emptyAnalysis;
+  bool? discardValidatedSpeech;
+  bool disposed = false;
+
+  @override
+  void selectModel(String modelId) {}
+  @override
+  Future<bool> isModelDownloaded({String? modelId}) async => true;
+  @override
+  bool isBrainDump(String transcript) => false;
+  @override
+  Future<TranscriptResult> processTranscript(
+    String transcript, {
+    bool correctTranscription = true,
+    String? classifyPromptOverride,
+    String? promptStrategyOverride,
+    bool rejectNoSpeechRoute = true,
+    void Function(String phase, String partialResponse, int tokens)? onProgress,
+  }) async {
+    discardValidatedSpeech = rejectNoSpeechRoute;
+    return TranscriptResult(
+      summary: emptyAnalysis || rejectNoSpeechRoute
+          ? ''
+          : 'A saved factual note.',
+      category: 'note',
+      originalTranscription: transcript,
+    );
+  }
+
+  @override
+  void dispose() {
+    disposed = true;
+  }
 }

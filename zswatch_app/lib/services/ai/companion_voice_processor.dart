@@ -41,6 +41,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
   Map<String, Object?> request, {
   required Future<void> Function(String transcript) saveTranscript,
   CompanionVoiceCancellation? cancellation,
+  LlmService Function()? analyzerFactory,
 }) async {
   final control = cancellation ?? CompanionVoiceCancellation();
   control.check();
@@ -116,8 +117,10 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
         'actions': <Object?>[],
       };
     }
-    final analyzer = LlmService(isCancelled: () => control.isCancelled)
-      ..selectModel(models[1]);
+    final analyzer =
+        (analyzerFactory?.call() ??
+              LlmService(isCancelled: () => control.isCancelled))
+          ..selectModel(models[1]);
     llm = analyzer;
     if (!await analyzer.isModelDownloaded()) {
       throw PlatformException(code: 'MODEL_MISSING');
@@ -130,12 +133,14 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
           )
         : await analyzer.processTranscript(
             transcript,
+            rejectNoSpeechRoute: false,
             correctTranscription: models[2] == 'true',
           );
     control.check();
-    // The existing router can also identify non-speech after transcription.
+    // Speech has already passed validation and is durably checkpointed. An
+    // empty analysis is an analysis failure, not evidence of silent audio.
     if (result.summary.trim().isEmpty && result.actions.isEmpty) {
-      throw PlatformException(code: 'NO_SPEECH');
+      throw PlatformException(code: 'ANALYSIS_EMPTY');
     }
     return {
       'version': 1,

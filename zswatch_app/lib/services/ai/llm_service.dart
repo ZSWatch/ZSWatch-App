@@ -1034,6 +1034,9 @@ class LlmService {
     bool correctTranscription = true,
     String? classifyPromptOverride,
     String? promptStrategyOverride,
+    // The companion validates speech before checkpointing it. Its lightweight
+    // router must not discard a valid saved transcript (for example Swedish).
+    bool rejectNoSpeechRoute = true,
     void Function(String phase, String partialResponse, int tokens)? onProgress,
   }) async {
     _stateSubject.add(
@@ -1118,7 +1121,14 @@ class LlmService {
         // Brief pause between inference calls
         await Future<void>.delayed(const Duration(milliseconds: 500));
 
-        // Router detected no meaningful speech — return empty result.
+        // Only callers without an independently validated transcript allow the
+        // router to discard speech. Preserve other routes, including timers.
+        if (routeResult == 'none' && !rejectNoSpeechRoute) {
+          routeResult = 'voice_memo';
+          debugPrint(
+            '[LlmService] Router was uncertain; analyzing validated speech',
+          );
+        }
         if (routeResult == 'none') {
           debugPrint(
             '[LlmService] Router returned "none" — no speech detected',
@@ -1181,7 +1191,9 @@ class LlmService {
       debugPrint(
         '[LlmService] Classify done at ${totalStopwatch.elapsedMilliseconds}ms',
       );
-      debugPrint('[LlmService] AI response received (${raw.length} characters)');
+      debugPrint(
+        '[LlmService] AI response received (${raw.length} characters)',
+      );
 
       // --- Parse JSON from output ---
       final result = structuredResult.result;
@@ -1444,7 +1456,9 @@ JSON:
       final raw = structuredResult.raw;
       final classifyMetrics = structuredResult.metrics;
 
-      debugPrint('[LlmService] Brain dump response received (${raw.length} characters)');
+      debugPrint(
+        '[LlmService] Brain dump response received (${raw.length} characters)',
+      );
 
       // Parse using the same JSON extraction logic
       final result = structuredResult.result;
