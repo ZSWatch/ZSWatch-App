@@ -1710,3 +1710,18 @@ stack remeasurement remains pending because watch USB is disconnected and the
 Bluetooth-shell XCTest route requires fresh iPhone passcode authentication.
 The delivery note distinguishes the accepted ae9a28d1 hardware cases from the
 last installed stack adjustment. Local evidence: weather-repair.
+
+
+### 2026-10-16 — phone authentication restored; debug lead disconnected
+
+The user entered the XCTest passcode. Normal UI/Developer Shell again works;
+`voice_memo status` independently confirms no recording. `kernel thread stacks`
+returns the live BT RX figure5012/9504, but its report is truncated at the configured
+1024-byte dummy-shell output buffer before the system workqueue entry. This
+harness failure is not a Weather failure. Current ecd78bfc UART confirms a fresh
+four-forecast UI update. Direct Nordic/generic-M33 debugger reads did not attach;
+no failed/partial read is counted as a stack measurement. A stalled owned J-Link
+process was terminated. The user then clarified that the debugger was intentionally
+disconnected. No further attach/reset attempts are running; final system-stack
+measurement awaits reconnecting the watch debug lead. The app/Weather operation
+does not require that connection.

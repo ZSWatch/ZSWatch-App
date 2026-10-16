@@ -103,10 +103,16 @@ signed app and firmware/ELF are retained under
 
 2026-10-16 follow-up: native Ready213 reports another successful real Weather
 fetch (159ms, 1,137 bytes), zero pending requests and no error. Final stack
-remeasurement on ecd78bfc remains pending: watch debug USB is disconnected and the
-Bluetooth-shell UI test has reached a fresh iPhone XCTest passcode prompt. Earlier
-physical UI/hash/stack observations above apply to ae9a28d1; the final package's
-installed hashes and native HTTP receipt are independently verified.
+remeasurement on ecd78bfc remains pending. The user entered the fresh XCTest
+passcode; normal phone UI and live BLE shell commands now work. The generic
+`kernel thread stacks` response is truncated by the firmware's 1,024-byte dummy
+shell buffer before the system workqueue entry (BT RX is visible:5012/9504).
+Final-firmware UART also confirms a fresh four-forecast UI update. The user
+confirmed the watch debugger was disconnected; adapter enumeration alone does
+not establish a connection to the watch CPU. No additional attach/reset attempts
+will run until the debug lead is reconnected. Earlier full physical UI/hash/stack
+observations above apply to ae9a28d1; final installed hashes, native HTTP receipt
+and current forecast rendering are independently verified.
 
 ## Validation and reproducibility
 
