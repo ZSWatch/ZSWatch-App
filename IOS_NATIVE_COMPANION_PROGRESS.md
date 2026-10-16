@@ -1750,3 +1750,73 @@ Final build/signature, native HTTP network tests, production C regressions and
 shared347-test/analysis evidence are retained. The original goal's excluded
 endurance/publication work and documented iOS variants remain explicit limits,
 not inferred passes. Local evidence:weather-repair.
+
+
+### 2026-10-16 — AccessorySetupKit migration and force-quit Weather PASS
+
+Implemented and committed app `791f8ac` on `codex/ios-companion`. The user's
+swipe-away/reset/Weather failure was an omitted iOS26 authorization path, not an
+unavoidable platform limitation: the previous app used CoreBluetooth alone.
+The new process-owned ASAccessorySession starts before CBCentralManager. The
+system picker migrates an existing UUID with ASMigrationDisplayItem and supplies
+new watch selections; startup and restoration never present UI. Only fully
+authorized accessories are accepted. Generation fencing rejects picker results
+after Stop/Forget, removal revokes running intent, and restored managers still
+cancel stale handles even when persisted intent is stopped. iOS14–17 keep their
+existing CoreBluetooth path; the ASK framework is weak-linked in the signed
+binary. Setup errors include the native recovery instruction.
+
+Physical existing-watch migration displayed Apple's Ready to Use sheet and
+returned Ready220. A separate signed reinstall retained authorization. The
+normal app-switcher force-quit check passed in 32.766s and observed notRunning;
+it did not reopen the app. iOS autonomously launched PID3217, delivered a new
+CoreBluetooth restore callback at 2026-10-16T10:49:07.122Z and reached Ready223.
+SWD reset then recovered Ready225 with the companion still backgrounded.
+Independent XCTest reported background state3 without activating the app.
+
+The user opened Weather and reported a temperature. UART records fresh GPS,
+HTTP and four forecasts. Final native receipt: 1,452ms, 1,137 bytes, written,
+pending0, no error, generation225. Read-only SWD confirms 15.0°, empty status,
+visible content and a running CPU throughout. Stack high-water in that session:
+SYS5840/6144, RX5012/9504, main1360/2048; no firmware edits in this change.
+Explicit Stop226 remained stopped across another SWD reset; explicit Connect
+passed in3.279s. All33 original phone sources were freshly recopied and checked
+against their prior SHA256/size receipts: all673,009 bytes unchanged.
+
+All348 Flutter tests pass; analysis passes; signed Release build, strict signature
+verification and weak ASK linkage pass. The final error-message-only Dart change
+also passed analysis and17 discovery/saved-watch tests. A final native hardening
+retains creation of an OS-restored central even with stopped intent, so its old
+peripherals are explicitly rejected/cancelled. Final signed executable, results
+and safe acceptance summary are retained in ignored local evidence:
+`.companion-hil-runs/20261016-ios-companion/accessory-setup/`.
+
+No unbonded ASK first pairing, OS authorization-revocation test, iOS18/older
+hardware, reboot-first-unlock, or endurance result is claimed. HID support in ASK
+starts at iOS18.4; the force-quit exception starts at iOS26. The live device's
+existing system bond and all user files were retained; no push/PR/publication.
+
+
+Final delivered revision is `a6f5314`, including the ASK invalidation guard and
+bounded SMP preparation-echo startup retry. One interim repeat failed because a
+new Nordic central reported poweredOff immediately after a service change;
+that failing result is archived and is not acceptance. The old UI helper also
+asserted at20s despite a25s preparation deadline and then continued; its idle
+check now waits60s and throws before any reset when no idle receipt arrives.
+The actual echo method now has a deterministic seven-case regression harness:
+`python3 zswatch_app/tool/ios_companion/test_smp_preparation.py`, PASS. It checks
+one transient retry only and rejection after Stop, replaced generation or the
+original deadline; shell/firmware commands are never replayed by this change.
+
+The final signed build passed cold SMP enable/service-change recovery and real
+Recording:no, then an actual ZSWatch app-switcher swipe/notRunning (32.331s).
+The focused card was visually checked in the screenshot. Without manual
+activation, iOS launched PID3228, restored at2026-10-16T11:00:01.077Z and reached
+Ready234. A separate observer again saw background state3. The actual retry
+branch was covered by the deterministic test, not the successful physical trace.
+All33 phone sources were recopied/rehashed after this last install, unchanged.
+The final archived Runner.app passes strict signature verification, and all
+tracked production Swift/plist/assets/Dart inputs match the build copy byte for
+byte. The earlier Weather15.0° measurement used the first signed ASK build,
+before these final invalidation/stale-restore/SMP hardenings. The final binary,
+versioned receipts and both passing/failing results remain in ignored evidence.

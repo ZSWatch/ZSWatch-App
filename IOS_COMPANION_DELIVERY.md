@@ -3,19 +3,21 @@
 2026-10-16. The normal Flutter app uses the Swift-owned iOS companion and the
 shared Dart voice processor. Implementation and the physical resource recovery
 are committed locally on `codex/ios-companion`. First-install Bluetooth denial, Settings recovery and new watch selection now
-pass on the phone. Untested variants remain explicit below; this checkpoint is
+pass on the phone. The existing watch is now migrated through AccessorySetupKit;
+a real app-switcher force-quit automatically restored the app and Weather worked
+after a watch reboot without reopening the phone app. Untested variants remain explicit below; this checkpoint is
 not a claim that every physical acceptance case has passed.
 
 ## Source and installable artifact
 
 | Component | Revision / location |
 | --- | --- |
-| Signed app executable | App `d2e0ba7` (Weather HTTP diagnostics and bounded transient retry) |
+| Signed app executable | App `a6f5314` (AccessorySetupKit migration/relaunch and bounded SMP initialization recovery); includes `d2e0ba7` Weather HTTP diagnostics and bounded transient retry |
 | Nordic fork | `06644b17bec8202605afba2065ba8b5f7ef00fcb` |
 | fllama fork | `115e7991e78de446ed44858ebe0a8dbc82769d8e` |
 | Installed WatchDK firmware | `ecd78bfc`, nested `ZSWatch/`, branch `codex/ios-companion` |
-| Signed development app | `.companion-hil-runs/20261015-ios-companion/weather-repair/Runner.app` |
-| Local evidence | `.companion-hil-runs/20261015-ios-companion/` |
+| Signed development app | `.companion-hil-runs/20261016-ios-companion/accessory-setup/Runner.app` |
+| Local evidence | `.companion-hil-runs/20261015-ios-companion/` and `.companion-hil-runs/20261016-ios-companion/accessory-setup/` |
 
 The app is signed for team `28L8XH4G9T` and the connected iPhone 11, iOS 26.1.
 It is a development-signed installation, not an App Store package. Raw evidence,
@@ -163,13 +165,62 @@ system-scheduled AI execution. These must not be inferred from ordinary relaunch
 a short Home interval or host tests. Long endurance testing is left to the user.
 
 CoreBluetooth restoration needs an eligible BLE event; it is not a periodic
-restart service. With this build's CoreBluetooth-only setup, user force-quit
-requires opening the app again. Apple's current iOS 26 rules add force-quit
-relaunch eligibility for accessories authorized through AccessorySetupKit, which
-this build does not implement. The older blanket force-quit limitation must not
-be interpreted as an unavoidable restriction on all iOS 26 apps. See
+restart service. On iOS 18 and later, the app now uses AccessorySetupKit
+for per-accessory authorization and a one-time migration of an existing bond,
+before creating CBCentralManager. On iOS 26 and later this enables the
+force-quit restoration path documented by Apple. The original CoreBluetooth-only
+force-quit result above describes the earlier build, not the current one. See
 [Apple TN3115](https://developer.apple.com/documentation/technotes/tn3115-bluetooth-state-restoration-app-relaunch-rules)
 and [Apple's clarification](https://developer.apple.com/forums/thread/806013).
+
+### 2026-10-16 — user force-quit, automatic relaunch and Weather PASS
+
+The existing bonded watch was migrated using ASMigrationDisplayItem without
+unpairing or changing its identifier. iOS displayed “Ready to Use”; dismissing
+it returned protocol Ready. The process-owned ASK session supplies authorized
+identifiers; startup waits for activation and never shows setup UI during
+background restoration. New discovery uses the system picker; iOS 14–17 retain
+the previous CoreBluetooth path. Authorization removal fences running intent.
+Stop and Forget continue to prevent automatic connection; Forget retains the
+system association/bond as described in the UI.
+
+A real app-switcher card swipe produced XCTest `notRunning` (32.766-second
+check). No test activated the companion afterward. iOS automatically relaunched
+PID 3217, recorded a fresh CoreBluetooth restore callback at
+2026-10-16T10:49:07.122Z and reached Ready 223. A subsequent physical SWD watch
+reset recovered Ready 225 while the app stayed in the background; an independent
+XCTest observed background state 3 without activating it. The user opened Weather
+on the watch and reported a temperature. UART records fresh GPS and four forecast
+updates; native HTTP receipts show a 1,452ms/1,137-byte response written with no
+pending requests. Read-only SWD confirmed 15.0°, an empty status label and visible
+content, with the CPU running before and after every read.
+
+Explicit Disconnect remained stopped at generation 226 across another watch
+reset; explicit Connect recovered Ready (3.279-second UI check). All 33 original
+phone sources were recopied and SHA-256/size checked: 673,009 bytes unchanged.
+All 348 Flutter tests and analysis passed; signed Release build and signature
+verification passed. Evidence is in the ignored `accessory-setup` directory above.
+
+The Weather measurement above used the first signed ASK build. The final
+`a6f5314` build additionally preserves intent on ASK session invalidation and
+retains cancellation of stale OS-restored handles. A repeat caught a transient
+SDK central-poweredOff error during cold SMP service-change preparation; this
+was not counted as acceptance. The final code retries only the idempotent
+preparation echo once after 250ms, within the original deadline. Seven tests of
+the actual method cover transient success, the retry cap, terminal errors,
+Stop, changed generation and deadline fences. The final physical repeat passed
+cold SMP preparation/Recording:no and real force-quit (32.331s), autonomous
+PID3228/Ready234, fresh restore callback at 2026-10-16T11:00:01.077Z and an
+independent background-state3 observer. The retry branch itself was exercised
+by the deterministic test, not observed in the final successful phone trace.
+All33 source files were recopied and rechecked after the final installation.
+
+This verifies the existing-watch migration on iPhone 11/iOS 26.1. A fresh unbonded
+ASK pairing, OS authorization revocation, and iOS 18/older-device behavior have
+not been physically exercised. HID discovery support starts at iOS 18.4. iOS
+14–17 have no ASK force-quit relaunch exception. iOS still decides when an eligible
+BLE event relaunches the app; this is not a perpetual background execution claim.
+
 AI waits when iOS
 has not granted execution; no permanent background process or immediate locked
 phone inference is promised. Phone Clock alarms are not created: actions use
