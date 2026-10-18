@@ -55,7 +55,9 @@ final class CompanionLocationRelay: NSObject, CLLocationManagerDelegate {
       manager.desiredAccuracy = kCLLocationAccuracyBest
       manager.distanceFilter = 10
       manager.allowsBackgroundLocationUpdates = permissions["background"] == true
-      manager.pausesLocationUpdatesAutomatically = true
+      // The watch asked for fixes. An automatic pause in the background only
+      // resumes in the foreground, which would silently starve the watch.
+      manager.pausesLocationUpdatesAutomatically = false
       self.requested = true; let token = self.token
       self.observe(generation, self.watchToken, "acquiring", true)
       manager.startUpdatingLocation()

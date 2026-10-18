@@ -373,17 +373,32 @@ final class IOSCompanionSmp {
     transport?.invalidate(); transport = nil; preparedGeneration = nil
     finish(.failure(CompanionFailure.unavailable(reason)))
   }
-  /// Resume only after verifying the entire saved prefix against the watch.
+  /// Resume only after verifying the tail of the saved prefix against the watch;
+  /// re-reading all of it could take longer than the transfer budget. The
+  /// completed file is still validated as a whole before publication.
   /// SDK APIs encode SMP; this owner only validates returned offsets/lengths.
+  private static let resumeCheckBytes = 4096
+  // A transfer fails when it stops making progress, not after a fixed total
+  // time that a large recording on a slow link can never meet.
+  private var recordingProgress = Date()
+  private func watchRecordingStall(_ id: UUID, _ generation: Int) {
+    owner?.queue.asyncAfter(deadline: .now() + 15) { [weak self] in
+      guard let self, self.current(id, generation) else { return }
+      guard Date().timeIntervalSince(self.recordingProgress) > 60 else { self.watchRecordingStall(id, generation); return }
+      self.transport?.invalidate(); self.transport = nil; self.preparedGeneration = nil
+      self.finish(.failure(CompanionFailure.unavailable("Recording transfer stalled")))
+    }
+  }
   func downloadRecording(_ generation: Int, path: String, expected: Int, prefix: Data,
                          append: @escaping (Int, Data) throws -> Void,
                          complete: @escaping (Result<[String: Any], Error>) -> Void) throws {
     guard path.range(of: "^/user/recordings/[A-Za-z0-9_-]{1,32}\\.zsw_opus$", options: .regularExpression) != nil,
           (34...16 * 1024 * 1024).contains(expected), prefix.count <= expected else { throw CompanionFailure.invalid("Invalid recording download") }
     let sdk = try prepared(generation)
-    let id = try begin(generation, timeout: 300, complete: complete)
+    let id = try begin(generation, timeout: 3600, complete: complete)
     let manager = FileSystemManager(transport: sdk); downloadManager = manager
     guard let owner else { return }
+    recordingProgress = Date(); watchRecordingStall(id, generation)
     DispatchQueue.main.async {
       manager.status(name: path) { response, error in
         owner.queue.async {
@@ -391,7 +406,8 @@ final class IOSCompanionSmp {
           guard error == nil, response?.getError() == nil, response?.len == UInt64(expected) else {
             self.finish(.failure(error ?? CompanionFailure.unavailable("Recording size changed"))); return
           }
-          self.recordingChunk(id, generation, manager, path: path, expected: expected, prefix: prefix, offset: 0, verifying: !prefix.isEmpty, append: append)
+          self.recordingChunk(id, generation, manager, path: path, expected: expected, prefix: prefix,
+            offset: max(0, prefix.count - Self.resumeCheckBytes), verifying: !prefix.isEmpty, append: append)
         }
       }
     }
@@ -414,6 +430,7 @@ final class IOSCompanionSmp {
             self.finish(.failure(error ?? CompanionFailure.unavailable("Recording chunk/length mismatch"))); return
           }
           let data = Data(chunk)
+          self.recordingProgress = Date()
           do {
             if verifying {
               let end = min(offset + data.count, prefix.count)

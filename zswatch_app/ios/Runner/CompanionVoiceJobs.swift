@@ -78,7 +78,8 @@ final class CompanionVoiceJobs {
       if next[existing.key]?["state"] as? String == "blocked" { next[existing.key]?["state"] = "ready"; next[existing.key]?["last_error"] = NSNull(); next[existing.key]?["attempts"] = 0; next[existing.key]?["deferred_attempts"] = 0 }
       try commit("voice_job_selected", next); return existing.key
     }
-    guard next.count < 100 else { throw CompanionFailure.unavailable("Voice job capacity reached") }
+    Self.pruneSuperseded(&next, incoming: identity)
+    guard Self.hasRoom(next) else { throw CompanionFailure.unavailable("Voice job capacity reached") }
     let generation = (prior.values.map { ($0["spec"] as? [String: Any])?["generation"] as? Int ?? 0 }.max() ?? 0) + 1
     let spec: [String: Any] = ["version": 1, "watch_id": address, "recording_id": identity, "input_sha256": hash,
       "backend": "local", "provider": "dart-voice-v1", "model": model, "pipeline_revision": revision,
@@ -94,6 +95,25 @@ final class CompanionVoiceJobs {
       "attempts": 0, "deferred_attempts": 0, "next_attempt": 0, "last_error": NSNull(), "remote_id": NSNull(), "selected": true]
     if reuseTranscript { item["transcript"] = transcript }
     next[id] = item; try commit("voice_job_created", next); return id
+  }
+  // Finished jobs hold the user's transcripts and results; only pending work
+  // is bounded, plus a generous total journal bound.
+  private static let activeLimit = 100, totalLimit = 2000
+  private static func recording(_ item: [String: Any]) -> String { (item["spec"] as? [String: Any])?["recording_id"] as? String ?? "" }
+  private static func generation(_ item: [String: Any]) -> Int { (item["spec"] as? [String: Any])?["generation"] as? Int ?? 0 }
+  private static func hasRoom(_ jobs: [String: [String: Any]]) -> Bool {
+    jobs.values.filter { ["ready", "blocked"].contains($0["state"] as? String ?? "") }.count < activeLimit && jobs.count < totalLimit
+  }
+  /// Drop failed/cancelled jobs without a result that a newer generation of the
+  /// same recording replaced. The incoming job is newer than every job of its recording.
+  private static func pruneSuperseded(_ jobs: inout [String: [String: Any]], incoming identity: String) {
+    var latest: [String: Int] = [:]
+    for item in jobs.values { latest[recording(item)] = max(latest[recording(item)] ?? 0, generation(item)) }
+    latest[identity] = Int.max
+    for (id, item) in jobs where ["failed", "cancelled"].contains(item["state"] as? String ?? "") && item["result"] == nil &&
+      (item["selected"] as? Bool != true || recording(item) == identity) && generation(item) < latest[recording(item)] ?? 0 {
+      jobs.removeValue(forKey: id)
+    }
   }
   func claim(_ id: String) throws -> Claim? {
     guard var item = jobs[id], item["state"] as? String == "ready", (item["lease_until"] as? Int ?? 0) <= CompanionJournal.now,
@@ -157,7 +177,7 @@ final class CompanionVoiceJobs {
           let spec = original["spec"] as? [String: Any], let identity = spec["recording_id"] as? String,
           (original["result"] as? [String: Any])?["transcript"] is String || original["transcript"] is String,
           !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-          transcript.utf8.count <= 64000, jobs.count < 100 else { throw CompanionFailure.invalid("Current saved transcript required (maximum 64 KB)") }
+          transcript.utf8.count <= 64000 else { throw CompanionFailure.invalid("Current saved transcript required (maximum 64 KB)") }
     let prior = jobs.filter { ($0.value["spec"] as? [String: Any])?["recording_id"] as? String == identity }
     var changedSpec = spec
     changedSpec["pipeline_revision"] = "transcript-edit-v1"
@@ -165,6 +185,8 @@ final class CompanionVoiceJobs {
     changedSpec["generation"] = (prior.values.map { ($0["spec"] as? [String: Any])?["generation"] as? Int ?? 0 }.max() ?? 0) + 1
     let editedID = Self.sha(try Self.canonical(changedSpec))
     var next = jobs
+    Self.pruneSuperseded(&next, incoming: identity)
+    guard Self.hasRoom(next) else { throw CompanionFailure.unavailable("Voice job capacity reached") }
     for (key, item) in prior {
       next[key]?["selected"] = false
       next[key]?["fence"] = (item["fence"] as? Int ?? 0) + 1; next[key]?["lease_until"] = NSNull()

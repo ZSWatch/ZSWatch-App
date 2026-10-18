@@ -32,7 +32,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       self?.queue.async {
         guard let self, self.gpsToken == token, self.isReadySession(generation) else { return }
         self.gpsRequested = requested
-        try? self.publish("gps_state", ["gps_runtime": ["generation": generation, "state": state, "requested": requested]])
+        // Fix-rate UI state: shown in the snapshot without rewriting the journal.
+        let runtime: [String: Any] = ["generation": generation, "state": state, "requested": requested]
+        let current = (self.volatileFields["gps_runtime"] ?? self.journal.fields["gps_runtime"]) as? NSDictionary
+        if current?.isEqual(to: runtime) != true { self.publishVolatile(["gps_runtime": runtime]) }
       }
     })
   func configureGps(_ enabled: Bool) throws {
@@ -42,7 +45,9 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       "gps_runtime": ["generation": journal.generation, "state": enabled ? "idle" : "disabled", "requested": false]])
   }
   func uiForegrounded() { firmware.foregrounded(); inbox?.foregrounded(); voice?.foregrounded() }
-  func uiInactive() { firmware.inactive(); voice?.inactive() }
+  // Control Center, alerts and Face ID only resign active. Inference keeps
+  // running until the app really enters the background.
+  func uiInactive() { firmware.inactive() }
   func journalChanged() {
     if journal.loadError != nil { storageFailedIfNeeded(); return }
     let value = snapshot()
@@ -51,6 +56,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   func uiBackgrounded() {
     firmware.backgrounded()
     inbox?.backgrounded()
+    voice?.inactive()
     scanStop()
     if gpsRequested, CompanionLocationRelay.permissions["background"] != true {
       gpsRequested = false; gpsToken = UUID()
@@ -108,6 +114,14 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     journal.desired && journal.generation == generation && phase == "ready" && peripheral != nil
   }
   func publish(_ event: String, _ fields: [String: Any] = [:]) throws { try changed(event, fields) }
+  // UI-only state that a restart makes stale anyway. Merged into snapshots
+  // without a journal rewrite; a durable change of the same key replaces it.
+  private var volatileFields: [String: Any] = [:]
+  private func publishVolatile(_ fields: [String: Any] = [:]) {
+    volatileFields.merge(fields) { _, new in new }
+    let value = snapshot()
+    for observer in observers.values { observer(value) }
+  }
   private var central: CBCentralManager?
   private var restorationPending: Bool
   private var accessorySetup: CompanionAccessorySetup?
@@ -297,6 +311,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
 
   func snapshot() -> [String: Any] {
     var fields = journal.fields
+    fields.merge(volatileFields) { _, volatile in volatile }
+    // Job bodies hold private transcripts and results; Flutter reads them on
+    // demand (voiceJob) and observes only the voice_jobs summary.
+    fields.removeValue(forKey: "jobs")
     fields["telemetry"] = Array((journal.fields["telemetry"] as? [[String: Any]] ?? []).prefix(200))
     let firstEvent = (journal.fields["events"] as? [[String: Any]])?.first?["seq"] as? Int ?? 1
     fields["event_gap"] = firstEvent > (journal.fields["acked_cursor"] as? Int ?? 0) + 1
@@ -340,8 +358,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     if let (kind, payload) = telemetry {
       changes.merge(journal.telemetryChanges(kind: kind, payload: payload)) { _, new in new }
     }
-    do { try journal.update(event, changes) }
-    catch {
+    do {
+      try journal.update(event, changes)
+      for key in changes.keys { volatileFields.removeValue(forKey: key) }
+    } catch {
       firmware.abort("storage_unavailable")
       closeLink(); phase = "error"
       for observer in observers.values { observer(snapshot()) }
@@ -838,7 +858,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   func centralManager(_ central: CBCentralManager, didDiscover item: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
     guard scanning else { return }
     if cacheScan(item, name: advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? item.name, rssi: RSSI.intValue) {
-      try? changed("watch_discovered")
+      publishVolatile() // scan_results are live fields; nothing to persist
     }
   }
   func centralManager(_ central: CBCentralManager, didConnect item: CBPeripheral) {
