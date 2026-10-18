@@ -190,7 +190,7 @@ final class IOSRecordingInbox {
             $0.value["address"] as? String == owner.journal.address && $0.value["state"] as? String == "pending"
           }), let size = CompanionRecordingFiles.integer(metadata["size_bytes"]), let name = metadata["filename"] as? String else { return }
     let token = UUID(); active = token
-    func finish(_ error: Error?, interrupted: Bool = false) {
+    func finish(_ error: Error?, interrupted: Bool = false, verified: Bool = false) {
       guard self.active == token else { return }
       self.active = nil; self.lease.end()
       do {
@@ -200,8 +200,8 @@ final class IOSRecordingInbox {
           next["error"] = String(error.localizedDescription.prefix(160)); try self.put(key, next)
         } else {
           try self.put(key, self.files.publish(key, metadata: metadata))
-          // The phone copy is verified; free the watch and keep its list short.
-          self.deleteOnWatch(name)
+          // Delete the watch copy only when the phone copy matches the watch's hash.
+          if verified { self.deleteOnWatch(name) }
           let list = owner.journal.fields["recording_list"] as? [String: Any]
           let pending = self.records.values.contains { $0["address"] as? String == owner.journal.address && $0["state"] as? String == "pending" }
           if list?["more"] as? Bool == true && !pending { self.requestList() }
@@ -223,7 +223,18 @@ final class IOSRecordingInbox {
             append: { offset, bytes in try self.files.append(key, offset: offset, bytes: bytes, expected: size) },
             complete: { result in
               switch result {
-              case .success: finish(nil)
+              case .success(let value):
+                let local = (try? Data(contentsOf: self.files.partial(key))).map(CompanionRecordingFiles.sha)
+                guard let watch = value["watch_sha256"] as? String else { finish(nil); break } // Older firmware: keep the watch copy.
+                if watch == local { finish(nil, verified: true) }
+                else {
+                  // Corrupted transfer: start over from byte 0 and keep the watch copy (bounded).
+                  try? FileManager.default.removeItem(at: self.files.partial(key))
+                  var record = self.records[key] ?? metadata
+                  let retries = CompanionRecordingFiles.integer(record["verify_retries"]) ?? 0
+                  record["verify_retries"] = retries + 1; try? self.put(key, record)
+                  finish(CompanionFailure.invalid("Recording hash differs from the watch"), interrupted: retries < 2)
+                }
               case .failure(let error): finish(error, interrupted: !owner.isReadySession(generation) || self.pausedBackground)
               }
             })

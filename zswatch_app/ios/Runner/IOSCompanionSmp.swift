@@ -419,7 +419,20 @@ final class IOSCompanionSmp {
     if verifying, offset >= prefix.count {
       recordingChunk(id, generation, manager, path: path, expected: expected, prefix: Data(), offset: prefix.count, verifying: false, append: append); return
     }
-    if !verifying, offset == expected { finish(.success(["version": 1, "completed": true])); return }
+    if !verifying, offset == expected {
+      // The container check cannot see corrupted audio payload; report the watch's
+      // hash so the inbox compares it before publishing and deleting the watch copy.
+      DispatchQueue.main.async {
+        manager.sha256(name: path, offset: 0, length: UInt64(expected)) { response, error in
+          owner.queue.async {
+            guard self.current(id, generation) else { return }
+            let hex = error == nil ? response?.output?.map { String(format: "%02x", $0) }.joined() : nil
+            self.finish(.success(["version": 1, "completed": true, "watch_sha256": hex as Any? ?? NSNull()]))
+          }
+        }
+      }
+      return
+    }
     DispatchQueue.main.async {
       manager.download(name: path, offset: UInt(offset)) { response, error in
         owner.queue.async {

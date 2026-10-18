@@ -19,6 +19,7 @@ import io.runtime.mcumgr.response.dflt.McuMgrOsResponse
 import io.runtime.mcumgr.response.img.McuMgrImageStateResponse
 import io.runtime.mcumgr.managers.FsManager
 import io.runtime.mcumgr.response.fs.McuMgrFsStatusResponse
+import io.runtime.mcumgr.response.fs.McuMgrFsSha256Response
 import io.runtime.mcumgr.managers.ShellManager
 import io.runtime.mcumgr.response.shell.McuMgrExecResponse
 import io.runtime.mcumgr.exception.McuMgrException
@@ -1106,7 +1107,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
                         // Hashes/offsets allow independent USB comparison without logging audio.
                         android.util.Log.d("ZSWPrototypeTransfer", "session=$session transfer=$transferId file=${metadata["filename"]} requested=$requested returned=$returned bytes=${data.size} sha256=${ReceiptFiles.sha(data)}")
                     }
-                    transfer = manager.fileDownload("/user/recordings/${metadata["filename"]}.zsw_opus",
+                    val path = "/user/recordings/${metadata["filename"]}.zsw_opus"
+                    transfer = manager.fileDownload(path,
                         object : DownloadCallback {
                             private fun deliver(action: () -> Unit) { handler.post {
                                 if (runtime.owns(session) && downloading && fileOperation == transferId) safely(action)
@@ -1126,17 +1128,38 @@ class NativePrototypeTransport(private val context: Context, private val handler
                             }
                             override fun onDownloadCanceled() = deliver { finishFile(key, metadata, "cancelled") }
                             override fun onDownloadCompleted(bytes: ByteArray) = deliver {
+                                // The container check cannot see corrupted audio payload, and the
+                                // watch copy is deleted afterwards: compare with the watch's hash first.
+                                manager.sha256(path, 0, bytes.size, object : McuMgrCallback<McuMgrFsSha256Response> {
+                                    override fun onResponse(response: McuMgrFsSha256Response) = deliver {
+                                        val watchSha = response.output?.joinToString("") { "%02x".format(it.toInt() and 255) }
+                                        if (response.isSuccess && watchSha == ReceiptFiles.sha(bytes)) publish(bytes, verified = true)
+                                        else retryUnverified(watchSha)
+                                    }
+                                    // Older firmware without fs hash support: keep the watch copy.
+                                    override fun onError(error: McuMgrException) = deliver { publish(bytes, verified = false) }
+                                })
+                            }
+
+                            private fun retryUnverified(watchSha: String?) {
+                                val retries = (metadata["verify_retries"] as? Number)?.toInt() ?: 0
+                                android.util.Log.w("ZSWPrototypeTransfer", "file=${metadata["filename"]} sha256_mismatch watch=$watchSha retry=$retries")
+                                finishFile(key, metadata + mapOf("verify_retries" to retries + 1), "watch_sha256_mismatch")
+                                if (retries < 2) store.putRecord(key, store.record(key)!! + mapOf("state" to "pending", "error" to null))
+                            }
+
+                            private fun publish(bytes: ByteArray, verified: Boolean) {
                                 val receipt = try { files.publish(key, metadata, bytes) }
                                     catch (error: Exception) {
                                         finishFile(key, metadata + mapOf("received_size_bytes" to bytes.size,
                                             "received_sha256" to ReceiptFiles.sha(bytes),
                                             "received_header_hex" to bytes.take(32).joinToString("") { "%02x".format(it.toInt() and 255) }),
                                             "${error.javaClass.simpleName}: ${error.message}")
-                                        return@deliver
+                                        return
                                     }
                                 store.putRecord(key, receipt)
-                                // The phone copy is verified; free the watch and keep its list short.
-                                deleteRecordingOnWatch(metadata["filename"] as String)
+                                // Free the watch only when the phone copy matches the watch's hash.
+                                if (verified) deleteRecordingOnWatch(metadata["filename"] as String)
                                 finishFile(key, receipt, null)
                                 downloadNext()
                             }
