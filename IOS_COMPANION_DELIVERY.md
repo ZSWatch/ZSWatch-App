@@ -260,3 +260,148 @@ verification and build-input comparison pass. Evidence and final Runner.app are
 in ignored `voice-model-readiness/` alongside the previous ASK artifacts. This
 is foreground recovery of the already-created automatic job, not evidence of a
 system-scheduled background AI grant or a new post-download automatic recording.
+
+## 2026-10-18 — review fixes on the Mac (`HANDOFF_REVIEW_FIXES.md`)
+
+App `7fad5de` (contains the Linux-written Swift fixes `f857ec1`). WatchDK firmware
+reports `result_ack_version: 1` (no reflash). WatchDK without debugger or UART;
+the watch was driven through the USB shell (`voice_memo start/stop`, `app launch`).
+
+**Build.** `flutter build ios --debug --no-codesign` and the signed Release build
+compiled the four Swift files without changes. Strict signature verification passes;
+installed with `devicectl device install app` (data retained). `flutter test`
+356/356, `flutter analyze` clean.
+
+**iOS regressions and new behaviour (passed).**
+
+| Check | Result |
+| --- | --- |
+| Connect after durable Stop | Ready in about 1 s (generation 272), 41/41 recordings retained, telemetry projected every 10 s with 0 pending |
+| Recording sync + voice | Manual 10 s recording: list immediately → download → transcript after 31 s → result and watch ACK at 10:28:02 |
+| 300 s recording (1.2 MB) | Uninterrupted download about 58 s (about 20 KB/s), job created |
+| Resume after SIGKILL | Killed at 303 KB (313 KB on disk); after relaunch (CoreBluetooth restore, generation 277) growth resumed from 313 KB within about 3 s; a full prefix re-read would take about 15 s. Phone SHA-256 = USB readback from the watch (585 373 B) |
+| Background deferral | `voice_execution_deferred` / `background_deferred` 1 s after the app was sent to the background |
+| Background GPS, stationary | App in background from 10:42 (same PID, never foregrounded); the Weather periodic GPS request produced a fix and HTTP fetch at 11:01 and 11:31 |
+
+**Not done yet (needs the user):** Control Center/Face ID during transcription,
+Demo Mode + kill/relaunch, scan/selection, a watch that never reaches Ready.
+
+**Observations, not attributed to the review fixes.**
+- Firmware caps a recording at 300 s (`ZSW_RECORDING_MAX_DURATION_S`), about 1.2 MB, so
+  a "several MB" recording cannot be produced.
+- `devicectl process terminate` without `--kill` (SIGTERM) does not end the app.
+- The watch disables SMP after a few idle minutes; iOS sees `services_fenced`
+  and reconnects in about 3–5 s. Expected, but visible as a short reconnect.
+- Once, the new-recording notification after a 300 s auto-stop was not seen: the
+  list only arrived after the next reconnect 5 minutes later. A second auto-stop
+  arrived immediately; not reproduced.
+- Mac speaker → watch microphone gives poor input: a 5 min recording became
+  `[bouncy music]` (`analysis_empty`, permanent), and an English sentence was
+  transcribed as Swedish gibberish with `whisperSmallMultilingualQ5` auto-detection.
+
+**Android on the Mac.** Installed Homebrew `openjdk@17`, `openjdk@21` and
+`android-commandlinetools`, SDK platforms 35/36, build-tools 36.0.0 and NDK
+29.0.13113456 in `~/Library/Android/sdk`. `flutter build apk --debug` passes.
+`./gradlew :app:testDebugUnitTest` needs **JDK 21** (LiteRT-LM `Engine` is class
+version 65); with JDK 17 `LiteRtLmBridgeTest` fails to load. With JDK 21: 267/267.
+The Nokia G100 had an app signed with a different debug key; with the user's OK it was
+uninstalled and the new debug APK installed (starts without a crash).
+
+**Android BLE on the Nokia G100 (Android 12), 2026-10-18.** Paired after the iPhone
+Bluetooth was turned off (iOS Stop does not drop the physical link; see below).
+
+| Check | Result |
+| --- | --- |
+| Connect / Ready | Ready 12:22:06, time, media and device info synced; list of 45 recordings with `result_ack_version: 1` |
+| Long link | Generation 11 stayed up about 1.5 h with health/status every 10 s |
+| Bluetooth off/on (`svc bluetooth`) | `transport_suspended`, Ready again about 6 s after enable, time/media/list re-synced |
+| Time zone change | London and back: `time_write_completed` within about 3 s each, offset 1 then 2, link unchanged |
+| Recording download | **Fails.** All 45 `failed` with `McuMgrNotSupportedException` |
+| Restart Watch | **Fails** after about 22 s: `RESTART_FAILED, SMP preparation timed out` |
+
+SMP never becomes available on the Nokia. After `smp status:true` the Nordic transport
+reconnects and calls `discoverServices()` about every 1.8 s, but receives Android's
+cached GATT database without the SMP service; no Service Changed indication from
+the watch is seen in the Bluetooth stack log. iOS sees the same SMP enable as
+`services_fenced` and downloads normally. The download path and SMP code were not
+changed by the review fixes. Without watch logs it is open whether the watch sends
+Service Changed to this bond.
+
+Related Android gaps found:
+- `failed` is terminal: a reconnect does not retry, and the normal Voice screen shows
+  "Retry failed downloads" only on iOS (`if (ios)`). `retryRecordings` is only reachable
+  from the unlinked `/developer/companion-runtime` route.
+- A transport error unrelated to the file (SMP not ready) marks every pending
+  recording `failed` in sequence instead of stopping the batch.
+
+After the user's approval, all runtime permissions and notification-listener
+access were granted with `adb`, location sharing and forwarding for `com.android.shell`
+were enabled in the app.
+
+| Check | Result |
+| --- | --- |
+| Notification updates | 26 revisions of one notification coalesced: revision 26 delivered with 2 writes |
+| Burst of 25 distinct notifications (0.3 s apart) | All queued and written, link unchanged (generation 14) |
+| GPS | Watch Weather request 14:53:42, `gps_written` 3 s later, watch HTTP fetch completed 14:53:53 |
+
+**Bug: watch eviction deletes phone notifications.** The watch stores at most 10
+notifications (`ZSW_NOTIFICATION_MGR_MAX_STORED`); a full list removes the oldest, and
+every removal sends `DISMISS` to the phone (`zsw_phone_app_publisher.c`). The Android
+companion then cancels that notification on the phone. After the burst only 10 of the
+25 test notifications remained on the phone. The watch should only send a dismissal for
+a user action, not for capacity eviction.
+
+**SMP on Android, analysis.** `onServiceChanged` never fires on the Nokia (0 log hits,
+generation stays 14), while iOS gets `services_fenced` for every SMP enable. Likely
+cause: the watch was re-bonded (reset and pairing 12:22) and lost its Service Changed
+CCCD for the Nokia, while Android kept its earlier bond state and did not re-subscribe.
+Earlier Nokia runs saw Service Changed. Options: re-bond on both sides to confirm, and/or
+refresh the GATT cache (`refreshDeviceCache`) when SMP reports not supported.
+
+Not run: manual clock change, AI failure handling (no recording could be downloaded).
+
+**Firmware reflash with RTT, 2026-10-18 16:56.** Built `codex/ios-companion` `5883d716`
+with `boards/debug.conf;boards/log_on_rtt.conf` (NCS v3.3.0-preview1, per
+`.github/copilot-instructions.md`) and flashed with `west flash --runner nrfjprog`
+without `--erase` (sector erase; external flash only `0x10120000-0x10195A07`), so bonds,
+recordings and resources were kept. `nrfjprog` 10.24.2 was unpacked without sudo to
+`~/.local/opt/nrf-command-line-tools` and wrapped in `~/.local/bin/nrfjprog` with
+`--jdll` for the user-local J-Link V9.24a. RTT is read through `JLinkExe` (port 19021).
+Boot log: `*** Booting WatchDK v0.8.1-5883d716285f ***`. Both phones reconnected.
+The watch releases USB after 20 s without a host (`USB boot guard timed out`), which is
+why the USB shell disappeared earlier.
+
+RTT with `CONFIG_BT_GATT_LOG_LEVEL_DBG` confirms both Android findings:
+- SMP: the watch logs `SMP enabled` on request, but restores Service Changed
+  configuration only for two Apple addresses (`9C:28:B3:E2:4A:2A`, `48:74:12:58:06:5A`),
+  not for the Nokia (`74:8A:28:B7:1B:94`). On connect the Nokia writes only the NUS
+  CCCD and never subscribes to Service Changed, because Android believes its existing
+  bond (`CF:4B:3D:A1:C5:E2`) is already configured. Zephyr therefore sends no Service
+  Changed when SMP registers, and Android keeps a cached GATT table without SMP. Bond
+  state drift, not a review-fix regression.
+- Notifications: with 10 stored, notifications 11 and 12 evict IDs 1000051/1000052
+  (`Remove notification on place 0/1`), the watch sends DISMISS, and the phone cancels
+  `ev1`/`ev2`.
+
+**Device switching.** iOS Stop only calls `cancelPeripheralConnection`. iOS keeps the
+physical link for ANCS/AMS, and the watch allows one connection (`CONFIG_BT_MAX_CONN=1`),
+so another phone cannot connect until iPhone Bluetooth is turned off. A real
+disconnect needs the watch to drop the link on request (no such message exists) or
+an AccessorySetupKit removal on Forget. Android's first pairing attempts were rejected
+(`reason=5`) because the watch only bonds in pairing mode; the old Android bond
+`CF:4B:3D:A1:C5:E2` remained after the app uninstall. The watch's USB CDC device
+disappeared after the user's watch reset, so USB-shell control stopped at 14:05.
+
+**Fixes, 2026-10-18.**
+- Firmware, branch `fix/notification-eviction-dismiss` (`2de73aab`, from `origin/main`): `zsw_notification_remove_event` carries a reason
+  (user, phone, evicted); `DISMISS` is sent to the phone only for a user dismissal.
+  Verified with RTT: notifications 11 and 12 evicted IDs 1000063/1000064 on the watch and
+  all 12 stayed on the phone. Also stops echoing phone removals back as dismissals.
+- Android (`NativePrototypeTransport.kt`): when the Nordic SMP transport reports
+  `McuMgrNotSupportedException`, the app clears Android's GATT cache
+  (`BluetoothGatt.refresh()`), reconnects after 0.5 s like a service change (max 2 attempts,
+  reset when SMP is ready), and keeps an affected download `pending` instead of `failed`.
+  Verified on the Nokia without re-bonding: `smp_gatt_refresh refreshed=true`, full
+  discovery (1.4 s instead of a 7 ms cache hit), then Restart Watch succeeded twice.
+  Kotlin tests 267/267. The first attempt directly after a refresh is not yet verified
+  with the 0.5 s reconnect.

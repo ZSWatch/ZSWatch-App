@@ -91,6 +91,10 @@ flutter test
 
 Drift tests need a loadable `libsqlite3` (present on macOS by default).
 
+Kotlin unit tests need JDK 21 (LiteRT-LM classes are class version 65). With
+Homebrew instead of Android Studio: `openjdk@21`, `android-commandlinetools`,
+`flutter config --android-sdk ~/Library/Android/sdk --jdk-dir <jdk21 home>`.
+
 ## Known follow-up
 
 Both native journals still rewrite the whole file on each durable change
