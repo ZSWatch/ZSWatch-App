@@ -15,6 +15,9 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
     private var execution = 0L
     private var closed = false
     private var failedClosed = false
+    // Recordings whose automatic start failed in this process. Retried after a
+    // restart or a manual run, never every tick.
+    private val automaticFailures = mutableSetOf<String>()
     private fun running() = !closed && CompanionPrototypeService.instance === service && service.runtime?.active == true &&
         service.runtime?.store?.control()?.get("desired_running") == true
     private val tick = object : Runnable {
@@ -23,7 +26,10 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
             try { service.transport?.deliverVoiceResults() } catch (error: Exception) {
                 LifecycleLogger.log("CompanionLocalJobs", "delivery_deferred ${error.javaClass.simpleName}")
             }
-            try { enqueueAutomatic(); advance() } catch (error: Exception) {
+            try { enqueueAutomatic() } catch (error: Exception) {
+                LifecycleLogger.log("CompanionLocalJobs", "automatic_enqueue_deferred ${error.javaClass.simpleName}")
+            }
+            try { advance() } catch (error: Exception) {
                 failedClosed = true
                 engine?.close(); engine = null
                 LifecycleLogger.log("CompanionLocalJobs", "fixture_disabled ${error.javaClass.simpleName}")
@@ -94,9 +100,19 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
                 spec.getString("recording_id") == identity && spec.getString("model") == model && spec.getString("pipeline_revision") == revision &&
                     spec.getString("input_sha256") == record["sha256"]
             }) continue
-            startRecording(identity as String, request["transcription_model"] as String,
-                request["analysis_model"] as String, request["correct_transcription"] as Boolean,
-                if (request["analysis_enabled"] == false) "transcribe" else "process")
+            if (identity in automaticFailures) continue
+            // One recording (missing receipt, full job journal) must not stop the others.
+            try {
+                startRecording(identity as String, request["transcription_model"] as String,
+                    request["analysis_model"] as String, request["correct_transcription"] as Boolean,
+                    if (request["analysis_enabled"] == false) "transcribe" else "process")
+            } catch (error: IllegalArgumentException) {
+                automaticFailures += identity as String
+                LifecycleLogger.log("CompanionLocalJobs", "automatic_start_skipped ${error.javaClass.simpleName}")
+            } catch (error: IllegalStateException) {
+                automaticFailures += identity as String
+                LifecycleLogger.log("CompanionLocalJobs", "automatic_start_skipped ${error.javaClass.simpleName}")
+            }
         }
     }
 
@@ -121,7 +137,9 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         fun unavailable(label: String) {
             if (!busy || execution != operation || !running()) return
             busy = false; currentEngine.close(); engine = null
-            jobs.defer(claim, System.currentTimeMillis() / 1000, 10, label, blocked = true)
+            // Background start limits and system stops are transient: retry later
+            // without spending an attempt, instead of blocking the job for good.
+            jobs.defer(claim, System.currentTimeMillis() / 1000, 60, label, countAttempt = false)
             activeClaim = null
         }
         fun execute() {
@@ -157,10 +175,11 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
                             LifecycleLogger.log("CompanionLocalJobs", "processing_cancelled")
                             return@fold
                         }
-                        val permanent = code in listOf("NO_SPEECH", "MODEL_MISSING")
+                        val permanent = code in listOf("NO_SPEECH", "MODEL_MISSING", "ANALYSIS_EMPTY")
                         val label = if (response.isSuccess) "invalid_dart_result" else when (code) {
                             "NO_SPEECH" -> "no_speech"
                             "MODEL_MISSING" -> "model_missing"
+                            "ANALYSIS_EMPTY" -> "analysis_empty"
                             else -> "dart_worker_failed"
                         }
                         jobs.defer(claim, received, 10, label, maxAttempts = if (response.isSuccess || permanent) 1 else 5)

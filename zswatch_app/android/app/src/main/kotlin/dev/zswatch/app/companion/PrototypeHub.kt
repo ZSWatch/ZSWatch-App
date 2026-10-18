@@ -6,6 +6,7 @@ import android.os.HandlerThread
 import android.os.Looper
 import java.io.File
 import java.util.concurrent.CopyOnWriteArraySet
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Serialized journal access shared by service commands and UI snapshot reads. */
 object PrototypeHub {
@@ -25,6 +26,12 @@ object PrototypeHub {
             "utc_ms" to System.currentTimeMillis(), "generation" to generation)
         trafficObservers.forEach { it(event) }
     }
+    private val notifyPending = AtomicBoolean(false)
+    /** Coalesce commit bursts (one BLE message commits many times) into one UI snapshot. */
+    private fun changed() {
+        if (!notifyPending.compareAndSet(false, true)) return
+        main.postDelayed({ notifyPending.set(false); observers.forEach { it() } }, 50)
+    }
     private var store: PrototypeStore? = null
     private var jobStore: PrototypeStore? = null
 
@@ -32,7 +39,7 @@ object PrototypeHub {
         check(Looper.myLooper() == worker.looper)
         return jobStore ?: PrototypeStore(File(context.filesDir, "companion-prototype/jobs"), 64).also { created ->
             PrototypeJobs(created).recoverLocalClaims()
-            created.onChanged = { observers.forEach { main.post(it) } }
+            created.onChanged = ::changed
             jobStore = created
         }
     }
@@ -49,7 +56,7 @@ object PrototypeHub {
     fun journal(context: Context): PrototypeStore {
         check(Looper.myLooper() == worker.looper)
         return store ?: PrototypeStore(File(context.filesDir, "companion-prototype")).also { created ->
-            created.onChanged = { observers.forEach { main.post(it) } }
+            created.onChanged = ::changed
             store = created
         }
     }

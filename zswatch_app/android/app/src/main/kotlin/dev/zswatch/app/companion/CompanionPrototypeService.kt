@@ -64,7 +64,7 @@ class CompanionPrototypeService : Service() {
                             owner.suspendTransport("Bluetooth disabled")
                         else if (radio == BluetoothAdapter.STATE_ON) owner.recoverForSystem()
                     } else if (action in listOf(Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED)) {
-                        if (owner.active && owner.store.control()["phase"] == "ready") transport?.syncTime()
+                        if (owner.active && owner.store.control()["phase"] == "ready") transport?.syncTime(deferIfFull = true)
                     } else if (action == LocationManager.PROVIDERS_CHANGED_ACTION) {
                         gps?.refresh()
                     }

@@ -49,6 +49,41 @@ class PrototypeJobsTest {
         assertEquals(1, reopened.pending("fixture-watch").size)
         assertEquals(next, reopened.summary().single { it["selected"] == true }["job_id"])
     }
+    @Test fun finishedJobsDoNotCountAgainstActiveCapacityAndSupersededFailuresArePruned() {
+        val jobs = PrototypeJobs(store())
+        fun voice(recording: String, generation: Long = 1) = spec().put("backend", "local").put("upload_authorized", false)
+            .put("provider", "dart-voice-v1").put("recording_id", recording).put("generation", generation)
+        for (index in 0 until 100) {
+            val id = jobs.create(voice("done-$index"))
+            assertTrue(jobs.complete(jobs.claim(id, 100)!!, 101, fixture("result-v1.json"), null))
+        }
+        // 100 finished results never block new work.
+        val failed = jobs.create(voice("retry"))
+        assertTrue(jobs.defer(jobs.claim(failed, 100)!!, 101, 0, "dart_worker_failed", maxAttempts = 1))
+        assertEquals("failed", jobs.state(failed).getString("state"))
+        val retry = jobs.create(voice("retry", 2))
+        assertEquals(101, jobs.identities().size)
+        assertFalse(failed in jobs.identities())
+        assertTrue(retry in jobs.identities())
+        for (index in 1 until 100) jobs.create(voice("queued-$index"))
+        rejected { jobs.create(voice("one-too-many")) }
+    }
+
+    @Test fun transientExecutionBlocksAreQueuedAgainInANewProcess() {
+        val jobs = PrototypeJobs(store())
+        val id = jobs.create(spec().put("backend", "local").put("upload_authorized", false).put("provider", "dart-voice-v1"))
+        assertTrue(jobs.defer(jobs.claim(id, 100)!!, 101, 10, "execution_not_allowed", blocked = true))
+        assertEquals("blocked", jobs.state(id).getString("state"))
+        PrototypeJobs(store()).recoverLocalClaims()
+        val recovered = PrototypeJobs(store())
+        assertEquals("ready", recovered.state(id).getString("state"))
+        val claim = recovered.claim(id, 102)!!
+        // A transient deferral does not spend an attempt.
+        assertTrue(recovered.defer(claim, 103, 60, "execution_interrupted", countAttempt = false))
+        assertEquals("ready", recovered.state(id).getString("state"))
+        assertEquals(0, recovered.state(id).getInt("attempts"))
+    }
+
     private fun rejected(action: () -> Unit) { try { action(); fail("Expected rejection") } catch (_: IllegalArgumentException) {} }
 
     private fun finishedVoice(type: String = "reminder"): Pair<PrototypeJobs, String> {

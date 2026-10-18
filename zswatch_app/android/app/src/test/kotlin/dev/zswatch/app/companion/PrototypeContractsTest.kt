@@ -254,10 +254,12 @@ class PrototypeContractsTest {
 
     @Test fun fullReceiptStoreRejectsNewEntriesAndAllowsUpdatingExisting() {
         val journal = store()
-        repeat(100) { journal.putRecord("memo$it", mapOf("state" to "pending")) }
+        repeat(PrototypeStore.RECORD_LIMIT) { journal.putRecord("memo$it", mapOf("state" to "pending")) }
+        assertFalse(journal.hasRecordRoom("overflow"))
+        assertTrue(journal.hasRecordRoom("memo0"))
         rejected { journal.putRecord("overflow", mapOf("state" to "pending")) }
         journal.putRecord("memo0", mapOf("state" to "downloaded"))
-        assertEquals(100, (store().control()["recordings"] as Map<*, *>).size)
+        assertEquals(PrototypeStore.RECORD_LIMIT, (store().control()["recordings"] as Map<*, *>).size)
         assertEquals("downloaded", store().record("memo0")!!["state"])
     }
 

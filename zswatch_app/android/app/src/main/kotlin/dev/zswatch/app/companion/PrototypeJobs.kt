@@ -21,7 +21,13 @@ class PrototypeJobs(private val store: PrototypeStore) {
         if (transcript != null) require(transcript.isNotBlank() && transcript.toByteArray(Charsets.UTF_8).size <= 65536)
         val id = key(spec)
         val jobs = jobs(); val outbox = outbox()
-        require(jobs.has(id) || jobs.length() < 100) { "Job capacity reached" }
+        if (!jobs.has(id)) {
+            pruneSuperseded(jobs, outbox, spec)
+            // Finished jobs hold the user's transcripts and results; only
+            // pending work is bounded, plus a generous total journal bound.
+            require(jobs.keys().asSequence().count { jobs.getJSONObject(it).getString("state") in ACTIVE } < ACTIVE_LIMIT &&
+                jobs.length() < TOTAL_LIMIT) { "Job capacity reached" }
+        }
         for (oldId in jobs.keys()) {
             val old = jobs.getJSONObject(oldId); val previous = old.getJSONObject("spec")
             if (previous.getString("watch_id") != spec.getString("watch_id") ||
@@ -42,6 +48,28 @@ class PrototypeJobs(private val store: PrototypeStore) {
         if (spec.getString("provider") == "dart-voice-v1") selectItem(jobs, id)
         commit("job_created", jobs, outbox)
         return id
+    }
+
+    /** Drop failed/cancelled jobs that a newer generation of the same recording replaced. */
+    private fun pruneSuperseded(jobs: JSONObject, outbox: JSONObject, incoming: JSONObject) {
+        fun recording(spec: JSONObject) = spec.getString("watch_id") + "\u0000" + spec.getString("recording_id")
+        val latest = mutableMapOf(recording(incoming) to incoming.getLong("generation"))
+        for (id in jobs.keys()) {
+            val spec = jobs.getJSONObject(id).getJSONObject("spec")
+            latest[recording(spec)] = maxOf(latest[recording(spec)] ?: 0L, spec.getLong("generation"))
+        }
+        val obsolete = jobs.keys().asSequence().filter { id ->
+            val item = jobs.getJSONObject(id); val spec = item.getJSONObject("spec")
+            // The incoming voice job takes over selection for its own recording.
+            val reselected = recording(spec) == recording(incoming) && incoming.getString("provider") == "dart-voice-v1"
+            item.getString("state") in listOf("failed", "cancelled") && (!item.optBoolean("selected") || reselected) &&
+                spec.getLong("generation") < latest.getValue(recording(spec))
+        }.toSet()
+        for (id in obsolete) jobs.remove(id)
+        for (resultId in outbox.keys().asSequence().toList()) {
+            val delivery = outbox.getJSONObject(resultId)
+            if (delivery.getString("job_id") in obsolete && delivery.getString("state") != "pending") outbox.remove(resultId)
+        }
     }
 
     fun state(id: String): JSONObject = jobs().getJSONObject(id)
@@ -152,6 +180,14 @@ class PrototypeJobs(private val store: PrototypeStore) {
         var changed = false
         for (id in jobs.keys()) {
             val item = jobs.getJSONObject(id)
+            // Earlier builds blocked a job when its foreground service could not
+            // start or was stopped. That is transient; queue it again.
+            if (item.getString("state") == "blocked" && item.optString("last_error") in TRANSIENT_EXECUTION_ERRORS) {
+                item.put("state", "ready").put("fence", item.getLong("fence") + 1).put("lease_until", JSONObject.NULL)
+                    .put("next_attempt", 0L).put("attempts", 0)
+                changed = true
+                continue
+            }
             if (item.getJSONObject("spec").getString("backend") != "local" || item.isNull("lease_until") ||
                 item.getString("state") != "ready") continue
             item.put("fence", item.getLong("fence") + 1).put("lease_until", JSONObject.NULL)
@@ -203,10 +239,11 @@ class PrototypeJobs(private val store: PrototypeStore) {
         commit("job_remote_accepted", jobs); return true
     }
 
-    fun defer(claim: Claim, now: Long, delay: Long, error: String, blocked: Boolean = false, maxAttempts: Int = 5): Boolean {
+    fun defer(claim: Claim, now: Long, delay: Long, error: String, blocked: Boolean = false, maxAttempts: Int = 5,
+              countAttempt: Boolean = true): Boolean {
         require(delay >= 0 && maxAttempts > 0)
         val jobs = jobs(); val item = owned(jobs, claim, now) ?: return false
-        val attempts = item.getInt("attempts") - if (error == "server_pending") 1 else 0
+        val attempts = item.getInt("attempts") - if (error == "server_pending" || !countAttempt) 1 else 0
         item.put("attempts", attempts).put("lease_until", JSONObject.NULL).put("next_attempt", now + delay)
             .put("last_error", error).put("state", if (blocked) "blocked" else if (attempts >= maxAttempts) "failed" else item.getString("state"))
         commit("job_deferred", jobs); return true
@@ -293,6 +330,10 @@ class PrototypeJobs(private val store: PrototypeStore) {
     }
 
     companion object {
+        private val ACTIVE = listOf("ready", "waiting_remote", "blocked")
+        private const val ACTIVE_LIMIT = 100
+        private const val TOTAL_LIMIT = 2000
+        val TRANSIENT_EXECUTION_ERRORS = listOf("execution_not_allowed", "execution_interrupted")
         private val fields = setOf("version", "watch_id", "recording_id", "input_sha256", "backend", "provider",
             "model", "pipeline_revision", "generation", "upload_authorized")
         fun sha(text: String): String = MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))

@@ -30,6 +30,25 @@ class PrototypeVoicePolicyTest {
         assertEquals(config, store.record("watch-a:new:123:100:1000")!!["processing_request"])
         assertFalse(store.record("watch-a:off:123:100:1000")!!.containsKey("processing_request"))
     }
+    @Test fun invalidAndOverCapacityListEntriesAreSkippedWithoutFailingTheList() {
+        val store = PrototypeStore(temporary.newFolder("skip"))
+        store.update("selected", mapOf("address" to "watch-a"))
+        fun entry(name: String, size: Long = 100) = JSONObject().put("filename", name).put("timestamp", 123)
+            .put("size_bytes", size).put("duration_ms", 1000)
+        PrototypeRecordingInbox(store) {}.receive(JSONObject().put("t", "voice_memo").put("action", "list_result")
+            .put("recordings", org.json.JSONArray().put(entry("bad name")).put(entry("huge", 32L * 1024 * 1024))
+                .put(entry("a".repeat(32))).put(JSONObject().put("filename", "no_size")).put(entry("good"))))
+        assertNotNull(store.record("watch-a:good:123:100:1000"))
+        assertEquals(1, (store.control()["recordings"] as Map<*, *>).size)
+        for (index in 1 until PrototypeStore.RECORD_LIMIT) store.putRecord("filler-$index", mapOf("state" to "downloaded"))
+        PrototypeRecordingInbox(store) {}.receive(JSONObject().put("t", "voice_memo").put("action", "list_result")
+            .put("recordings", org.json.JSONArray().put(entry("good")).put(entry("over"))))
+        assertNull(store.record("watch-a:over:123:100:1000"))
+        assertNotNull(store.record("watch-a:good:123:100:1000"))
+        val skipped = (store.control()["events"] as List<*>).map { it as Map<*, *> }
+            .last { it["kind"] == "recording_list_entries_skipped" }["detail"] as Map<*, *>
+        assertEquals(1, skipped["capacity"])
+    }
     @Test fun requestsAreWatchScopedAndCaptureConfiguration() {
         val config = PrototypeVoicePolicy.configuration("kbWhisperBase", "qwen", false)
         val policy = config + mapOf("watch_id" to "watch-a", "enabled" to true)

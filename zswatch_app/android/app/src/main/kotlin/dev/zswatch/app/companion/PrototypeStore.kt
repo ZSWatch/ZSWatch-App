@@ -9,6 +9,9 @@ import java.io.FileOutputStream
 class PrototypeStore(private val directory: File, private val eventLimit: Int = 256) {
     private val file = File(directory, "state-v1.json")
     private var data: JSONObject
+    // Decoded view of data. Callers read control() many times per BLE message;
+    // decode once per commit instead of on every read.
+    private var view: Map<String, Any?>? = null
     var onChanged: (() -> Unit)? = null
     internal var onCommitted: (() -> Unit)? = null
 
@@ -23,7 +26,7 @@ class PrototypeStore(private val directory: File, private val eventLimit: Int = 
         require(data.getInt("version") == 1) { "Unsupported prototype journal version" }
     }
 
-    @Synchronized fun control(): Map<String, Any?> = asMap(data)
+    @Synchronized fun control(): Map<String, Any?> = view ?: asMap(data).also { view = it }
 
     /** Commit state plus event in one flushed rename before notifying a UI. */
     @Synchronized fun update(kind: String, fields: Map<String, Any?> = emptyMap(),
@@ -59,9 +62,15 @@ class PrototypeStore(private val directory: File, private val eventLimit: Int = 
     @Synchronized fun record(key: String): Map<String, Any?>? =
         data.getJSONObject("recordings").optJSONObject(key)?.let(::asMap)
 
+    /** The journal is the recording library; a full library skips new entries. */
+    @Synchronized fun hasRecordRoom(key: String): Boolean {
+        val records = data.getJSONObject("recordings")
+        return records.has(key) || records.length() < RECORD_LIMIT
+    }
+
     @Synchronized fun putRecord(key: String, metadata: Map<String, Any?>) {
         val records = JSONObject(data.getJSONObject("recordings").toString())
-        require(records.has(key) || records.length() < 100) { "Prototype receipt capacity reached" }
+        require(records.has(key) || records.length() < RECORD_LIMIT) { "Prototype receipt capacity reached" }
         records.put(key, JSONObject(metadata))
         update("recording_state", mapOf("recordings" to records), mapOf("recording_key" to key))
     }
@@ -92,12 +101,14 @@ class PrototypeStore(private val directory: File, private val eventLimit: Int = 
             check(temporary.renameTo(file)) { "Prototype journal publication failed" }
             // Keep the exact published value, without aliases to caller-owned JSON.
             data = JSONObject(encoded)
+            view = null
         } finally { temporary.delete() }
         onCommitted?.invoke()
         onChanged?.invoke()
     }
 
     companion object {
+        const val RECORD_LIMIT = 1000
         fun asMap(json: JSONObject): Map<String, Any?> = json.keys().asSequence().associateWith { key ->
             decode(json.get(key))
         }

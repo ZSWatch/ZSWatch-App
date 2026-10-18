@@ -478,8 +478,12 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var bondReceiver: BroadcastReceiver? = null
     private val recordingInbox = PrototypeRecordingInbox(store) {
         // Subscription completion always requests a list, including for early hints.
-        if (store.control()["phase"] == "ready") requestRecordings()
+        if (store.control()["phase"] == "ready") requestRecordings(deferIfFull = true)
     }
+    // Watch- and system-initiated requests wait for queue room instead of
+    // treating a full queue as a lost link. Sent from writeFinished().
+    private var timeSyncDeferred = false
+    private var recordingListDeferred = false
     private var writing = false
     private var noResponse = false
     private var fileTransport: McuMgrBleTransport? = null
@@ -585,6 +589,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                     } == true
                 }.map { it.name }.toSet())
                 retryDelay = 5000
+                timeSyncDeferred = false; recordingListDeferred = false
                 readInitialBattery(client, session)
                 command("GB({\"t\":\"log\",\"status\":false})")
                 syncTime()
@@ -711,7 +716,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         retryDelay = minOf(60000, retryDelay * 2)
     }
 
-    fun syncTime() {
+    fun syncTime(deferIfFull: Boolean = false) {
         check(store.control()["phase"] == "ready") { "NUS not ready" }
         val now = System.currentTimeMillis()
         val offset = PrototypeClockCommands.offsetHours(now, TimeZone.getDefault())
@@ -721,6 +726,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
             store.update("time_write_failed", mapOf("last_time_error" to error.message))
             return
         }
+        if (deferIfFull && runtime.owns(token) && writes.size + packets.size > 16) { timeSyncDeferred = true; return }
         check(runtime.owns(token) && writes.size + packets.size <= 16) { "NUS write queue unavailable" }
         packets.forEachIndexed { index, bytes ->
             writes.add(NusWrite(bytes, {
@@ -735,10 +741,13 @@ class NativePrototypeTransport(private val context: Context, private val handler
     fun syncTimeIfTimezoneChanged() {
         if (!runtime.owns(token) || store.control()["phase"] != "ready" || writes.size > 14) return
         if (PrototypeClockCommands.timezoneChanged(store.control()["last_time_zone_offset_hours"],
-                System.currentTimeMillis(), TimeZone.getDefault())) syncTime()
+                System.currentTimeMillis(), TimeZone.getDefault())) syncTime(deferIfFull = true)
     }
 
-    fun requestRecordings() { command("GB({\"t\":\"voice_memo\",\"action\":\"list\"})") }
+    fun requestRecordings(deferIfFull: Boolean = false) {
+        if (deferIfFull && runtime.owns(token) && writes.size >= 16) { recordingListDeferred = true; return }
+        command("GB({\"t\":\"voice_memo\",\"action\":\"list\"})")
+    }
     private val resultSentAt = mutableMapOf<String, Long>()
 
     private fun voiceResultsNegotiated(): Boolean {
@@ -760,7 +769,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
             val id = envelope.getString("result_id")
             if (now - (resultSentAt[id] ?: -10000L) < 10000) continue
             val recording = store.record(envelope.getString("recording_id")) ?: continue
-            val packet = PrototypeVoiceResult.packet(envelope, recording["filename"] as String)
+            // Skip a result the watch cannot receive instead of blocking later ones.
+            val packet = runCatching { PrototypeVoiceResult.packet(envelope, recording["filename"] as String) }
+                .getOrNull() ?: continue
             val generation = token
             writes.add(NusWrite("GB($packet)".toByteArray(Charsets.UTF_8), {}, payloadSize) {
                 runtime.owns(generation) && jobs.pending(watch).any { JSONObject(it.getString("payload")).getString("result_id") == id }
@@ -778,7 +789,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
         for (pending in jobs.pending(watch)) {
             val envelope = JSONObject(pending.getString("payload"))
             val recording = store.record(envelope.getString("recording_id")) ?: continue
-            val packet = PrototypeVoiceResult.packet(envelope, recording["filename"] as String)
+            // An undeliverable result never matches an ACK; it must not drop the link.
+            val packet = runCatching { PrototypeVoiceResult.packet(envelope, recording["filename"] as String) }
+                .getOrNull() ?: continue
             if (PrototypeVoiceResult.matches(packet, message)) {
                 jobs.acknowledge(watch, envelope.getString("result_id"), "accepted")
                 store.update("voice_result_accepted")
@@ -912,6 +925,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
             item.done()
         }
         pump()
+        if (store.control()["phase"] == "ready") {
+            if (timeSyncDeferred) { timeSyncDeferred = false; syncTime(deferIfFull = true) }
+            if (recordingListDeferred) { recordingListDeferred = false; requestRecordings(deferIfFull = true) }
+        }
         flushNotifications()
     }
 
@@ -961,7 +978,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
             val message = JSONObject(text)
             // A notification may precede the CCCD completion callback. Readiness
             // sends time anyway; do not disconnect a valid subscribing link.
-            if (message.optString("t") == "time" && store.control()["phase"] == "ready") syncTime()
+            if (message.optString("t") == "time" && store.control()["phase"] == "ready") syncTime(deferIfFull = true)
             PrototypeWatchInfo(store).receive(message, token, System.currentTimeMillis())
             if (message.optString("t") == "act") healthReceive(message, token)
             val dismissals = PrototypeNotifications(store).dismissalKeys(message, token, System.currentTimeMillis())

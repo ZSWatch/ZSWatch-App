@@ -195,7 +195,8 @@ class LiteRtLmBridge(
                     var tokenCount = 0
                     val startTime = System.currentTimeMillis()
 
-                    Log.i(TAG, "generate: sending prompt (${prompt.length} chars): ${prompt.take(200)}...")
+                    // Prompts and output contain private transcript text; log sizes only.
+                    Log.i(TAG, "generate: sending prompt (${prompt.length} chars)")
 
                     // Use CompletableDeferred to bridge async callbacks → coroutine
                     val deferred = CompletableDeferred<Map<String, Any?>>()
@@ -205,7 +206,6 @@ class LiteRtLmBridge(
                         object : MessageCallback {
                             override fun onMessage(message: Message) {
                                 val text = message.toString()
-                                Log.i(TAG, "onMessage: text='${text.take(200)}' (len=${text.length})")
                                 accumulated.append(text)
                                 tokenCount++
 
@@ -222,7 +222,7 @@ class LiteRtLmBridge(
 
                             override fun onDone() {
                                 val elapsed = System.currentTimeMillis() - startTime
-                                Log.i(TAG, "onDone: accumulated='${accumulated.toString().take(500)}' tokens=$tokenCount elapsed=${elapsed}ms")
+                                Log.i(TAG, "onDone: length=${accumulated.length} tokens=$tokenCount elapsed=${elapsed}ms")
                                 deferred.complete(
                                     mapOf(
                                         "text" to accumulated.toString(),
