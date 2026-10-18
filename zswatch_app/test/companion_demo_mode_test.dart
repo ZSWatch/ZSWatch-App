@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
 import 'package:zswatch_app/providers/demo_mode_provider.dart';
@@ -43,6 +44,7 @@ void main() {
   bool failStop = false;
   Completer<void>? stopGate;
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     calls.clear();
     failStop = false;
     stopGate = null;
@@ -105,6 +107,19 @@ void main() {
       );
     },
   );
+  test('process death in preview resumes the stopped watch once', () async {
+    await container.read(demoModeControllerProvider).set(true);
+    expect(calls, ['snapshot', 'stop']);
+    // A new process starts outside Demo Mode with the native Stop persisted.
+    container.dispose();
+    container = ProviderContainer(
+      overrides: [nativeCompanionRuntimeProvider.overrideWithValue(true)],
+    );
+    await container.read(demoModeControllerProvider).recoverInterrupted();
+    expect(calls, ['snapshot', 'stop', 'start']);
+    await container.read(demoModeControllerProvider).recoverInterrupted();
+    expect(calls, ['snapshot', 'stop', 'start']);
+  });
   test('preview recording imports never open the real local ledger', () async {
     final isolated = ProviderContainer(
       overrides: [

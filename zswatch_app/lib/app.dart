@@ -13,6 +13,7 @@ import 'providers/ble_providers.dart';
 import 'providers/companion_runtime_providers.dart';
 import 'providers/companion_watch_providers.dart';
 import 'providers/coredump_providers.dart';
+import 'providers/demo_mode_provider.dart';
 import 'providers/developer_providers.dart';
 import 'providers/foreground_service_providers.dart';
 import 'providers/gps_providers.dart';
@@ -45,7 +46,18 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     LifecycleLogger.log('AppLifecycle', 'initState');
     if (ref.read(nativeCompanionRuntimeProvider)) {
       _nativeRouter = AppRouter.createNativeRouter();
-      return; // Observe the existing service; UI startup never sends Start.
+      // Observe the existing service; UI startup never sends Start, except
+      // to undo the Stop of a Demo Mode session that the process outlived.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(demoModeControllerProvider)
+            .recoverInterrupted()
+            .catchError(
+              (Object error) =>
+                  debugPrint('[DemoMode] Resume after restart failed: $error'),
+            );
+      });
+      return;
     }
     // Initialize BLE service after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {

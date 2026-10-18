@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/models/connection.dart';
 import '../data/models/connection_state.dart';
@@ -23,10 +24,27 @@ final demoModeControllerProvider = Provider<DemoModeController>(
 );
 
 class DemoModeController {
+  /// Demo Mode persists a native Stop. The watch to resume is persisted too,
+  /// so a process death while in Demo Mode does not leave the watch stopped.
+  static const _resumeKey = 'demo_mode_resume_address';
   final Ref ref;
   CompanionPrototypeClient? _realClient;
   String? _resume;
   DemoModeController(this.ref);
+
+  /// Demo Mode never survives a restart; resume the watch it stopped.
+  Future<void> recoverInterrupted() async {
+    if (!ref.read(nativeCompanionRuntimeProvider) ||
+        ref.read(demoModeProvider)) {
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final address = prefs.getString(_resumeKey);
+    if (address == null) return;
+    await ref.read(companionClientProvider).start(address);
+    await prefs.remove(_resumeKey);
+  }
+
   Future<void> set(bool enabled) async {
     if (ref.read(demoModeProvider) == enabled ||
         ref.read(demoModeBusyProvider)) {
@@ -55,6 +73,8 @@ class DemoModeController {
                 (before.fields['address'] as String? ?? '').isNotEmpty
             ? before.fields['address'] as String
             : null;
+        final prefs = await SharedPreferences.getInstance();
+        if (_resume != null) await prefs.setString(_resumeKey, _resume!);
         ref.read(demoModeProvider.notifier).state = true;
       } else {
         final client = _realClient, address = _resume;
@@ -62,6 +82,7 @@ class DemoModeController {
         _resume = null;
         ref.read(demoModeProvider.notifier).state = false;
         if (client != null && address != null) await client.start(address);
+        await (await SharedPreferences.getInstance()).remove(_resumeKey);
       }
     } finally {
       ref.read(demoModeBusyProvider.notifier).state = false;

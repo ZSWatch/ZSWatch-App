@@ -7,6 +7,7 @@ import 'companion_prototype_client.dart';
 /// Flutter alone writes Drift. Data and the native receipt watermark commit in
 /// one transaction, so replay after a lost native acknowledgement is harmless.
 class IosTelemetryProjector {
+  static const _catalogueGrace = Duration(minutes: 5);
   final AppDatabase db;
   const IosTelemetryProjector(this.db);
 
@@ -61,8 +62,18 @@ class IosTelemetryProjector {
           db.watches,
         )..where((row) => row.id.upper().equals(address))).getSingleOrNull();
         // Catalogue creates rows only from a verified Ready receipt. Wait for
-        // that writer rather than resurrecting a forgotten/missing watch here.
-        if (watch == null) break;
+        // that writer rather than resurrecting a forgotten/missing watch here,
+        // but only for the selected watch and only briefly: a watch that never
+        // reached Ready must not block every later receipt.
+        if (watch == null) {
+          final selected = (snapshot.fields['address'] as String? ?? '')
+              .toUpperCase();
+          final age = DateTime.now().toUtc().difference(timestamp);
+          if (address == selected && age < _catalogueGrace) break;
+          cursor = sequence;
+          consumed = true;
+          continue;
+        }
         final payload = raw['payload'] as Map;
         switch (raw['kind']) {
           case 'connection':

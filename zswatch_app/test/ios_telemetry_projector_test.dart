@@ -105,14 +105,12 @@ void main() {
         ..['utc_ms'] = expired,
       receipt(2, 'battery', {'level': 85, 'is_charging': false})
         ..['utc_ms'] = expired,
-      receipt(3, 'health', {'stp': 100, 'hrm': 70})
-        ..['utc_ms'] = expired,
+      receipt(3, 'health', {'stp': 100, 'hrm': 70})..['utc_ms'] = expired,
       receipt(4, 'connection', {'event_type': 'connected'})
         ..['utc_ms'] = recent,
       receipt(5, 'battery', {'level': 87, 'is_charging': false})
         ..['utc_ms'] = recent,
-      receipt(6, 'health', {'stp': 200, 'hrm': 72})
-        ..['utc_ms'] = recent,
+      receipt(6, 'health', {'stp': 200, 'hrm': 72})..['utc_ms'] = recent,
     ]);
     expect(await projector.project(batch), 6);
     expect(await projector.project(batch), 6);
@@ -150,6 +148,26 @@ void main() {
         (await db.select(db.companionTelemetryCursors).get()).single.sequence,
         1,
       );
+    },
+  );
+  test(
+    'receipts from a watch that never reached Ready do not block later ones',
+    () async {
+      const failed = 'F31A05BD-1C30-4B66-AAC0-157004320333';
+      final stale = receipt(1, 'connection', {
+        'event_type': 'reconnect_attempt',
+      })..['address'] = failed;
+      expect(
+        await projector.project(
+          snapshot([
+            stale,
+            receipt(2, 'battery', {'level': 87, 'is_charging': true}),
+          ]),
+        ),
+        2,
+      );
+      expect((await db.select(db.batteryReadings).get()).single.level, 87);
+      expect(await db.select(db.connectionEvents).get(), isEmpty);
     },
   );
   test(
