@@ -1,5 +1,8 @@
 # Mac / iOS companion handoff
 
+**Latest (2026-10-18):** start with [HANDOFF_REVIEW_FIXES.md](HANDOFF_REVIEW_FIXES.md)
+for the review fixes, their verification status and the Mac test plan.
+
 Original handoff: 2026-10-12. For the implemented branch, installed revisions and
 current acceptance evidence, read [IOS_COMPANION_DELIVERY.md](IOS_COMPANION_DELIVERY.md).
 Read this historical setup handoff together with `IOS_COMPANION_IMPLEMENTATION_PLAN.md`.
