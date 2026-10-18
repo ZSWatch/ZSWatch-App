@@ -27,3 +27,20 @@ zswatch_app/android/*.jks
 .Spotlight-V100
 .Trashes
 Thumbs.db
+# Local Python environments
+.mlc_venv/
+.venv/
+
+# Build output and tool caches
+/build/
+.dart_tool/
+*.profraw
+*.bak
+
+# Local model files (download separately)
+*.gguf
+*.litertlm
+
+# Local reference material and store mockups (kept outside git)
+gallery/
+screenshots/
