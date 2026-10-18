@@ -358,7 +358,10 @@ CCCD for the Nokia, while Android kept its earlier bond state and did not re-sub
 Earlier Nokia runs saw Service Changed. Options: re-bond on both sides to confirm, and/or
 refresh the GATT cache (`refreshDeviceCache`) when SMP reports not supported.
 
-Not run: manual clock change, AI failure handling (no recording could be downloaded).
+Manual clock change: with automatic time off, `cmd alarm set-time` +2 h and back each produced
+an immediate time write to the watch; link unchanged (generation 37); automatic time restored.
+
+Not run: AI failure handling (no new recording could be made without the USB shell).
 
 **Firmware reflash with RTT, 2026-10-18 16:56.** Built `codex/ios-companion` `5883d716`
 with `boards/debug.conf;boards/log_on_rtt.conf` (NCS v3.3.0-preview1, per
