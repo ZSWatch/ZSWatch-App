@@ -481,10 +481,21 @@ class LlmService {
             ? modelId.replaceFirst('custom::', '')
             : catalogModels.first.displayName);
     _modelPath = null;
-    // Dispose previous LiteRT-LM engine when switching models.
+    // Dispose previous LiteRT-LM engine when switching models. _ensureModel
+    // awaits this so the next call never sees the old engine as loaded.
     if (_liteRtLmService.isLoaded) {
-      _liteRtLmService.dispose();
+      _liteRtDisposal = _disposeLiteRtWhenIdle();
     }
+  }
+
+  Future<void>? _liteRtDisposal;
+
+  /// The native engine crashes if disposed during generate; wait for the lock.
+  Future<void> _disposeLiteRtWhenIdle() async {
+    while (_liteRtLmLock != null) {
+      await _liteRtLmLock!.future;
+    }
+    await _liteRtLmService.dispose();
   }
 
   Future<LlmModelInfo> currentModelInfo() async {
@@ -684,6 +695,11 @@ class LlmService {
   /// Returns the resolved [LlmModelInfo] so callers can use it without
   /// a second async call (which would be vulnerable to provider races).
   Future<LlmModelInfo> _ensureModel() async {
+    final disposal = _liteRtDisposal;
+    if (disposal != null) {
+      await disposal;
+      if (identical(_liteRtDisposal, disposal)) _liteRtDisposal = null;
+    }
     if (_modelPath != null) {
       // Model path already set — resolve the info for consistency.
       final model = await currentModelInfo();
@@ -700,7 +716,8 @@ class LlmService {
     _modelPath = path;
 
     // LiteRT-LM models need to initialise the native engine.
-    if (model.isLiteRtLm && !_liteRtLmService.isLoaded) {
+    if (model.isLiteRtLm && _liteRtLmService.loadedPath != path) {
+      if (_liteRtLmService.isLoaded) await _disposeLiteRtWhenIdle();
       await _liteRtLmService.loadModel(path, backend: 'cpu');
     }
     return model;
@@ -939,8 +956,7 @@ class LlmService {
       _liteRtLmLock = Completer<void>();
       try {
         debugPrint(
-          '[LlmService] LiteRT-LM generate: prompt length=${prompt.length}, '
-          'first 200 chars: ${prompt.substring(0, prompt.length > 200 ? 200 : prompt.length)}',
+          '[LlmService] LiteRT-LM generate: prompt length=${prompt.length}',
         );
         final result = await _liteRtLmService.generate(
           prompt,
@@ -956,7 +972,7 @@ class LlmService {
           },
         );
         debugPrint(
-          '[LlmService] LiteRT-LM result: text="${result.text.substring(0, result.text.length > 500 ? 500 : result.text.length)}" '
+          '[LlmService] LiteRT-LM result: length=${result.text.length} '
           'tokens=${result.tokenCount} elapsed=${result.elapsedMs}ms cancelled=${result.cancelled}',
         );
         text = result.text.trim();
@@ -1080,7 +1096,9 @@ class LlmService {
             corrected.length > 5) {
           correctedTranscription = corrected;
           effectiveTranscript = corrected;
-          debugPrint('[LlmService] Corrected transcription: $corrected');
+          debugPrint(
+            '[LlmService] Corrected transcription (${corrected.length} chars)',
+          );
         } else {
           debugPrint(
             '[LlmService] Correction output not usable, using original',
@@ -1913,7 +1931,8 @@ JSON:
         actions: actions,
       );
     } catch (e) {
-      debugPrint('[LlmService] Failed to parse AI response: $e');
+      // FormatException messages embed the source text; log only the type.
+      debugPrint('[LlmService] Failed to parse AI response: ${e.runtimeType}');
       return TranscriptResult(summary: jsonStr, category: 'note');
     }
   }

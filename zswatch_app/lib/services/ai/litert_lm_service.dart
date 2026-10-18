@@ -12,10 +12,14 @@ class LiteRtLmService {
   static const _eventChannel = EventChannel('dev.zswatch.app/litert_lm_events');
 
   bool _loaded = false;
+  String? _loadedPath;
   StreamSubscription<dynamic>? _eventSubscription;
 
   /// Whether a model is currently loaded.
   bool get isLoaded => _loaded;
+
+  /// Path of the loaded model, or null when no model is loaded.
+  String? get loadedPath => _loaded ? _loadedPath : null;
 
   /// Load a .litertlm model file.
   ///
@@ -36,6 +40,7 @@ class LiteRtLmService {
       'maxTokens': maxTokens,
     });
     _loaded = true;
+    _loadedPath = modelPath;
     debugPrint('[LiteRtLmService] Model loaded successfully');
   }
 
@@ -130,6 +135,7 @@ class LiteRtLmService {
     _eventSubscription = null;
     await _methodChannel.invokeMethod('dispose');
     _loaded = false;
+    _loadedPath = null;
   }
 
   /// Check if a model is loaded on the native side.

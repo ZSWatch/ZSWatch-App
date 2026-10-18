@@ -137,15 +137,23 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
             correctTranscription: models[2] == 'true',
           );
     control.check();
+    // Native result validation requires a summary. Actions without one keep
+    // their titles as the summary instead of failing the whole result.
+    final summary = result.summary.trim().isNotEmpty
+        ? result.summary
+        : result.actions
+              .map((a) => a.title.trim())
+              .where((t) => t.isNotEmpty)
+              .join('; ');
     // Speech has already passed validation and is durably checkpointed. An
     // empty analysis is an analysis failure, not evidence of silent audio.
-    if (result.summary.trim().isEmpty && result.actions.isEmpty) {
+    if (summary.trim().isEmpty) {
       throw PlatformException(code: 'ANALYSIS_EMPTY');
     }
     return {
       'version': 1,
       'transcript': result.correctedTranscription ?? transcript,
-      'summary': result.summary,
+      'summary': summary,
       'category': result.category,
       'actions': [
         for (final a in result.actions)

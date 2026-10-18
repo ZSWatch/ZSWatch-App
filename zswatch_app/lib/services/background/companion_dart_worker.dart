@@ -13,7 +13,7 @@ Future<void> startCompanionDartWorker() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Inference diagnostics must not routinely log private transcript/prompt text.
   // The native owner reports bounded state/error codes for this engine.
-  if (defaultTargetPlatform == TargetPlatform.iOS) {
+  if (defaultTargetPlatform == TargetPlatform.iOS || !kDebugMode) {
     debugPrint = (String? message, {int? wrapWidth}) {};
   }
   const channel = MethodChannel(companionWorkerChannel);
@@ -52,7 +52,7 @@ Future<void> startCompanionDartWorker() async {
       } else {
         result = companionLocalFixtureResult(request);
         await getTemporaryDirectory();
-        if (defaultTargetPlatform == TargetPlatform.iOS) {
+        if (defaultTargetPlatform == TargetPlatform.iOS || !kDebugMode) {
           runtime['ffmpeg_version'] = await FFmpegKitConfig.getFFmpegVersion();
           runtime['available_memory_mb'] = await const MethodChannel(
             'dev.zswatch.app/productivity',

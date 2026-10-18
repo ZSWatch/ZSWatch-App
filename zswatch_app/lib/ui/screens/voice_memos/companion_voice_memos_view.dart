@@ -659,10 +659,11 @@ class _CompanionVoiceMemosViewState
     'result_ready' => 'Processed • Waiting for watch acceptance',
     'delivered' => 'Processed • Accepted by watch',
     'cancelled' => 'Cancelled',
-    'failed' =>
-      job['last_error'] == 'no_speech'
-          ? 'No speech detected'
-          : 'Processing failed',
+    'failed' => switch (job['last_error']) {
+      'no_speech' => 'No speech detected',
+      'analysis_empty' => 'Analysis found nothing to summarize',
+      _ => 'Processing failed',
+    },
     'blocked' =>
       job['last_error'] == 'model_missing'
           ? 'Selected model not downloaded'

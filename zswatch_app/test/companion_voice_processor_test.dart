@@ -189,11 +189,17 @@ void main() {
     requireCompanionSpeech('Påminn mig att köpa mjölk i morgon.');
     requireCompanionSpeech('Start a timer for three minutes.');
   });
-  for (final emptyAnalysis in [false, true]) {
+  for (final mode in _AnalysisMode.values) {
+    final emptyAnalysis = mode == _AnalysisMode.empty;
     test(
-      emptyAnalysis
-          ? 'empty analysis of valid speech is not reported as silent audio'
-          : 'validated bilingual checkpoints continue past an uncertain router',
+      switch (mode) {
+        _AnalysisMode.empty =>
+          'empty analysis of valid speech is not reported as silent audio',
+        _AnalysisMode.actionsOnly =>
+          'actions without a summary keep their titles as the summary',
+        _AnalysisMode.summary =>
+          'validated bilingual checkpoints continue past an uncertain router',
+      },
       () async {
         final root = await Directory.systemTemp.createTemp('voice-analysis-');
         final recording = await seedCompanionRecording(root);
@@ -213,7 +219,7 @@ void main() {
           'Den blå cykeln står i garaget. Kaffebönorna ligger på den översta hyllan.',
           'The blue bicycle is in the garage. The coffee beans are on the top shelf.',
         ]) {
-          final analyzer = _UncertainRouterAnalyzer(emptyAnalysis);
+          final analyzer = _UncertainRouterAnalyzer(mode);
           final processing = processCompanionVoiceRecording(
             {
               'version': 1,
@@ -257,7 +263,12 @@ void main() {
           } else {
             final result = await processing;
             expect(result['transcript'], text);
-            expect(result['summary'], isNotEmpty);
+            expect(
+              result['summary'],
+              mode == _AnalysisMode.actionsOnly
+                  ? 'Buy coffee beans'
+                  : isNotEmpty,
+            );
           }
           expect(analyzer.discardValidatedSpeech, isFalse);
           expect(analyzer.disposed, isTrue);
@@ -270,9 +281,11 @@ void main() {
 
 /// Simulates the actual failing router: "none" discards the text unless the
 /// caller requests normal analysis of independently validated speech.
+enum _AnalysisMode { summary, empty, actionsOnly }
+
 class _UncertainRouterAnalyzer extends Fake implements LlmService {
-  _UncertainRouterAnalyzer(this.emptyAnalysis);
-  final bool emptyAnalysis;
+  _UncertainRouterAnalyzer(this.mode);
+  final _AnalysisMode mode;
   bool? discardValidatedSpeech;
   bool disposed = false;
 
@@ -293,10 +306,14 @@ class _UncertainRouterAnalyzer extends Fake implements LlmService {
   }) async {
     discardValidatedSpeech = rejectNoSpeechRoute;
     return TranscriptResult(
-      summary: emptyAnalysis || rejectNoSpeechRoute
+      summary: mode != _AnalysisMode.summary || rejectNoSpeechRoute
           ? ''
           : 'A saved factual note.',
       category: 'note',
+      actions: [
+        if (mode == _AnalysisMode.actionsOnly)
+          const ExtractedActionResult(type: 'task', title: 'Buy coffee beans'),
+      ],
       originalTranscription: transcript,
     );
   }
