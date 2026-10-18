@@ -69,10 +69,12 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 override fun onError(error: Throwable) { handler.post {
                     done(Result.failure(if (error is McuMgrNotSupportedException) PrototypeSmpServicePending()
                         else IllegalStateException(error.javaClass.simpleName)))
+                    if (error is McuMgrNotSupportedException) refreshStaleGatt(generation)
                 } }
             })
         },
         prepared = { generation ->
+            smpRefreshAttempts = 0
             smpIdleLease.hold(generation)
             smpIdleLease.idle(generation)
             // If UI leaves after preparation, queued background recordings must
@@ -706,6 +708,24 @@ class NativePrototypeTransport(private val context: Context, private val handler
         }, delay)
     }
 
+    // The watch registers its SMP service on demand. Android learns about that
+    // only through Service Changed, which a peer without that subscription (for
+    // example after bond state drifted) never receives, so its cached GATT table
+    // keeps lacking SMP. Clear the cache and reconnect like a service change.
+    private var smpRefreshAttempts = 0
+    private fun refreshStaleGatt(session: Long) {
+        if (!runtime.owns(session) || smpRefreshAttempts >= 2) return
+        smpRefreshAttempts++
+        val client = gatt ?: return
+        val refreshed = runCatching {
+            client.javaClass.getMethod("refresh").invoke(client) as Boolean
+        }.getOrDefault(false)
+        android.util.Log.i("ZSWCompanionBle", "smp_gatt_refresh session=$session attempt=$smpRefreshAttempts refreshed=$refreshed")
+        // Reconnect promptly so a waiting SMP preparation can still use the fresh session.
+        retryDelay = 500
+        lost(session, "SMP service missing from cached GATT")
+    }
+
     private fun lost(session: Long, reason: String) {
         if (!runtime.owns(session)) return
         runtime.phase(session, "disconnected", reason)
@@ -1083,6 +1103,14 @@ class NativePrototypeTransport(private val context: Context, private val handler
                             } }
                             override fun onDownloadProgressChanged(current: Int, total: Int, timestamp: Long) {}
                             override fun onDownloadFailed(error: McuMgrException) = deliver {
+                                if (error is McuMgrNotSupportedException && smpRefreshAttempts < 2) {
+                                    // SMP is missing from a stale GATT cache, not from this file:
+                                    // keep the recording pending and rediscover services.
+                                    fileOperation++; downloading = false; transfer = null
+                                    store.putRecord(key, metadata + mapOf("state" to "pending"))
+                                    refreshStaleGatt(session)
+                                    return@deliver
+                                }
                                 val reason = if (error is FileChunkMismatchException) "${error.javaClass.simpleName}: ${error.message}" else error.javaClass.simpleName
                                 finishFile(key, metadata, reason)
                             }
