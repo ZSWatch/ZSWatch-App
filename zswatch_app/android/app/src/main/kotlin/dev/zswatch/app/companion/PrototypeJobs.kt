@@ -50,7 +50,10 @@ class PrototypeJobs(private val store: PrototypeStore) {
         return id
     }
 
-    /** Drop failed/cancelled jobs that a newer generation of the same recording replaced. */
+    /**
+     * Drop failed/cancelled jobs without a result that a newer generation of the
+     * same recording replaced. Jobs with a result stay selectable in the UI.
+     */
     private fun pruneSuperseded(jobs: JSONObject, outbox: JSONObject, incoming: JSONObject) {
         fun recording(spec: JSONObject) = spec.getString("watch_id") + "\u0000" + spec.getString("recording_id")
         val latest = mutableMapOf(recording(incoming) to incoming.getLong("generation"))
@@ -62,7 +65,8 @@ class PrototypeJobs(private val store: PrototypeStore) {
             val item = jobs.getJSONObject(id); val spec = item.getJSONObject("spec")
             // The incoming voice job takes over selection for its own recording.
             val reselected = recording(spec) == recording(incoming) && incoming.getString("provider") == "dart-voice-v1"
-            item.getString("state") in listOf("failed", "cancelled") && (!item.optBoolean("selected") || reselected) &&
+            item.getString("state") in listOf("failed", "cancelled") && !item.has("result") &&
+                (!item.optBoolean("selected") || reselected) &&
                 spec.getLong("generation") < latest.getValue(recording(spec))
         }.toSet()
         for (id in obsolete) jobs.remove(id)
