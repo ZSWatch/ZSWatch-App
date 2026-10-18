@@ -344,7 +344,7 @@ class PrototypeContractsTest {
         assertTrue((journal.control()["recordings"] as Map<*, *>).isEmpty())
     }
 
-    @Test fun unchangedAndEmptyWatchListsPersistFreshObservationWithoutRetryingOrDeletingReceipts() {
+    @Test fun unchangedAndEmptyWatchListsPersistFreshObservationAndRetryListedFailures() {
         val journal = store()
         journal.update("selected", mapOf("address" to address, "generation" to 7L, "recording_sync_enabled" to false))
         val inbox = PrototypeRecordingInbox(journal) { error("Unexpected list request") }
@@ -353,9 +353,11 @@ class PrototypeContractsTest {
         inbox.receive(response)
         val key = (journal.control()["recordings"] as Map<*, *>).keys.single() as String
         journal.putRecord(key, journal.record(key)!! + mapOf("state" to "failed", "error" to "transfer_timeout"))
-        val retained = journal.record(key)!!
         inbox.receive(response)
-        assertEquals(retained, journal.record(key))
+        // A failed file still on the watch is retried (bounded) so it cannot hide newer ones.
+        assertEquals("pending", journal.record(key)!!["state"])
+        assertEquals(1, (journal.record(key)!!["list_retries"] as Number).toInt())
+        val retained = journal.record(key)!!
         val observation = journal.control()["recording_list"] as Map<*, *>
         assertEquals(address, observation["address"])
         assertEquals(7L, (observation["generation"] as Number).toLong())

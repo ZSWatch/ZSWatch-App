@@ -478,7 +478,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var servicesHandled = false
     private var bonding: PrototypeBonding? = null
     private var bondReceiver: BroadcastReceiver? = null
-    private val recordingInbox = PrototypeRecordingInbox(store) {
+    private val recordingInbox = PrototypeRecordingInbox(store, { deleteRecordingOnWatch(it) }) {
         // Subscription completion always requests a list, including for early hints.
         if (store.control()["phase"] == "ready") requestRecordings(deferIfFull = true)
     }
@@ -764,6 +764,11 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 System.currentTimeMillis(), TimeZone.getDefault())) syncTime(deferIfFull = true)
     }
 
+    private fun deleteRecordingOnWatch(filename: String) {
+        if (!runtime.owns(token) || store.control()["phase"] != "ready" || writes.size >= 16) return
+        command("GB(${JSONObject().put("t", "voice_memo").put("action", "delete").put("filename", filename)})")
+    }
+
     fun requestRecordings(deferIfFull: Boolean = false) {
         if (deferIfFull && runtime.owns(token) && writes.size >= 16) { recordingListDeferred = true; return }
         command("GB({\"t\":\"voice_memo\",\"action\":\"list\"})")
@@ -988,8 +993,13 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private fun incoming(bytes: ByteArray) {
         val droppedBefore = framer.droppedFrames
         val frames = framer.feed(bytes)
-        if (framer.droppedFrames > droppedBefore)
-            store.update("nus_incomplete_frame_discarded", detail = mapOf("count" to framer.droppedFrames - droppedBefore))
+        if (framer.droppedFrames > droppedBefore) {
+            // Shown in the app so we notice if large watch messages need another solution.
+            val total = ((store.control()["incomplete_watch_messages"] as? Number)?.toInt() ?: 0) +
+                framer.droppedFrames - droppedBefore
+            store.update("nus_incomplete_frame_discarded", mapOf("incomplete_watch_messages" to total),
+                mapOf("count" to framer.droppedFrames - droppedBefore))
+        }
         for (text in frames) {
             // The existing framer has already removed firmware logs and joined
             // split UTF-8/JSON. Diagnostic capture does not participate in parsing.
@@ -1125,6 +1135,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
                                         return@deliver
                                     }
                                 store.putRecord(key, receipt)
+                                // The phone copy is verified; free the watch and keep its list short.
+                                deleteRecordingOnWatch(metadata["filename"] as String)
                                 finishFile(key, receipt, null)
                                 downloadNext()
                             }
@@ -1152,6 +1164,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
             it["address"] == store.control()["address"] && it["state"] == "pending"
         }
         if (!more) {
+            // The watch lists only its oldest recordings; fetch the next page after deletions.
+            if ((store.control()["recording_list"] as? Map<*, *>)?.get("more") == true &&
+                runtime.owns(token) && store.control()["phase"] == "ready") requestRecordings(deferIfFull = true)
             smpIdleLease.close()
             fileTransport?.release(); fileTransport = null
             if (runtime.owns(token) && store.control()["phase"] == "ready") command("GB({\"t\":\"smp\",\"status\":false})")

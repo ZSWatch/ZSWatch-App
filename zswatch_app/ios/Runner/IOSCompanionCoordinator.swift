@@ -733,6 +733,14 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
                   "status_observed_ms": CompanionJournal.now]); return
     }
     guard characteristic === rx else { return }
+    let droppedBefore = framer.droppedFrames
+    defer {
+      // Shown in the app so we notice if large watch messages need another solution.
+      if framer.droppedFrames > droppedBefore {
+        let total = (journal.fields["incomplete_watch_messages"] as? Int ?? 0) + framer.droppedFrames - droppedBefore
+        try? changed("nus_incomplete_frame_discarded", ["incomplete_watch_messages": total])
+      }
+    }
     framer.feed(data, message: {
       self.trafficObserver?(["version": 1, "direction": "rx", "generation": generation,
         "utc_ms": CompanionJournal.now, "data": String(data: self.framer.lastMessageData, encoding: .utf8) ?? "",

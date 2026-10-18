@@ -104,8 +104,29 @@ final class IOSRecordingInbox {
       try? owner.send("GB({\"t\":\"voice_memo\",\"action\":\"list\"})")
     } else if message["action"] as? String == "list_result", let list = message["recordings"] as? [[String: Any]], list.count <= 512 {
       var next = records
+      var deleted = 0
       for raw in list {
-        if let (key, original) = CompanionRecordingFiles.metadata(raw, address: owner.journal.address), next[key] == nil, next.count < 4096 {
+        guard let (key, original) = CompanionRecordingFiles.metadata(raw, address: owner.journal.address) else { continue }
+        if var existing = next[key] {
+          switch existing["state"] as? String {
+          case "downloaded", "deleted":
+            // Already on the phone (or removed there); the watch copy only fills its list.
+            let attempts = CompanionRecordingFiles.integer(existing["watch_delete_attempts"]) ?? 0
+            if attempts < Self.maxListRetries, let name = existing["filename"] as? String {
+              existing["watch_delete_attempts"] = attempts + 1; next[key] = existing
+              deleteOnWatch(name); deleted += 1
+            }
+          case "failed":
+            // Retry a few times while the watch still has the file, so a failed
+            // oldest entry does not hide newer recordings forever.
+            let retries = CompanionRecordingFiles.integer(existing["list_retries"]) ?? 0
+            if retries < Self.maxListRetries {
+              existing["state"] = "pending"; existing.removeValue(forKey: "error"); existing["list_retries"] = retries + 1
+              next[key] = existing
+            }
+          default: break
+          }
+        } else if next.count < 4096 {
           var metadata = original
           if let policy = owner.journal.fields["voice_processing_policy"] as? [String: Any],
              policy["enabled"] as? Bool == true, policy["watch_id"] as? String == owner.journal.address {
@@ -114,14 +135,25 @@ final class IOSRecordingInbox {
           next[key] = metadata
         }
       }
+      let more = message["more"] as? Bool == true
       try? owner.publish("recording_list_received", ["recordings": next,
         "recording_list": ["address": owner.journal.address, "generation": owner.journal.generation,
           "observed_ms": CompanionJournal.now, "count": list.count,
-          "result_ack_version": CompanionRecordingFiles.integer(message["result_ack_version"]) == 1 ? 1 : 0]])
+          "result_ack_version": CompanionRecordingFiles.integer(message["result_ack_version"]) == 1 ? 1 : 0,
+          "more": more]])
+      // The watch lists only its oldest recordings; ask for the next page after deletions.
+      if deleted > 0 && more { requestList() }
       downloadNext()
     }
     return true
   }
+  private static let maxListRetries = 3
+  private func deleteOnWatch(_ name: String) {
+    guard let owner, let data = try? JSONSerialization.data(withJSONObject: ["t": "voice_memo", "action": "delete", "filename": name]),
+          let json = String(data: data, encoding: .utf8) else { return }
+    try? owner.send("GB(\(json))")
+  }
+  private func requestList() { try? owner?.send("GB({\"t\":\"voice_memo\",\"action\":\"list\"})") }
   func foregrounded() { foreground = true; pausedBackground = false; downloadNext() }
   func backgrounded() {
     foreground = false
@@ -166,7 +198,14 @@ final class IOSRecordingInbox {
         if let error {
           var next = metadata; next["state"] = interrupted ? "pending" : "failed"
           next["error"] = String(error.localizedDescription.prefix(160)); try self.put(key, next)
-        } else { try self.put(key, self.files.publish(key, metadata: metadata)) }
+        } else {
+          try self.put(key, self.files.publish(key, metadata: metadata))
+          // The phone copy is verified; free the watch and keep its list short.
+          self.deleteOnWatch(name)
+          let list = owner.journal.fields["recording_list"] as? [String: Any]
+          let pending = self.records.values.contains { $0["address"] as? String == owner.journal.address && $0["state"] as? String == "pending" }
+          if list?["more"] as? Bool == true && !pending { self.requestList() }
+        }
       } catch { var next = metadata; next["state"] = "failed"; next["error"] = "receipt_publish_failed"; try? self.put(key, next) }
       owner.queue.asyncAfter(deadline: .now() + 0.5) { self.downloadNext() }
     }

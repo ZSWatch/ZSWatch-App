@@ -183,15 +183,32 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     }
   }
 
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
+
   @override
   Widget build(BuildContext context) {
     if (ref.watch(nativeCompanionRuntimeProvider)) {
       ref.watch(companionWatchPersistenceProvider);
       ref.watch(companionTelemetryUpdatesProvider);
+      // Make dropped (too large) watch messages visible so we notice if they happen.
+      ref.listen(companionSnapshotProvider, (previous, next) {
+        final previousSnapshot = previous?.asData?.value;
+        final after = next.asData?.value.fields['incomplete_watch_messages'];
+        if (previousSnapshot == null || after is! int) return;
+        final before = previousSnapshot.fields['incomplete_watch_messages'];
+        if (after > (before is int ? before : 0)) {
+          _messenger.currentState?.showSnackBar(
+            const SnackBar(
+              content: Text('A message from the watch arrived incomplete'),
+            ),
+          );
+        }
+      });
     }
 
     return MaterialApp.router(
       title: 'ZSWatch',
+      scaffoldMessengerKey: _messenger,
       debugShowCheckedModeBanner: false,
 
       // Theme configuration
