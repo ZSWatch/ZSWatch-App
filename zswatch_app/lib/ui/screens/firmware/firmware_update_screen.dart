@@ -1,4 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +13,7 @@ import '../../../data/models/dfu_state.dart';
 import '../../../data/models/filesystem_image.dart';
 import '../../../data/models/firmware_image.dart';
 import '../../../providers/dfu_providers.dart';
-import '../../../providers/filesystem_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../../services/dfu/firmware_manager.dart';
@@ -36,6 +37,7 @@ class FirmwareUpdateScreen extends ConsumerStatefulWidget {
 }
 
 class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
+  ProviderSubscription<AsyncValue<String>>? _logSubscription;
   bool _showLogs = false;
   final List<String> _logs = [];
   bool _wakelockEnabled = false;
@@ -49,26 +51,27 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
     // Reset state when entering the screen to clear any stale state
     // Use addPostFrameCallback to ensure ref is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (mounted && !ref.read(nativeCompanionRuntimeProvider)) {
         ref.read(dfuNotifierProvider.notifier).reset();
       }
     });
 
-    // Listen to DFU logs
-    ref.read(dfuServiceProvider).logStream.listen((log) {
-      if (mounted) {
-        setState(() => _logs.add(log));
-      }
-    });
-    ref.read(firmwareManagerProvider).logStream.listen((log) {
-      if (mounted) {
-        setState(() => _logs.add(log));
-      }
+    // One combined observer; disposal only detaches UI observation.
+    _logSubscription = ref.listenManual(dfuLogsProvider, (previous, next) {
+      next.whenData((log) {
+        if (mounted) {
+          setState(() {
+            _logs.add(log);
+            if (_logs.length > 500) _logs.removeAt(0);
+          });
+        }
+      });
     });
   }
 
   @override
   void dispose() {
+    _logSubscription?.close();
     // Ensure wakelock is disabled when leaving the screen
     _disableWakelock();
     super.dispose();
@@ -96,11 +99,11 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
   @override
   Widget build(BuildContext context) {
     final dfuState = ref.watch(dfuStateProvider);
-    final operationState = ref.watch(dfuNotifierProvider);
+    final operationState = ref.watch(effectiveDfuOperationStateProvider);
     final downloadProgress = ref.watch(downloadProgressProvider);
     final watch = ref.watch(currentWatchProvider);
     final isConnected = ref.watch(isWatchConnectedProvider);
-    final fsUploadState = ref.watch(filesystemUploadStateProvider);
+    final fsUploadState = ref.watch(firmwareFilesystemStateProvider);
     final hasSmp = ref.watch(hasSmpServiceProvider);
 
     // Manage wakelock based on DFU/upload state
@@ -147,7 +150,7 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                       _BatteryWarningCard(level: watch.batteryLevel ?? 0),
 
                     // Connection status
-                    if (!isConnected)
+                    if (!isConnected && !dfuState.status.isInProgress)
                       _ConnectionWarningCard(
                         onReconnect: () => context.go(AppRoutes.scan),
                       ),
@@ -243,6 +246,24 @@ class _FirmwareUpdateScreenState extends ConsumerState<FirmwareUpdateScreen> {
                               ref.read(dfuNotifierProvider.notifier).reset(),
                         ),
 
+                      if (!operationState.hasFirmware &&
+                          operationState.hasFilesystem)
+                        Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.storage),
+                            title: const Text('LVGL resources'),
+                            subtitle: Text(
+                              '${operationState.filesystemImage!.name} (${operationState.filesystemImage!.formattedSize})',
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.close),
+                              tooltip: 'Clear selection',
+                              onPressed: () => ref
+                                  .read(dfuNotifierProvider.notifier)
+                                  .reset(),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: AppTheme.spacingSm),
 
                       // Rotated firmware option (subtle)
@@ -454,6 +475,13 @@ class _ConnectionWarningCard extends StatelessWidget {
   }
 }
 
+String nativeResourceTitle(WidgetRef ref, FilesystemUploadState state) =>
+    ref.watch(nativeCompanionRuntimeProvider) &&
+        ref.watch(companionFirmwareStatusProvider).valueOrNull?.phase ==
+            'resource_verifying'
+    ? 'Verifying Resources...'
+    : 'Uploading Filesystem...';
+
 class _StatusCard extends ConsumerWidget {
   final DfuState dfuState;
   final DownloadProgress downloadProgress;
@@ -464,9 +492,9 @@ class _StatusCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDownloading = downloadProgress.status.isInProgress;
     final isDfuInProgress = dfuState.status.isInProgress;
-    final fsUploadState = ref.watch(filesystemUploadStateProvider);
+    final fsUploadState = ref.watch(firmwareFilesystemStateProvider);
     final isFsUploading = fsUploadState.status.isInProgress;
-    final operationState = ref.watch(dfuNotifierProvider);
+    final operationState = ref.watch(effectiveDfuOperationStateProvider);
 
     if (!isDownloading && !isDfuInProgress && !isFsUploading) {
       return const SizedBox.shrink();
@@ -489,7 +517,7 @@ class _StatusCard extends ConsumerWidget {
           '${downloadProgress.formattedBytesReceived} / ${downloadProgress.formattedTotalBytes}';
       percentText = '${downloadProgress.progressPercent}%';
     } else if (isFsUploading) {
-      statusTitle = 'Uploading Filesystem...';
+      statusTitle = nativeResourceTitle(ref, fsUploadState);
       progress = fsUploadState.progress;
       bytesText =
           '${fsUploadState.formattedBytesTransferred} / ${fsUploadState.formattedTotalBytes}';
@@ -573,6 +601,19 @@ class _StatusCard extends ConsumerWidget {
                 Text(percentText, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
+
+            if (ref.watch(nativeCompanionRuntimeProvider) &&
+                defaultTargetPlatform == TargetPlatform.iOS &&
+                isDfuInProgress &&
+                !isFsUploading)
+              Padding(
+                padding: const EdgeInsets.only(top: AppTheme.spacingSm),
+                child: Text(
+                  'Keep the app open until the update finishes. Firmware uploads '
+                  'pause when you leave briefly and resume when you return.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
 
             // Speed and time remaining
             if (speedText != null && timeRemainingText != null)
@@ -1537,7 +1578,11 @@ class _ActionButtons extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fsUploadState = ref.watch(filesystemUploadStateProvider);
+    final native = ref.watch(nativeCompanionRuntimeProvider);
+    final nativeStatus = native
+        ? ref.watch(companionFirmwareStatusProvider).valueOrNull
+        : null;
+    final fsUploadState = ref.watch(firmwareFilesystemStateProvider);
     final isFsUploading = fsUploadState.status.isInProgress;
     final isFsCompleted =
         fsUploadState.status == FilesystemUploadStatus.completed;
@@ -1550,7 +1595,9 @@ class _ActionButtons extends ConsumerWidget {
 
     // Completed state - show reset button
     if (dfuState.status == DfuStatus.completed || showFsOnlyComplete) {
-      final isFullComplete = dfuState.status == DfuStatus.completed;
+      final isFullComplete = native
+          ? nativeStatus?.indices.isNotEmpty == true
+          : dfuState.status == DfuStatus.completed;
       return Column(
         children: [
           const Icon(
@@ -1579,8 +1626,12 @@ class _ActionButtons extends ConsumerWidget {
     }
 
     // Failed state - show retry/reset buttons
-    if (dfuState.status == DfuStatus.failed || isFsFailed) {
-      final errorMessage = dfuState.status == DfuStatus.failed
+    if (dfuState.status == DfuStatus.failed ||
+        dfuState.status == DfuStatus.cancelled ||
+        isFsFailed) {
+      final errorMessage =
+          (dfuState.status == DfuStatus.failed ||
+              dfuState.status == DfuStatus.cancelled)
           ? dfuState.errorMessage
           : fsUploadState.errorMessage;
       return Column(
@@ -1588,7 +1639,11 @@ class _ActionButtons extends ConsumerWidget {
           const Icon(Icons.error, color: AppTheme.errorColor, size: 64),
           const SizedBox(height: AppTheme.spacingMd),
           Text(
-            'Update Failed',
+            dfuState.status == DfuStatus.cancelled
+                ? 'Update Cancelled'
+                : native && nativeStatus?.resultUnknown == true
+                ? 'Update Result Unverified'
+                : 'Update Failed',
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(color: AppTheme.errorColor),
@@ -1605,18 +1660,22 @@ class _ActionButtons extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              OutlinedButton(onPressed: onReset, child: const Text('Reset')),
-              const SizedBox(width: AppTheme.spacingMd),
-              FilledButton(
-                onPressed: isFsFailed && dfuState.status != DfuStatus.failed
-                    ? (operationState.canStartFilesystemUpload
-                          ? onStartFilesystem
-                          : null)
-                    : (operationState.canStartFirmwareUpdate
-                          ? onStartFirmware
-                          : null),
-                child: const Text('Retry'),
+              OutlinedButton(
+                onPressed: nativeStatus?.busy == true ? null : onReset,
+                child: const Text('Reset'),
               ),
+              const SizedBox(width: AppTheme.spacingMd),
+              if (!native)
+                FilledButton(
+                  onPressed: isFsFailed && dfuState.status != DfuStatus.failed
+                      ? (operationState.canStartFilesystemUpload
+                            ? onStartFilesystem
+                            : null)
+                      : (operationState.canStartFirmwareUpdate
+                            ? onStartFirmware
+                            : null),
+                  child: const Text('Retry'),
+                ),
             ],
           ),
         ],
@@ -1638,7 +1697,9 @@ class _ActionButtons extends ConsumerWidget {
         isFsUploading ||
         operationState.isBothUpdating) {
       final isCritical = dfuState.status.isCritical;
-      final canCancel = dfuState.status.canCancel || isFsUploading;
+      final canCancel = native
+          ? nativeStatus?.canCancel == true
+          : dfuState.status.canCancel || isFsUploading;
 
       return Column(
         children: [
@@ -1649,13 +1710,15 @@ class _ActionButtons extends ConsumerWidget {
                 color: AppTheme.warningColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.warning, color: AppTheme.warningColor),
-                  SizedBox(width: AppTheme.spacingSm),
+                  const Icon(Icons.warning, color: AppTheme.warningColor),
+                  const SizedBox(width: AppTheme.spacingSm),
                   Expanded(
                     child: Text(
-                      'Do not disconnect or close the app during this phase.',
+                      native
+                          ? 'Keep the watch powered and Bluetooth enabled during the update.'
+                          : 'Do not disconnect or close the app during this phase.',
                     ),
                   ),
                 ],
@@ -1745,6 +1808,13 @@ class _ActionButtons extends ConsumerWidget {
           ],
         ),
 
+        if (native && operationState.hasFilesystem)
+          const Padding(
+            padding: EdgeInsets.only(top: AppTheme.spacingSm),
+            child: Text(
+              'Resource replacement cannot be cancelled once started. Keep the watch powered and Bluetooth enabled.',
+            ),
+          ),
         // Status messages
         if (!isConnected)
           Padding(

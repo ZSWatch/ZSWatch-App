@@ -102,6 +102,7 @@ object LifecycleLogger {
         if (lowerSource == "startupcause") return true
         if (lowerSource == "applifecycle" || lowerSource == "mainactivity") return true
         if (lowerSource == "bootreceiver") return true
+        if (lowerSource == "companionprototype") return true
         if (lowerSource.contains("notificationservice")) {
             return lowerMessage.contains("oncreate") ||
                 lowerMessage.contains("ondestroy") ||
@@ -112,6 +113,9 @@ object LifecycleLogger {
         }
         if (lowerSource == "bleconnectionservice") {
             return lowerMessage.contains("oncreate") ||
+                // START_STICKY can restart the service with a null intent while
+                // Flutter/UI is absent. Preserve that evidence across relaunch.
+                lowerMessage.contains("onstartcommand action=null") ||
                 lowerMessage.contains("ondestroy") ||
                 lowerMessage.contains("onlowmemory") ||
                 lowerMessage.contains("ontrimmemory") ||

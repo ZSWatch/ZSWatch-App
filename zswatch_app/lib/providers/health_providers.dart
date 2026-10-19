@@ -7,6 +7,7 @@ import '../data/models/health_sample.dart';
 import '../data/repositories/health_repository.dart';
 import '../services/health/health_sync_service.dart';
 import 'watch_providers.dart';
+import 'companion_runtime_providers.dart';
 import 'watch_service_provider.dart';
 
 export '../services/health/health_sync_service.dart'
@@ -26,13 +27,42 @@ final healthRepositoryProvider = Provider<HealthRepository>((ref) {
 
 /// Provider for the health sync service singleton
 final healthSyncServiceProvider = Provider<HealthSyncService>((ref) {
-  final watchService = ref.watch(watchServiceProvider);
   final healthRepository = ref.watch(healthRepositoryProvider);
-
-  final service = HealthSyncService(
-    watchService: watchService,
-    healthRepository: healthRepository,
-  );
+  final HealthSyncService service;
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    // Reset live readings when the owner/watch/generation changes, retaining
+    // history in the shared database. Snapshot observation never starts BLE.
+    ref.watch(
+      companionSnapshotProvider.select((value) {
+        final s = value.valueOrNull;
+        return (s?.fields['address'], s?.generation, s?.protocolReady);
+      }),
+    );
+    final activity =
+        companionValues<Map<String, dynamic>?>(ref, (s) {
+              final value = s.fields['latest_health'];
+              if (!s.protocolReady ||
+                  value is! Map ||
+                  value['address'] != s.fields['address'] ||
+                  value['generation'] != s.generation) {
+                return null;
+              }
+              return Map<String, dynamic>.from(value)..['t'] = 'act';
+            })
+            .where((value) => value != null)
+            .cast<Map<String, dynamic>>()
+            .distinct((a, b) => a['sequence'] == b['sequence']);
+    service = HealthSyncService.forCompanion(
+      healthRepository: healthRepository,
+      watchId: () => ref.read(currentWatchProvider)?.id,
+      activity: activity,
+    );
+  } else {
+    service = HealthSyncService(
+      watchService: ref.watch(watchServiceProvider),
+      healthRepository: healthRepository,
+    );
+  }
 
   ref.onDispose(() => service.dispose());
   return service;
@@ -275,6 +305,7 @@ class ActivityBreakdownNotifier extends StateNotifier<ActivityBreakdownState> {
         }
       }
 
+      if (_disposed) return;
       state = state.copyWith(
         breakdown: ActivityBreakdown(
           durations: durations,
@@ -285,6 +316,7 @@ class ActivityBreakdownNotifier extends StateNotifier<ActivityBreakdownState> {
         error: null,
       );
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -389,6 +421,7 @@ class HealthSummaryNotifier extends StateNotifier<HealthSummaryState> {
         granularity: Granularity.daily,
       );
 
+      if (_disposed) return;
       state = state.copyWith(
         todaySteps: todaySteps,
         latestHeartRate: latestHr?.intValue,
@@ -397,6 +430,7 @@ class HealthSummaryNotifier extends StateNotifier<HealthSummaryState> {
         error: null,
       );
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -520,6 +554,7 @@ class StepsHistoryNotifier extends StateNotifier<StepsHistoryState> {
         total = data.map((a) => a.total.round()).reduce((a, b) => a + b);
       }
 
+      if (_disposed) return;
       state = state.copyWith(
         data: data,
         totalSteps: total,
@@ -527,6 +562,7 @@ class StepsHistoryNotifier extends StateNotifier<StepsHistoryState> {
         error: null,
       );
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -636,6 +672,7 @@ class HeartRateHistoryNotifier extends StateNotifier<HeartRateHistoryState> {
         );
       }
 
+      if (_disposed) return;
       state = state.copyWith(
         todayReadings: readings,
         todayAggregate: aggregate,
@@ -643,6 +680,7 @@ class HeartRateHistoryNotifier extends StateNotifier<HeartRateHistoryState> {
         error: null,
       );
     } catch (e) {
+      if (_disposed) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }

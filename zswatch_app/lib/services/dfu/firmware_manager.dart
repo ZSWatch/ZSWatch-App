@@ -48,6 +48,23 @@ class FirmwareManager {
     return hardwareVersion.substring(0, slashIndex);
   }
 
+  /// Nordic manifests use the base board name for WatchDK's default revision.
+  /// app/boards/zswatch/watchdk/board.yml defines only revision 1 as the default.
+  /// Other board families and explicit revisions remain distinct.
+  static bool firmwareBoardMatches(
+    String? declaredBoard,
+    String? hardwareVersion,
+  ) {
+    String? canonical(String? name) {
+      final prefix = boardPrefixFromHardwareVersion(name);
+      return prefix == 'watchdk' ? 'watchdk@1' : prefix;
+    }
+
+    final declared = canonical(declaredBoard),
+        selected = canonical(hardwareVersion);
+    return declared == null || selected == null || declared == selected;
+  }
+
   /// Check whether a release asset name is compatible with the given board prefix.
   ///
   /// If [boardPrefix] is null the asset is always considered compatible.
@@ -1042,6 +1059,15 @@ class FirmwareManager {
       );
     }
 
+    if (FilesystemConstants.isFilesystemImage(name)) {
+      return ReleaseExtractionResult(
+        filesystemImage: FilesystemImage.fromFile(
+          filePath: filePath,
+          size: size,
+        ),
+      );
+    }
+
     // For zip files, check if it's a release-style archive
     if (lower.endsWith('.zip')) {
       try {
@@ -1426,15 +1452,12 @@ class FirmwareDownloadException implements Exception {
 /// a filesystem image (lvgl_resources_raw.bin) if found in the archive.
 class ReleaseExtractionResult {
   /// The extracted firmware image (dfu_application.zip)
-  final FirmwareImage firmwareImage;
+  final FirmwareImage? firmwareImage;
 
   /// The extracted filesystem image (lvgl_resources_raw.bin), if found
   final FilesystemImage? filesystemImage;
 
-  const ReleaseExtractionResult({
-    required this.firmwareImage,
-    this.filesystemImage,
-  });
+  const ReleaseExtractionResult({this.firmwareImage, this.filesystemImage});
 
   /// Whether a filesystem image was found
   bool get hasFilesystemImage => filesystemImage != null;

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Watch HTTP relay: watch requests support HTTP as well as HTTPS.
+     Certificate verification remains the platform default for HTTPS. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

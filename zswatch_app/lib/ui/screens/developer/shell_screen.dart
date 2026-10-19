@@ -10,6 +10,7 @@ import '../../../data/models/connection.dart';
 import '../../../data/models/thread_monitor_data.dart';
 import '../../../providers/shell_providers.dart';
 import '../../../providers/watch_service_provider.dart';
+import '../../../providers/companion_runtime_providers.dart';
 
 /// Shell screen with tabs: Terminal, Quick Actions, Remote Control, Live Monitor.
 class ShellScreen extends ConsumerStatefulWidget {
@@ -47,8 +48,10 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
       Future(monitorNotifier.stop);
     }
 
-    final watchService = ref.read(watchServiceProvider);
-    unawaited(watchService.disableSmp());
+    if (!ref.read(nativeCompanionRuntimeProvider)) {
+      final watchService = ref.read(watchServiceProvider);
+      unawaited(watchService.disableSmp());
+    }
     super.deactivate();
   }
 
@@ -60,6 +63,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
   }
 
   Future<void> _enableSmp() async {
+    if (ref.read(nativeCompanionRuntimeProvider)) return;
     if (_smpEnabling) return;
     _setSmpEnabling(true);
     try {
@@ -99,6 +103,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
   @override
   Widget build(BuildContext context) {
     final connection = ref.watch(watchConnectionProvider);
+    final native = ref.watch(nativeCompanionRuntimeProvider);
 
     // Re-enable SMP whenever the watch reconnects while this screen is open.
     ref.listen<Connection>(watchConnectionProvider, (prev, next) {
@@ -119,17 +124,18 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
       appBar: AppBar(
         title: const Text('Shell'),
         actions: [
-          IconButton(
-            icon: _smpEnabling
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh),
-            tooltip: 'Re-enable SMP',
-            onPressed: _smpEnabling ? null : _enableSmp,
-          ),
+          if (!native)
+            IconButton(
+              icon: _smpEnabling
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              tooltip: 'Re-enable SMP',
+              onPressed: _smpEnabling ? null : _enableSmp,
+            ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -143,15 +149,28 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
           ],
         ),
       ),
-      body: !connection.isConnected
+      body: !native && !connection.isConnected
           ? const Center(child: Text('Watch not connected'))
-          : TabBarView(
-              controller: _tabController,
-              children: const [
-                _TerminalTab(),
-                _QuickActionsTab(),
-                _RemoteControlTab(),
-                _LiveMonitorTab(),
+          : Column(
+              children: [
+                if (native && !connection.isConnected)
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Text('Watch not connected'),
+                  ),
+                // Preserve pending UI results through native SMP preparation.
+                Expanded(
+                  key: const ValueKey('shell-tabs'),
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: const [
+                      _TerminalTab(),
+                      _QuickActionsTab(),
+                      _RemoteControlTab(),
+                      _LiveMonitorTab(),
+                    ],
+                  ),
+                ),
               ],
             ),
     );

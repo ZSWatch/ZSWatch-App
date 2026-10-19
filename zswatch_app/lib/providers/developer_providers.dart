@@ -11,6 +11,7 @@ import '../data/repositories/comm_log_repository.dart';
 import '../services/ble/sensor_gatt_service.dart';
 import '../services/watch_service.dart';
 import 'watch_service_provider.dart';
+import 'companion_runtime_providers.dart';
 
 part 'developer_providers.freezed.dart';
 
@@ -24,23 +25,74 @@ final logFilterProvider = StateProvider<LogFilter>((ref) => LogFilter.all);
 /// Provider for whether log streaming is enabled on watch
 final logStreamingEnabledProvider = StateProvider<bool>((ref) => false);
 
+// Only the log view observes payloads; leaving it cancels capture through the
+// bridge without changing the native companion's lifetime or connection.
+final companionLiveLogEventsProvider =
+    StreamProvider.autoDispose<Map<String, Object?>>((ref) {
+      return ref.watch(companionClientProvider).liveLogs();
+    });
+
 /// Provider for log streaming state (with pending/error tracking)
 final logStreamingStateProvider =
-    StateNotifierProvider<LogStreamingStateNotifier, LogStreamingState>((ref) {
+    StateNotifierProvider.autoDispose<
+      LogStreamingStateNotifier,
+      LogStreamingState
+    >((ref) {
+      if (ref.watch(nativeCompanionRuntimeProvider)) {
+        final notifier = LogStreamingStateNotifier.native(
+          ref.watch(companionClientProvider).setLogStreaming,
+        );
+        ref.listen(companionLiveLogEventsProvider, (previous, next) {
+          next.whenData(notifier.receiveNative);
+          if (next.hasError) notifier.failNative(next.error!);
+        });
+        return notifier;
+      }
+      ref.keepAlive(); // Preserve the existing deferred iOS provider lifetime.
       final watchService = ref.watch(watchServiceProvider);
       return LogStreamingStateNotifier(watchService);
     });
 
 class LogStreamingStateNotifier extends StateNotifier<LogStreamingState> {
-  final WatchService _watchService;
+  final WatchService? _watchService;
+  final Future<void> Function(bool)? _nativeCommand;
 
   LogStreamingStateNotifier(this._watchService)
-    : super(const LogStreamingState());
+    : _nativeCommand = null,
+      super(const LogStreamingState());
 
-  Future<void> enable() async {
+  LogStreamingStateNotifier.native(this._nativeCommand)
+    : _watchService = null,
+      super(const LogStreamingState());
+
+  void receiveNative(Map<String, Object?> event) {
+    if (event['kind'] != 'state') return;
+    state = state.copyWith(
+      requestedByApp: event['requested'] == true,
+      enabledOnWatch: event['written'] == true,
+      pending: event['pending'] == true,
+      error: null,
+    );
+  }
+
+  void failNative(Object error) {
+    state = state.copyWith(pending: false, error: error.toString());
+  }
+
+  Future<void> _setNative(bool enabled) async {
     state = state.copyWith(pending: true, error: null);
     try {
-      await _watchService.setLogStreaming(true);
+      await _nativeCommand!(enabled);
+    } catch (error) {
+      if (mounted) failNative(error);
+    }
+  }
+
+  Future<void> enable() async {
+    if (_nativeCommand != null) return _setNative(true);
+    state = state.copyWith(pending: true, error: null);
+    try {
+      await _watchService!.setLogStreaming(true);
       state = state.copyWith(
         requestedByApp: true,
         enabledOnWatch: true,
@@ -52,9 +104,10 @@ class LogStreamingStateNotifier extends StateNotifier<LogStreamingState> {
   }
 
   Future<void> disable() async {
+    if (_nativeCommand != null) return _setNative(false);
     state = state.copyWith(pending: true, error: null);
     try {
-      await _watchService.setLogStreaming(false);
+      await _watchService!.setLogStreaming(false);
       state = state.copyWith(
         requestedByApp: false,
         enabledOnWatch: false,
@@ -76,7 +129,21 @@ class LogStreamingStateNotifier extends StateNotifier<LogStreamingState> {
 
 /// Provider for all log entries (maintains a buffer)
 final logEntriesProvider =
-    StateNotifierProvider<LogEntriesNotifier, List<LogEntry>>((ref) {
+    StateNotifierProvider.autoDispose<LogEntriesNotifier, List<LogEntry>>((
+      ref,
+    ) {
+      if (ref.watch(nativeCompanionRuntimeProvider)) {
+        final notifier = LogEntriesNotifier.native();
+        ref.listen(companionLiveLogEventsProvider, (previous, next) {
+          next.whenData((event) {
+            if (event['kind'] == 'log' && event['message'] is String) {
+              notifier._emitLogEntry(event['message']! as String);
+            }
+          });
+        });
+        return notifier;
+      }
+      ref.keepAlive(); // Preserve the existing deferred iOS log buffer lifetime.
       final watchService = ref.watch(watchServiceProvider);
       return LogEntriesNotifier(watchService);
     });
@@ -88,7 +155,7 @@ class LogEntriesNotifier extends StateNotifier<List<LogEntry>> {
   static const String _bleLogPrefix = '<BLELOG>';
   static const String _bleLogSuffix = '</BLELOG>';
 
-  final WatchService _watchService;
+  final WatchService? _watchService;
   int _nextId = 1;
   StreamSubscription<String>? _incomingSubscription;
 
@@ -99,10 +166,13 @@ class LogEntriesNotifier extends StateNotifier<List<LogEntry>> {
   LogEntriesNotifier(this._watchService) : super([]) {
     _subscribeToStreams();
   }
+  LogEntriesNotifier.native() : _watchService = null, super([]);
 
   void _subscribeToStreams() {
     // Only subscribe to incoming data - we only want real logs from BLELOG wrapper
-    _incomingSubscription = _watchService.rawIncomingData.listen((String data) {
+    _incomingSubscription = _watchService!.rawIncomingData.listen((
+      String data,
+    ) {
       _processIncomingData(data);
     });
     // Note: We don't subscribe to outgoing data for the log viewer
@@ -234,7 +304,15 @@ final filteredLogEntriesProvider = Provider<List<LogEntry>>((ref) {
 /// Provider for the communication log repository
 /// Wired to watch service streams to automatically capture TX/RX traffic
 final commLogRepositoryProvider =
-    StateNotifierProvider<CommLogNotifier, List<CommLogEntry>>((ref) {
+    StateNotifierProvider.autoDispose<CommLogNotifier, List<CommLogEntry>>((
+      ref,
+    ) {
+      if (ref.watch(nativeCompanionRuntimeProvider)) {
+        return CommLogNotifier.native(
+          ref.watch(companionClientProvider).communicationTraffic(),
+        );
+      }
+      ref.keepAlive(); // Preserve the deferred iOS diagnostic lifetime.
       final watchService = ref.watch(watchServiceProvider);
       return CommLogNotifier(watchService);
     });
@@ -244,14 +322,40 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
   static const String _bleLogPrefix = '<BLELOG>';
   static const String _bleLogSuffix = '</BLELOG>';
 
-  final WatchService _watchService;
+  final WatchService? _watchService;
   final CommLogRepository _repo = CommLogRepository();
   StreamSubscription<String>? _rxSubscription;
   StreamSubscription<String>? _txSubscription;
+  StreamSubscription<Map<String, Object?>>? _nativeSubscription;
+  int _nativeId = 1;
   bool _discardingBleLog = false;
 
   CommLogNotifier(this._watchService) : super([]) {
     _subscribeToStreams();
+  }
+
+  CommLogNotifier.native(Stream<Map<String, Object?>> events)
+    : _watchService = null,
+      super([]) {
+    _nativeSubscription = events.listen((event) {
+      final chunks = event['chunk_count']! as int;
+      _repo.add(
+        CommLogEntry(
+          id: _nativeId++,
+          timestamp: DateTime.fromMillisecondsSinceEpoch(
+            event['utc_ms']! as int,
+          ),
+          data: event['data']! as String,
+          direction: event['direction'] == 'tx'
+              ? CommDirection.tx
+              : CommDirection.rx,
+          sizeBytes: event['size_bytes']! as int,
+          wasChunked: event['direction'] == 'tx' && chunks > 1,
+          chunkCount: event['direction'] == 'tx' ? chunks : null,
+        ),
+      );
+      state = _repo.entries;
+    });
   }
 
   CommLogRepository get repository => _repo;
@@ -300,7 +404,7 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
   }
 
   void _subscribeToStreams() {
-    _rxSubscription = _watchService.rawIncomingData.listen((data) {
+    _rxSubscription = _watchService!.rawIncomingData.listen((data) {
       final sanitized = _stripDebugLogs(data);
       if (sanitized == null) return;
 
@@ -325,12 +429,13 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
   void dispose() {
     _rxSubscription?.cancel();
     _txSubscription?.cancel();
+    _nativeSubscription?.cancel();
     super.dispose();
   }
 }
 
 /// Provider for communication log entries (refreshes on change)
-final commLogEntriesProvider = Provider<List<CommLogEntry>>((ref) {
+final commLogEntriesProvider = Provider.autoDispose<List<CommLogEntry>>((ref) {
   final entries = ref.watch(commLogRepositoryProvider);
   // Return in chronological order (oldest first, newest last)
   // This matches the auto-scroll to bottom behavior in the UI
@@ -338,7 +443,7 @@ final commLogEntriesProvider = Provider<List<CommLogEntry>>((ref) {
 });
 
 /// Provider for communication log statistics
-final commLogStatsProvider = Provider<CommLogStats>((ref) {
+final commLogStatsProvider = Provider.autoDispose<CommLogStats>((ref) {
   // Watch the state to trigger rebuild when entries change
   final entries = ref.watch(commLogRepositoryProvider);
 

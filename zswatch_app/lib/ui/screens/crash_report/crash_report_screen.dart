@@ -11,6 +11,7 @@ import '../../../data/database/app_database.dart';
 import '../../../data/models/coredump_analysis.dart';
 import '../../../data/models/crash_summary.dart';
 import '../../../providers/coredump_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../../services/coredump/coredump_service.dart';
@@ -20,11 +21,40 @@ class CrashReportScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final native = ref.watch(nativeCompanionRuntimeProvider);
+    final inspection = native
+        ? ref.watch(nativeCoredumpInspectionProvider)
+        : null;
+    // History/analysis remain in the existing UI repository. This provider uses
+    // the native summary stream on Android and never constructs WatchService.
+    if (native) ref.watch(crashReportPersistenceProvider);
+    final current = inspection?.isLoading == true
+        ? const Center(child: CircularProgressIndicator())
+        : inspection?.hasError == true
+        ? Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Could not inspect current crash: ${inspection!.error}',
+              ),
+            ),
+          )
+        : const _CurrentCrashTab();
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Crash Reports'),
+          actions: [
+            if (native)
+              IconButton(
+                tooltip: 'Refresh crash summary',
+                icon: const Icon(Icons.refresh),
+                onPressed: inspection?.isLoading == true
+                    ? null
+                    : () => ref.invalidate(nativeCoredumpInspectionProvider),
+              ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Current'),
@@ -32,7 +62,7 @@ class CrashReportScreen extends ConsumerWidget {
             ],
           ),
         ),
-        body: const TabBarView(children: [_CurrentCrashTab(), _HistoryTab()]),
+        body: TabBarView(children: [current, const _HistoryTab()]),
       ),
     );
   }
@@ -822,10 +852,16 @@ class _ActionButtons extends ConsumerWidget {
     final service = ref.read(coredumpServiceProvider);
     final coredumpTxt = service.lastCoredumpTxt;
     if (coredumpTxt == null) return;
+    final sha = summary.fwCommitSha;
+    final suffix = sha.isEmpty
+        ? 'unknown'
+        : sha.length > 7
+        ? sha.substring(0, 7)
+        : sha;
 
     final savePath = await FilePicker.platform.saveFile(
       dialogTitle: 'Save coredump.txt',
-      fileName: 'coredump_${summary.fwCommitSha.substring(0, 7)}.txt',
+      fileName: 'coredump_$suffix.txt',
     );
 
     if (savePath == null) return;
@@ -864,8 +900,13 @@ class _ActionButtons extends ConsumerWidget {
     if (confirmed != true) return;
     if (!context.mounted) return;
 
-    final watchService = ref.read(watchServiceProvider);
-    await watchService.eraseCoredump();
+    if (ref.read(nativeCompanionRuntimeProvider)) {
+      final client = ref.read(companionClientProvider);
+      final snapshot = await client.snapshot();
+      await client.inspectCoredump(snapshot.generation, erase: true);
+    } else {
+      await ref.read(watchServiceProvider).eraseCoredump();
+    }
 
     if (context.mounted) {
       ScaffoldMessenger.of(

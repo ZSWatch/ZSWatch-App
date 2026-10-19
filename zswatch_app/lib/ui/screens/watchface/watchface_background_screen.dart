@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/filesystem_image.dart';
 import '../../../providers/filesystem_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/watchface_background_provider.dart';
 import 'watchface_crop_screen.dart';
 
@@ -27,6 +28,13 @@ class _WatchfaceBackgroundScreenState
   Widget build(BuildContext context) {
     final bgState = ref.watch(watchfaceBackgroundProvider);
     final uploadState = ref.watch(filesystemUploadStateProvider);
+    final native = ref.watch(nativeCompanionRuntimeProvider);
+    final nativeStatus = native
+        ? ref.watch(companionWatchfaceStatusProvider).valueOrNull
+        : null;
+    final selectedAddress = native
+        ? ref.watch(companionSnapshotProvider).valueOrNull?.fields['address']
+        : null;
 
     // Show snackbar on success/error
     ref.listen<WatchfaceBackgroundState>(watchfaceBackgroundProvider, (
@@ -59,15 +67,50 @@ class _WatchfaceBackgroundScreenState
       body: Column(
         children: [
           // Upload progress
-          if (bgState.isUploading) _UploadProgressBar(uploadState: uploadState),
+          if (bgState.isUploading)
+            _UploadProgressBar(
+              uploadState: uploadState,
+              nativePhase: ref.watch(nativeCompanionRuntimeProvider)
+                  ? ref
+                                .watch(companionWatchfaceStatusProvider)
+                                .valueOrNull
+                                ?.busy ==
+                            true
+                        ? ref
+                              .watch(companionWatchfaceStatusProvider)
+                              .valueOrNull
+                              ?.phase
+                        : 'preparing'
+                  : null,
+            ),
           if (bgState.isApplying) const LinearProgressIndicator(),
 
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppTheme.spacingMd),
+              padding: EdgeInsets.fromLTRB(
+                AppTheme.spacingMd,
+                AppTheme.spacingMd,
+                AppTheme.spacingMd,
+                AppTheme.spacingMd + MediaQuery.viewPaddingOf(context).bottom,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (nativeStatus?.phase == 'failed' &&
+                      nativeStatus?.address == selectedAddress &&
+                      !isBusy)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          nativeStatus!.applicationUncertain
+                              ? 'The previous background result is unknown. Check the watch, then reconnect before retrying.'
+                              : nativeStatus.error == 'interrupted'
+                              ? 'The previous background update was interrupted. You can retry it.'
+                              : 'The previous background update failed. You can retry it.',
+                        ),
+                      ),
+                    ),
                   for (final group in backgroundGroups) ...[
                     Text(
                       group.name,
@@ -253,7 +296,8 @@ class _BackgroundTile extends StatelessWidget {
 class _UploadProgressBar extends StatelessWidget {
   final FilesystemUploadState uploadState;
 
-  const _UploadProgressBar({required this.uploadState});
+  final String? nativePhase;
+  const _UploadProgressBar({required this.uploadState, this.nativePhase});
 
   @override
   Widget build(BuildContext context) {
@@ -263,17 +307,29 @@ class _UploadProgressBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: AppTheme.spacingSm),
-          LinearProgressIndicator(value: uploadState.progress),
+          LinearProgressIndicator(
+            value: nativePhase != null && nativePhase != 'uploading'
+                ? null
+                : uploadState.progress,
+          ),
           const SizedBox(height: AppTheme.spacingXs),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${uploadState.progressPercent}%',
+                nativePhase != null && nativePhase != 'uploading'
+                    ? ''
+                    : '${uploadState.progressPercent}%',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               Text(
-                '${uploadState.formattedSpeed} - ETA ${uploadState.formattedTimeRemaining}',
+                nativePhase == null
+                    ? '${uploadState.formattedSpeed} - ETA ${uploadState.formattedTimeRemaining}'
+                    : nativePhase == 'preparing'
+                    ? 'Preparing background'
+                    : nativePhase == 'verifying'
+                    ? 'Verifying background'
+                    : 'Uploading background',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],

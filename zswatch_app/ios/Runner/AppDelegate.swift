@@ -1,4 +1,5 @@
 import EventKit
+import BackgroundTasks
 import Flutter
 import UIKit
 import UserNotifications
@@ -7,12 +8,27 @@ import UserNotifications
 @objc class AppDelegate: FlutterAppDelegate {
   private let productivityChannelName = "dev.zswatch.app/productivity"
   private let eventStore = EKEventStore()
+  private var companion: IOSCompanionCoordinator!
+  private var companionActions: IOSCompanionActions?
+  private var companionBridge: IOSCompanionBridge?
 
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    let restored = (launchOptions?[.bluetoothCentrals] as? [String])?.contains(IOSCompanionCoordinator.restorationID) == true
+    companion = IOSCompanionCoordinator(root: root, restoredLaunch: restored)
+    companionActions = IOSCompanionActions(owner: companion, presenter: { [weak self] in self?.window?.rootViewController })
+    BGTaskScheduler.shared.register(forTaskWithIdentifier: IOSVoiceCoordinator.backgroundID, using: companion.queue) { [weak self] task in
+      guard let task = task as? BGProcessingTask, let owner = self?.companion else { task.setTaskCompleted(success: false); return }
+      guard let voice = owner.voice else { task.setTaskCompleted(success: false); return }
+      voice.grant(task)
+    }
     GeneratedPluginRegistrant.register(with: self)
+    if let registrar = registrar(forPlugin: "IOSCompanionBridge") {
+      companionBridge = IOSCompanionBridge(messenger: registrar.messenger(), owner: companion)
+    }
 
     if let controller = window?.rootViewController as? FlutterViewController {
       let channel = FlutterMethodChannel(
@@ -28,8 +44,26 @@ import UserNotifications
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  override func applicationWillResignActive(_ application: UIApplication) {
+    companion.queue.async { [companion] in companion?.uiInactive() }
+    super.applicationWillResignActive(application)
+  }
+
+  override func applicationDidBecomeActive(_ application: UIApplication) {
+    companion.queue.async { [companion] in companion?.uiForegrounded() }
+    super.applicationDidBecomeActive(application)
+  }
+
+  override func applicationDidEnterBackground(_ application: UIApplication) {
+    companion.queue.async { [companion] in companion?.uiBackgrounded() }
+    super.applicationDidEnterBackground(application)
+  }
+
   private func handleProductivityCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "companionAction":
+      guard let args = call.arguments as? [String: Any] else { result(FlutterError(code: "INVALID_ARGUMENT", message: "Confirmed action required", details: nil)); return }
+      companionActions?.handle(args, result: result)
     case "createAction":
       handleCreateAction(call, result: result)
     case "getDeviceMemoryMB":
@@ -65,13 +99,13 @@ import UserNotifications
     let reminderMinutes = (args["reminderMinutes"] as? NSNumber)?.intValue
     let durationSeconds = (args["durationSeconds"] as? NSNumber)?.intValue
 
-    // Timer and alarm use Clock app URLs on iOS — no calendar permission needed.
+    // Timer and alarm schedule local app notifications; no calendar permission is needed.
     if actionType == "timer" {
-      createTimerViaClockApp(durationSeconds: durationSeconds ?? 0, label: title, result: result)
+      createTimerNotification(durationSeconds: durationSeconds ?? 0, label: title, result: result)
       return
     }
     if actionType == "alarm" {
-      createAlarmViaClockApp(scheduledAtMillis: scheduledAtMillis, label: title, result: result)
+      createAlarmNotification(scheduledAtMillis: scheduledAtMillis, label: title, result: result)
       return
     }
 
@@ -104,7 +138,7 @@ import UserNotifications
     }
   }
 
-  private func createTimerViaClockApp(durationSeconds: Int, label: String, result: @escaping FlutterResult) {
+  private func createTimerNotification(durationSeconds: Int, label: String, result: @escaping FlutterResult) {
     guard durationSeconds > 0 else {
       result(FlutterError(code: "INVALID_ARGUMENT", message: "durationSeconds must be > 0", details: nil))
       return
@@ -143,7 +177,7 @@ import UserNotifications
     }
   }
 
-  private func createAlarmViaClockApp(scheduledAtMillis: Double?, label: String, result: @escaping FlutterResult) {
+  private func createAlarmNotification(scheduledAtMillis: Double?, label: String, result: @escaping FlutterResult) {
     guard let scheduledAtMillis = scheduledAtMillis else {
       result(FlutterError(code: "INVALID_ARGUMENT", message: "scheduledAtMillis is required", details: nil))
       return

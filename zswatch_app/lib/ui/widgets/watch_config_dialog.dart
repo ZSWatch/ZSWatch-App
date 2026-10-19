@@ -15,12 +15,16 @@ class WatchConfigDialog extends StatefulWidget {
   final WatchEntity watch;
   final Future<void> Function(String watchId, String? customName) onRename;
   final Future<void> Function(String watchId) onForget;
+  final bool allowForget;
+  final String? forgetDescription;
 
   const WatchConfigDialog({
     super.key,
     required this.watch,
     required this.onRename,
     required this.onForget,
+    this.allowForget = true,
+    this.forgetDescription,
   });
 
   /// Show the dialog and return true if the watch was forgotten (deleted)
@@ -29,6 +33,8 @@ class WatchConfigDialog extends StatefulWidget {
     required WatchEntity watch,
     required Future<void> Function(String watchId, String? customName) onRename,
     required Future<void> Function(String watchId) onForget,
+    bool allowForget = true,
+    String? forgetDescription,
   }) {
     return showDialog<bool>(
       context: context,
@@ -36,6 +42,8 @@ class WatchConfigDialog extends StatefulWidget {
         watch: watch,
         onRename: onRename,
         onForget: onForget,
+        allowForget: allowForget,
+        forgetDescription: forgetDescription,
       ),
     );
   }
@@ -68,21 +76,24 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
 
   bool get _hasChanges {
     final newName = _nameController.text.trim();
-    final currentName = widget.watch.customName ?? widget.watch.name;
-    return newName != currentName && newName.isNotEmpty;
+    final customName = newName.isEmpty || newName == widget.watch.name
+        ? null
+        : newName;
+    return customName != widget.watch.customName;
   }
 
   Future<void> _handleSave() async {
     if (_isSaving || _isForgetting) return;
 
     final newName = _nameController.text.trim();
-    if (newName.isEmpty) return;
 
     setState(() => _isSaving = true);
 
     try {
-      // If new name equals the original advertised name, clear customName
-      final customName = newName == widget.watch.name ? null : newName;
+      // An empty field restores the advertised name, as the helper explains.
+      final customName = newName.isEmpty || newName == widget.watch.name
+          ? null
+          : newName;
       await widget.onRename(widget.watch.id, customName);
 
       if (mounted) {
@@ -114,8 +125,7 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
         title: const Text('Forget Watch'),
         content: Text(
           'Are you sure you want to forget "$_displayName"?\n\n'
-          'This will remove the watch from your saved devices and unpair it. '
-          'You will need to pair it again to use it.',
+          '${widget.forgetDescription ?? 'This will remove the watch from your saved devices and unpair it. You will need to pair it again to use it.'}',
         ),
         actions: [
           TextButton(
@@ -198,24 +208,25 @@ class _WatchConfigDialogState extends State<WatchConfigDialog> {
             const SizedBox(height: AppTheme.spacingLg),
 
             // Forget watch button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: isLoading ? null : _handleForget,
-                icon: _isForgetting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.delete_outline),
-                label: const Text('Forget Watch'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.errorColor,
-                  side: const BorderSide(color: AppTheme.errorColor),
+            if (widget.allowForget)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: isLoading ? null : _handleForget,
+                  icon: _isForgetting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline),
+                  label: const Text('Forget Watch'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.errorColor,
+                    side: const BorderSide(color: AppTheme.errorColor),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

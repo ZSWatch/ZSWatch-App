@@ -11,10 +11,12 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/database/app_database.dart';
 import '../../../data/models/connection_state.dart';
 import '../../../providers/auto_reconnect_provider.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/ble_providers.dart';
 import '../../../providers/watch_providers.dart' as db;
 import '../../../providers/watch_service_provider.dart';
 import '../../widgets/watch_config_dialog.dart';
+import 'companion_start_view.dart';
 
 /// Start page showing stored watches and option to add new watch (FR-067 to FR-070)
 ///
@@ -38,6 +40,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
   @override
   void initState() {
     super.initState();
+    if (ref.read(nativeCompanionRuntimeProvider)) return;
     // Start auto-reconnect on launch (FR-071)
     // Use post-frame callback to ensure providers are ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -158,6 +161,9 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      return const CompanionStartView();
+    }
     final watchesAsync = ref.watch(db.allWatchesProvider);
 
     // Navigate to dashboard when connected (FR-074)
@@ -257,7 +263,7 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
       itemCount: sortedWatches.length,
       itemBuilder: (context, index) {
         final watch = sortedWatches[index];
-        return _WatchListTile(
+        return SavedWatchListTile(
           watch: watch,
           isConnecting: _connectingWatchId == watch.id,
           onTap: () => _connectToWatch(watch),
@@ -300,17 +306,20 @@ class _StartPageScreenState extends ConsumerState<StartPageScreen> {
 }
 
 /// Individual watch list tile (FR-067, FR-068, T116)
-class _WatchListTile extends StatelessWidget {
+class SavedWatchListTile extends StatelessWidget {
   final WatchEntity watch;
   final bool isConnecting;
   final VoidCallback onTap;
   final VoidCallback onConfig;
+  final bool enabled;
 
-  const _WatchListTile({
+  const SavedWatchListTile({
+    super.key,
     required this.watch,
     required this.isConnecting,
     required this.onTap,
     required this.onConfig,
+    this.enabled = true,
   });
 
   @override
@@ -347,7 +356,7 @@ class _WatchListTile extends StatelessWidget {
       ),
       subtitle: _buildSubtitle(),
       trailing: _buildTrailing(),
-      onTap: isConnecting ? null : onTap,
+      onTap: isConnecting || !enabled ? null : onTap,
     );
   }
 

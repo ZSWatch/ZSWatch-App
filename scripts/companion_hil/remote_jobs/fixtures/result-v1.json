@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "transcript": "Påminn mig om att ladda klockan i kväll.",
+  "summary": "Ladda klockan 🔋",
+  "category": "reminder",
+  "actions": [
+    {"type": "reminder", "title": "Ladda klockan", "due_date": "2026-10-02T18:00:00Z"}
+  ]
+}

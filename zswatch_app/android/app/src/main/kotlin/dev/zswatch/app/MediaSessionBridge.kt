@@ -21,7 +21,7 @@ import android.util.Log
  * 
  * Note: Requires NotificationListenerService permission to access MediaSessionManager.
  */
-class MediaSessionBridge(private val context: Context) {
+class MediaSessionBridge(private val context: Context, private val logTrackMetadata: Boolean = true) {
     
     companion object {
         private const val TAG = "ZSWMediaBridge"
@@ -41,10 +41,12 @@ class MediaSessionBridge(private val context: Context) {
     interface MediaCallback {
         fun onPlaybackStateChanged(state: Map<String, Any?>)
         fun onMetadataChanged(metadata: Map<String, Any?>)
+        fun onSessionChanged(hasSession: Boolean) {}
     }
     
     private val controllerCallback = object : MediaController.Callback() {
         override fun onPlaybackStateChanged(state: PlaybackState?) {
+            if (state == null) mediaCallback?.onSessionChanged(activeController != null)
             state?.let {
                 val stateStr = playbackStateToString(it.state)
                 val position = calculateCurrentPosition(it)
@@ -79,13 +81,23 @@ class MediaSessionBridge(private val context: Context) {
                     lastTrack = track
                     lastArtist = artist
                     
-                    Log.d(TAG, "Metadata changed: $track")
+                    if (logTrackMetadata) Log.d(TAG, "Metadata changed: $track")
                     if (mediaCallback == null) {
-                        LifecycleLogger.log(TAG, "drop metadata callback=null track=$track")
+                        if (logTrackMetadata) LifecycleLogger.log(TAG, "drop metadata callback=null track=$track")
                     }
                     mediaCallback?.onMetadataChanged(metadataMap)
                 }
             }
+            // Native observers fetch a complete fresh snapshot, including album
+            // and duration changes that the legacy track/artist dedupe omits.
+            mediaCallback?.onSessionChanged(activeController != null)
+        }
+
+        override fun onSessionDestroyed() {
+            val component = ComponentName(context, NotificationListenerServiceImpl::class.java)
+            val controllers = try { mediaSessionManager?.getActiveSessions(component) }
+                catch (_: SecurityException) { null }
+            updateActiveController(controllers)
         }
     }
     
@@ -140,6 +152,11 @@ class MediaSessionBridge(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Error disposing MediaSessionBridge", e)
             LifecycleLogger.log(TAG, "dispose failed: ${e.javaClass.simpleName}: ${e.message}")
+        } finally {
+            activeController = null
+            mediaSessionManager = null
+            mediaCallback = null
+            lastPlaybackState = null; lastPosition = null; lastTrack = null; lastArtist = null
         }
     }
     
@@ -189,6 +206,7 @@ class MediaSessionBridge(private val context: Context) {
             Log.d(TAG, "Active controller set: ${controller.packageName}")
             LifecycleLogger.log(TAG, "activeController=${controller.packageName}")
         } ?: LifecycleLogger.log(TAG, "activeController=null")
+        mediaCallback?.onSessionChanged(activeController != null)
     }
     
     private fun extractMetadata(metadata: MediaMetadata): Map<String, Any?> {
@@ -384,5 +402,3 @@ class MediaSessionBridge(private val context: Context) {
         return activeController != null
     }
 }
-
-

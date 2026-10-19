@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/models/sensor_fusion_data.dart';
 import '../../../data/models/sensor_reading.dart';
 import '../../../providers/watch_service_provider.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../services/ble/sensor_gatt_service.dart';
 
 /// Sensor debug screen with real-time visualization
@@ -29,6 +30,7 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
   final int _maxHistoryLength = 100;
 
   SensorGattService? _sensorService;
+  StreamSubscription<bool>? _sensorConnection;
   final Map<SensorType, bool> _enabledSensors = {};
   final Map<SensorType, StreamSubscription<SensorReading>?> _subscriptions = {};
 
@@ -54,6 +56,32 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
   }
 
   Future<void> _initializeSensorService() async {
+    if (ref.read(nativeCompanionRuntimeProvider)) {
+      final service = SensorGattService.native(
+        ref.read(companionClientProvider),
+      );
+      _sensorService = service;
+      _sensorConnection = service.connectionChanges.listen((connected) {
+        if (!mounted) return;
+        setState(() {
+          if (!connected) {
+            for (final sub in _subscriptions.values) {
+              unawaited(sub?.cancel());
+            }
+            _subscriptions.clear();
+            unawaited(_fusionSubscription?.cancel());
+            _fusionSubscription = null;
+            _enabledSensors.updateAll((_, _) => false);
+            _fusionEnabled = false;
+            _latestFusionData = null;
+            _orientationOffset = null;
+          }
+        });
+      });
+      await service.initializeNative();
+      if (mounted) setState(() {});
+      return;
+    }
     final watchService = ref.read(watchServiceProvider);
     final device = watchService.device;
     if (device == null) return;
@@ -77,7 +105,8 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
       sub?.cancel();
     }
     _fusionSubscription?.cancel();
-    _sensorService?.stopAll();
+    unawaited(_sensorConnection?.cancel());
+    unawaited(_sensorService?.dispose());
     super.dispose();
   }
 
@@ -111,7 +140,7 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
       debugPrint('[SensorDebug] Error toggling sensor fusion: $e');
       if (mounted) {
         setState(() {
-          _fusionEnabled = !enable;
+          _fusionEnabled = (_sensorService?.isConnected ?? false) && !enable;
         });
       }
     }
@@ -211,7 +240,8 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
       // Reset state on error
       if (mounted) {
         setState(() {
-          _enabledSensors[type] = !enable;
+          _enabledSensors[type] =
+              (_sensorService?.isConnected ?? false) && !enable;
         });
       }
     }

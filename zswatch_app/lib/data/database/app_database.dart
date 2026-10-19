@@ -2,11 +2,11 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:drift_sqflite/drift_sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import 'tables/battery_readings_table.dart';
-import 'tables/chat_history_table.dart';
 import 'tables/comm_log_entries_table.dart';
 import 'tables/connection_events_table.dart';
 import 'tables/crash_reports_table.dart';
@@ -16,6 +16,15 @@ import 'tables/voice_memos_table.dart';
 import 'tables/watches_table.dart';
 
 part 'app_database.g.dart';
+
+/// A transactionally committed receipt watermark prevents telemetry replay
+/// after Flutter dies between committing data and acknowledging native storage.
+class CompanionTelemetryCursors extends Table {
+  TextColumn get journalId => text()();
+  IntColumn get sequence => integer()();
+  @override
+  Set<Column<Object>> get primaryKey => {journalId};
+}
 
 /// Main application database using drift (SQLite)
 ///
@@ -35,15 +44,26 @@ part 'app_database.g.dart';
     VoiceMemos,
     ExtractedActions,
     CrashReports,
-    ChatHistory,
+    CompanionTelemetryCursors,
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  final bool recoverLegacyProcessing;
+
+  AppDatabase() : recoverLegacyProcessing = true, super(_openConnection());
+
+  /// Native jobs have their own recovery owner. Opening saved-watch metadata
+  /// must not reset unrelated legacy voice-processing rows.
+  AppDatabase.forCompanion()
+    : recoverLegacyProcessing = false,
+      super(_openConnection());
+
+  /// Uses the same schema and migrations with an explicit executor in tests.
+  AppDatabase.forTesting(super.executor, {this.recoverLegacyProcessing = true});
 
   /// Database schema version
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -71,16 +91,62 @@ class AppDatabase extends _$AppDatabase {
           // Guard: only run when the table already existed (v2+).
           await m.addColumn(voiceMemos, voiceMemos.archived);
         }
-        if (from < 6) {
-          // v5 → v6: added ChatHistory table for voice chat feature.
-          await m.createTable(chatHistory);
+        if (from < 7) {
+          // Remove the unsupported voice-chat prototype, preserving app data.
+          await customStatement('DROP TABLE IF EXISTS chat_history');
+        }
+        if (from < 8) {
+          await _repairLegacyVoiceMemos(m);
+        }
+        if (from < 9) {
+          await m.createTable(companionTelemetryCursors);
         }
       },
       beforeOpen: (details) async {
         // Reset memos stuck in intermediate processing states from a crash.
-        await resetStuckProcessingMemos();
+        if (recoverLegacyProcessing) await resetStuckProcessingMemos();
       },
     );
+  }
+
+  /// Earlier development databases reported v6/v7 while retaining nullable
+  /// required fields or missing AI columns. Repair them once during upgrade,
+  /// before Drift maps rows or legacy processing recovery reads those columns.
+  Future<void> _repairLegacyVoiceMemos(Migrator migrator) async {
+    final info = await customSelect('PRAGMA table_info(voice_memos)').get();
+    if (info.isEmpty) return;
+    final existing = info.map((row) => row.read<String>('name')).toSet();
+    for (final column in [
+      voiceMemos.summary,
+      voiceMemos.category,
+      voiceMemos.processingStatus,
+      voiceMemos.aiModel,
+      voiceMemos.aiProcessedAt,
+      voiceMemos.taskCreated,
+      voiceMemos.calendarEventCreated,
+      voiceMemos.actionReviewState,
+      voiceMemos.archived,
+    ]) {
+      if (!existing.contains(column.name)) {
+        await migrator.addColumn(voiceMemos, column);
+      }
+    }
+    await customStatement('''
+      UPDATE voice_memos
+      SET
+        timestamp_utc = COALESCE(timestamp_utc, 0),
+        duration_ms = COALESCE(duration_ms, 0),
+        size_bytes = COALESCE(size_bytes, 0),
+        synced_from_watch = COALESCE(synced_from_watch, 0),
+        deleted_on_watch = COALESCE(deleted_on_watch, 0),
+        task_created = COALESCE(task_created, 0),
+        calendar_event_created = COALESCE(calendar_event_created, 0),
+        archived = COALESCE(archived, 0)
+      WHERE timestamp_utc IS NULL OR duration_ms IS NULL OR size_bytes IS NULL
+        OR synced_from_watch IS NULL OR deleted_on_watch IS NULL
+        OR task_created IS NULL OR calendar_event_created IS NULL
+        OR archived IS NULL
+    ''');
   }
 
   // ==================== Watch Operations ====================
@@ -104,9 +170,18 @@ class AppDatabase extends _$AppDatabase {
   }
 
   /// Insert or update a watch
-  Future<void> upsertWatch(WatchesCompanion watch) {
-    return into(watches).insertOnConflictUpdate(watch);
-  }
+  Future<void> upsertWatch(WatchesCompanion watch) => transaction(() async {
+    // Android's older system SQLite lacks ON CONFLICT ... DO UPDATE. Keep the
+    // same sparse update semantics without REPLACE deleting related history.
+    final existing = await getWatchById(watch.id.value);
+    if (existing == null) {
+      await into(watches).insert(watch);
+    } else {
+      await (update(
+        watches,
+      )..where((row) => row.id.equals(watch.id.value))).write(watch);
+    }
+  });
 
   /// Set a watch as primary (clears other primary flags)
   Future<void> setWatchAsPrimary(String watchId) async {
@@ -778,53 +853,6 @@ class AppDatabase extends _$AppDatabase {
     await deleteOldBatteryReadings(cutoff);
     await deleteOldConnectionEvents(cutoff);
   }
-
-  // ==================== Chat History Operations ====================
-
-  /// Insert a new chat history entry.
-  Future<int> insertChatHistoryEntry(ChatHistoryCompanion entry) {
-    return into(chatHistory).insert(entry);
-  }
-
-  /// Get all chat history entries, newest first.
-  Future<List<ChatHistoryEntity>> getAllChatHistory() {
-    return (select(
-      chatHistory,
-    )..orderBy([(t) => OrderingTerm.desc(t.timestampUtc)])).get();
-  }
-
-  /// Get the N most recent chat history entries.
-  Future<List<ChatHistoryEntity>> getRecentChatHistory(int limit) {
-    return (select(chatHistory)
-          ..orderBy([(t) => OrderingTerm.desc(t.timestampUtc)])
-          ..limit(limit))
-        .get();
-  }
-
-  /// Watch all chat history entries (stream), newest first.
-  Stream<List<ChatHistoryEntity>> watchAllChatHistory() {
-    return (select(
-      chatHistory,
-    )..orderBy([(t) => OrderingTerm.desc(t.timestampUtc)])).watch();
-  }
-
-  /// Delete a chat history entry by ID.
-  Future<int> deleteChatHistoryEntry(int id) {
-    return (delete(chatHistory)..where((t) => t.id.equals(id))).go();
-  }
-
-  /// Delete all chat history entries.
-  Future<int> deleteAllChatHistory() {
-    return delete(chatHistory).go();
-  }
-
-  /// Delete chat history older than [cutoff].
-  Future<int> deleteOldChatHistory(DateTime cutoff) {
-    final cutoffEpoch = cutoff.toUtc().millisecondsSinceEpoch ~/ 1000;
-    return (delete(
-      chatHistory,
-    )..where((t) => t.timestampUtc.isSmallerThanValue(cutoffEpoch))).go();
-  }
 }
 
 /// Stats for crash frequency per file
@@ -845,6 +873,11 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'zswatch_app.db'));
+    if (Platform.isAndroid) {
+      // Native telemetry uses Android SQLiteDatabase. Do not open the same
+      // file through a second bundled SQLite library in this process.
+      return SqfliteQueryExecutor(path: file.path);
+    }
     return NativeDatabase.createInBackground(file);
   });
 }

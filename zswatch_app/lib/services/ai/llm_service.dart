@@ -243,6 +243,16 @@ class TranscriptResult {
 ///
 /// The model loads lazily on first inference and stays cached in-process.
 class LlmService {
+  LlmService({bool Function()? isCancelled}) : _isCancelled = isCancelled;
+
+  final bool Function()? _isCancelled;
+
+  void _checkCancelled() {
+    if (_isCancelled?.call() == true) {
+      throw PlatformException(code: 'CANCELLED');
+    }
+  }
+
   static const int defaultTargetContextSize = 3072;
   static const int reducedContextSize = 2048;
   static const int minimumContextSize = 1024;
@@ -471,10 +481,21 @@ class LlmService {
             ? modelId.replaceFirst('custom::', '')
             : catalogModels.first.displayName);
     _modelPath = null;
-    // Dispose previous LiteRT-LM engine when switching models.
+    // Dispose previous LiteRT-LM engine when switching models. _ensureModel
+    // awaits this so the next call never sees the old engine as loaded.
     if (_liteRtLmService.isLoaded) {
-      _liteRtLmService.dispose();
+      _liteRtDisposal = _disposeLiteRtWhenIdle();
     }
+  }
+
+  Future<void>? _liteRtDisposal;
+
+  /// The native engine crashes if disposed during generate; wait for the lock.
+  Future<void> _disposeLiteRtWhenIdle() async {
+    while (_liteRtLmLock != null) {
+      await _liteRtLmLock!.future;
+    }
+    await _liteRtLmService.dispose();
   }
 
   Future<LlmModelInfo> currentModelInfo() async {
@@ -602,15 +623,23 @@ class LlmService {
 
   /// Delete the local model file.
   Future<void> deleteModel({String? modelId}) async {
-    final model =
-        await _resolveModelById(modelId ?? _selectedModelId) ??
-        catalogModels.first;
+    final deletingId = modelId ?? _selectedModelId;
+    final model = await _resolveModelById(deletingId);
+    if (model == null) {
+      throw StateError(
+        'Selected model is no longer available. Select another model.',
+      );
+    }
     final f = File(await _modelFilePathFor(model));
     if (f.existsSync()) {
       f.deleteSync();
     }
-    if ((modelId ?? _selectedModelId) == _selectedModelId) {
-      _modelPath = null;
+    if (deletingId == _selectedModelId) {
+      if (model.userProvided) {
+        selectModel(defaultModelId);
+      } else {
+        _modelPath = null;
+      }
     }
     _stateSubject.add(const LlmServiceState());
     debugPrint('[LlmService] Model deleted');
@@ -666,6 +695,11 @@ class LlmService {
   /// Returns the resolved [LlmModelInfo] so callers can use it without
   /// a second async call (which would be vulnerable to provider races).
   Future<LlmModelInfo> _ensureModel() async {
+    final disposal = _liteRtDisposal;
+    if (disposal != null) {
+      await disposal;
+      if (identical(_liteRtDisposal, disposal)) _liteRtDisposal = null;
+    }
     if (_modelPath != null) {
       // Model path already set — resolve the info for consistency.
       final model = await currentModelInfo();
@@ -682,7 +716,8 @@ class LlmService {
     _modelPath = path;
 
     // LiteRT-LM models need to initialise the native engine.
-    if (model.isLiteRtLm && !_liteRtLmService.isLoaded) {
+    if (model.isLiteRtLm && _liteRtLmService.loadedPath != path) {
+      if (_liteRtLmService.isLoaded) await _disposeLiteRtWhenIdle();
       await _liteRtLmService.loadModel(path, backend: 'cpu');
     }
     return model;
@@ -869,6 +904,7 @@ class LlmService {
     // Cancel any still-running inference (e.g. leftover from hot-restart or
     // a previous phase) before starting a new one.  This reduces the window
     // for the "Callback invoked after it has been deleted" crash.
+    _checkCancelled();
     cancelInference();
     debugPrint(
       '[LlmService] _generate: _selectedModelId=$_selectedModelId _modelPath=$_modelPath',
@@ -884,6 +920,7 @@ class LlmService {
     final stopwatch = Stopwatch()..start();
 
     final params = await _computeInferenceParams(modelInfo);
+    _checkCancelled();
 
     // Apply maxTokens cap from memory check. The cap is the hard ceiling;
     // the caller's overrideMaxTokens or default maxTokens is also respected
@@ -914,12 +951,12 @@ class LlmService {
       while (_liteRtLmLock != null) {
         debugPrint('[LlmService] LiteRT-LM busy, waiting for previous call...');
         await _liteRtLmLock!.future;
+        _checkCancelled();
       }
       _liteRtLmLock = Completer<void>();
       try {
         debugPrint(
-          '[LlmService] LiteRT-LM generate: prompt length=${prompt.length}, '
-          'first 200 chars: ${prompt.substring(0, prompt.length > 200 ? 200 : prompt.length)}',
+          '[LlmService] LiteRT-LM generate: prompt length=${prompt.length}',
         );
         final result = await _liteRtLmService.generate(
           prompt,
@@ -935,7 +972,7 @@ class LlmService {
           },
         );
         debugPrint(
-          '[LlmService] LiteRT-LM result: text="${result.text.substring(0, result.text.length > 500 ? 500 : result.text.length)}" '
+          '[LlmService] LiteRT-LM result: length=${result.text.length} '
           'tokens=${result.tokenCount} elapsed=${result.elapsedMs}ms cancelled=${result.cancelled}',
         );
         text = result.text.trim();
@@ -975,13 +1012,16 @@ class LlmService {
           completer.complete(response);
         }
       });
-
+      // Cancellation can arrive while the native request ID is being allocated.
+      if (_isCancelled?.call() == true) cancelInference();
       text = (await completer.future).trim();
+      _runningRequestId = -1;
     }
     stopwatch.stop();
 
     // Release the foreground service + wake lock.
     await LlmComputeService.instance.stop();
+    _checkCancelled();
 
     final wallTime = stopwatch.elapsed;
     final tokPerSec = wallTime.inMilliseconds > 0
@@ -1000,52 +1040,6 @@ class LlmService {
     return (text: text, metrics: metrics);
   }
 
-  /// Generate a short conversational reply for the voice chat feature.
-  ///
-  /// Unlike [processTranscript], this does not extract structured data.
-  /// It produces a short, spoken-friendly answer text.
-  Future<({String text, LlmInferenceMetrics metrics})> generateChatReply(
-    String question, {
-    List<({String question, String answer})>? history,
-    String answerLength = 'short',
-  }) async {
-    final lengthHint = switch (answerLength) {
-      'ultra_short' => '1 sentence',
-      'short' => '2-3 sentences',
-      'normal' => '3-5 sentences',
-      _ => '2-3 sentences',
-    };
-
-    final historyBlock = StringBuffer();
-    if (history != null && history.isNotEmpty) {
-      for (final turn in history) {
-        historyBlock.writeln('User: ${turn.question}');
-        historyBlock.writeln('Assistant: ${turn.answer}');
-      }
-    }
-
-    final prompt =
-        '''You are a helpful voice assistant on a smartwatch. Answer the user's question directly and concisely in $lengthHint. Use simple language that sounds natural when spoken aloud. Avoid markdown, lists, or formatting. If uncertain, say so briefly.
-
-${historyBlock.isNotEmpty ? 'Previous conversation:\n$historyBlock\n' : ''}User: $question
-Assistant:''';
-
-    _stateSubject.add(
-      const LlmServiceState(status: LlmServiceStatus.processing),
-    );
-
-    try {
-      final result = await _generate(prompt, overrideMaxTokens: 256);
-      _stateSubject.add(const LlmServiceState(status: LlmServiceStatus.ready));
-      return result;
-    } catch (e) {
-      _stateSubject.add(
-        LlmServiceState(status: LlmServiceStatus.error, error: e.toString()),
-      );
-      rethrow;
-    }
-  }
-
   /// Process a voice memo transcript: optionally correct transcription errors,
   /// then classify + summarise in a single LLM pass, and parse the structured
   /// JSON output.
@@ -1056,6 +1050,9 @@ Assistant:''';
     bool correctTranscription = true,
     String? classifyPromptOverride,
     String? promptStrategyOverride,
+    // The companion validates speech before checkpointing it. Its lightweight
+    // router must not discard a valid saved transcript (for example Swedish).
+    bool rejectNoSpeechRoute = true,
     void Function(String phase, String partialResponse, int tokens)? onProgress,
   }) async {
     _stateSubject.add(
@@ -1099,7 +1096,9 @@ Assistant:''';
             corrected.length > 5) {
           correctedTranscription = corrected;
           effectiveTranscript = corrected;
-          debugPrint('[LlmService] Corrected transcription: $corrected');
+          debugPrint(
+            '[LlmService] Corrected transcription (${corrected.length} chars)',
+          );
         } else {
           debugPrint(
             '[LlmService] Correction output not usable, using original',
@@ -1140,7 +1139,14 @@ Assistant:''';
         // Brief pause between inference calls
         await Future<void>.delayed(const Duration(milliseconds: 500));
 
-        // Router detected no meaningful speech — return empty result.
+        // Only callers without an independently validated transcript allow the
+        // router to discard speech. Preserve other routes, including timers.
+        if (routeResult == 'none' && !rejectNoSpeechRoute) {
+          routeResult = 'voice_memo';
+          debugPrint(
+            '[LlmService] Router was uncertain; analyzing validated speech',
+          );
+        }
         if (routeResult == 'none') {
           debugPrint(
             '[LlmService] Router returned "none" — no speech detected',
@@ -1203,7 +1209,9 @@ Assistant:''';
       debugPrint(
         '[LlmService] Classify done at ${totalStopwatch.elapsedMilliseconds}ms',
       );
-      debugPrint('[LlmService] Raw AI response: $raw');
+      debugPrint(
+        '[LlmService] AI response received (${raw.length} characters)',
+      );
 
       // --- Parse JSON from output ---
       final result = structuredResult.result;
@@ -1241,6 +1249,11 @@ Assistant:''';
   }
 
   /// Cancel a running inference (best-effort).
+  Future<void> cancelProcessing() async {
+    cancelInference();
+    if (_liteRtLmLock != null) await _liteRtLmService.cancel();
+  }
+
   void cancelInference() {
     if (_runningRequestId >= 0) {
       fllamaCancelInference(_runningRequestId);
@@ -1461,7 +1474,9 @@ JSON:
       final raw = structuredResult.raw;
       final classifyMetrics = structuredResult.metrics;
 
-      debugPrint('[LlmService] Raw brain dump response: $raw');
+      debugPrint(
+        '[LlmService] Brain dump response received (${raw.length} characters)',
+      );
 
       // Parse using the same JSON extraction logic
       final result = structuredResult.result;
@@ -1916,7 +1931,8 @@ JSON:
         actions: actions,
       );
     } catch (e) {
-      debugPrint('[LlmService] Failed to parse AI response: $e');
+      // FormatException messages embed the source text; log only the type.
+      debugPrint('[LlmService] Failed to parse AI response: ${e.runtimeType}');
       return TranscriptResult(summary: jsonStr, category: 'note');
     }
   }

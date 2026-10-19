@@ -39,6 +39,7 @@ final llmAvailableModelsProvider = FutureProvider<List<LlmModelInfo>>((
 });
 
 final selectedLlmModelInfoProvider = FutureProvider<LlmModelInfo>((ref) async {
+  ref.watch(selectedAiModelIdProvider);
   final service = ref.watch(llmServiceProvider);
   return service.currentModelInfo();
 });
@@ -51,14 +52,16 @@ final llmServiceStateProvider = StreamProvider<LlmServiceState>((ref) {
 
 /// Whether the GGUF model file exists on disk.
 final llmModelDownloadedProvider = FutureProvider<bool>((ref) async {
+  final modelId = ref.watch(selectedAiModelIdProvider);
   final service = ref.watch(llmServiceProvider);
-  return service.isModelDownloaded();
+  return service.isModelDownloaded(modelId: modelId);
 });
 
 /// Size of the local model file in bytes (null if not downloaded).
 final llmModelSizeProvider = FutureProvider<int?>((ref) async {
+  final modelId = ref.watch(selectedAiModelIdProvider);
   final service = ref.watch(llmServiceProvider);
-  return service.modelFileSize();
+  return service.modelFileSize(modelId: modelId);
 });
 
 /// Memory fit check for the currently selected model on this device.

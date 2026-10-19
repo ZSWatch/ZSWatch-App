@@ -6,10 +6,14 @@ import '../data/models/connection.dart';
 import '../data/models/connection_state.dart';
 import '../services/ble/ble_scanner.dart';
 import 'base_async_notifier.dart';
+import 'companion_runtime_providers.dart';
 import 'watch_service_provider.dart';
 
 /// Provider for the BLE scanner singleton.
 final bleScannerProvider = Provider<BleScanner>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native companion owns watch discovery');
+  }
   final scanner = BleScanner();
   ref.onDispose(() => scanner.dispose());
   return scanner;
@@ -19,6 +23,9 @@ final bleScannerProvider = Provider<BleScanner>((ref) {
 final bluetoothAdapterStateProvider = StreamProvider<BluetoothAdapterState>((
   ref,
 ) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native companion owns Bluetooth state');
+  }
   return FlutterBluePlus.adapterState;
 });
 
@@ -36,17 +43,26 @@ final scannedDevicesProvider = StreamProvider<List<ScannedWatch>>((ref) {
 
 /// Provider for whether currently scanning.
 final isScanningProvider = StreamProvider<bool>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native companion owns watch discovery');
+  }
   return FlutterBluePlus.isScanning;
 });
 
 /// Provider for BLE connection state — derives from BleConnectionService.
 final bleConnectionProvider = StreamProvider<Connection>((ref) {
-  final ble = ref.watch(bleConnectionServiceProvider);
-  return ble.connectionStream;
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return companionValues(ref, (s) => s.connection);
+  }
+  final service = ref.watch(bleConnectionServiceProvider);
+  return service.connectionStream;
 });
 
 /// Provider for current connection info (non-stream).
 final currentConnectionProvider = Provider<Connection?>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return ref.watch(watchConnectionProvider);
+  }
   final asyncValue = ref.watch(bleConnectionProvider);
   return asyncValue.valueOrNull;
 });

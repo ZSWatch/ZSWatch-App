@@ -8,7 +8,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/models/connection.dart';
 import '../../../data/models/crash_summary.dart';
 import '../../../providers/developer_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/watch_service_provider.dart';
+import '../dashboard/companion_find_watch_button.dart';
 import '../../widgets/developer/music_debug_section.dart';
 import '../../widgets/developer/notification_debug_section.dart';
 
@@ -45,6 +47,7 @@ class _DeveloperToolsBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final native = ref.watch(nativeCompanionRuntimeProvider);
     final toolTiles = [
       _BlendToolTile(
         icon: Icons.article_outlined,
@@ -122,18 +125,24 @@ class _DeveloperToolsBody extends ConsumerWidget {
         Row(
           children: [
             Expanded(
-              child: _BlendActionChip(
-                icon: Icons.vibration,
-                label: 'Find',
-                onTap: connection.isConnected
-                    ? () async {
-                        final watchService = ref.read(watchServiceProvider);
-                        await watchService.findDevice(true);
-                        await Future<void>.delayed(const Duration(seconds: 2));
-                        await watchService.findDevice(false);
-                      }
-                    : null,
-              ),
+              child: native
+                  ? const CompanionFindWatchButton()
+                  : _BlendActionChip(
+                      icon: Icons.vibration,
+                      label: 'Find',
+                      onTap: connection.isConnected
+                          ? () async {
+                              final watchService = ref.read(
+                                watchServiceProvider,
+                              );
+                              await watchService.findDevice(true);
+                              await Future<void>.delayed(
+                                const Duration(seconds: 2),
+                              );
+                              await watchService.findDevice(false);
+                            }
+                          : null,
+                    ),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -142,12 +151,17 @@ class _DeveloperToolsBody extends ConsumerWidget {
                 label: 'Sync Time',
                 onTap: connection.isConnected
                     ? () async {
-                        final watchService = ref.read(watchServiceProvider);
-                        await watchService.syncTime();
+                        if (native) {
+                          await ref
+                              .read(companionClientProvider)
+                              .command('syncTime');
+                        } else {
+                          await ref.read(watchServiceProvider).syncTime();
+                        }
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Time synced'),
+                              content: Text('Time sync requested'),
                               duration: Duration(seconds: 1),
                             ),
                           );
@@ -163,8 +177,15 @@ class _DeveloperToolsBody extends ConsumerWidget {
                 label: 'Device Info',
                 onTap: connection.isConnected
                     ? () async {
-                        final watchService = ref.read(watchServiceProvider);
-                        await watchService.requestDeviceInfo();
+                        if (native) {
+                          await ref
+                              .read(companionClientProvider)
+                              .command('requestDeviceInfo');
+                        } else {
+                          await ref
+                              .read(watchServiceProvider)
+                              .requestDeviceInfo();
+                        }
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -179,10 +200,12 @@ class _DeveloperToolsBody extends ConsumerWidget {
             ),
           ],
         ),
-        const SizedBox(height: AppTheme.spacingLg),
-        const _BlendTerminalSectionTitle('DEBUG'),
-        const SizedBox(height: AppTheme.spacingSm),
-        const _CompactDebugToolsHub(),
+        if (!native) ...[
+          const SizedBox(height: AppTheme.spacingLg),
+          const _BlendTerminalSectionTitle('DEBUG'),
+          const SizedBox(height: AppTheme.spacingSm),
+          const _CompactDebugToolsHub(),
+        ],
       ],
     );
   }

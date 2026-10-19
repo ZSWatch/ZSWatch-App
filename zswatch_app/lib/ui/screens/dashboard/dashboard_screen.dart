@@ -9,6 +9,8 @@ import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/watch.dart';
 import '../../../providers/auto_reconnect_provider.dart';
+import '../../../providers/companion_runtime_providers.dart';
+import 'companion_find_watch_button.dart';
 import '../../../providers/demo_mode_provider.dart';
 import '../../../providers/health_providers.dart';
 import '../../../data/models/crash_summary.dart';
@@ -47,7 +49,17 @@ Future<void> _restartWatch(BuildContext context, WidgetRef ref) async {
   if (deviceId.isEmpty) return;
 
   try {
-    await OsManager.reset(deviceId);
+    if (ref.read(nativeCompanionRuntimeProvider)) {
+      final snapshot = ref.read(companionSnapshotProvider).asData?.value;
+      if (snapshot?.protocolReady != true) {
+        throw StateError('Current watch connection required');
+      }
+      await ref
+          .read(companionClientProvider)
+          .restartWatch(snapshot!.generation);
+    } else {
+      await OsManager.reset(deviceId);
+    }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Restart command sent to watch')),
@@ -70,6 +82,7 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final native = ref.watch(nativeCompanionRuntimeProvider);
     final watch = ref.watch(currentWatchProvider);
     final connection = ref.watch(watchConnectionProvider);
     final healthSummary = ref.watch(healthSummaryProvider);
@@ -81,6 +94,7 @@ class DashboardScreen extends ConsumerWidget {
         title: SvgPicture.asset('assets/images/ZSWatch_Text.svg', height: 24),
         actions: [
           IconButton(
+            tooltip: 'Settings',
             icon: const Icon(Icons.settings),
             onPressed: () => context.push(AppRoutes.settings),
           ),
@@ -113,7 +127,9 @@ class DashboardScreen extends ConsumerWidget {
 
             // Stats row - 4 compact cards
             _StatsRow(
-              batteryLevel: watch?.batteryLevel,
+              batteryLevel: native
+                  ? ref.watch(batteryLevelProvider)
+                  : watch?.batteryLevel,
               firmwareVersion: watch?.shortFirmwareVersion,
               todaySteps: healthSummary.todaySteps,
               latestHeartRate: healthSummary.latestHeartRate,
@@ -132,29 +148,36 @@ class DashboardScreen extends ConsumerWidget {
               onDisconnect: () async {
                 // In demo mode, just turn off the flag
                 if (ref.read(demoModeProvider)) {
-                  ref.read(demoModeProvider.notifier).state = false;
+                  await ref.read(demoModeControllerProvider).set(false);
                   if (context.mounted) context.go(AppRoutes.home);
                   return;
                 }
                 // Suppress auto-reconnect when user manually disconnects
-                ref
-                    .read(autoReconnectNotifierProvider.notifier)
-                    .suppressForSession();
+                if (!native) {
+                  ref
+                      .read(autoReconnectNotifierProvider.notifier)
+                      .suppressForSession();
+                }
                 final notifier = ref.read(watchNotifierProvider.notifier);
                 await notifier.disconnect();
                 if (context.mounted) {
                   context.go(AppRoutes.home);
                 }
               },
-              onRestartWatch: ref.watch(hasSmpServiceProvider)
+              onRestartWatch: (native || ref.watch(hasSmpServiceProvider))
                   ? () => _restartWatch(context, ref)
                   : null,
             ),
 
+            if (native) ...[
+              const SizedBox(height: AppTheme.spacingSm),
+              const CompanionFindWatchButton(),
+            ],
+
             const SizedBox(height: AppTheme.spacingMd),
 
             // Feature shortcuts
-            _FeatureShortcuts(),
+            const _FeatureShortcuts(),
           ],
         ),
       ),
@@ -270,24 +293,26 @@ class _StatsRow extends StatelessWidget {
                 : AppTheme.textSecondary,
           ),
         ),
-        const SizedBox(width: AppTheme.spacingSm),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.directions_walk,
-            label: 'Steps',
-            value: _formatSteps(todaySteps),
-            color: AppTheme.secondaryColor,
+        ...[
+          const SizedBox(width: AppTheme.spacingSm),
+          Expanded(
+            child: _StatCard(
+              icon: Icons.directions_walk,
+              label: 'Steps',
+              value: _formatSteps(todaySteps),
+              color: AppTheme.secondaryColor,
+            ),
           ),
-        ),
-        const SizedBox(width: AppTheme.spacingSm),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.favorite,
-            label: 'Heart Rate',
-            value: latestHeartRate != null ? '$latestHeartRate' : '--',
-            color: AppTheme.errorColor,
+          const SizedBox(width: AppTheme.spacingSm),
+          Expanded(
+            child: _StatCard(
+              icon: Icons.favorite,
+              label: 'Heart Rate',
+              value: latestHeartRate != null ? '$latestHeartRate' : '--',
+              color: AppTheme.errorColor,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -441,7 +466,7 @@ class _InfoRow extends StatelessWidget {
 }
 
 class _QuickActionsSection extends StatelessWidget {
-  final VoidCallback onFirmwareUpdate;
+  final VoidCallback? onFirmwareUpdate;
   final VoidCallback onDisconnect;
   final VoidCallback? onRestartWatch;
 
@@ -460,23 +485,25 @@ class _QuickActionsSection extends StatelessWidget {
         const SizedBox(height: AppTheme.spacingSm),
         Row(
           children: [
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: onFirmwareUpdate,
-                  icon: const Icon(Icons.system_update, size: 18),
-                  label: const Text('Update Firmware'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 12,
+            if (onFirmwareUpdate != null) ...[
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: onFirmwareUpdate,
+                    icon: const Icon(Icons.system_update, size: 18),
+                    label: const Text('Update Firmware'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: AppTheme.spacingSm),
+              const SizedBox(width: AppTheme.spacingSm),
+            ],
             Expanded(
               child: SizedBox(
                 height: 48,
@@ -519,6 +546,7 @@ class _QuickActionsSection extends StatelessWidget {
 }
 
 class _FeatureShortcuts extends StatelessWidget {
+  const _FeatureShortcuts();
   @override
   Widget build(BuildContext context) {
     return Column(

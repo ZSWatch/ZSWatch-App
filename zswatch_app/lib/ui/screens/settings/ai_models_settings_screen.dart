@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/ai_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/voice_memo_providers.dart';
 import '../../../services/ai/ai_debug_info.dart';
@@ -20,6 +21,8 @@ import '../../../services/ai/llm_service.dart';
 import '../../../services/ai/model_benchmark_service.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../widgets/ai_debug_widgets.dart';
+import '../../widgets/companion_voice_policy_tile.dart';
+import '../../widgets/companion_voice_batch_button.dart';
 
 // ---------------------------------------------------------------------------
 // Benchmark provider (screen-scoped singleton)
@@ -52,6 +55,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final native = ref.watch(nativeCompanionRuntimeProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Voice Memo AI')),
       body: ListView(
@@ -63,7 +67,13 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             subtitle: 'Speech-to-text engine used for voice memos',
           ),
           const _TranscriptionModelSelector(),
-          const _RetranscribeButton(),
+          if (native)
+            const CompanionVoiceBatchButton(
+              operation: 'retranscribe',
+              label: 'Re-transcribe all with selected model',
+            )
+          else
+            const _RetranscribeButton(),
 
           const SizedBox(height: 24),
           const Divider(height: 1),
@@ -74,11 +84,25 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             title: 'AI Processing Model',
             subtitle: 'Local LLM for summarisation & classification',
           ),
-          const _AiTogglesTile(),
+          if (!native) const _AiTogglesTile(),
+          if (native)
+            SwitchListTile(
+              title: const Text('Correct transcription before analysis'),
+              value: ref.watch(aiCorrectionEnabledProvider),
+              onChanged: (value) => ref
+                  .read(aiCorrectionEnabledProvider.notifier)
+                  .setEnabled(value),
+            ),
           const _AiModelSelector(),
           const _ImportModelTile(),
+          if (native) const CompanionVoicePolicyTile(),
+          if (native)
+            const CompanionVoiceBatchButton(
+              operation: 'process',
+              label: 'Process all unprocessed',
+            ),
 
-          if (ref.watch(localAiEnabledProvider)) ...[
+          if (native || ref.watch(localAiEnabledProvider)) ...[
             const SizedBox(height: 24),
             const Divider(height: 1),
             const SizedBox(height: 8),
@@ -96,42 +120,34 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             if (Platform.isAndroid) const _CalendarPickerTile(),
           ],
 
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
+          ...[
+            const SizedBox(height: 24),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
 
-          // ---- Voice Chat section ----
-          const _SectionHeader(
-            title: 'Voice Chat',
-            subtitle:
-                'Configure the watch voice chat feature: '
-                'answer style, conversation memory, and history depth.',
-          ),
-          const _VoiceChatSettings(),
+            // ---- Benchmark section ----
+            const _SectionHeader(
+              title: 'Model Benchmark',
+              subtitle: 'Test model performance on your device',
+            ),
+            const _BenchmarkSection(),
 
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-
-          // ---- Benchmark section ----
-          const _SectionHeader(
-            title: 'Model Benchmark',
-            subtitle: 'Test model performance on your device',
-          ),
-          const _BenchmarkSection(),
-
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-
-          // ---- Timer / Alarm test section ----
-          const _SectionHeader(
-            title: 'Timer & Alarm Test',
-            subtitle:
-                'Test creating timers and alarms via the system clock app '
-                'without connecting a watch.',
-          ),
-          const _TimerAlarmTestSection(),
+            const SizedBox(height: 24),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+          ],
+          // The existing Clock controls use the productivity channel only.
+          // They do not depend on legacy BLE, repositories or local inference.
+          ...[
+            // ---- Timer / Alarm test section ----
+            _SectionHeader(
+              title: 'Timer & Alarm Test',
+              subtitle: Platform.isIOS
+                  ? 'Test timer and alarm notifications from ZSWatch without connecting a watch.'
+                  : 'Test creating timers and alarms via the system clock app without connecting a watch.',
+            ),
+            const _TimerAlarmTestSection(),
+          ],
         ],
       ),
     );
@@ -790,122 +806,6 @@ class _AiTogglesTile extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Voice Chat settings
-// ---------------------------------------------------------------------------
-
-class _VoiceChatSettings extends ConsumerWidget {
-  const _VoiceChatSettings();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final answerLength = ref.watch(chatAnswerLengthProvider);
-    final memoryMode = ref.watch(chatMemoryModeProvider);
-    final maxHistory = ref.watch(chatMaxHistoryProvider);
-
-    return Column(
-      children: [
-        ListTile(
-          leading: const Icon(Icons.short_text, color: AppTheme.primaryColor),
-          title: const Text('Answer Length'),
-          subtitle: Text(_answerLengthLabel(answerLength)),
-          trailing: DropdownButton<String>(
-            value: answerLength,
-            underline: const SizedBox.shrink(),
-            items: const [
-              DropdownMenuItem(
-                value: 'ultra_short',
-                child: Text('Ultra Short'),
-              ),
-              DropdownMenuItem(value: 'short', child: Text('Short')),
-              DropdownMenuItem(value: 'normal', child: Text('Normal')),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                ref.read(chatAnswerLengthProvider.notifier).setValue(value);
-              }
-            },
-          ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.history, color: AppTheme.primaryColor),
-          title: const Text('Conversation Memory'),
-          subtitle: Text(_memoryModeLabel(memoryMode)),
-          trailing: DropdownButton<String>(
-            value: memoryMode,
-            underline: const SizedBox.shrink(),
-            items: const [
-              DropdownMenuItem(value: 'single_turn', child: Text('None')),
-              DropdownMenuItem(
-                value: 'last_exchange',
-                child: Text('Last Exchange'),
-              ),
-              DropdownMenuItem(
-                value: 'short_history',
-                child: Text('Short History'),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                ref.read(chatMemoryModeProvider.notifier).setValue(value);
-              }
-            },
-          ),
-        ),
-        if (memoryMode == 'short_history')
-          ListTile(
-            leading: const Icon(
-              Icons.format_list_numbered,
-              color: AppTheme.primaryColor,
-            ),
-            title: const Text('Max History Entries'),
-            subtitle: Text('$maxHistory exchanges used for context'),
-            trailing: DropdownButton<int>(
-              value: maxHistory,
-              underline: const SizedBox.shrink(),
-              items: const [
-                DropdownMenuItem(value: 3, child: Text('3')),
-                DropdownMenuItem(value: 5, child: Text('5')),
-                DropdownMenuItem(value: 10, child: Text('10')),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  ref.read(chatMaxHistoryProvider.notifier).setValue(value);
-                }
-              },
-            ),
-          ),
-      ],
-    );
-  }
-
-  String _answerLengthLabel(String value) {
-    switch (value) {
-      case 'ultra_short':
-        return '1 sentence max — fastest response';
-      case 'short':
-        return '2–3 sentences — balanced';
-      case 'normal':
-        return 'Full response — most detailed';
-      default:
-        return value;
-    }
-  }
-
-  String _memoryModeLabel(String value) {
-    switch (value) {
-      case 'single_turn':
-        return 'Each question is independent';
-      case 'last_exchange':
-        return 'Remembers last Q&A pair';
-      case 'short_history':
-        return 'Uses recent conversation history';
-      default:
-        return value;
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
 // AI Model selector (dropdown + status + download/delete/import)
 // ---------------------------------------------------------------------------
 
@@ -970,7 +870,16 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
     if (!shouldDelete) return;
 
     try {
-      await ref.read(llmServiceProvider).deleteModel();
+      final service = ref.read(llmServiceProvider);
+      final selectedId = ref.read(selectedAiModelIdProvider);
+      await service.deleteModel(modelId: selectedId);
+      if (mounted &&
+          ref.read(selectedAiModelIdProvider) == selectedId &&
+          service.selectedModelId != selectedId) {
+        ref
+            .read(selectedAiModelIdProvider.notifier)
+            .setModelId(service.selectedModelId);
+      }
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -1334,6 +1243,11 @@ class _ImportModelTile extends ConsumerWidget {
 class _ProcessAllButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Native recordings are scheduled from their verified receipt in Voice Notes.
+    // The legacy batch reads a different repository and cannot process these rows.
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      return const SizedBox.shrink();
+    }
     final localAiEnabled = ref.watch(localAiEnabledProvider);
     final aiActionsState = ref.watch(aiActionsProvider);
     final isBusy = aiActionsState.isLoading;

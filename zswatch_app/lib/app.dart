@@ -3,14 +3,17 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/utils/lifecycle_logger.dart';
 import 'data/models/connection_state.dart';
 import 'providers/analytics_providers.dart';
 import 'providers/ble_providers.dart';
-import 'providers/chat_providers.dart';
+import 'providers/companion_runtime_providers.dart';
+import 'providers/companion_watch_providers.dart';
 import 'providers/coredump_providers.dart';
+import 'providers/demo_mode_provider.dart';
 import 'providers/developer_providers.dart';
 import 'providers/foreground_service_providers.dart';
 import 'providers/gps_providers.dart';
@@ -34,21 +37,41 @@ class ZSWatchApp extends ConsumerStatefulWidget {
 
 class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     with WidgetsBindingObserver {
+  GoRouter? _nativeRouter;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     LifecycleLogger.log('AppLifecycle', 'initState');
-    try {
-      ref.read(watchChatServiceProvider);
-      debugPrint('[app] watchChatServiceProvider initialized in initState');
-    } catch (e, st) {
-      debugPrint('[app] early watchChatServiceProvider init failed: $e\n$st');
+    if (ref.read(nativeCompanionRuntimeProvider)) {
+      _nativeRouter = AppRouter.createNativeRouter();
+      // Observe the existing service; UI startup never sends Start, except
+      // to undo the Stop of a Demo Mode session that the process outlived.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(demoModeControllerProvider)
+            .recoverInterrupted()
+            .catchError(
+              (Object error) =>
+                  debugPrint('[DemoMode] Resume after restart failed: $error'),
+            );
+      });
+      return;
     }
     // Initialize BLE service after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_initializeVoiceRecovery());
       _initializeBle();
     });
+  }
+
+  Future<void> _initializeVoiceRecovery() async {
+    try {
+      await ref.read(voiceMemoRecoveryProvider.future);
+    } catch (error) {
+      debugPrint('[VoiceMemoRecovery] Startup recovery failed: $error');
+    }
   }
 
   @override
@@ -62,6 +85,7 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
   void dispose() {
     LifecycleLogger.log('AppLifecycle', 'dispose');
     WidgetsBinding.instance.removeObserver(this);
+    _nativeRouter?.dispose();
     super.dispose();
   }
 
@@ -111,6 +135,7 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
   Future<void> _syncForegroundServiceLifecycleState(
     AppLifecycleState state,
   ) async {
+    if (ref.read(nativeCompanionRuntimeProvider)) return;
     if (!Platform.isAndroid) return;
 
     final foregroundService = ref.read(foregroundServiceProvider);
@@ -158,14 +183,32 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     }
   }
 
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
+
   @override
   Widget build(BuildContext context) {
-    // Keep the chat service alive for the full app lifetime so incoming
-    // question_ready messages are always consumed even if no chat UI is open.
-    ref.watch(watchChatServiceProvider);
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      ref.watch(companionWatchPersistenceProvider);
+      ref.watch(companionTelemetryUpdatesProvider);
+      // Make dropped (too large) watch messages visible so we notice if they happen.
+      ref.listen(companionSnapshotProvider, (previous, next) {
+        final previousSnapshot = previous?.asData?.value;
+        final after = next.asData?.value.fields['incomplete_watch_messages'];
+        if (previousSnapshot == null || after is! int) return;
+        final before = previousSnapshot.fields['incomplete_watch_messages'];
+        if (after > (before is int ? before : 0)) {
+          _messenger.currentState?.showSnackBar(
+            const SnackBar(
+              content: Text('A message from the watch arrived incomplete'),
+            ),
+          );
+        }
+      });
+    }
 
     return MaterialApp.router(
       title: 'ZSWatch',
+      scaffoldMessengerKey: _messenger,
       debugShowCheckedModeBanner: false,
 
       // Theme configuration
@@ -174,7 +217,7 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
       themeMode: ThemeMode.dark,
 
       // Router configuration
-      routerConfig: AppRouter.router,
+      routerConfig: _nativeRouter ?? AppRouter.router,
 
       // Builder for global overlays/providers
       builder: (context, child) {

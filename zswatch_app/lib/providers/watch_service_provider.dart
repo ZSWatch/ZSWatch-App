@@ -8,17 +8,25 @@ import '../data/models/connection_phase.dart';
 import '../data/models/connection_state.dart';
 import '../data/models/crash_summary.dart';
 import '../data/models/watch.dart';
+import '../data/database/app_database.dart' show WatchEntity;
 import '../data/repositories/watch_repository.dart';
 import '../services/ble/ble_connection_service.dart';
 import '../services/ble/ble_scanner.dart';
+import '../services/background/companion_prototype_client.dart';
 import '../services/watch_service.dart';
 import 'base_async_notifier.dart';
+import 'companion_runtime_providers.dart';
 import 'demo_mode_provider.dart';
 import 'watch_providers.dart';
 
 /// Provider for the BleConnectionService singleton — single source of truth
 /// for connection lifecycle.
 final bleConnectionServiceProvider = Provider<BleConnectionService>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError(
+      'Native companion owns BLE; legacy BLE service is disabled',
+    );
+  }
   final service = BleConnectionService();
   ref.onDispose(() => service.dispose());
   return service;
@@ -42,18 +50,29 @@ final watchServiceProvider = Provider<WatchService>((ref) {
 
 /// Provider for connection phase stream (primary state).
 final connectionPhaseStreamProvider = StreamProvider<ConnectionPhase>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return companionValues(ref, (s) => s.connectionPhase);
+  }
   final ble = ref.watch(bleConnectionServiceProvider);
   return ble.phaseStream;
 });
 
 /// Provider for current connection phase.
 final connectionPhaseProvider = Provider<ConnectionPhase>((ref) {
+  if (ref.watch(demoModeProvider)) return const ConnectionPhase.connected();
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return ref.watch(companionSnapshotProvider).asData?.value.connectionPhase ??
+        const ConnectionPhase.disconnected();
+  }
   final asyncValue = ref.watch(connectionPhaseStreamProvider);
   return asyncValue.valueOrNull ?? const ConnectionPhase.disconnected();
 });
 
 /// Provider for connection state stream (backwards compat Connection model).
 final watchConnectionStreamProvider = StreamProvider<Connection>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return companionValues(ref, (s) => s.connection);
+  }
   final ble = ref.watch(bleConnectionServiceProvider);
   return ble.connectionStream;
 });
@@ -65,6 +84,10 @@ final watchConnectionStreamProvider = StreamProvider<Connection>((ref) {
 final watchConnectionProvider = Provider<Connection>((ref) {
   final demo = demoConnectionOrNull(ref);
   if (demo != null) return demo;
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return ref.watch(companionSnapshotProvider).asData?.value.connection ??
+        const Connection(watchId: '', state: WatchConnectionState.disconnected);
+  }
 
   final asyncValue = ref.watch(watchConnectionStreamProvider);
   return asyncValue.valueOrNull ??
@@ -85,6 +108,9 @@ final watchConnectionStateProvider = Provider<WatchConnectionState>((ref) {
 
 /// Provider for watch info stream.
 final watchInfoStreamProvider = StreamProvider<Watch?>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return companionValues(ref, (s) => s.watch);
+  }
   final service = ref.watch(watchServiceProvider);
   return service.watchInfoStream;
 });
@@ -95,6 +121,29 @@ final watchInfoStreamProvider = StreamProvider<Watch?>((ref) {
 final currentWatchProvider = Provider<Watch?>((ref) {
   final demo = demoWatchOrNull(ref);
   if (demo != null) return demo;
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    final live = ref.watch(companionSnapshotProvider).asData?.value.watch;
+    if (live == null) return null;
+    final saved =
+        ref.watch(allWatchesProvider).asData?.value ?? <WatchEntity>[];
+    // Preserve Android MAC spelling in Drift. Do not pick an arbitrary name
+    // if old rows have ambiguous aliases for one physical watch.
+    final exact = saved.where((w) => w.id == live.id).toList();
+    final matches = exact.isNotEmpty
+        ? exact
+        : saved
+              .where((w) => w.id.toUpperCase() == live.id.toUpperCase())
+              .toList();
+    if (matches.length != 1) return live;
+    final metadata = matches.single;
+    return live.copyWith(
+      name: metadata.name,
+      customName: metadata.customName,
+      isPrimary: metadata.isPrimary,
+      createdAt: metadata.createdAt,
+      lastConnectedAt: metadata.lastConnectedAt,
+    );
+  }
 
   final asyncValue = ref.watch(watchInfoStreamProvider);
   final service = ref.watch(watchServiceProvider);
@@ -121,18 +170,35 @@ final connectedWatchProvider = Provider<Watch?>((ref) {
 
 /// Provider for battery level stream.
 final batteryLevelStreamProvider = StreamProvider<int>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    return companionValues<int?>(
+      ref,
+      (s) => s.hasLiveStatus ? s.watch?.batteryLevel : null,
+    ).where((level) => level != null).cast<int>();
+  }
   final service = ref.watch(watchServiceProvider);
   return service.batteryStream;
 });
 
 /// Provider for current battery level.
 final batteryLevelProvider = Provider<int?>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    final snapshot = ref.watch(companionSnapshotProvider).asData?.value;
+    return snapshot?.hasLiveStatus == true
+        ? snapshot?.watch?.batteryLevel
+        : null;
+  }
   final asyncValue = ref.watch(batteryLevelStreamProvider);
   return asyncValue.valueOrNull;
 });
 
 /// Provider for whether the connected watch has the SMP service available.
 final hasSmpServiceProvider = Provider<bool>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    final state = ref.watch(companionSnapshotProvider).asData?.value;
+    return state?.protocolReady == true &&
+        (state?.fields['capabilities'] as Map?)?['smp'] == true;
+  }
   final isConnected = ref.watch(isWatchConnectedProvider);
   if (!isConnected) return false;
   final ble = ref.watch(bleConnectionServiceProvider);
@@ -141,6 +207,31 @@ final hasSmpServiceProvider = Provider<bool>((ref) {
 
 /// Provider for crash summary stream (null if no crash available).
 final crashSummaryStreamProvider = StreamProvider<CrashSummary?>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    // Reuse the app's one snapshot subscription. Only crash/identity changes
+    // restart this projection; battery/status traffic must not resave history.
+    ref.watch(
+      companionSnapshotProvider.select((snapshot) {
+        final value = snapshot.valueOrNull;
+        final crash = value?.crashSummary;
+        return crash == null
+            ? null
+            : (
+                value?.fields['address'],
+                crash.file,
+                crash.line,
+                crash.time,
+                crash.fwVersion,
+                crash.fwCommitSha,
+                crash.board,
+                crash.buildType,
+              );
+      }),
+    );
+    return Stream.value(
+      ref.read(companionSnapshotProvider).valueOrNull?.crashSummary,
+    );
+  }
   final service = ref.watch(watchServiceProvider);
   return service.crashSummaryStream;
 });
@@ -226,25 +317,43 @@ final watchInfoPersistenceProvider = Provider<void>((ref) {
 
 /// Notifier for watch operations.
 class WatchNotifier extends BaseAsyncNotifier {
-  final WatchService _watchService;
+  final WatchService? _watchService;
+  final CompanionPrototypeClient? _native;
 
-  WatchNotifier(this._watchService);
+  WatchNotifier(WatchService service) : _watchService = service, _native = null;
+  WatchNotifier.native(CompanionPrototypeClient client)
+    : _watchService = null,
+      _native = client;
 
   /// Connect to a scanned device.
-  Future<void> connect(ScannedWatch device) =>
-      run(() => _watchService.connect(device), rethrowError: true);
+  Future<void> connect(ScannedWatch device) => run(
+    () => _native?.start(device.id) ?? _watchService!.connect(device),
+    rethrowError: true,
+  );
 
   /// Connect to a saved device by ID.
-  Future<void> connectById(String deviceId) =>
-      run(() => _watchService.connectById(deviceId), rethrowError: true);
+  Future<void> connectById(String deviceId) => run(
+    () => _native?.start(deviceId) ?? _watchService!.connectById(deviceId),
+    rethrowError: true,
+  );
 
   /// Disconnect from current device.
-  Future<void> disconnect() => run(() => _watchService.disconnect());
+  Future<void> disconnect() => run(() async {
+    if (_native != null) {
+      await _native.command('stop');
+    } else {
+      await _watchService!.disconnect();
+    }
+  });
 
   /// Request device info.
   Future<void> requestDeviceInfo() async {
     try {
-      await _watchService.requestDeviceInfo();
+      if (_native != null) {
+        await _native.command('requestDeviceInfo');
+      } else {
+        await _watchService!.requestDeviceInfo();
+      }
     } catch (e) {
       // Non-fatal
     }
@@ -253,7 +362,11 @@ class WatchNotifier extends BaseAsyncNotifier {
   /// Sync time.
   Future<void> syncTime() async {
     try {
-      await _watchService.syncTime();
+      if (_native != null) {
+        await _native.command('syncTime');
+      } else {
+        await _watchService!.syncTime();
+      }
     } catch (e) {
       // Non-fatal
     }
@@ -263,6 +376,9 @@ class WatchNotifier extends BaseAsyncNotifier {
 /// Provider for watch notifier.
 final watchNotifierProvider =
     StateNotifierProvider<WatchNotifier, AsyncValue<void>>((ref) {
+      if (ref.watch(nativeCompanionRuntimeProvider)) {
+        return WatchNotifier.native(ref.watch(companionClientProvider));
+      }
       final watchService = ref.watch(watchServiceProvider);
       return WatchNotifier(watchService);
     });

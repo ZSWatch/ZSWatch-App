@@ -28,10 +28,6 @@ Guid _guid(String uuid) => Guid(uuid);
 class WatchService {
   final BleConnectionService _ble;
 
-  /// Dedicated callback for chat messages. This avoids relying solely on the
-  /// generic incoming message broadcast path for the chat pipeline.
-  void Function(Map<String, dynamic> message)? onChatMessage;
-
   WatchService(this._ble) {
     LifecycleLogger.log('WatchService', 'created');
     // Register our setup callback so BleConnectionService calls us
@@ -350,16 +346,6 @@ class WatchService {
   Future<Map<String, dynamic>> resetWatchfaceBackground() =>
       sendWatchfaceBackgroundCommand('reset');
 
-  /// Send a chat command to the watch.
-  Future<void> sendChatCommand(
-    String action, {
-    Map<String, dynamic>? extraData,
-  }) async {
-    final data = <String, dynamic>{'t': 'chat', 'action': action};
-    if (extraData != null) data.addAll(extraData);
-    await _sendGb(data);
-  }
-
   /// Enable MCUmgr/SMP on the watch.
   Future<void> enableSmp() => _sendGb({'t': 'smp', 'status': true});
 
@@ -421,6 +407,9 @@ class WatchService {
     } catch (e) {
       debugPrint('[WatchService] NUS setup failed: $e');
       LifecycleLogger.log('WatchService', '_setupNus failed: $e');
+      // NUS is required for the companion protocol. Let the connection owner
+      // handle setup failure instead of reporting an unusable link as connected.
+      rethrow;
     }
 
     // Subscribe to battery service
@@ -486,7 +475,7 @@ class WatchService {
     final nusService = _findServiceIn(services, _guid(NusUuids.service));
     if (nusService == null) {
       LifecycleLogger.log('WatchService', '_setupNus missing service');
-      return;
+      throw StateError('NUS service unavailable');
     }
 
     final rxChar = _findCharacteristic(
@@ -498,11 +487,18 @@ class WatchService {
         'WatchService',
         '_setupNus missing RX characteristic',
       );
-      return;
+      throw StateError('NUS notify characteristic unavailable');
+    }
+
+    if (_findCharacteristic(nusService, _guid(NusUuids.txCharacteristic)) ==
+        null) {
+      throw StateError('NUS write characteristic unavailable');
     }
 
     _nusRxChar = rxChar;
-    await rxChar.setNotifyValue(true);
+    if (!await rxChar.setNotifyValue(true)) {
+      throw StateError('NUS notification subscription rejected');
+    }
     _nusSubscription = rxChar.onValueReceived.listen(_handleNusData);
     LifecycleLogger.log('WatchService', '_setupNus subscribed');
   }
@@ -733,11 +729,6 @@ class WatchService {
         debugPrint(
           '[WatchService] Watchface background message: ${message['action']}',
         );
-        break;
-
-      case 'chat':
-        debugPrint('[WatchService] Chat message: ${message['action']}');
-        onChatMessage?.call(message);
         break;
     }
   }

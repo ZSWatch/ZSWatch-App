@@ -5570,534 +5570,229 @@ class CrashReportsCompanion extends UpdateCompanion<CrashReportEntity> {
   }
 }
 
-class $ChatHistoryTable extends ChatHistory
-    with TableInfo<$ChatHistoryTable, ChatHistoryEntity> {
+class $CompanionTelemetryCursorsTable extends CompanionTelemetryCursors
+    with TableInfo<$CompanionTelemetryCursorsTable, CompanionTelemetryCursor> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $ChatHistoryTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
-    'id',
-    aliasedName,
-    false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
-  );
-  static const VerificationMeta _timestampUtcMeta = const VerificationMeta(
-    'timestampUtc',
+  $CompanionTelemetryCursorsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _journalIdMeta = const VerificationMeta(
+    'journalId',
   );
   @override
-  late final GeneratedColumn<int> timestampUtc = GeneratedColumn<int>(
-    'timestamp_utc',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _transcriptMeta = const VerificationMeta(
-    'transcript',
-  );
-  @override
-  late final GeneratedColumn<String> transcript = GeneratedColumn<String>(
-    'transcript',
+  late final GeneratedColumn<String> journalId = GeneratedColumn<String>(
+    'journal_id',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _answerMeta = const VerificationMeta('answer');
-  @override
-  late final GeneratedColumn<String> answer = GeneratedColumn<String>(
-    'answer',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _modelUsedMeta = const VerificationMeta(
-    'modelUsed',
+  static const VerificationMeta _sequenceMeta = const VerificationMeta(
+    'sequence',
   );
   @override
-  late final GeneratedColumn<String> modelUsed = GeneratedColumn<String>(
-    'model_used',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _latencyMsMeta = const VerificationMeta(
-    'latencyMs',
-  );
-  @override
-  late final GeneratedColumn<int> latencyMs = GeneratedColumn<int>(
-    'latency_ms',
-    aliasedName,
-    true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _successMeta = const VerificationMeta(
-    'success',
-  );
-  @override
-  late final GeneratedColumn<bool> success = GeneratedColumn<bool>(
-    'success',
+  late final GeneratedColumn<int> sequence = GeneratedColumn<int>(
+    'sequence',
     aliasedName,
     false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("success" IN (0, 1))',
-    ),
-    defaultValue: const Constant(true),
-  );
-  static const VerificationMeta _errorMessageMeta = const VerificationMeta(
-    'errorMessage',
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
   );
   @override
-  late final GeneratedColumn<String> errorMessage = GeneratedColumn<String>(
-    'error_message',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    timestampUtc,
-    transcript,
-    answer,
-    modelUsed,
-    latencyMs,
-    success,
-    errorMessage,
-  ];
+  List<GeneratedColumn> get $columns => [journalId, sequence];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'chat_history';
+  static const String $name = 'companion_telemetry_cursors';
   @override
   VerificationContext validateIntegrity(
-    Insertable<ChatHistoryEntity> instance, {
+    Insertable<CompanionTelemetryCursor> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('timestamp_utc')) {
+    if (data.containsKey('journal_id')) {
       context.handle(
-        _timestampUtcMeta,
-        timestampUtc.isAcceptableOrUnknown(
-          data['timestamp_utc']!,
-          _timestampUtcMeta,
-        ),
+        _journalIdMeta,
+        journalId.isAcceptableOrUnknown(data['journal_id']!, _journalIdMeta),
       );
     } else if (isInserting) {
-      context.missing(_timestampUtcMeta);
+      context.missing(_journalIdMeta);
     }
-    if (data.containsKey('transcript')) {
+    if (data.containsKey('sequence')) {
       context.handle(
-        _transcriptMeta,
-        transcript.isAcceptableOrUnknown(data['transcript']!, _transcriptMeta),
+        _sequenceMeta,
+        sequence.isAcceptableOrUnknown(data['sequence']!, _sequenceMeta),
       );
     } else if (isInserting) {
-      context.missing(_transcriptMeta);
-    }
-    if (data.containsKey('answer')) {
-      context.handle(
-        _answerMeta,
-        answer.isAcceptableOrUnknown(data['answer']!, _answerMeta),
-      );
-    }
-    if (data.containsKey('model_used')) {
-      context.handle(
-        _modelUsedMeta,
-        modelUsed.isAcceptableOrUnknown(data['model_used']!, _modelUsedMeta),
-      );
-    }
-    if (data.containsKey('latency_ms')) {
-      context.handle(
-        _latencyMsMeta,
-        latencyMs.isAcceptableOrUnknown(data['latency_ms']!, _latencyMsMeta),
-      );
-    }
-    if (data.containsKey('success')) {
-      context.handle(
-        _successMeta,
-        success.isAcceptableOrUnknown(data['success']!, _successMeta),
-      );
-    }
-    if (data.containsKey('error_message')) {
-      context.handle(
-        _errorMessageMeta,
-        errorMessage.isAcceptableOrUnknown(
-          data['error_message']!,
-          _errorMessageMeta,
-        ),
-      );
+      context.missing(_sequenceMeta);
     }
     return context;
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {id};
+  Set<GeneratedColumn> get $primaryKey => {journalId};
   @override
-  ChatHistoryEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+  CompanionTelemetryCursor map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return ChatHistoryEntity(
-      id: attachedDatabase.typeMapping.read(
+    return CompanionTelemetryCursor(
+      journalId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}journal_id'],
+      )!,
+      sequence: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}id'],
+        data['${effectivePrefix}sequence'],
       )!,
-      timestampUtc: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}timestamp_utc'],
-      )!,
-      transcript: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}transcript'],
-      )!,
-      answer: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}answer'],
-      ),
-      modelUsed: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}model_used'],
-      ),
-      latencyMs: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}latency_ms'],
-      ),
-      success: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}success'],
-      )!,
-      errorMessage: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}error_message'],
-      ),
     );
   }
 
   @override
-  $ChatHistoryTable createAlias(String alias) {
-    return $ChatHistoryTable(attachedDatabase, alias);
+  $CompanionTelemetryCursorsTable createAlias(String alias) {
+    return $CompanionTelemetryCursorsTable(attachedDatabase, alias);
   }
 }
 
-class ChatHistoryEntity extends DataClass
-    implements Insertable<ChatHistoryEntity> {
-  /// Auto-incrementing row identifier
-  final int id;
-
-  /// Timestamp when the question was asked (UTC epoch seconds)
-  final int timestampUtc;
-
-  /// Recognized transcript of the user's question
-  final String transcript;
-
-  /// LLM-generated answer text (null if the request failed before answer)
-  final String? answer;
-
-  /// LLM model ID used for this exchange (e.g., "gemma4_e2b_litertlm")
-  final String? modelUsed;
-
-  /// End-to-end latency in milliseconds (stop-recording to reply-ready)
-  final int? latencyMs;
-
-  /// Whether the exchange completed successfully
-  final bool success;
-
-  /// Error message if the exchange failed
-  final String? errorMessage;
-  const ChatHistoryEntity({
-    required this.id,
-    required this.timestampUtc,
-    required this.transcript,
-    this.answer,
-    this.modelUsed,
-    this.latencyMs,
-    required this.success,
-    this.errorMessage,
+class CompanionTelemetryCursor extends DataClass
+    implements Insertable<CompanionTelemetryCursor> {
+  final String journalId;
+  final int sequence;
+  const CompanionTelemetryCursor({
+    required this.journalId,
+    required this.sequence,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['timestamp_utc'] = Variable<int>(timestampUtc);
-    map['transcript'] = Variable<String>(transcript);
-    if (!nullToAbsent || answer != null) {
-      map['answer'] = Variable<String>(answer);
-    }
-    if (!nullToAbsent || modelUsed != null) {
-      map['model_used'] = Variable<String>(modelUsed);
-    }
-    if (!nullToAbsent || latencyMs != null) {
-      map['latency_ms'] = Variable<int>(latencyMs);
-    }
-    map['success'] = Variable<bool>(success);
-    if (!nullToAbsent || errorMessage != null) {
-      map['error_message'] = Variable<String>(errorMessage);
-    }
+    map['journal_id'] = Variable<String>(journalId);
+    map['sequence'] = Variable<int>(sequence);
     return map;
   }
 
-  ChatHistoryCompanion toCompanion(bool nullToAbsent) {
-    return ChatHistoryCompanion(
-      id: Value(id),
-      timestampUtc: Value(timestampUtc),
-      transcript: Value(transcript),
-      answer: answer == null && nullToAbsent
-          ? const Value.absent()
-          : Value(answer),
-      modelUsed: modelUsed == null && nullToAbsent
-          ? const Value.absent()
-          : Value(modelUsed),
-      latencyMs: latencyMs == null && nullToAbsent
-          ? const Value.absent()
-          : Value(latencyMs),
-      success: Value(success),
-      errorMessage: errorMessage == null && nullToAbsent
-          ? const Value.absent()
-          : Value(errorMessage),
+  CompanionTelemetryCursorsCompanion toCompanion(bool nullToAbsent) {
+    return CompanionTelemetryCursorsCompanion(
+      journalId: Value(journalId),
+      sequence: Value(sequence),
     );
   }
 
-  factory ChatHistoryEntity.fromJson(
+  factory CompanionTelemetryCursor.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return ChatHistoryEntity(
-      id: serializer.fromJson<int>(json['id']),
-      timestampUtc: serializer.fromJson<int>(json['timestampUtc']),
-      transcript: serializer.fromJson<String>(json['transcript']),
-      answer: serializer.fromJson<String?>(json['answer']),
-      modelUsed: serializer.fromJson<String?>(json['modelUsed']),
-      latencyMs: serializer.fromJson<int?>(json['latencyMs']),
-      success: serializer.fromJson<bool>(json['success']),
-      errorMessage: serializer.fromJson<String?>(json['errorMessage']),
+    return CompanionTelemetryCursor(
+      journalId: serializer.fromJson<String>(json['journalId']),
+      sequence: serializer.fromJson<int>(json['sequence']),
     );
   }
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'timestampUtc': serializer.toJson<int>(timestampUtc),
-      'transcript': serializer.toJson<String>(transcript),
-      'answer': serializer.toJson<String?>(answer),
-      'modelUsed': serializer.toJson<String?>(modelUsed),
-      'latencyMs': serializer.toJson<int?>(latencyMs),
-      'success': serializer.toJson<bool>(success),
-      'errorMessage': serializer.toJson<String?>(errorMessage),
+      'journalId': serializer.toJson<String>(journalId),
+      'sequence': serializer.toJson<int>(sequence),
     };
   }
 
-  ChatHistoryEntity copyWith({
-    int? id,
-    int? timestampUtc,
-    String? transcript,
-    Value<String?> answer = const Value.absent(),
-    Value<String?> modelUsed = const Value.absent(),
-    Value<int?> latencyMs = const Value.absent(),
-    bool? success,
-    Value<String?> errorMessage = const Value.absent(),
-  }) => ChatHistoryEntity(
-    id: id ?? this.id,
-    timestampUtc: timestampUtc ?? this.timestampUtc,
-    transcript: transcript ?? this.transcript,
-    answer: answer.present ? answer.value : this.answer,
-    modelUsed: modelUsed.present ? modelUsed.value : this.modelUsed,
-    latencyMs: latencyMs.present ? latencyMs.value : this.latencyMs,
-    success: success ?? this.success,
-    errorMessage: errorMessage.present ? errorMessage.value : this.errorMessage,
-  );
-  ChatHistoryEntity copyWithCompanion(ChatHistoryCompanion data) {
-    return ChatHistoryEntity(
-      id: data.id.present ? data.id.value : this.id,
-      timestampUtc: data.timestampUtc.present
-          ? data.timestampUtc.value
-          : this.timestampUtc,
-      transcript: data.transcript.present
-          ? data.transcript.value
-          : this.transcript,
-      answer: data.answer.present ? data.answer.value : this.answer,
-      modelUsed: data.modelUsed.present ? data.modelUsed.value : this.modelUsed,
-      latencyMs: data.latencyMs.present ? data.latencyMs.value : this.latencyMs,
-      success: data.success.present ? data.success.value : this.success,
-      errorMessage: data.errorMessage.present
-          ? data.errorMessage.value
-          : this.errorMessage,
+  CompanionTelemetryCursor copyWith({String? journalId, int? sequence}) =>
+      CompanionTelemetryCursor(
+        journalId: journalId ?? this.journalId,
+        sequence: sequence ?? this.sequence,
+      );
+  CompanionTelemetryCursor copyWithCompanion(
+    CompanionTelemetryCursorsCompanion data,
+  ) {
+    return CompanionTelemetryCursor(
+      journalId: data.journalId.present ? data.journalId.value : this.journalId,
+      sequence: data.sequence.present ? data.sequence.value : this.sequence,
     );
   }
 
   @override
   String toString() {
-    return (StringBuffer('ChatHistoryEntity(')
-          ..write('id: $id, ')
-          ..write('timestampUtc: $timestampUtc, ')
-          ..write('transcript: $transcript, ')
-          ..write('answer: $answer, ')
-          ..write('modelUsed: $modelUsed, ')
-          ..write('latencyMs: $latencyMs, ')
-          ..write('success: $success, ')
-          ..write('errorMessage: $errorMessage')
+    return (StringBuffer('CompanionTelemetryCursor(')
+          ..write('journalId: $journalId, ')
+          ..write('sequence: $sequence')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-    id,
-    timestampUtc,
-    transcript,
-    answer,
-    modelUsed,
-    latencyMs,
-    success,
-    errorMessage,
-  );
+  int get hashCode => Object.hash(journalId, sequence);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is ChatHistoryEntity &&
-          other.id == this.id &&
-          other.timestampUtc == this.timestampUtc &&
-          other.transcript == this.transcript &&
-          other.answer == this.answer &&
-          other.modelUsed == this.modelUsed &&
-          other.latencyMs == this.latencyMs &&
-          other.success == this.success &&
-          other.errorMessage == this.errorMessage);
+      (other is CompanionTelemetryCursor &&
+          other.journalId == this.journalId &&
+          other.sequence == this.sequence);
 }
 
-class ChatHistoryCompanion extends UpdateCompanion<ChatHistoryEntity> {
-  final Value<int> id;
-  final Value<int> timestampUtc;
-  final Value<String> transcript;
-  final Value<String?> answer;
-  final Value<String?> modelUsed;
-  final Value<int?> latencyMs;
-  final Value<bool> success;
-  final Value<String?> errorMessage;
-  const ChatHistoryCompanion({
-    this.id = const Value.absent(),
-    this.timestampUtc = const Value.absent(),
-    this.transcript = const Value.absent(),
-    this.answer = const Value.absent(),
-    this.modelUsed = const Value.absent(),
-    this.latencyMs = const Value.absent(),
-    this.success = const Value.absent(),
-    this.errorMessage = const Value.absent(),
+class CompanionTelemetryCursorsCompanion
+    extends UpdateCompanion<CompanionTelemetryCursor> {
+  final Value<String> journalId;
+  final Value<int> sequence;
+  final Value<int> rowid;
+  const CompanionTelemetryCursorsCompanion({
+    this.journalId = const Value.absent(),
+    this.sequence = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
-  ChatHistoryCompanion.insert({
-    this.id = const Value.absent(),
-    required int timestampUtc,
-    required String transcript,
-    this.answer = const Value.absent(),
-    this.modelUsed = const Value.absent(),
-    this.latencyMs = const Value.absent(),
-    this.success = const Value.absent(),
-    this.errorMessage = const Value.absent(),
-  }) : timestampUtc = Value(timestampUtc),
-       transcript = Value(transcript);
-  static Insertable<ChatHistoryEntity> custom({
-    Expression<int>? id,
-    Expression<int>? timestampUtc,
-    Expression<String>? transcript,
-    Expression<String>? answer,
-    Expression<String>? modelUsed,
-    Expression<int>? latencyMs,
-    Expression<bool>? success,
-    Expression<String>? errorMessage,
+  CompanionTelemetryCursorsCompanion.insert({
+    required String journalId,
+    required int sequence,
+    this.rowid = const Value.absent(),
+  }) : journalId = Value(journalId),
+       sequence = Value(sequence);
+  static Insertable<CompanionTelemetryCursor> custom({
+    Expression<String>? journalId,
+    Expression<int>? sequence,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (timestampUtc != null) 'timestamp_utc': timestampUtc,
-      if (transcript != null) 'transcript': transcript,
-      if (answer != null) 'answer': answer,
-      if (modelUsed != null) 'model_used': modelUsed,
-      if (latencyMs != null) 'latency_ms': latencyMs,
-      if (success != null) 'success': success,
-      if (errorMessage != null) 'error_message': errorMessage,
+      if (journalId != null) 'journal_id': journalId,
+      if (sequence != null) 'sequence': sequence,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
-  ChatHistoryCompanion copyWith({
-    Value<int>? id,
-    Value<int>? timestampUtc,
-    Value<String>? transcript,
-    Value<String?>? answer,
-    Value<String?>? modelUsed,
-    Value<int?>? latencyMs,
-    Value<bool>? success,
-    Value<String?>? errorMessage,
+  CompanionTelemetryCursorsCompanion copyWith({
+    Value<String>? journalId,
+    Value<int>? sequence,
+    Value<int>? rowid,
   }) {
-    return ChatHistoryCompanion(
-      id: id ?? this.id,
-      timestampUtc: timestampUtc ?? this.timestampUtc,
-      transcript: transcript ?? this.transcript,
-      answer: answer ?? this.answer,
-      modelUsed: modelUsed ?? this.modelUsed,
-      latencyMs: latencyMs ?? this.latencyMs,
-      success: success ?? this.success,
-      errorMessage: errorMessage ?? this.errorMessage,
+    return CompanionTelemetryCursorsCompanion(
+      journalId: journalId ?? this.journalId,
+      sequence: sequence ?? this.sequence,
+      rowid: rowid ?? this.rowid,
     );
   }
 
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<int>(id.value);
+    if (journalId.present) {
+      map['journal_id'] = Variable<String>(journalId.value);
     }
-    if (timestampUtc.present) {
-      map['timestamp_utc'] = Variable<int>(timestampUtc.value);
+    if (sequence.present) {
+      map['sequence'] = Variable<int>(sequence.value);
     }
-    if (transcript.present) {
-      map['transcript'] = Variable<String>(transcript.value);
-    }
-    if (answer.present) {
-      map['answer'] = Variable<String>(answer.value);
-    }
-    if (modelUsed.present) {
-      map['model_used'] = Variable<String>(modelUsed.value);
-    }
-    if (latencyMs.present) {
-      map['latency_ms'] = Variable<int>(latencyMs.value);
-    }
-    if (success.present) {
-      map['success'] = Variable<bool>(success.value);
-    }
-    if (errorMessage.present) {
-      map['error_message'] = Variable<String>(errorMessage.value);
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
     }
     return map;
   }
 
   @override
   String toString() {
-    return (StringBuffer('ChatHistoryCompanion(')
-          ..write('id: $id, ')
-          ..write('timestampUtc: $timestampUtc, ')
-          ..write('transcript: $transcript, ')
-          ..write('answer: $answer, ')
-          ..write('modelUsed: $modelUsed, ')
-          ..write('latencyMs: $latencyMs, ')
-          ..write('success: $success, ')
-          ..write('errorMessage: $errorMessage')
+    return (StringBuffer('CompanionTelemetryCursorsCompanion(')
+          ..write('journalId: $journalId, ')
+          ..write('sequence: $sequence, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -6120,7 +5815,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $CrashReportsTable crashReports = $CrashReportsTable(this);
-  late final $ChatHistoryTable chatHistory = $ChatHistoryTable(this);
+  late final $CompanionTelemetryCursorsTable companionTelemetryCursors =
+      $CompanionTelemetryCursorsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6134,7 +5830,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     voiceMemos,
     extractedActions,
     crashReports,
-    chatHistory,
+    companionTelemetryCursors,
   ];
 }
 
@@ -9594,237 +9290,138 @@ typedef $$CrashReportsTableProcessedTableManager =
       CrashReportEntity,
       PrefetchHooks Function({bool watchId})
     >;
-typedef $$ChatHistoryTableCreateCompanionBuilder =
-    ChatHistoryCompanion Function({
-      Value<int> id,
-      required int timestampUtc,
-      required String transcript,
-      Value<String?> answer,
-      Value<String?> modelUsed,
-      Value<int?> latencyMs,
-      Value<bool> success,
-      Value<String?> errorMessage,
+typedef $$CompanionTelemetryCursorsTableCreateCompanionBuilder =
+    CompanionTelemetryCursorsCompanion Function({
+      required String journalId,
+      required int sequence,
+      Value<int> rowid,
     });
-typedef $$ChatHistoryTableUpdateCompanionBuilder =
-    ChatHistoryCompanion Function({
-      Value<int> id,
-      Value<int> timestampUtc,
-      Value<String> transcript,
-      Value<String?> answer,
-      Value<String?> modelUsed,
-      Value<int?> latencyMs,
-      Value<bool> success,
-      Value<String?> errorMessage,
+typedef $$CompanionTelemetryCursorsTableUpdateCompanionBuilder =
+    CompanionTelemetryCursorsCompanion Function({
+      Value<String> journalId,
+      Value<int> sequence,
+      Value<int> rowid,
     });
 
-class $$ChatHistoryTableFilterComposer
-    extends Composer<_$AppDatabase, $ChatHistoryTable> {
-  $$ChatHistoryTableFilterComposer({
+class $$CompanionTelemetryCursorsTableFilterComposer
+    extends Composer<_$AppDatabase, $CompanionTelemetryCursorsTable> {
+  $$CompanionTelemetryCursorsTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
-    column: $table.id,
+  ColumnFilters<String> get journalId => $composableBuilder(
+    column: $table.journalId,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get timestampUtc => $composableBuilder(
-    column: $table.timestampUtc,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get transcript => $composableBuilder(
-    column: $table.transcript,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get answer => $composableBuilder(
-    column: $table.answer,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get modelUsed => $composableBuilder(
-    column: $table.modelUsed,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get latencyMs => $composableBuilder(
-    column: $table.latencyMs,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<bool> get success => $composableBuilder(
-    column: $table.success,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get errorMessage => $composableBuilder(
-    column: $table.errorMessage,
+  ColumnFilters<int> get sequence => $composableBuilder(
+    column: $table.sequence,
     builder: (column) => ColumnFilters(column),
   );
 }
 
-class $$ChatHistoryTableOrderingComposer
-    extends Composer<_$AppDatabase, $ChatHistoryTable> {
-  $$ChatHistoryTableOrderingComposer({
+class $$CompanionTelemetryCursorsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CompanionTelemetryCursorsTable> {
+  $$CompanionTelemetryCursorsTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
-    column: $table.id,
+  ColumnOrderings<String> get journalId => $composableBuilder(
+    column: $table.journalId,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get timestampUtc => $composableBuilder(
-    column: $table.timestampUtc,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get transcript => $composableBuilder(
-    column: $table.transcript,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get answer => $composableBuilder(
-    column: $table.answer,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get modelUsed => $composableBuilder(
-    column: $table.modelUsed,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get latencyMs => $composableBuilder(
-    column: $table.latencyMs,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<bool> get success => $composableBuilder(
-    column: $table.success,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get errorMessage => $composableBuilder(
-    column: $table.errorMessage,
+  ColumnOrderings<int> get sequence => $composableBuilder(
+    column: $table.sequence,
     builder: (column) => ColumnOrderings(column),
   );
 }
 
-class $$ChatHistoryTableAnnotationComposer
-    extends Composer<_$AppDatabase, $ChatHistoryTable> {
-  $$ChatHistoryTableAnnotationComposer({
+class $$CompanionTelemetryCursorsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CompanionTelemetryCursorsTable> {
+  $$CompanionTelemetryCursorsTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
+  GeneratedColumn<String> get journalId =>
+      $composableBuilder(column: $table.journalId, builder: (column) => column);
 
-  GeneratedColumn<int> get timestampUtc => $composableBuilder(
-    column: $table.timestampUtc,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get transcript => $composableBuilder(
-    column: $table.transcript,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<String> get answer =>
-      $composableBuilder(column: $table.answer, builder: (column) => column);
-
-  GeneratedColumn<String> get modelUsed =>
-      $composableBuilder(column: $table.modelUsed, builder: (column) => column);
-
-  GeneratedColumn<int> get latencyMs =>
-      $composableBuilder(column: $table.latencyMs, builder: (column) => column);
-
-  GeneratedColumn<bool> get success =>
-      $composableBuilder(column: $table.success, builder: (column) => column);
-
-  GeneratedColumn<String> get errorMessage => $composableBuilder(
-    column: $table.errorMessage,
-    builder: (column) => column,
-  );
+  GeneratedColumn<int> get sequence =>
+      $composableBuilder(column: $table.sequence, builder: (column) => column);
 }
 
-class $$ChatHistoryTableTableManager
+class $$CompanionTelemetryCursorsTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $ChatHistoryTable,
-          ChatHistoryEntity,
-          $$ChatHistoryTableFilterComposer,
-          $$ChatHistoryTableOrderingComposer,
-          $$ChatHistoryTableAnnotationComposer,
-          $$ChatHistoryTableCreateCompanionBuilder,
-          $$ChatHistoryTableUpdateCompanionBuilder,
+          $CompanionTelemetryCursorsTable,
+          CompanionTelemetryCursor,
+          $$CompanionTelemetryCursorsTableFilterComposer,
+          $$CompanionTelemetryCursorsTableOrderingComposer,
+          $$CompanionTelemetryCursorsTableAnnotationComposer,
+          $$CompanionTelemetryCursorsTableCreateCompanionBuilder,
+          $$CompanionTelemetryCursorsTableUpdateCompanionBuilder,
           (
-            ChatHistoryEntity,
-            BaseReferences<_$AppDatabase, $ChatHistoryTable, ChatHistoryEntity>,
+            CompanionTelemetryCursor,
+            BaseReferences<
+              _$AppDatabase,
+              $CompanionTelemetryCursorsTable,
+              CompanionTelemetryCursor
+            >,
           ),
-          ChatHistoryEntity,
+          CompanionTelemetryCursor,
           PrefetchHooks Function()
         > {
-  $$ChatHistoryTableTableManager(_$AppDatabase db, $ChatHistoryTable table)
-    : super(
+  $$CompanionTelemetryCursorsTableTableManager(
+    _$AppDatabase db,
+    $CompanionTelemetryCursorsTable table,
+  ) : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$ChatHistoryTableFilterComposer($db: db, $table: table),
+              $$CompanionTelemetryCursorsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
           createOrderingComposer: () =>
-              $$ChatHistoryTableOrderingComposer($db: db, $table: table),
+              $$CompanionTelemetryCursorsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
           createComputedFieldComposer: () =>
-              $$ChatHistoryTableAnnotationComposer($db: db, $table: table),
+              $$CompanionTelemetryCursorsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
-                Value<int> timestampUtc = const Value.absent(),
-                Value<String> transcript = const Value.absent(),
-                Value<String?> answer = const Value.absent(),
-                Value<String?> modelUsed = const Value.absent(),
-                Value<int?> latencyMs = const Value.absent(),
-                Value<bool> success = const Value.absent(),
-                Value<String?> errorMessage = const Value.absent(),
-              }) => ChatHistoryCompanion(
-                id: id,
-                timestampUtc: timestampUtc,
-                transcript: transcript,
-                answer: answer,
-                modelUsed: modelUsed,
-                latencyMs: latencyMs,
-                success: success,
-                errorMessage: errorMessage,
+                Value<String> journalId = const Value.absent(),
+                Value<int> sequence = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CompanionTelemetryCursorsCompanion(
+                journalId: journalId,
+                sequence: sequence,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
-                required int timestampUtc,
-                required String transcript,
-                Value<String?> answer = const Value.absent(),
-                Value<String?> modelUsed = const Value.absent(),
-                Value<int?> latencyMs = const Value.absent(),
-                Value<bool> success = const Value.absent(),
-                Value<String?> errorMessage = const Value.absent(),
-              }) => ChatHistoryCompanion.insert(
-                id: id,
-                timestampUtc: timestampUtc,
-                transcript: transcript,
-                answer: answer,
-                modelUsed: modelUsed,
-                latencyMs: latencyMs,
-                success: success,
-                errorMessage: errorMessage,
+                required String journalId,
+                required int sequence,
+                Value<int> rowid = const Value.absent(),
+              }) => CompanionTelemetryCursorsCompanion.insert(
+                journalId: journalId,
+                sequence: sequence,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -9834,21 +9431,25 @@ class $$ChatHistoryTableTableManager
       );
 }
 
-typedef $$ChatHistoryTableProcessedTableManager =
+typedef $$CompanionTelemetryCursorsTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $ChatHistoryTable,
-      ChatHistoryEntity,
-      $$ChatHistoryTableFilterComposer,
-      $$ChatHistoryTableOrderingComposer,
-      $$ChatHistoryTableAnnotationComposer,
-      $$ChatHistoryTableCreateCompanionBuilder,
-      $$ChatHistoryTableUpdateCompanionBuilder,
+      $CompanionTelemetryCursorsTable,
+      CompanionTelemetryCursor,
+      $$CompanionTelemetryCursorsTableFilterComposer,
+      $$CompanionTelemetryCursorsTableOrderingComposer,
+      $$CompanionTelemetryCursorsTableAnnotationComposer,
+      $$CompanionTelemetryCursorsTableCreateCompanionBuilder,
+      $$CompanionTelemetryCursorsTableUpdateCompanionBuilder,
       (
-        ChatHistoryEntity,
-        BaseReferences<_$AppDatabase, $ChatHistoryTable, ChatHistoryEntity>,
+        CompanionTelemetryCursor,
+        BaseReferences<
+          _$AppDatabase,
+          $CompanionTelemetryCursorsTable,
+          CompanionTelemetryCursor
+        >,
       ),
-      ChatHistoryEntity,
+      CompanionTelemetryCursor,
       PrefetchHooks Function()
     >;
 
@@ -9871,6 +9472,9 @@ class $AppDatabaseManager {
       $$ExtractedActionsTableTableManager(_db, _db.extractedActions);
   $$CrashReportsTableTableManager get crashReports =>
       $$CrashReportsTableTableManager(_db, _db.crashReports);
-  $$ChatHistoryTableTableManager get chatHistory =>
-      $$ChatHistoryTableTableManager(_db, _db.chatHistory);
+  $$CompanionTelemetryCursorsTableTableManager get companionTelemetryCursors =>
+      $$CompanionTelemetryCursorsTableTableManager(
+        _db,
+        _db.companionTelemetryCursors,
+      );
 }

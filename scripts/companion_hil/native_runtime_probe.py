@@ -1,0 +1,168 @@
+"""Read-only native prototype observations; never a background acceptance PASS."""
+
+import argparse
+import hashlib
+import json
+import re
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+COMPONENT = 'dev.zswatch.app.companion.CompanionPrototypeService'
+HTTP_OUTCOMES = {'pending', 'written', 'error_written', 'delivery_expired', 'delivery_unavailable',
+                 'connection_closed', 'process_interrupted', 'invalid_id', 'busy'}
+
+
+def connected_device_foreground(services, component=COMPONENT):
+    """Check the actual owner's record, allowing additional foreground types."""
+    records = list(re.finditer(r'^\s*\* ServiceRecord\{[^\r\n]*\}', services, re.MULTILINE))
+    for index, record in enumerate(records):
+        if component not in record.group():
+            continue
+        end = records[index + 1].start() if index + 1 < len(records) else len(services)
+        block = services[record.end():end]
+        foreground = re.search(r'\bisForeground=(true|false)\b[^\r\n]*\btypes=(0x[0-9a-fA-F]+)\b', block)
+        return bool(foreground and foreground[1] == 'true' and int(foreground[2], 16) & 0x10)
+    return False
+
+
+def summarize_jobs(state):
+    jobs, outbox = state.get('jobs', {}), state.get('outbox', {})
+    if state.get('version') != 1 or not isinstance(jobs, dict) or not isinstance(outbox, dict):
+        raise ValueError('Unsupported native job journal')
+    for identity, job in jobs.items():
+        encoded = json.dumps(job['spec'], ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+        if hashlib.sha256(encoded.encode()).hexdigest() != identity:
+            raise ValueError('Job identity differs from its spec')
+        result_id = hashlib.sha256(('result-v1:' + identity).encode()).hexdigest()
+        delivery = outbox.get(result_id)
+        if job['state'] in ('result_ready', 'delivered'):
+            if not delivery or delivery.get('job_id') != identity:
+                raise ValueError('Committed result is missing its atomic outbox')
+            payload = json.loads(delivery['payload'])
+            if (payload['result_id'] != result_id or payload['job_id'] != identity or
+                    payload['watch_id'] != job['spec']['watch_id'] or
+                    payload['result'] != job['result']):
+                raise ValueError('Result and outbox disagree')
+            if job['state'] == 'delivered' and delivery['state'] != 'acked':
+                raise ValueError('Delivered job lacks an application receipt ACK')
+    return {
+        'job_count': len(jobs), 'pending_result_count': sum(d['state'] == 'pending' for d in outbox.values()),
+        'jobs': [{k: job.get(k) for k in ('state', 'fence', 'attempts', 'remote_id', 'last_error')} |
+                 {'job_id': identity} for identity, job in jobs.items()],
+    }
+
+
+def summarize(state, services, pid, expected=None):
+    """Reject malformed Android JSON values and stale persisted readiness."""
+    if state.get('version') != 1 or type(state.get('desired_running')) is not bool:
+        raise ValueError('Unsupported native state')
+    if type(state.get('generation')) is not int or state['generation'] < 0:
+        raise ValueError('Invalid generation')
+    packages = state.get('notification_packages', [])
+    notices = state.get('notifications', {})
+    if not isinstance(packages, list) or not all(isinstance(x, str) for x in packages):
+        raise ValueError('Notification packages must be a JSON array, not a string')
+    if not isinstance(notices, dict) or len(notices) > 64:
+        raise ValueError('Invalid bounded notification journal')
+    active = bool(re.search(r'ServiceRecord\{[^\n]*' + re.escape(COMPONENT), services))
+    live = active and bool(pid.strip())
+    ready = active and bool(pid.strip()) and state.get('desired_running') is True and state.get('phase') == 'ready'
+    stopped = not active and state.get('desired_running') is False and state.get('phase') == 'stopped' and not notices
+    if expected == 'ready' and not ready:
+        raise ValueError('Live native service is not protocol-ready')
+    if expected == 'stopped' and not stopped:
+        raise ValueError('Stop is not persisted, released, and cleared')
+    http_enabled, pending = state.get('http_enabled', True), state.get('http_pending_count', 0)
+    if type(http_enabled) is not bool or type(pending) is not int or not 0 <= pending <= 4:
+        raise ValueError('Invalid native HTTP policy/count')
+    last_http = state.get('last_http')
+    if last_http is not None:
+        if (not isinstance(last_http, dict) or type(last_http.get('generation')) is not int or
+                last_http['generation'] < 0 or type(last_http.get('utc_ms')) is not int or
+                last_http['utc_ms'] < 0 or last_http.get('outcome') not in HTTP_OUTCOMES):
+            raise ValueError('Invalid native HTTP outcome')
+        last_http = ({key: last_http[key] for key in ('generation', 'utc_ms', 'outcome')}
+                     if live and last_http['generation'] == state['generation'] else None)
+    info = state.get('watch_info', {})
+    media = {}
+    for key in ('last_media_write', 'last_media_control'):
+        value = state.get(key)
+        if value is not None:
+            if (not isinstance(value, dict) or type(value.get('generation')) is not int or
+                    value['generation'] < 0 or type(value.get('utc_ms')) is not int or value['utc_ms'] < 0 or
+                    (key == 'last_media_control' and type(value.get('accepted')) is not bool)):
+                raise ValueError('Invalid native media receipt')
+        fields = ('generation', 'utc_ms', 'accepted') if key == 'last_media_control' else ('generation', 'utc_ms')
+        media[key] = ({field: value[field] for field in fields}
+                      if value is not None and ready and value['generation'] == state['generation'] else None)
+    observed_status = None
+    if (ready and isinstance(info, dict) and info.get('address') == state.get('address') and
+            type(info.get('status_generation')) is int and info['status_generation'] == state['generation']):
+        observed_status = info.get('status_observed_ms')
+        if type(observed_status) is not int or observed_status < 0:
+            raise ValueError('Invalid current watch status timestamp')
+    return {
+        'schema_version': 1, 'scope': 'READ_ONLY_NATIVE_STATE', 'acceptance': 'NOT_RUN',
+        'observed_utc': datetime.now(timezone.utc).isoformat(),
+        'pid': pid.strip(), 'service_present': active, 'protocol_ready': ready,
+        'generation': state['generation'], 'phase': state.get('phase'),
+        'desired_running': state['desired_running'], 'notification_count': len(notices),
+        'notification_packages': packages, 'recording_sync_enabled': state.get('recording_sync_enabled'),
+        'last_time_write_utc_ms': state.get('last_time_write_utc_ms'),
+        'last_notification_write_utc_ms': state.get('last_notification_write_utc_ms'),
+        'watch_status_observed_utc_ms': observed_status,
+        'http_enabled': http_enabled, 'http_pending_count': pending if live else 0,
+        'last_http': last_http,
+        **media,
+        # Do not emit Android keys, notification text, recordings or job content.
+        'notifications': [{k: item.get(k) for k in ('id', 'revision', 'removed', 'delivered_generation', 'delivered_revision')}
+                          for item in notices.values()],
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--adb', default='adb')
+    parser.add_argument('--android-serial', required=True)
+    parser.add_argument('--expect', choices=['ready', 'stopped'])
+    parser.add_argument('--apk', type=Path, help='Optional frozen APK to verify against the installed hash')
+    parser.add_argument('--jobs', action='store_true', help='Observe the separate synthetic job/result journal without content')
+    parser.add_argument('--output', type=Path, required=True, help='New JSON output file')
+    args = parser.parse_args()
+    if args.android_serial.startswith('emulator-'):
+        parser.error('Select an explicit physical phone')
+    def adb(*command):
+        return subprocess.run([args.adb, '-s', args.android_serial, *command],
+                              text=True, capture_output=True, check=True, timeout=20).stdout
+    state = json.loads(adb('shell', 'run-as', 'com.zswatch.app', 'cat', 'files/companion-prototype/state-v1.json'))
+    # pidof returns nonzero for a stopped process; listener may keep it alive.
+    processes = adb('shell', 'ps', '-A')
+    pid = next((line.split()[1] for line in processes.splitlines() if line.split()[-1:] == ['com.zswatch.app']), '')
+    result = summarize(state, adb('shell', 'dumpsys', 'activity', 'services', 'com.zswatch.app'), pid, args.expect)
+    result['android_serial'] = args.android_serial
+    if args.jobs:
+        result['remote_jobs'] = summarize_jobs(json.loads(adb('shell', 'run-as', 'com.zswatch.app', 'cat',
+                                                            'files/companion-prototype/jobs/state-v1.json')))
+    result['resumed_activity'] = next((line.strip() for line in adb('shell', 'dumpsys', 'activity', 'activities').splitlines()
+                                       if 'mResumedActivity:' in line), None)
+    if args.apk:
+        installed = adb('shell', 'pm', 'path', 'com.zswatch.app').strip().removeprefix('package:')
+        if not installed.startswith('/data/app/') or '\n' in installed:
+            raise ValueError('Expected one installed base APK')
+        remote_hash = adb('shell', 'sha256sum', installed).split()[0]
+        with args.apk.open('rb') as apk:
+            local_hash = hashlib.file_digest(apk, 'sha256').hexdigest()
+        if remote_hash != local_hash:
+            raise ValueError('Installed APK differs from frozen artifact')
+        result['installed_apk_sha256'] = remote_hash
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open('x') as output:
+        json.dump(result, output, indent=2)
+        output.write('\n')
+    print(json.dumps(result, indent=2))
+
+
+if __name__ == '__main__':
+    main()

@@ -17,10 +17,17 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -33,7 +40,11 @@ import java.util.concurrent.CancellationException
  * - MethodChannel: loadModel, generate, cancel, dispose
  * - EventChannel: streams partial tokens during generation
  */
-class LiteRtLmBridge(private val context: Context) {
+class LiteRtLmBridge(
+    private val context: Context,
+    private val mainDispatcher: CoroutineDispatcher = Dispatchers.Main,
+    workDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
 
     companion object {
         private const val TAG = "LiteRtLmBridge"
@@ -44,7 +55,7 @@ class LiteRtLmBridge(private val context: Context) {
     private var engine: Engine? = null
     private var conversation: Conversation? = null
     private var eventSink: EventChannel.EventSink? = null
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + workDispatcher)
     private var currentJob: Job? = null
     private val generateMutex = Mutex()
 
@@ -65,10 +76,10 @@ class LiteRtLmBridge(private val context: Context) {
                     scope.launch {
                         try {
                             loadModel(modelPath, backend, maxTokens)
-                            launch(Dispatchers.Main) { result.success(true) }
+                            launch(mainDispatcher) { result.success(true) }
                         } catch (e: Exception) {
                             Log.e(TAG, "loadModel failed", e)
-                            launch(Dispatchers.Main) {
+                            launch(mainDispatcher) {
                                 result.error("LOAD_FAILED", e.message, null)
                             }
                         }
@@ -159,6 +170,7 @@ class LiteRtLmBridge(private val context: Context) {
         return conv
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private fun generate(
         prompt: String,
         temperature: Double,
@@ -171,93 +183,108 @@ class LiteRtLmBridge(private val context: Context) {
             return
         }
 
-        currentJob = scope.launch {
-            generateMutex.withLock {
+        // Enter the try block even if cancel arrives before IO dispatch starts.
+        currentJob = scope.launch(start = CoroutineStart.ATOMIC) {
+            // Accessed only in Main dispatcher blocks below.
+            var replied = false
             try {
-                val conv = createConversation(temperature, topK, topP)
-                val accumulated = StringBuilder()
-                var tokenCount = 0
-                val startTime = System.currentTimeMillis()
+                generateMutex.withLock {
+                    currentCoroutineContext().ensureActive()
+                    val conv = createConversation(temperature, topK, topP)
+                    val accumulated = StringBuilder()
+                    var tokenCount = 0
+                    val startTime = System.currentTimeMillis()
 
-                Log.i(TAG, "generate: sending prompt (${prompt.length} chars): ${prompt.take(200)}...")
+                    // Prompts and output contain private transcript text; log sizes only.
+                    Log.i(TAG, "generate: sending prompt (${prompt.length} chars)")
 
-                // Use CompletableDeferred to bridge async callbacks → coroutine
-                val deferred = CompletableDeferred<Map<String, Any?>>()
+                    // Use CompletableDeferred to bridge async callbacks → coroutine
+                    val deferred = CompletableDeferred<Map<String, Any?>>()
 
-                conv.sendMessageAsync(
-                    Contents.of(listOf(Content.Text(prompt))),
-                    object : MessageCallback {
-                        override fun onMessage(message: Message) {
-                            val text = message.toString()
-                            Log.i(TAG, "onMessage: text='${text.take(200)}' (len=${text.length})")
-                            accumulated.append(text)
-                            tokenCount++
+                    conv.sendMessageAsync(
+                        Contents.of(listOf(Content.Text(prompt))),
+                        object : MessageCallback {
+                            override fun onMessage(message: Message) {
+                                val text = message.toString()
+                                accumulated.append(text)
+                                tokenCount++
 
-                            // Stream partial result to Flutter via EventChannel
-                            val partialMap = mapOf(
-                                "type" to "token",
-                                "text" to accumulated.toString(),
-                                "tokenCount" to tokenCount,
-                            )
-                            scope.launch(Dispatchers.Main) {
-                                eventSink?.success(partialMap)
-                            }
-                        }
-
-                        override fun onDone() {
-                            val elapsed = System.currentTimeMillis() - startTime
-                            Log.i(TAG, "onDone: accumulated='${accumulated.toString().take(500)}' tokens=$tokenCount elapsed=${elapsed}ms")
-                            deferred.complete(
-                                mapOf(
+                                // Stream partial result to Flutter via EventChannel
+                                val partialMap = mapOf(
+                                    "type" to "token",
                                     "text" to accumulated.toString(),
                                     "tokenCount" to tokenCount,
-                                    "elapsedMs" to elapsed,
-                                ),
-                            )
-                        }
+                                )
+                                scope.launch(mainDispatcher) {
+                                    eventSink?.success(partialMap)
+                                }
+                            }
 
-                        override fun onError(throwable: Throwable) {
-                            Log.e(TAG, "onError: ${throwable.javaClass.name}: ${throwable.message}", throwable)
-                            if (throwable is CancellationException) {
-                                Log.i(TAG, "Inference cancelled")
+                            override fun onDone() {
+                                val elapsed = System.currentTimeMillis() - startTime
+                                Log.i(TAG, "onDone: length=${accumulated.length} tokens=$tokenCount elapsed=${elapsed}ms")
                                 deferred.complete(
                                     mapOf(
                                         "text" to accumulated.toString(),
                                         "tokenCount" to tokenCount,
-                                        "elapsedMs" to (System.currentTimeMillis() - startTime),
-                                        "cancelled" to true,
+                                        "elapsedMs" to elapsed,
                                     ),
                                 )
-                            } else {
-                                deferred.completeExceptionally(throwable)
                             }
-                        }
-                    },
-                    emptyMap(),
-                )
 
-                // Suspend until onDone or onError fires
-                val resultMap = deferred.await()
-
-                // Send final event + MethodChannel result on main thread
-                withContext(Dispatchers.Main) {
-                    eventSink?.success(
-                        mapOf(
-                            "type" to "done",
-                            "text" to (resultMap["text"] as? String ?: ""),
-                            "tokenCount" to (resultMap["tokenCount"] as? Int ?: 0),
-                            "elapsedMs" to (resultMap["elapsedMs"] as? Long ?: 0L),
-                        ),
+                            override fun onError(throwable: Throwable) {
+                                Log.e(TAG, "onError: ${throwable.javaClass.name}: ${throwable.message}", throwable)
+                                if (throwable is CancellationException) {
+                                    Log.i(TAG, "Inference cancelled")
+                                    deferred.complete(
+                                        mapOf(
+                                            "text" to accumulated.toString(),
+                                            "tokenCount" to tokenCount,
+                                            "elapsedMs" to (System.currentTimeMillis() - startTime),
+                                            "cancelled" to true,
+                                        ),
+                                    )
+                                } else {
+                                    deferred.completeExceptionally(throwable)
+                                }
+                            }
+                        },
+                        emptyMap(),
                     )
-                    result.success(resultMap)
-                }
+
+                    // Retain the conversation and headless engine until the SDK
+                    // finishes, including after cancelProcess. Coroutine cancellation
+                    // alone does not establish that native inference has stopped.
+                    val resultMap = withContext(NonCancellable) { deferred.await() }
+
+                    // Send final event + MethodChannel result on main thread
+                    withContext(mainDispatcher) {
+                        if (replied) return@withContext
+                        replied = true
+                        result.success(resultMap)
+                        eventSink?.success(
+                            mapOf(
+                                "type" to "done",
+                                "text" to (resultMap["text"] as? String ?: ""),
+                                "tokenCount" to (resultMap["tokenCount"] as? Int ?: 0),
+                                "elapsedMs" to (resultMap["elapsedMs"] as? Long ?: 0L),
+                            ),
+                        )
+                    }
+                } // generateMutex.withLock
             } catch (e: Exception) {
                 Log.e(TAG, "generate failed: ${e.javaClass.name}: ${e.message}", e)
-                withContext(Dispatchers.Main) {
-                    result.error("GENERATE_FAILED", e.message, null)
+                // Cancellation also reaches Dart, including while waiting for
+                // the mutex. A cancelled coroutine cannot switch dispatchers
+                // normally, which would otherwise leave invokeMethod pending.
+                withContext(NonCancellable + mainDispatcher) {
+                    // withContext can report cancellation after a successful
+                    // reply was sent, while returning to the IO dispatcher.
+                    if (replied) return@withContext
+                    replied = true
+                    result.error(if (e is CancellationException) "CANCELLED" else "GENERATE_FAILED", e.message, null)
                 }
             }
-            } // generateMutex.withLock
         }
     }
 
@@ -284,5 +311,12 @@ class LiteRtLmBridge(private val context: Context) {
         }
         conversation = null
         engine = null
+    }
+
+    /** Called when the owning headless engine ends, including interrupted work. */
+    fun close() {
+        dispose()
+        eventSink = null
+        scope.cancel()
     }
 }

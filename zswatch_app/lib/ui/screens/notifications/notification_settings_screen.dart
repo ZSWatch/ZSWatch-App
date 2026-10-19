@@ -1,11 +1,14 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/notification.dart';
 import '../../../providers/notification_providers.dart';
+import '../../../providers/companion_runtime_providers.dart';
+import 'companion_notification_settings_view.dart';
 
 /// Notification settings screen for Android.
 ///
@@ -33,7 +36,7 @@ class _NotificationSettingsScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadApps();
+    if (!ref.read(nativeCompanionRuntimeProvider)) _loadApps();
   }
 
   @override
@@ -44,6 +47,7 @@ class _NotificationSettingsScreenState
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (ref.read(nativeCompanionRuntimeProvider)) return;
     // Refresh permission status when app resumes (user may have granted permission)
     if (state == AppLifecycleState.resumed) {
       ref.read(notificationForwardingProvider.notifier).refreshPermission();
@@ -74,6 +78,15 @@ class _NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Notifications')),
+          body: _buildIosMessage(),
+        );
+      }
+      return const CompanionNotificationSettingsView();
+    }
     final isSupported = ref.watch(isNotificationForwardingSupported);
 
     if (!isSupported) {
@@ -111,9 +124,21 @@ class _NotificationSettingsScreenState
               ),
             ),
             const SizedBox(height: AppTheme.spacingMd),
+            if (ref.watch(nativeCompanionRuntimeProvider))
+              Text(
+                ref
+                            .watch(companionSnapshotProvider)
+                            .asData
+                            ?.value
+                            .fields['ancs_authorized'] ==
+                        true
+                    ? 'System notification sharing is authorized'
+                    : 'System notification sharing is not authorized for the current connection',
+              ),
+            const SizedBox(height: AppTheme.spacingMd),
             const Text(
               'On iOS, notifications are forwarded directly from your iPhone to ZSWatch using Apple Notification Center Service (ANCS).\n\n'
-              'No app configuration is needed - just make sure your watch is connected and paired.',
+              'Pair your watch and allow it to share system notifications. You can change this in iPhone Settings > Bluetooth > ZSWatch > Share System Notifications. iOS controls which notifications are shared.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
             ),

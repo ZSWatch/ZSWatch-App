@@ -13,6 +13,7 @@ import '../services/media/media_service.dart';
 import '../services/protocol/protocol_service.dart';
 import '../services/watch_service.dart';
 import 'watch_service_provider.dart';
+import 'companion_runtime_providers.dart';
 
 part 'notification_providers.freezed.dart';
 
@@ -29,6 +30,9 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 
 /// Provider for the media service singleton
 final mediaServiceProvider = Provider<MediaService>((ref) {
+  if (ref.watch(nativeCompanionRuntimeProvider)) {
+    throw StateError('Native companion owns Android media');
+  }
   final service = MediaService();
   ref.onDispose(() => service.dispose());
   return service;

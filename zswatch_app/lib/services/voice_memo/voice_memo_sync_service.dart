@@ -12,6 +12,7 @@ import '../../data/models/voice_memo.dart';
 import '../../data/repositories/voice_memo_repository.dart';
 import '../watch_service.dart';
 import 'ogg_opus_writer.dart';
+import 'voice_memo_file_store.dart';
 import 'zsw_opus_parser.dart';
 
 /// State of the voice memo sync process
@@ -107,6 +108,9 @@ class VoiceMemoSyncService {
 
   final WatchService _watchService;
   final VoiceMemoRepository _repository;
+  final FsManager Function(String remoteId) _createFsManager;
+  final Future<Directory> Function() _getDocumentsDirectory;
+  final Future<void> Function()? _beforeSync;
 
   /// Called after sync completes with the number of newly downloaded memos.
   /// Used to trigger auto-transcription from the provider layer.
@@ -123,12 +127,22 @@ class VoiceMemoSyncService {
   Completer<List<WatchRecordingInfo>>? _listCompleter;
   Completer<Uint8List?>? _downloadCompleter;
   bool _hasAutoSynced = false;
+  Timer? _resetStateTimer;
+  Timer? _autoSyncTimer;
+  bool _disposed = false;
 
   VoiceMemoSyncService({
     required WatchService watchService,
     required VoiceMemoRepository repository,
+    FsManager Function(String remoteId)? fsManagerFactory,
+    Future<Directory> Function()? documentsDirectory,
+    Future<void> Function()? beforeSync,
   }) : _watchService = watchService,
-       _repository = repository {
+       _repository = repository,
+       _createFsManager = fsManagerFactory ?? FsManager.new,
+       _beforeSync = beforeSync,
+       _getDocumentsDirectory =
+           documentsDirectory ?? getApplicationDocumentsDirectory {
     _messageSubscription = _watchService.incomingMessages.listen(
       _handleMessage,
     );
@@ -138,14 +152,18 @@ class VoiceMemoSyncService {
   }
 
   void _handleConnectionChange(Connection connection) {
+    if (_disposed) return;
     if (connection.isConnected && !_hasAutoSynced) {
       _hasAutoSynced = true;
       // Delay slightly to allow BLE services to settle
-      Future.delayed(const Duration(seconds: 3), () {
+      _autoSyncTimer?.cancel();
+      _autoSyncTimer = Timer(const Duration(seconds: 3), () {
+        if (_disposed || !_watchService.isConnected) return;
         _log('Auto-syncing voice memos on watch connect');
         syncRecordings();
       });
     } else if (connection.isDisconnected) {
+      _autoSyncTimer?.cancel();
       _hasAutoSynced = false;
       unawaited(_resetFsManager());
     }
@@ -211,6 +229,7 @@ class VoiceMemoSyncService {
 
   /// Request recording list from the watch and sync new recordings
   Future<void> syncRecordings() async {
+    if (_disposed) return;
     if (currentState.isSyncing) {
       _log('Sync already in progress, skipping');
       return;
@@ -225,23 +244,36 @@ class VoiceMemoSyncService {
       _updateState(
         const VoiceMemoSyncState(phase: VoiceMemoSyncPhase.fetchingList),
       );
+      await _beforeSync?.call();
+      if (_disposed) return;
 
-      // Request recording list from watch
-      await _watchService.sendVoiceMemoCommand('list');
-
-      // Wait for list response (with timeout)
-      _listCompleter = Completer<List<WatchRecordingInfo>>();
-      final recordings = await _listCompleter!.future.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          _log('List request timed out');
-          return <WatchRecordingInfo>[];
-        },
-      );
+      // Register before sending: a fast response may arrive before send returns.
+      final listCompleter = Completer<List<WatchRecordingInfo>>();
+      _listCompleter = listCompleter;
+      final List<WatchRecordingInfo> recordings;
+      try {
+        await _watchService.sendVoiceMemoCommand('list');
+        recordings = await listCompleter.future.timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            _log('List request timed out');
+            return <WatchRecordingInfo>[];
+          },
+        );
+      } finally {
+        if (identical(_listCompleter, listCompleter)) {
+          _listCompleter = null;
+        }
+      }
       _log('Fetched ${recordings.length} recordings from list');
 
       // Find recordings not yet downloaded
-      final undownloaded = await _repository.getUndownloadedMemos();
+      final available = recordings
+          .map((recording) => recording.filename)
+          .toSet();
+      final undownloaded = (await _repository.getUndownloadedMemos())
+          .where((memo) => available.contains(memo.filename))
+          .toList();
       if (undownloaded.isEmpty) {
         _log('All recordings already synced');
         _updateState(
@@ -339,7 +371,7 @@ class VoiceMemoSyncService {
       // Recreate FsManager for each transfer attempt to avoid stale native
       // transport handles after SMP disable/enable or reconnection cycles.
       await _resetFsManager();
-      _fsManager = FsManager(device.remoteId.str);
+      _fsManager = _createFsManager(device.remoteId.str);
 
       final remotePath = '$_recordingDir/${memo.filename}.zsw_opus';
       _log('Downloading: $remotePath');
@@ -353,10 +385,15 @@ class VoiceMemoSyncService {
       }
 
       // Set up download completion listener
-      _downloadCompleter = Completer<Uint8List?>();
+      final downloadCompleter = Completer<Uint8List?>();
+      _downloadCompleter = downloadCompleter;
       await _downloadSubscription?.cancel();
       _downloadSubscription = _fsManager!.downloadCallbacks.listen(
         (callback) {
+          if (!identical(_downloadCompleter, downloadCompleter) ||
+              callback.path != remotePath) {
+            return;
+          }
           switch (callback) {
             case OnDownloadProgressChanged():
               final progress = callback.total > 0
@@ -364,21 +401,22 @@ class VoiceMemoSyncService {
                   : 0.0;
               _updateState(currentState.copyWith(downloadProgress: progress));
             case OnDownloadCompleted():
-              _downloadCompleter?.complete(callback.data);
+              downloadCompleter.complete(callback.data);
               _downloadCompleter = null;
             case OnDownloadFailed():
               _log('Download failed: ${callback.cause}');
-              _downloadCompleter?.complete(null);
+              downloadCompleter.complete(null);
               _downloadCompleter = null;
             case OnDownloadCancelled():
               _log('Download cancelled');
-              _downloadCompleter?.complete(null);
+              downloadCompleter.complete(null);
               _downloadCompleter = null;
           }
         },
         onError: (Object error) {
+          if (!identical(_downloadCompleter, downloadCompleter)) return;
           _log('Download callback stream error: $error');
-          _downloadCompleter?.complete(null);
+          downloadCompleter.complete(null);
           _downloadCompleter = null;
         },
       );
@@ -387,10 +425,14 @@ class VoiceMemoSyncService {
       await _fsManager!.download(remotePath);
 
       // Wait for completion
-      final data = await _downloadCompleter!.future.timeout(
+      final data = await downloadCompleter.future.timeout(
         const Duration(minutes: 5),
         onTimeout: () {
           _log('Download timed out');
+          if (identical(_downloadCompleter, downloadCompleter)) {
+            _downloadCompleter = null;
+            downloadCompleter.complete(null);
+          }
           return null;
         },
       );
@@ -474,15 +516,14 @@ class VoiceMemoSyncService {
 
   /// Save downloaded recording to app's local storage
   Future<String> _saveToLocalStorage(String filename, Uint8List data) async {
-    final appDir = await getApplicationDocumentsDirectory();
+    final appDir = await _getDocumentsDirectory();
     final voiceDir = Directory(p.join(appDir.path, 'voice_memos'));
     if (!voiceDir.existsSync()) {
       voiceDir.createSync(recursive: true);
     }
 
     final file = File(p.join(voiceDir.path, '$filename.zsw_opus'));
-    await file.writeAsBytes(data);
-    return file.path;
+    return VoiceMemoFileStore.write(file, data);
   }
 
   /// Convert .zsw_opus to standard Ogg/Opus for playback
@@ -494,15 +535,14 @@ class VoiceMemoSyncService {
 
     final oggData = OggOpusWriter.convert(parsed);
 
-    final appDir = await getApplicationDocumentsDirectory();
+    final appDir = await _getDocumentsDirectory();
     final voiceDir = Directory(p.join(appDir.path, 'voice_memos'));
     if (!voiceDir.existsSync()) {
       voiceDir.createSync(recursive: true);
     }
 
     final file = File(p.join(voiceDir.path, '$filename.ogg'));
-    await file.writeAsBytes(oggData);
-    return file.path;
+    return VoiceMemoFileStore.write(file, oggData);
   }
 
   void _handleMessage(Map<String, dynamic> message) {
@@ -521,11 +561,14 @@ class VoiceMemoSyncService {
   }
 
   void _updateState(VoiceMemoSyncState state) {
+    if (_disposed) return;
     _syncState.add(state);
   }
 
   void _resetStateAfterDelay() {
-    Future.delayed(const Duration(seconds: 3), () {
+    if (_disposed) return;
+    _resetStateTimer?.cancel();
+    _resetStateTimer = Timer(const Duration(seconds: 3), () {
       if (!currentState.isSyncing) {
         _updateState(const VoiceMemoSyncState());
       }
@@ -611,6 +654,10 @@ class VoiceMemoSyncService {
 
   /// Clean up resources
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _autoSyncTimer?.cancel();
+    _resetStateTimer?.cancel();
     _messageSubscription?.cancel();
     _connectionSubscription?.cancel();
     for (final timer in _pendingConfirmations.values) {
@@ -618,7 +665,11 @@ class VoiceMemoSyncService {
     }
     _pendingConfirmations.clear();
     unawaited(_resetFsManager());
-    _listCompleter?.complete([]);
+    final pendingList = _listCompleter;
+    _listCompleter = null;
+    if (pendingList != null && !pendingList.isCompleted) {
+      pendingList.complete([]);
+    }
     _syncState.close();
   }
 }

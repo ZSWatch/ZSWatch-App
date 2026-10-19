@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../data/models/connection_state.dart';
 import '../../data/models/voice_memo.dart';
 import '../../providers/auto_reconnect_provider.dart';
+import '../../providers/companion_runtime_providers.dart';
+import '../../providers/demo_mode_provider.dart';
 import '../../providers/foreground_service_providers.dart';
 import '../../providers/permission_providers.dart';
 import '../../providers/watch_service_provider.dart';
@@ -14,6 +16,7 @@ import '../screens/connection/scan_screen.dart';
 import '../screens/crash_report/crash_report_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/developer/comm_log_screen.dart';
+import '../screens/developer/companion_prototype_app.dart';
 import '../screens/developer/developer_screen.dart';
 import '../screens/developer/file_system_screen.dart';
 import '../screens/developer/log_viewer_screen.dart';
@@ -57,6 +60,7 @@ abstract final class AppRoutes {
   static const String sensors = '/developer/sensors';
   static const String commLog = '/developer/comm-log';
   static const String fileSystem = '/developer/file-system';
+  static const String companionRuntime = '/developer/companion-runtime';
 
   // Settings sub-routes
   static const String aiModels = '/settings/ai-models';
@@ -77,6 +81,108 @@ abstract final class AppRoutes {
 /// App router configuration using go_router
 class AppRouter {
   AppRouter._();
+
+  /// Only migrated routes can enter the native-owned app. In particular, deep
+  /// links cannot instantiate legacy BLE owners or DB detail views.
+  /// Each app instance owns/disposes this router; neither operation owns BLE.
+  static GoRouter createNativeRouter() => GoRouter(
+    initialLocation: AppRoutes.home,
+    routes: [
+      GoRoute(
+        path: AppRoutes.health,
+        builder: (context, state) => const HealthScreen(),
+        routes: [
+          GoRoute(
+            path: 'heart-rate',
+            builder: (context, state) => const HeartRateScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: AppRoutes.analytics,
+        builder: (context, state) => const AnalyticsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.home,
+        builder: (context, state) => const _HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.dashboard,
+        builder: (context, state) => const _HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.settings,
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.scan,
+        builder: (context, state) => const ScanScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.notifications,
+        builder: (context, state) => const NotificationSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.voiceMemos,
+        builder: (context, state) => const VoiceMemosScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.alarmsTimers,
+        builder: (context, state) => const AlarmsTimersScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.aiModels,
+        builder: (context, state) => const AiModelsSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.companionRuntime,
+        builder: (context, state) => const CompanionPrototypeApp(),
+      ),
+      GoRoute(
+        path: AppRoutes.savedWatches,
+        builder: (context, state) => const StartPageScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.developer,
+        builder: (context, state) => const DeveloperScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.logViewer,
+        builder: (context, state) => const LogViewerScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.commLog,
+        builder: (context, state) => const CommLogScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.crashReport,
+        builder: (context, state) => const CrashReportScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.sensors,
+        builder: (context, state) => const SensorDebugScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.shell,
+        builder: (context, state) => const ShellScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.fileSystem,
+        builder: (context, state) => const FileSystemScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.firmware,
+        builder: (context, state) => const FirmwareUpdateScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.watchfaceBackground,
+        builder: (context, state) => const WatchfaceBackgroundScreen(),
+      ),
+    ],
+    errorBuilder: (context, state) => const Scaffold(
+      body: Center(child: Text('This feature is not available in this build')),
+    ),
+  );
 
   static final GlobalKey<NavigatorState> _rootNavigatorKey =
       GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -256,6 +362,32 @@ class _HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(demoModeProvider)) return const DashboardScreen();
+    if (ref.watch(nativeCompanionRuntimeProvider)) {
+      final snapshot = ref.watch(companionSnapshotProvider);
+      return snapshot.when(
+        skipLoadingOnRefresh: false,
+        data: (state) => state.protocolReady
+            ? const DashboardScreen()
+            : const StartPageScreen(),
+        loading: () =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        error: (error, stack) => Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Watch connection status is unavailable'),
+                OutlinedButton(
+                  onPressed: () => ref.invalidate(companionSnapshotProvider),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     final permissionState = ref.watch(permissionNotifierProvider);
     final connection = ref.watch(watchConnectionProvider);
     final isConnected = connection.state == WatchConnectionState.connected;

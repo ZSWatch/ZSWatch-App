@@ -1,5 +1,6 @@
 # Local development directories (not part of this repo - clone separately)
 ZSWatch-Firmware
+/ZSWatch/
 
 # Reference materials (kept locally, not needed for compilation)
 Gadgetbridge
@@ -27,3 +28,9 @@ zswatch_app/android/*.jks
 .Spotlight-V100
 .Trashes
 Thumbs.db
+
+# Local companion HIL evidence (device logs and build provenance)
+.companion-hil-runs/
+
+# Local Mac/Linux watch-control Python environment
+/.venv-watch/

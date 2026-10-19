@@ -52,6 +52,11 @@ val releaseKeystoreConfig =
 val hasReleaseKeystore = releaseKeystoreConfig != null
 
 android {
+    buildFeatures { buildConfig = true }
+    sourceSets.getByName("debug").assets.srcDir("../../../scripts/companion_hil/remote_jobs/fixtures")
+    testOptions.unitTests.all {
+        it.systemProperty("companion.fixtures", rootProject.file("../../scripts/companion_hil/remote_jobs/fixtures").absolutePath)
+    }
     namespace = "dev.zswatch.app"
     compileSdk = 36
     ndkVersion = "29.0.13113456" // Required by whisper_ggml_plus (highest NDK among all plugins)
@@ -87,6 +92,7 @@ android {
 
     buildTypes {
         release {
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // If a release keystore is configured via android/key.properties, sign properly.
             // Otherwise fall back to debug signing (fine for local testing, not ideal for releases).
             signingConfig = if (hasReleaseKeystore) {
@@ -99,6 +105,10 @@ android {
 }
 
 dependencies {
+    implementation("no.nordicsemi.android:mcumgr-ble:2.7.2")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+    testImplementation("org.mockito:mockito-core:5.19.0")
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")
 }
 

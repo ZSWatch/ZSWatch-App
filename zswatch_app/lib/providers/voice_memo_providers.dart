@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../data/models/extracted_action.dart';
 import '../data/models/voice_memo.dart';
@@ -10,6 +11,7 @@ import '../data/repositories/voice_memo_repository.dart';
 import '../services/ai/extracted_action_creation_service.dart';
 import '../services/ai/voice_note_ai_pipeline.dart';
 import '../services/voice_memo/transcription_engine.dart';
+import '../services/voice_memo/voice_memo_recovery_service.dart';
 import '../services/voice_memo/voice_memo_sync_service.dart';
 import 'ai_providers.dart';
 import 'settings_providers.dart';
@@ -22,6 +24,25 @@ import 'watch_service_provider.dart';
 final voiceMemoRepositoryProvider = Provider<VoiceMemoRepository>((ref) {
   final db = ref.watch(databaseProvider);
   return VoiceMemoRepository(db);
+});
+
+/// A shared startup pass, also awaited before sync or displaying voice memos.
+final voiceMemoRecoveryProvider = FutureProvider<VoiceMemoRecoveryReport>((
+  ref,
+) async {
+  final report = await VoiceMemoRecoveryService(
+    repository: ref.watch(voiceMemoRepositoryProvider),
+    documentsDirectory: getApplicationDocumentsDirectory,
+  ).recover();
+  debugPrint(
+    '[VoiceMemoRecovery] receipts=${report.recoveredReceipts} '
+    'stages=${report.recoveredStages} conversions=${report.rebuiltConversions} '
+    'missing=${report.missingRecordings} retained=${report.retainedFiles.length}',
+  );
+  for (final error in report.errors) {
+    debugPrint('[VoiceMemoRecovery] $error');
+  }
+  return report;
 });
 
 // ==================== Transcription Engine Provider ====================
@@ -93,6 +114,9 @@ final voiceMemoSyncServiceProvider = Provider<VoiceMemoSyncService>((ref) {
   final service = VoiceMemoSyncService(
     watchService: watchService,
     repository: repository,
+    beforeSync: () async {
+      await ref.read(voiceMemoRecoveryProvider.future);
+    },
   );
 
   // Wire up auto-transcription (and optionally AI processing) after sync.
@@ -284,15 +308,20 @@ Future<void> _autoCreateActionsForMemo({
 // ==================== Voice Memo List Provider ====================
 
 /// Stream of all voice memos (reactive, newest first)
-final voiceMemoListProvider = StreamProvider<List<VoiceMemo>>((ref) {
+final voiceMemoListProvider = StreamProvider<List<VoiceMemo>>((ref) async* {
   final repository = ref.watch(voiceMemoRepositoryProvider);
-  return repository.watchAllMemos();
+  await ref.watch(voiceMemoRecoveryProvider.future);
+  yield* repository.watchAllMemos();
 });
 
 /// Stream a single voice memo by database id.
-final voiceMemoByIdProvider = StreamProvider.family<VoiceMemo?, int>((ref, id) {
+final voiceMemoByIdProvider = StreamProvider.family<VoiceMemo?, int>((
+  ref,
+  id,
+) async* {
   final repository = ref.watch(voiceMemoRepositoryProvider);
-  return repository.watchAllMemos().map((memos) {
+  await ref.watch(voiceMemoRecoveryProvider.future);
+  yield* repository.watchAllMemos().map((memos) {
     for (final memo in memos) {
       if (memo.id == id) {
         return memo;

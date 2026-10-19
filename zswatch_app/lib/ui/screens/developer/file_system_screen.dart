@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../data/models/fs_file_entry.dart';
 import '../../../providers/file_system_provider.dart';
+import '../../../providers/companion_runtime_providers.dart';
 
 class FileSystemScreen extends ConsumerStatefulWidget {
   const FileSystemScreen({super.key});
@@ -66,7 +67,10 @@ class _LogsTab extends ConsumerWidget {
       children: [
         _LogsContent(fsState: fsState),
         if (fsState.downloadingPath != null)
-          _DownloadOverlay(progress: fsState.downloadProgress),
+          _DownloadOverlay(
+            progress: fsState.downloadProgress,
+            native: ref.watch(nativeCompanionRuntimeProvider),
+          ),
       ],
     );
   }
@@ -161,7 +165,12 @@ class _LogsContent extends ConsumerWidget {
     }
 
     try {
-      await ref.read(fileSystemProvider.notifier).downloadFile(entry);
+      final notifier = ref.read(fileSystemProvider.notifier);
+      await notifier.downloadFile(entry);
+      if (!context.mounted ||
+          !identical(notifier, ref.read(fileSystemProvider.notifier))) {
+        return;
+      }
       final updatedPath = ref
           .read(fileSystemProvider)
           .downloadedPaths[entry.path];
@@ -317,8 +326,9 @@ class _FilesTab extends StatelessWidget {
 
 class _DownloadOverlay extends StatelessWidget {
   final double progress;
+  final bool native;
 
-  const _DownloadOverlay({required this.progress});
+  const _DownloadOverlay({required this.progress, this.native = false});
 
   @override
   Widget build(BuildContext context) {
@@ -338,6 +348,8 @@ class _DownloadOverlay extends StatelessWidget {
                 Text(
                   progress > 0
                       ? 'Downloading… ${(progress * 100).toStringAsFixed(0)}%'
+                      : native
+                      ? 'Downloading…'
                       : 'Connecting…',
                 ),
               ],

@@ -4,6 +4,7 @@ import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_session.dart';
 import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
@@ -46,6 +47,10 @@ enum TranscriptionEngineType {
   /// Whisper Large-v3-Turbo q5_0 quantised (~547 MB). Near cloud-level
   /// accuracy, optimised for speed. Needs ~1 GB RAM — modern flagships only.
   whisperLargeV3TurboQ5,
+
+  /// Quantized multilingual Small with automatic language detection (~190 MB).
+  /// Separate from the English-only and forced-German Small preferences.
+  whisperSmallMultilingualQ5,
 }
 
 /// Static metadata for a selectable transcription model.
@@ -179,6 +184,18 @@ abstract final class TranscriptionModelCatalog {
         'Multilingual (547 MB, slow) — near cloud-level accuracy for any language. Needs ~1 GB RAM.',
   );
 
+  static const _smallMultilingualQ5 = TranscriptionModelInfo(
+    type: TranscriptionEngineType.whisperSmallMultilingualQ5,
+    name: 'Whisper Small · Q5_1 (Multilingual)',
+    language: 'auto',
+    sourceUrl:
+        'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin',
+    fileName: 'ggml-small-q5_1.bin',
+    expectedSizeBytes: 190 * 1000 * 1000,
+    description:
+        'Multilingual (190 MB) — automatically detects the spoken language, including Swedish and English.',
+  );
+
   // Models grouped by language: English → Swedish → German → Multilingual,
   // ordered best→worst within each group.
   static const List<TranscriptionModelInfo> all = [
@@ -191,6 +208,7 @@ abstract final class TranscriptionModelCatalog {
     _smallMultiDe,
     _baseMultiDe,
     _whisperLargeV3TurboQ5,
+    _smallMultilingualQ5,
   ];
 
   static TranscriptionModelInfo info(TranscriptionEngineType type) {
@@ -213,6 +231,8 @@ abstract final class TranscriptionModelCatalog {
         return _smallMultiDe;
       case TranscriptionEngineType.whisperLargeV3TurboQ5:
         return _whisperLargeV3TurboQ5;
+      case TranscriptionEngineType.whisperSmallMultilingualQ5:
+        return _smallMultilingualQ5;
     }
   }
 }
@@ -261,6 +281,14 @@ TranscriptionEngine createTranscriptionEngine(TranscriptionEngineType type) {
       );
     case TranscriptionEngineType.whisperLargeV3TurboQ5:
       return KbWhisperEngines.largeV3TurboQ5();
+    case TranscriptionEngineType.whisperSmallMultilingualQ5:
+      final info = TranscriptionModelCatalog.info(type);
+      return CustomGgmlWhisperEngine(
+        modelUrl: info.sourceUrl,
+        modelFileName: info.fileName,
+        languageCode: info.language,
+        displayName: info.name,
+      );
   }
 }
 
@@ -280,6 +308,9 @@ abstract class TranscriptionEngine {
   /// Returns the transcribed text, or empty string if nothing was recognized.
   /// Throws on engine errors (model not loaded, file not found, etc.).
   Future<String> transcribe(String audioFilePath);
+
+  /// Signal native inference; the transcribe future still owns cleanup.
+  Future<void> cancel();
 
   /// Whether this engine is currently available (model downloaded, etc.)
   Future<bool> isAvailable();
@@ -361,6 +392,14 @@ class TranscriptionEngineState {
 /// transcriptions use the cached model. The WhisperController keeps
 /// the model in memory for fast back-to-back transcriptions.
 class WhisperEngine implements TranscriptionEngine {
+  bool _cancelled = false;
+
+  @override
+  Future<void> cancel() async {
+    _cancelled = true;
+    await const Whisper(model: WhisperModel.tinyEn).abort();
+  }
+
   static const WhisperModel _defaultModel = WhisperModel.tinyEn;
 
   final WhisperController _controller = WhisperController();
@@ -434,6 +473,7 @@ class WhisperEngine implements TranscriptionEngine {
 
   @override
   Future<String> transcribe(String audioFilePath) async {
+    _cancelled = false;
     if (!File(audioFilePath).existsSync()) {
       throw Exception('Audio file not found: $audioFilePath');
     }
@@ -450,12 +490,16 @@ class WhisperEngine implements TranscriptionEngine {
       ),
     );
 
+    String? convertedAudioPath;
     try {
-      debugPrint('[WhisperEngine] Transcribing: $audioFilePath');
+      final prepared = await _prepareAudioForWhisper(audioFilePath);
+      if (prepared != audioFilePath) convertedAudioPath = prepared;
+      if (_cancelled) throw PlatformException(code: 'CANCELLED');
+      debugPrint('[WhisperEngine] Transcribing: $prepared');
 
       final result = await _controller.transcribe(
         model: _defaultModel,
-        audioPath: audioFilePath,
+        audioPath: prepared,
         lang: 'en',
       );
 
@@ -464,12 +508,13 @@ class WhisperEngine implements TranscriptionEngine {
       );
 
       if (result == null) {
-        debugPrint('[WhisperEngine] Transcription returned null');
-        return '';
+        throw StateError('Whisper failed to transcribe the prepared audio.');
       }
 
       final text = result.transcription.text.trim();
-      debugPrint('[WhisperEngine] Result: $text');
+      debugPrint(
+        '[WhisperEngine] Transcription completed (${text.length} characters)',
+      );
       return text;
     } catch (e) {
       debugPrint('[WhisperEngine] Error: $e');
@@ -480,6 +525,8 @@ class WhisperEngine implements TranscriptionEngine {
         ),
       );
       rethrow;
+    } finally {
+      _deletePreparedWhisperAudio(convertedAudioPath);
     }
   }
 
@@ -585,6 +632,14 @@ class WhisperEngine implements TranscriptionEngine {
 ///
 /// Use [KbWhisperEngines] for pre-configured Swedish KB-Whisper variants.
 class CustomGgmlWhisperEngine implements TranscriptionEngine {
+  bool _cancelled = false;
+
+  @override
+  Future<void> cancel() async {
+    _cancelled = true;
+    await const Whisper(model: WhisperModel.base).abort();
+  }
+
   final String _modelUrl;
   final String _modelFileName;
   final String _languageCode;
@@ -737,6 +792,7 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
 
   @override
   Future<String> transcribe(String audioFilePath) async {
+    _cancelled = false;
     if (!File(audioFilePath).existsSync()) {
       throw Exception('Audio file not found: $audioFilePath');
     }
@@ -762,6 +818,7 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
       if (transcriptionAudioPath != audioFilePath) {
         convertedAudioPath = transcriptionAudioPath;
       }
+      if (_cancelled) throw PlatformException(code: 'CANCELLED');
 
       debugPrint(
         '[CustomGgmlWhisperEngine] Transcribing: $transcriptionAudioPath',
@@ -785,7 +842,9 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
       );
 
       final text = response.text.trim();
-      debugPrint('[CustomGgmlWhisperEngine] Result: $text');
+      debugPrint(
+        '[CustomGgmlWhisperEngine] Transcription completed (${text.length} characters)',
+      );
       return text;
     } catch (e) {
       debugPrint('[CustomGgmlWhisperEngine] Error: $e');
@@ -797,60 +856,8 @@ class CustomGgmlWhisperEngine implements TranscriptionEngine {
       );
       rethrow;
     } finally {
-      if (convertedAudioPath != null) {
-        try {
-          final convertedFile = File(convertedAudioPath);
-          if (convertedFile.existsSync()) {
-            convertedFile.deleteSync();
-          }
-        } catch (e) {
-          debugPrint('[CustomGgmlWhisperEngine] Failed to delete temp WAV: $e');
-        }
-      }
+      _deletePreparedWhisperAudio(convertedAudioPath);
     }
-  }
-
-  Future<String> _prepareAudioForWhisper(String audioFilePath) async {
-    if (audioFilePath.toLowerCase().endsWith('.wav')) {
-      return audioFilePath;
-    }
-
-    final input = File(audioFilePath);
-    final outputPath = '${input.path}.wav';
-    final output = File(outputPath);
-
-    if (output.existsSync()) {
-      output.deleteSync();
-    }
-
-    final arguments = <String>[
-      '-y',
-      '-i',
-      '"${input.path}"',
-      '-ar',
-      '16000',
-      '-ac',
-      '1',
-      '-c:a',
-      'pcm_s16le',
-      '"$outputPath"',
-    ];
-
-    debugPrint(
-      '[CustomGgmlWhisperEngine] Converting audio for Whisper: ${input.path} -> $outputPath',
-    );
-
-    final FFmpegSession session = await FFmpegKit.execute(arguments.join(' '));
-    final ReturnCode? returnCode = await session.getReturnCode();
-
-    if (ReturnCode.isSuccess(returnCode) && output.existsSync()) {
-      return outputPath;
-    }
-
-    final logs = await session.getOutput();
-    throw Exception(
-      'Audio conversion failed (returnCode=${returnCode?.getValue()}): ${logs ?? 'no FFmpeg logs'}',
-    );
   }
 
   Future<String> _modelFilePath() async {
@@ -936,4 +943,46 @@ abstract final class KbWhisperEngines {
     languageCode: 'auto',
     displayName: 'Whisper Large-v3-Turbo · Q5_0',
   );
+}
+
+// Both built-in and custom Whisper require mono 16 kHz PCM WAV.
+// Originals are never overwritten; only this helper's unique cache directory is removed.
+Future<String> _prepareAudioForWhisper(String audioFilePath) async {
+  if (audioFilePath.toLowerCase().endsWith('.wav')) return audioFilePath;
+  final cache = await getTemporaryDirectory();
+  final scratch = await Directory(cache.path).createTemp('whisper-wav-');
+  final output = File('${scratch.path}/audio.wav');
+  try {
+    final FFmpegSession session = await FFmpegKit.executeWithArguments([
+      '-y',
+      '-i',
+      audioFilePath,
+      '-ar',
+      '16000',
+      '-ac',
+      '1',
+      '-c:a',
+      'pcm_s16le',
+      output.path,
+    ]);
+    final code = await session.getReturnCode();
+    if (ReturnCode.isSuccess(code) && output.existsSync()) return output.path;
+    throw StateError(
+      'Audio conversion failed (returnCode=${code?.getValue()}): ${await session.getOutput()}',
+    );
+  } catch (_) {
+    if (scratch.existsSync()) scratch.deleteSync(recursive: true);
+    rethrow;
+  }
+}
+
+void _deletePreparedWhisperAudio(String? prepared) {
+  if (prepared == null) return;
+  try {
+    final audio = File(prepared);
+    if (audio.existsSync()) audio.deleteSync();
+    if (audio.parent.existsSync()) audio.parent.deleteSync();
+  } catch (error) {
+    debugPrint('[WhisperEngine] Failed to remove temporary WAV: $error');
+  }
 }

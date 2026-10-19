@@ -65,6 +65,9 @@ abstract final class LifecycleLogger {
     final lowerMessage = message.toLowerCase();
 
     if (lowerSource == 'processexitreason') return true;
+    if (lowerSource == 'startupcause' || lowerSource == 'companionprototype') {
+      return true;
+    }
     if (lowerSource == 'applifecycle' || lowerSource == 'mainactivity') {
       return true;
     }
