@@ -198,49 +198,39 @@ locks. Close existing UART readers first. Opening UART leaves DTR/RTS deasserted
 validate physical wiring before relying on uninterrupted hardware sessions.
 Do not run the separate UART capture while pytest's UART fixture owns the port.
 
-## Session-preserving watch probe
+## Session-preserving USB tools
 
-The firmware repository now supports `--preserve-session`, requiring an explicit
-physical board, local config and tests marked `companion_session`. Ordinary boot,
-DFU, PPK2 and PC BLE tests are rejected before fixtures run. Fixture reset,
-recover, flash and PPK2 power setup are disabled; deployment failures in ordinary
-mode now fail instead of skipping. This guards fixtures and audited tests, not
-arbitrary Python code or shell commands added by a future test author.
-
-Create a local YAML with verified ports (never copy old debugger identifiers):
-
-```yaml
-devices:
-  watchdk@1:
-    serial_port: /dev/serial/by-id/VERIFIED_UART
-    usb_cdc_port: /dev/serial/by-id/VERIFIED_USB_SMP
-```
-
-From the ZSWatch firmware repository:
+These leave the phone's BLE session alone (no debugger, no flashing unless you
+run `usb_dfu.py`). They replace the earlier firmware-pytest `--preserve-session`
+probe, which is not in the firmware repository.
 
 ```bash
-python3 -m venv /tmp/zswatch-companion-hil-venv
-/tmp/zswatch-companion-hil-venv/bin/pip install \
-  'pytest==9.1.1' 'pytest-asyncio==1.4.0' 'PyYAML==6.0.3' \
-  'pyserial==3.5' 'smpclient[ble,serial]==7.3.0'
-/tmp/zswatch-companion-hil-venv/bin/python -m pytest \
-  app/pytest/companion_session_probe.py --board watchdk@1 \
-  --device-config /absolute/path/devices_local.yaml --preserve-session -s \
-  --basetemp /tmp/zswatch-status-probe-001
+# Shell status over USB SMP
+.venv-watch/bin/python scripts/companion_hil/watch_usb.py --port /dev/cu.usbmodemXXXX -- voice_memo status
+# Reboot through SMP (refused while recording), hold USB past the boot guard
+.venv-watch/bin/python scripts/companion_hil/watch_usb.py --port /dev/cu.usbmodemXXXX --reboot
+# Install, verify, reboot and confirm a firmware build over USB
+.venv-watch/bin/python scripts/companion_hil/usb_dfu.py --port /dev/cu.usbmodemXXXX \
+  --zip build/dfu_application.zip --output .companion-hil-runs/<date>-dfu
 ```
 
-Use a **new** `--basetemp` directory; pytest clears that directory on startup.
-The probe only executes `app state` and `voice_memo status` over USB SMP and
-requires expected responses and zero shell return status. It saves those
-responses in pytest's per-test temporary artifacts. This proves the separate
-control path, not notification/time/voice delivery from a backgrounded phone.
-The module name keeps it out of ordinary HIL test discovery.
+`usb_dfu.py` refuses to start while the watch records or has a pending image,
+checks each slot against the image's own SHA-256 TLV, and confirms only images
+that actually booted.
 
-Safety regression tests run without any probe, serial port or phone:
+## iPhone system log
+
+`ios_syslog.py` streams a USB-connected iPhone's log through
+`pymobiledevice3` (install it in a venv; no sudo needed) and keeps only the app,
+`bluetoothd`, `deviceaccessd` and `AccessorySetupUI` by default:
 
 ```bash
-python3 -m pytest app/pytest_unit/test_session_safety.py -q
+python3 scripts/companion_hil/ios_syslog.py --output .companion-hil-runs/<date>-ios.log --seconds 120
 ```
+
+The phone streams its whole log (~30k lines/s) regardless of the filter, and
+the stream sometimes drops. Start it just before a repro, stop it right after,
+and never wrap it in a restart loop: that made the phone sluggish.
 
 ## Synthetic file-transfer probe without a phone
 

@@ -31,6 +31,14 @@ class WatchUsbTests(unittest.TestCase):
         self.assertEqual(watch_usb.reset_command(args, '/tmp'),
                          ['nrfjprog', '--reset', '-f', 'NRF53', '--snr', '123'])
 
+    def test_reboot_holds_past_boot_guard_and_excludes_debugger_reset(self):
+        args = watch_usb.arguments(['--port', '/dev/cu.example', '--reboot'])
+        self.assertTrue(args.reboot)
+        self.assertEqual(args.hold_seconds, 25)
+        for extra in [['--hold-seconds', '1'], ['--reset', 'nrfjprog', '--probe', '123']]:
+            with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                watch_usb.arguments(['--port', '/dev/cu.example', '--reboot', *extra])
+
     def test_existing_usb_rejects_reset_before_starting_debugger(self):
         import asyncio
         args = watch_usb.arguments(['--port', __file__, '--reset', 'nrfjprog', '--probe', '123'])

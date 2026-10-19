@@ -3,6 +3,7 @@
 
 Uses smpclient's serial framing, including its SMP escape sequence. No custom SMP.
 No reset unless explicitly requested; never flashes or erases firmware.
+--reboot restarts a running watch through SMP itself, without a debugger.
 """
 
 import argparse
@@ -15,6 +16,7 @@ import time
 
 from smpclient import SMPClient
 from smpclient.generics import success
+from smpclient.requests.os_management import ResetWrite
 from smpclient.requests.shell_management import Execute
 from smpclient.transport.serial import SMPSerialTransport
 
@@ -23,19 +25,23 @@ def arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', required=True, help='Explicit USB CDC device path')
     parser.add_argument('--reset', choices=['nrfjprog', 'nrfutil', 'jlink'])
+    parser.add_argument('--reboot', action='store_true',
+                        help='Reboot over SMP (refused while recording), wait for USB to return')
     parser.add_argument('--probe', help='Explicit debugger serial number for reset')
     parser.add_argument('--device', default='NRF5340_XXAA_APP', help='J-Link target')
     parser.add_argument('--hold-seconds', type=float, default=None)
     parser.add_argument('command', nargs=argparse.REMAINDER,
                         help='Shell argv after --; default: app state')
     args = parser.parse_args(argv)
+    if args.reset and args.reboot:
+        parser.error('--reboot and --reset are alternatives')
     if args.reset and not args.probe:
         parser.error('--reset requires --probe; never reset an arbitrary target')
     if args.hold_seconds is None:
-        args.hold_seconds = 25 if args.reset else 0
+        args.hold_seconds = 25 if args.reset or args.reboot else 0
     if args.hold_seconds < 0:
         parser.error('--hold-seconds must be nonnegative')
-    if args.reset and args.hold_seconds < 25:
+    if (args.reset or args.reboot) and args.hold_seconds < 25:
         parser.error('After reset, hold USB for at least 25 seconds past the boot guard')
     if args.command[:1] == ['--']:
         args.command = args.command[1:]
@@ -71,8 +77,29 @@ async def execute(client, command):
     print(response.o, flush=True)
 
 
+async def wait_for_port(port, present, timeout):
+    deadline = time.monotonic() + timeout
+    while port.exists() != present:
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f'USB {"did not return" if present else "did not drop"} within {timeout}s')
+        await asyncio.sleep(0.05)
+
+
+async def smp_reboot(port):
+    async with SMPClient(SMPSerialTransport(exclusive=True), str(port), timeout_s=5) as client:
+        status = await client.request(Execute(argv=['voice_memo', 'status']), timeout_s=5)
+        if not success(status) or status.ret != 0 or 'Recording: no' not in status.o:
+            raise RuntimeError('Watch is recording or status failed; not rebooting')
+        if not success(await client.request(ResetWrite(), timeout_s=5)):
+            raise RuntimeError('SMP reset request failed')
+    await wait_for_port(port, False, 20)
+    await wait_for_port(port, True, 90)
+
+
 async def run(args):
     port = Path(args.port)
+    if args.reboot:
+        await smp_reboot(port)
     if args.reset and port.exists():
         raise RuntimeError('USB already exists. Try without --reset first; reset is only a bootstrap action.')
     process = None
