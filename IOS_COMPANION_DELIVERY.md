@@ -408,3 +408,28 @@ disappeared after the user's watch reset, so USB-shell control stopped at 14:05.
   discovery (1.4 s instead of a 7 ms cache hit), then Restart Watch succeeded twice.
   Kotlin tests 267/267. The first attempt directly after a refresh is not yet verified
   with the 0.5 s reconnect.
+
+## 2026-10-19 — iOS on the reworked firmware and apps
+
+App `433202a` (signed release) on the iPhone, firmware `feat/companion-firmware` `2d11b82a`
+(debug + RTT). Connect was tapped through the XCTest runner (`ios_ui`, extra local
+`testTapConnect`): connected home in 15 s, Ready generation 284.
+
+| Check | Result |
+| --- | --- |
+| Deferred voice job after foreground | Claimed immediately on launch |
+| Empty list | `count 0, more false` (watch emptied by the Android sync) |
+| New recording "påminn mig om tio minuter att jag ska köpa mjölk" | new → list (194 B) → download 21 669 B → watch hash match → watch `deleted` → transcript after 28 s → `reminder` result → delivered and ACKed 1 s later |
+| Result without receipts | `voice_delivery_acked` with the simplified firmware |
+| GPS + HTTP | Periodic watch GPS 01:30:32 (watch time), altimeter HTTP through the iPhone (367 B) |
+
+Android, same day: SMP notifications on the Nokia G100 are intermittently delivered
+with their tail repeating bytes from two notifications earlier (raw packets, before SDK
+reassembly). iOS receives the same 244-byte notifications without it, and it persists
+with a 182-byte MTU and slower intervals, so it is phone-side. The Android app now
+downloads chunk by chunk with per-chunk retries and repairs mismatching ranges using
+watch range hashes; all affected files, including 0.6–1.2 MB recordings, then matched
+the watch's hash and were deleted on the watch.
+
+Still manual: Control Center/Face ID during transcription, Demo Mode kill/relaunch,
+scan/selection, a watch that never reaches Ready.
