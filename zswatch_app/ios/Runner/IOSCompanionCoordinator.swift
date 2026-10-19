@@ -232,6 +232,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     guard let setup = accessorySetup else { return }
     let previous = authorizedAccessoryIDs
     authorizedAccessoryIDs = setup.identifiers
+    if setup.activated, let pending = startAfterActivation {
+      startAfterActivation = nil
+      startWithSetup(pending.id, expected: pending.expected, completion: pending.completion)
+    }
     // Even stopped intent must recreate a system-restored manager so
     // willRestoreState can reject/cancel stale peripheral handles.
     if restorationPending, setup.activated, !setup.presenting { ensureCentral() }
@@ -290,7 +294,20 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     }
   }
 
+  // A start right after launch (Demo Mode resume) can arrive before AccessorySetupKit
+  // reports the authorized watches; it would then look like an unauthorized watch.
+  private var startAfterActivation: (id: String, expected: Int?, completion: (Result<Void, Error>) -> Void)?
   func startWithSetup(_ id: String, expected: Int?, completion: @escaping (Result<Void, Error>) -> Void) {
+    if usesAccessorySetup, accessorySetup?.activated != true {
+      startAfterActivation?.completion(.failure(CompanionFailure.unavailable("Replaced by a newer start")))
+      startAfterActivation = (id, expected, completion)
+      queue.asyncAfter(deadline: .now() + 10) { [weak self] in
+        guard let self, let pending = self.startAfterActivation, pending.id == id else { return }
+        self.startAfterActivation = nil
+        pending.completion(.failure(CompanionFailure.unavailable("iPhone accessory setup is not ready")))
+      }
+      return
+    }
     guard usesAccessorySetup, let uuid = UUID(uuidString: id), !authorizedAccessoryIDs.contains(uuid) else {
       do { try start(id, expected: expected); completion(.success(())) } catch { completion(.failure(error)) }; return
     }
