@@ -135,7 +135,7 @@ DEPENDENCIES:
   - geolocator_apple (from `.symlinks/plugins/geolocator_apple/darwin`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
-  - iOSMcuManagerLibrary (from `../../Flutter-nRF-Connect-Device-Manager/ios/Vendor/iOSMcuManagerLibrary`)
+  - iOSMcuManagerLibrary (from `https://github.com/ZSWatch/IOS-nRF-Connect-Device-Manager.git`, commit `b8072b209faef8d4643f375e251faed3f9c66dd4`)
   - just_audio (from `.symlinks/plugins/just_audio/darwin`)
   - mcumgr_flutter (from `.symlinks/plugins/mcumgr_flutter/ios`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
@@ -183,7 +183,8 @@ EXTERNAL SOURCES:
   integration_test:
     :path: ".symlinks/plugins/integration_test/ios"
   iOSMcuManagerLibrary:
-    :path: "../../Flutter-nRF-Connect-Device-Manager/ios/Vendor/iOSMcuManagerLibrary"
+    :commit: b8072b209faef8d4643f375e251faed3f9c66dd4
+    :git: https://github.com/ZSWatch/IOS-nRF-Connect-Device-Manager.git
   just_audio:
     :path: ".symlinks/plugins/just_audio/darwin"
   mcumgr_flutter:
@@ -210,6 +211,11 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/wakelock_plus/ios"
   whisper_ggml_plus:
     :path: ".symlinks/plugins/whisper_ggml_plus/ios"
+
+CHECKOUT OPTIONS:
+  iOSMcuManagerLibrary:
+    :commit: b8072b209faef8d4643f375e251faed3f9c66dd4
+    :git: https://github.com/ZSWatch/IOS-nRF-Connect-Device-Manager.git
 
 SPEC CHECKSUMS:
   audio_session: 9bb7f6c970f21241b19f5a3658097ae459681ba0
@@ -245,6 +251,6 @@ SPEC CHECKSUMS:
   whisper_ggml_plus: a01d7b6bf1208c76137032b9d6c91b1d202038e4
   ZIPFoundation: b8c29ea7ae353b309bc810586181fd073cb3312c
 
-PODFILE CHECKSUM: 30c0ee9240ce91b697f71a278cdfd6f205bd48c4
+PODFILE CHECKSUM: 19e5cc3a5c54e23996e1060c1685d720ecec8f9b
 
 COCOAPODS: 1.16.2
