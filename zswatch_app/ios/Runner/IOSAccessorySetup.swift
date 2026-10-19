@@ -82,7 +82,9 @@ final class IOSAccessorySetup: CompanionAccessorySetup {
         let descriptor = ASDiscoveryDescriptor()
         descriptor.bluetoothServiceUUID = IOSCompanionCoordinator.nus
         descriptor.bluetoothNameSubstring = "ZSWatch"
-        descriptor.supportedOptions = [.bluetoothPairingLE]
+        // No .bluetoothPairingLE: iOS drops the link as ASK-driven SMP completes
+        // with the watch. Bonding happens on first connect via the watch's
+        // security request, as before ASK.
         if #available(iOS 18.4, *) { descriptor.supportedOptions.insert(.bluetoothHID) }
         let item: ASPickerDisplayItem
         if let existing {
