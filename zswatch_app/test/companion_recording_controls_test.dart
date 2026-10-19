@@ -269,8 +269,12 @@ void main() {
       expect(find.text('Export text'), findsOneWidget);
     },
   );
-  testWidgets('ordinary iOS download controls use the native owner', (tester) async {
-    final stopped = snapshot({identity('failed'): receipt('failed', state: 'failed')});
+  testWidgets('ordinary iOS download controls use the native owner', (
+    tester,
+  ) async {
+    final stopped = snapshot({
+      identity('failed'): receipt('failed', state: 'failed'),
+    });
     final state = CompanionPrototypeSnapshot.decode({
       ...stopped.fields,
       'runtime_active': true,
@@ -289,24 +293,29 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Pause downloads'));
     await tester.pumpAndSettle();
-    expect(calls.map((call) => call.method), ['retryRecordings', 'setRecordingSync']);
+    expect(calls.map((call) => call.method), [
+      'retryRecordings',
+      'setRecordingSync',
+    ]);
     expect((calls.last.arguments as Map)['enabled'], isFalse);
     expect(find.textContaining('Error'), findsNothing);
   });
 
-  testWidgets('download intent can be paused without starting a stopped watch', (tester) async {
-    final state = snapshot({});
-    final calls = <MethodCall>[];
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
-          calls.add(call);
-          return state.fields;
-        });
-    await mount(tester, state);
-    await tester.tap(find.text('Pause downloads'));
-    await tester.pumpAndSettle();
-    expect(calls.map((call) => call.method), ['setRecordingSync']);
-    expect((calls.single.arguments as Map)['enabled'], isFalse);
-  });
-
+  testWidgets(
+    'download intent can be paused without starting a stopped watch',
+    (tester) async {
+      final state = snapshot({});
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            return state.fields;
+          });
+      await mount(tester, state);
+      await tester.tap(find.text('Pause downloads'));
+      await tester.pumpAndSettle();
+      expect(calls.map((call) => call.method), ['setRecordingSync']);
+      expect((calls.single.arguments as Map)['enabled'], isFalse);
+    },
+  );
 }

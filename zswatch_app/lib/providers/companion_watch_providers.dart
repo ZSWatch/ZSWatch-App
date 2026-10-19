@@ -181,7 +181,8 @@ final companionWatchPersistenceStateProvider =
 /// App-lifetime projection, independent of which Flutter screen is visible.
 /// Disposal cancels observation; native BLE and its durable journal continue.
 final companionWatchPersistenceProvider = Provider<void>((ref) {
-  if (!ref.watch(nativeCompanionRuntimeProvider) || ref.watch(demoModeProvider)) {
+  if (!ref.watch(nativeCompanionRuntimeProvider) ||
+      ref.watch(demoModeProvider)) {
     return;
   }
   final writer = ref.watch(companionWatchPersistenceStateProvider.notifier);

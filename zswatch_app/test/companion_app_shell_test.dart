@@ -268,47 +268,80 @@ void main() {
       return saved;
     });
   });
-  testWidgets('native connection error ends spinner and exposes cancellation failure', (tester) async {
-    final failed = {...snapshot(active: true), 'phase': 'error', 'last_error': 'Previous Bluetooth session has not finished disconnecting. Cancel connection and try again.'};
-    await mount(tester, failed); await tester.pumpAndSettle();
-    expect(find.text(failed['last_error'] as String), findsOneWidget);
-    expect(find.text('Cancel connection'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-    await tester.tap(find.text('Cancel connection')); await tester.pumpAndSettle();
-    expect(calls.where((c) => c.method == 'stop'), hasLength(1));
-    expect(calls.where((c) => c.method == 'start'), isEmpty);
-  });
-
-  testWidgets('native settings enters isolated demo and all six entrances remain usable', (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    await tester.binding.setSurfaceSize(const Size(1000, 2400));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await mount(tester, snapshot());
-    router(tester).go(AppRoutes.settings);
-    await tester.pumpAndSettle();
-    expect(find.text('Demo Mode'), findsOneWidget);
-    await tester.ensureVisible(find.text('Demo Mode'));
-    final toggle = find.descendant(of: find.ancestor(of: find.text('Demo Mode'), matching: find.byType(ListTile)), matching: find.byType(Switch));
-    final target = toggle.evaluate().isNotEmpty ? toggle : find.byType(Switch).last;
-    await tester.tap(target);
-    await tester.pumpAndSettle();
-    expect(find.byType(DashboardScreen), findsOneWidget);
-    final scope = ProviderScope.containerOf(tester.element(find.byType(DashboardScreen)));
-    expect(scope.read(demoModeProvider), true);
-    expect(calls.where((c) => c.method == 'stop'), hasLength(1));
-    calls.clear(); metadataWrites.clear();
-    for (final route in [AppRoutes.health, AppRoutes.notifications, AppRoutes.analytics, AppRoutes.watchfaceBackground, AppRoutes.developer, AppRoutes.voiceMemos]) {
-      router(tester).go(route);
+  testWidgets(
+    'native connection error ends spinner and exposes cancellation failure',
+    (tester) async {
+      final failed = {
+        ...snapshot(active: true),
+        'phase': 'error',
+        'last_error':
+            'Previous Bluetooth session has not finished disconnecting. Cancel connection and try again.',
+      };
+      await mount(tester, failed);
       await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull, reason: route);
-    }
-    expect(calls, isEmpty); expect(metadataWrites, isEmpty); expect(forbidden, isEmpty);
-    await scope.read(demoModeControllerProvider).set(false);
-    await tester.pump();
-    await emit(tester, snapshot());
-    await tester.pumpAndSettle();
-    expect(calls.where((c) => c.method == 'start'), isEmpty);
-  });
+      expect(find.text(failed['last_error'] as String), findsOneWidget);
+      expect(find.text('Cancel connection'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      await tester.tap(find.text('Cancel connection'));
+      await tester.pumpAndSettle();
+      expect(calls.where((c) => c.method == 'stop'), hasLength(1));
+      expect(calls.where((c) => c.method == 'start'), isEmpty);
+    },
+  );
+
+  testWidgets(
+    'native settings enters isolated demo and all six entrances remain usable',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.binding.setSurfaceSize(const Size(1000, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await mount(tester, snapshot());
+      router(tester).go(AppRoutes.settings);
+      await tester.pumpAndSettle();
+      expect(find.text('Demo Mode'), findsOneWidget);
+      await tester.ensureVisible(find.text('Demo Mode'));
+      final toggle = find.descendant(
+        of: find.ancestor(
+          of: find.text('Demo Mode'),
+          matching: find.byType(ListTile),
+        ),
+        matching: find.byType(Switch),
+      );
+      final target = toggle.evaluate().isNotEmpty
+          ? toggle
+          : find.byType(Switch).last;
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+      expect(find.byType(DashboardScreen), findsOneWidget);
+      final scope = ProviderScope.containerOf(
+        tester.element(find.byType(DashboardScreen)),
+      );
+      expect(scope.read(demoModeProvider), true);
+      expect(calls.where((c) => c.method == 'stop'), hasLength(1));
+      calls.clear();
+      metadataWrites.clear();
+      for (final route in [
+        AppRoutes.health,
+        AppRoutes.notifications,
+        AppRoutes.analytics,
+        AppRoutes.watchfaceBackground,
+        AppRoutes.developer,
+        AppRoutes.voiceMemos,
+      ]) {
+        router(tester).go(route);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: route);
+      }
+      expect(calls, isEmpty);
+      expect(metadataWrites, isEmpty);
+      expect(forbidden, isEmpty);
+      await scope.read(demoModeControllerProvider).set(false);
+      await tester.pump();
+      await emit(tester, snapshot());
+      await tester.pumpAndSettle();
+      expect(calls.where((c) => c.method == 'start'), isEmpty);
+    },
+  );
 
   testWidgets(
     'Restart confirmation uses only the native owner and generation',
@@ -359,59 +392,88 @@ void main() {
     expect(forbidden, isEmpty);
   });
 
-  testWidgets('Transcribe-only and batch controls queue natively without an LLM', (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    await tester.binding.setSurfaceSize(const Size(1000, 2200));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    final state = snapshot(active: true, ready: true);
-    const identity = 'AA:BB:CC:DD:EE:FF:memo_001:1700000000:100:1000';
-    state['recordings'] = {identity: {
-      'address': state['address'], 'filename': 'memo_001', 'timestamp': 1700000000,
-      'size_bytes': 100, 'duration_ms': 1000, 'state': 'downloaded',
-      'local_path': '/private/test.zsw_opus', 'sha256': 'b' * 64,
-    }};
-    await mount(tester, state);
-    router(tester).go(AppRoutes.voiceMemos);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Transcription actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Transcribe only'));
-    await tester.pumpAndSettle();
-    expect(find.text('Transcribe recording'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-    expect(calls.where((c) => c.method == 'processRecording'), isEmpty);
-    await tester.tap(find.byTooltip('Transcription actions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Transcribe only'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Transcribe'));
-    await tester.pumpAndSettle();
-    final queued = calls.where((c) => c.method == 'processRecording').single;
-    expect((queued.arguments as Map)['operation'], 'transcribe');
-    expect((queued.arguments as Map)['identity'], identity);
-    await tester.tap(find.text('Transcribe all untranscribed'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Queue'));
-    await tester.pumpAndSettle();
-    expect(calls.where((c) => c.method == 'processRecording'), hasLength(2));
-    final id = 'a' * 64;
-    nativeJobDetails[id] = {'state': 'transcribed', 'result': {
-      'transcript': 'Stored speech', 'summary': '', 'category': '', 'actions': <Object?>[],
-    }};
-    await emit(tester, {...state, 'voice_jobs': [{
-      'job_id': id, 'recording_id': identity, 'watch_id': state['address'],
-      'generation': 1, 'state': 'transcribed', 'selected': true, 'transcript_saved': true,
-    }]});
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('memo_001'));
-    await tester.pumpAndSettle();
-    expect(find.text('Stored speech'), findsOneWidget);
-    expect(find.text('Summary'), findsNothing);
-    expect(forbidden, isEmpty);
-    expect(calls.where((c) => c.method == 'start' || c.method == 'stop'), isEmpty);
-    expect(subscriptions.where((s) => s == 'listen'), hasLength(1));
-  });
+  testWidgets(
+    'Transcribe-only and batch controls queue natively without an LLM',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.binding.setSurfaceSize(const Size(1000, 2200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final state = snapshot(active: true, ready: true);
+      const identity = 'AA:BB:CC:DD:EE:FF:memo_001:1700000000:100:1000';
+      state['recordings'] = {
+        identity: {
+          'address': state['address'],
+          'filename': 'memo_001',
+          'timestamp': 1700000000,
+          'size_bytes': 100,
+          'duration_ms': 1000,
+          'state': 'downloaded',
+          'local_path': '/private/test.zsw_opus',
+          'sha256': 'b' * 64,
+        },
+      };
+      await mount(tester, state);
+      router(tester).go(AppRoutes.voiceMemos);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Transcription actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Transcribe only'));
+      await tester.pumpAndSettle();
+      expect(find.text('Transcribe recording'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(calls.where((c) => c.method == 'processRecording'), isEmpty);
+      await tester.tap(find.byTooltip('Transcription actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Transcribe only'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Transcribe'));
+      await tester.pumpAndSettle();
+      final queued = calls.where((c) => c.method == 'processRecording').single;
+      expect((queued.arguments as Map)['operation'], 'transcribe');
+      expect((queued.arguments as Map)['identity'], identity);
+      await tester.tap(find.text('Transcribe all untranscribed'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Queue'));
+      await tester.pumpAndSettle();
+      expect(calls.where((c) => c.method == 'processRecording'), hasLength(2));
+      final id = 'a' * 64;
+      nativeJobDetails[id] = {
+        'state': 'transcribed',
+        'result': {
+          'transcript': 'Stored speech',
+          'summary': '',
+          'category': '',
+          'actions': <Object?>[],
+        },
+      };
+      await emit(tester, {
+        ...state,
+        'voice_jobs': [
+          {
+            'job_id': id,
+            'recording_id': identity,
+            'watch_id': state['address'],
+            'generation': 1,
+            'state': 'transcribed',
+            'selected': true,
+            'transcript_saved': true,
+          },
+        ],
+      });
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('memo_001'));
+      await tester.pumpAndSettle();
+      expect(find.text('Stored speech'), findsOneWidget);
+      expect(find.text('Summary'), findsNothing);
+      expect(forbidden, isEmpty);
+      expect(
+        calls.where((c) => c.method == 'start' || c.method == 'stop'),
+        isEmpty,
+      );
+      expect(subscriptions.where((s) => s == 'listen'), hasLength(1));
+    },
+  );
 
   tearDown(() {
     messenger.setMockMethodCallHandler(methods, null);
@@ -1221,24 +1283,29 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
-  testWidgets('Ready transitions preserve an open Voice route above disconnected Home', (tester) async {
-    await mount(tester, snapshot());
-    final routes = router(tester);
-    unawaited(routes.push<void>(AppRoutes.voiceMemos));
-    await tester.pumpAndSettle();
-    expect(find.text('Voice Notes'), findsOneWidget);
-    await emit(tester, snapshot(active: true, ready: true));
-    await tester.pumpAndSettle();
-    expect(find.text('Voice Notes'), findsOneWidget);
-    await emit(tester, {...snapshot(active: true), 'phase': 'disconnected'});
-    await tester.pumpAndSettle();
-    await emit(tester, snapshot(active: true, ready: true));
-    await tester.pumpAndSettle();
-    expect(find.text('Voice Notes'), findsOneWidget);
-    expect(calls.where((c) => c.method == 'start' || c.method == 'stop'), isEmpty);
-    expect(forbidden, isEmpty);
-    await tester.pumpWidget(const SizedBox());
-    await tester.pumpAndSettle();
-  });
-
+  testWidgets(
+    'Ready transitions preserve an open Voice route above disconnected Home',
+    (tester) async {
+      await mount(tester, snapshot());
+      final routes = router(tester);
+      unawaited(routes.push<void>(AppRoutes.voiceMemos));
+      await tester.pumpAndSettle();
+      expect(find.text('Voice Notes'), findsOneWidget);
+      await emit(tester, snapshot(active: true, ready: true));
+      await tester.pumpAndSettle();
+      expect(find.text('Voice Notes'), findsOneWidget);
+      await emit(tester, {...snapshot(active: true), 'phase': 'disconnected'});
+      await tester.pumpAndSettle();
+      await emit(tester, snapshot(active: true, ready: true));
+      await tester.pumpAndSettle();
+      expect(find.text('Voice Notes'), findsOneWidget);
+      expect(
+        calls.where((c) => c.method == 'start' || c.method == 'stop'),
+        isEmpty,
+      );
+      expect(forbidden, isEmpty);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+  );
 }

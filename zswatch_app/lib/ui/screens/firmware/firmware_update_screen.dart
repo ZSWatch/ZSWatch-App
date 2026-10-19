@@ -1626,8 +1626,12 @@ class _ActionButtons extends ConsumerWidget {
     }
 
     // Failed state - show retry/reset buttons
-    if (dfuState.status == DfuStatus.failed || dfuState.status == DfuStatus.cancelled || isFsFailed) {
-      final errorMessage = (dfuState.status == DfuStatus.failed || dfuState.status == DfuStatus.cancelled)
+    if (dfuState.status == DfuStatus.failed ||
+        dfuState.status == DfuStatus.cancelled ||
+        isFsFailed) {
+      final errorMessage =
+          (dfuState.status == DfuStatus.failed ||
+              dfuState.status == DfuStatus.cancelled)
           ? dfuState.errorMessage
           : fsUploadState.errorMessage;
       return Column(

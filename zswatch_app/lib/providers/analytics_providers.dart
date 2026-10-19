@@ -54,7 +54,8 @@ final companionTelemetryRevisionProvider = Provider<Object?>((ref) {
 /// Android commits native SQLite writes. iOS hands durable native receipts to
 /// Flutter's sole Drift writer before acknowledging them.
 final companionTelemetryUpdatesProvider = Provider<void>((ref) {
-  if (!ref.watch(nativeCompanionRuntimeProvider) || ref.watch(demoModeProvider)) {
+  if (!ref.watch(nativeCompanionRuntimeProvider) ||
+      ref.watch(demoModeProvider)) {
     return;
   }
   final db = ref.watch(databaseProvider);

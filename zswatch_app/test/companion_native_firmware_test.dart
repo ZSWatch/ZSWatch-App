@@ -697,18 +697,24 @@ void main() {
       }
     },
   );
-  test('Nordic default WatchDK manifest matches revision 1 but rejects other revisions', () async {
-    final c = container(Stream.value(snapshot()));
-    addTearDown(c.dispose);
-    await c.read(companionSnapshotProvider.future);
-    final notifier = c.read(dfuNotifierProvider.notifier);
-    final original = manager.images.single;
-    manager.images = [original.copyWith(board: 'watchdk')];
-    await notifier.loadLocalFile(original.filePath);
-    await notifier.startUpdate();
-    expect(c.read(dfuNotifierProvider).hasError, false);
-    expect(calls.map((call) => call.method), ['prepareShell', 'startFirmware']);
-  });
+  test(
+    'Nordic default WatchDK manifest matches revision 1 but rejects other revisions',
+    () async {
+      final c = container(Stream.value(snapshot()));
+      addTearDown(c.dispose);
+      await c.read(companionSnapshotProvider.future);
+      final notifier = c.read(dfuNotifierProvider.notifier);
+      final original = manager.images.single;
+      manager.images = [original.copyWith(board: 'watchdk')];
+      await notifier.loadLocalFile(original.filePath);
+      await notifier.startUpdate();
+      expect(c.read(dfuNotifierProvider).hasError, false);
+      expect(calls.map((call) => call.method), [
+        'prepareShell',
+        'startFirmware',
+      ]);
+    },
+  );
 
   test(
     'board mismatch, duplicate indices, ambiguous package and changed file reject before preparing SMP',
@@ -831,24 +837,38 @@ void main() {
       expect(calls, isEmpty);
     },
   );
-  testWidgets('native upload cancellation remains visible until explicit UI dismissal', (tester) async {
-    final c = container(Stream.value(snapshot(operation: firmware('cancelled', cancelled: true))));
-    addTearDown(c.dispose);
-    await c.read(companionSnapshotProvider.future);
-    await tester.pumpWidget(UncontrolledProviderScope(container: c, child: const MaterialApp(home: FirmwareUpdateScreen())));
-    await tester.pumpAndSettle();
-    expect(find.text('Update Cancelled'), findsOneWidget);
-    expect(find.text('Reset'), findsOneWidget);
-    expect(find.text('FW Update'), findsNothing);
-    await tester.tap(find.text('Reset'));
-    await tester.pumpAndSettle();
-    expect(c.read(dfuStateProvider).status, DfuStatus.idle);
-    expect(calls, isEmpty);
-    await tester.pumpWidget(const SizedBox());
-    await tester.pumpAndSettle();
-  });
+  testWidgets(
+    'native upload cancellation remains visible until explicit UI dismissal',
+    (tester) async {
+      final c = container(
+        Stream.value(
+          snapshot(operation: firmware('cancelled', cancelled: true)),
+        ),
+      );
+      addTearDown(c.dispose);
+      await c.read(companionSnapshotProvider.future);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: c,
+          child: const MaterialApp(home: FirmwareUpdateScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Update Cancelled'), findsOneWidget);
+      expect(find.text('Reset'), findsOneWidget);
+      expect(find.text('FW Update'), findsNothing);
+      await tester.tap(find.text('Reset'));
+      await tester.pumpAndSettle();
+      expect(c.read(dfuStateProvider).status, DfuStatus.idle);
+      expect(calls, isEmpty);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    },
+  );
 
-  testWidgets('resource-only completion names the filesystem outcome', (tester) async {
+  testWidgets('resource-only completion names the filesystem outcome', (
+    tester,
+  ) async {
     final operation = firmware('completed')
       ..['targets'] = <Object?>[]
       ..['resource'] = {'bytes': 64, 'hash': 'b' * 64}
@@ -856,7 +876,12 @@ void main() {
     final c = container(Stream.value(snapshot(operation: operation)));
     addTearDown(c.dispose);
     await c.read(companionSnapshotProvider.future);
-    await tester.pumpWidget(UncontrolledProviderScope(container: c, child: const MaterialApp(home: FirmwareUpdateScreen())));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: const MaterialApp(home: FirmwareUpdateScreen()),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Filesystem Upload Complete!'), findsOneWidget);
     expect(find.text('Update Complete!'), findsNothing);
@@ -865,5 +890,4 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pumpAndSettle();
   });
-
 }

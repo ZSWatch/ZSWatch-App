@@ -51,12 +51,17 @@ class FirmwareManager {
   /// Nordic manifests use the base board name for WatchDK's default revision.
   /// app/boards/zswatch/watchdk/board.yml defines only revision 1 as the default.
   /// Other board families and explicit revisions remain distinct.
-  static bool firmwareBoardMatches(String? declaredBoard, String? hardwareVersion) {
+  static bool firmwareBoardMatches(
+    String? declaredBoard,
+    String? hardwareVersion,
+  ) {
     String? canonical(String? name) {
       final prefix = boardPrefixFromHardwareVersion(name);
       return prefix == 'watchdk' ? 'watchdk@1' : prefix;
     }
-    final declared = canonical(declaredBoard), selected = canonical(hardwareVersion);
+
+    final declared = canonical(declaredBoard),
+        selected = canonical(hardwareVersion);
     return declared == null || selected == null || declared == selected;
   }
 
