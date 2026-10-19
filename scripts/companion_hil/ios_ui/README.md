@@ -1,71 +1,161 @@
-# Normal iPhone UI acceptance
+# iPhone UI regression flows
 
-This standalone XCTest bundle controls the installed `dev.zswatch.companion` app.
-It uses public Xcode UI automation; there is no special product entrypoint or
-injected companion command. It does not connect, pair, Stop, delete recordings,
-select models or install firmware. Shell sends the read-only `app state` command.
+`CompanionPhoneUITests.swift` is a standalone XCUITest bundle that drives the
+installed, normally signed companion app on a real iPhone through public UI
+automation. It never installs the app. Each `test*` method is one flow; run
+them one at a time, in order, against one phone.
 
-Require an unlocked Mac/iPhone, trusted USB device, Developer Mode, signing team,
-and a selected watch already connected through the normal app. Install the
-normal signed app first. `xcodeproj` is provided by the CocoaPods Ruby environment.
-Use fresh output/result directories and select the individual check explicitly:
+## Prerequisites
+
+- Mac with Xcode, unlocked iPhone on USB, trusted, Developer Mode on.
+- The app installed (see `AGENTS.md`) and, for most flows, the watch already
+  connected (dashboard shows **Disconnect**).
+- An Apple signing team for the test runner.
+- `xcodeproj` gem (comes with CocoaPods).
+
+Flutter release builds may need an accessibility inspection session before
+XCTest sees their semantics. An empty hierarchy is a tooling problem, not an
+app failure. A pymobiledevice3 AccessibilityAudit session enabled inspection
+without changing VoiceOver on our rig; this runner does not start one.
+
+## Create the project
+
+The project is generated, not committed. Use a fresh directory each time
+(re-run after editing the Swift file, or edit the copy and open it in Xcode):
 
 ```sh
-export ZSW_IOS_TEAM=YOUR_TEAM
+export ZSW_IOS_TEAM=YOUR_TEAM_ID
+export OUT=.companion-hil-runs/phone-ui-$(date +%Y%m%d-%H%M%S)
+LANG=en_US.UTF-8 ruby scripts/companion_hil/ios_ui/create_project.rb "$OUT"
+open "$OUT/PhoneAcceptance.xcodeproj"   # optional, to run from Xcode
+```
+
+`ZSW_UITEST_BUNDLE_ID` overrides the runner's bundle id
+(default `dev.zswatch.companion.hil.acceptance`).
+
+Compile check without a phone or signing:
+
+```sh
+xcodebuild build-for-testing -project "$OUT/PhoneAcceptance.xcodeproj" -scheme PhoneAcceptance -destination 'generic/platform=iOS' -derivedDataPath "$OUT/build" CODE_SIGNING_ALLOWED=NO
+```
+
+## Select a device and run one flow
+
+`xcrun devicectl list devices` lists device ids. Build once for the phone,
+then run single flows with `-only-testing` and a distinct result bundle:
+
+```sh
 export ZSW_PHONE_UDID=YOUR_DEVICE_UDID
-ruby scripts/companion_hil/ios_ui/create_project.rb /tmp/zswatch-phone-acceptance-NEW
-xcodebuild build-for-testing \
-  -project /tmp/zswatch-phone-acceptance-NEW/PhoneAcceptance.xcodeproj \
-  -scheme PhoneAcceptance -destination "id=$ZSW_PHONE_UDID" \
-  -derivedDataPath /tmp/zswatch-phone-acceptance-NEW/build \
-  -allowProvisioningUpdates
-xcodebuild test-without-building \
-  -project /tmp/zswatch-phone-acceptance-NEW/PhoneAcceptance.xcodeproj \
-  -scheme PhoneAcceptance -destination "id=$ZSW_PHONE_UDID" \
-  -derivedDataPath /tmp/zswatch-phone-acceptance-NEW/build \
-  -only-testing:PhoneAcceptance/CompanionPhoneUITests/testConnectedRoutes \
-  -resultBundlePath /tmp/zswatch-phone-acceptance-NEW/routes.xcresult
+xcodebuild build-for-testing -project "$OUT/PhoneAcceptance.xcodeproj" -scheme PhoneAcceptance -destination "id=$ZSW_PHONE_UDID" -derivedDataPath "$OUT/build" -allowProvisioningUpdates
 ```
-
-Select `testReadOnlyShell` similarly, with a distinct result path.
-`testBackgroundReturn` presses Home for 20 seconds, then reopens the app; it
-checks the UI return only. Capture native journal receipts and database projection
-separately to establish data collection while the app is in the background.
-Neither check proves a locked-screen exchange or genuine OS restoration. Assertions stop
-before subsequent UI actions on failure. Screenshots/results may contain private
-recording names or diagnostic information; retain them in ignored local evidence,
-not source control. No complete app hierarchy or transcript is printed.
-
-Flutter release builds may need a temporary accessibility inspection session for
-XCTest to see their semantics. Diagnose an empty hierarchy separately from app
-functionality. Inspection is a test facility and must not become a release-mode
-product requirement or a VoiceOver preference change. On this rig a temporary
-pymobiledevice3 AccessibilityAudit session enabled inspection without changing
-VoiceOver. This runner does not enable that session or bypass a locked device.
-
-The original six-route phone check passed on iPhone 11 / iOS 26.1 with app
-8ee84dd. The reusable runner's build and subsequent evidence are documented in
-IOS_NATIVE_COMPANION_PROGRESS.md; shell response/navigation acceptance is separate
-from the successful route check. Run tests sequentially against one phone.
-
-
-### Owned AMS media fixture
-
-Generate a new directory with:
 
 ```sh
-python3 scripts/companion_hil/ios_media_fixture.py /tmp/owned-ams-fixture
+xcodebuild test-without-building -project "$OUT/PhoneAcceptance.xcodeproj" -scheme PhoneAcceptance -destination "id=$ZSW_PHONE_UDID" -derivedDataPath "$OUT/build" -only-testing:PhoneAcceptance/CompanionPhoneUITests/testMainRoutes -resultBundlePath "$OUT/main-routes.xcresult"
 ```
 
-Serve its parent through the existing local HTTP
-fixture/server and open the page in iPhone Safari. Tap Start owned audio through
-the normal UI. The two quiet generated tones publish unique track titles and
-artist through MediaSession; the page supplies play/pause/next/previous handlers.
-Watch Music UI controls should produce `remote-play`, `remote-pause`,
-`remote-next` and `remote-previous` GET receipts, including track and paused state.
-A simple file server returns 404 for these marker URLs; its request log still
-records the callback. Do not treat a download or watch-USB command alone as AMS
-acceptance. Verify the phone player state and watch metadata, stop the owned audio
-and return the watch to its preceding page afterward. Keep captures of unrelated
-notification/media content private. The HTML declares UTF-8 for reliable iOS
-accessibility labels.
+Keep `.xcresult` bundles in the gitignored `.companion-hil-runs/`: screenshots
+can show recording names, transcripts and diagnostics.
+
+### Configuration
+
+Flows read environment variables. xcodebuild forwards `TEST_RUNNER_<NAME>` to
+the runner as `<NAME>`, e.g.
+`TEST_RUNNER_ZSW_RECORDING=hil_test_note xcodebuild test-without-building ...`.
+A flow whose required variable is unset is skipped.
+
+| Variable | Default | Used by |
+| --- | --- | --- |
+| `ZSW_BUNDLE_ID` | `dev.zswatch.companion` | all |
+| `ZSW_WATCH_NAME` | `ZSWatch` | `testPairWatch` (pairing prompt text) |
+| `ZSW_FW_PACKAGE` | required | firmware flows; file name prefix of a `dfu_application.zip` |
+| `ZSW_RESOURCE_PACKAGE` | required | `testResourceUpload`; file name prefix of the resource image |
+| `ZSW_PICKER_LOCATION` | `On My iPhone` | document picker root (`iCloud Drive` also works) |
+| `ZSW_PICKER_FOLDER` | `Downloads` | folder under that root holding the packages |
+| `ZSW_RECORDING` | required | recording/transcript flows; search text that must match exactly one recording |
+| `ZSW_BACKGROUND` | `Aurora` | `testWatchfaceApplyBundledBackground` |
+| `ZSW_SPEECH_MODEL` | `Whisper Small (English)` | `testSelectSpeechModel` |
+| `ZSW_SENSORS` | all sensors | `testSensorsStartStop`; comma-separated row labels |
+| `ZSW_BACKGROUND_SECONDS` | `20` | `testBackgroundReturn` (firmware background caps at 10) |
+
+Put firmware/resource packages into Files yourself first (Safari download,
+AirDrop, Finder file sharing). The flows only pick them.
+
+## Flows
+
+**Read-only** (no watch or phone state change beyond navigation):
+
+| Flow | Checks |
+| --- | --- |
+| `testMainRoutes` | Health (Today/Week/Month), Notifications, Analytics, Watchface, Developer, Voice open and Home stays connected |
+| `testSettingsReadOnly` | iOS permission rows, App Version, Licenses, Coredump Server dialog (cancelled) |
+| `testShellAppState` | BLE shell `app state` returns `UI state:` |
+| `testDeveloperReadOnlyRoutes` | Crash Reports, File System, Comm Log load watch data |
+| `testFirmwareSelectPackage` | picks `ZSW_FW_PACKAGE`; no upload |
+| `testRecordingPlaybackSeek` | plays and seeks the `ZSW_RECORDING` audio |
+| `testBackgroundReturn` | Home → wait → reopen, connected dashboard returns (UI only; native receipts prove background work) |
+
+**Change watch state:**
+
+| Flow | Effect |
+| --- | --- |
+| `testFindWatch` | watch buzzes |
+| `testSyncTime` | sets the watch clock |
+| `testLogStreaming` | toggles watch log streaming; ends off |
+| `testSensorsStartStop` | starts/stops each sensor stream; ends all off |
+| `testWatchfaceApplyBundledBackground` | changes the watchface background |
+| `testWatchfaceResetToDefault` | resets the background to default |
+| `testRestartWatch` | reboots the watch, waits for reconnect |
+| `testResourceUpload` | overwrites watch filesystem resources |
+| `testFirmwareCancelDuringUpload` | starts a DFU and cancels it during upload, then Reset |
+| `testFirmwareUpdateToCompletion` | flashes `ZSW_FW_PACKAGE`, watch reboots |
+| `testFirmwareUpdateWithShortBackground` | same, with ≤10 s in background during upload |
+| `testFirmwareRetry` | retries a failed/cancelled update already on screen, to completion |
+| `testAnalyzeTranscript` | sends an analysis result for `ZSW_RECORDING` to the watch |
+
+Upload resources before firmware: the firmware reboot cuts a resource upload.
+
+**Change phone/app state:**
+
+| Flow | Effect |
+| --- | --- |
+| `testPairWatch` | taps Connect and accepts the iOS pairing prompt (creates a bond). Ask before running. |
+| `testExplicitStopSurvivesRelaunch` | Disconnect, terminate and relaunch app, verify still stopped, Connect |
+| `testDemoModeRoundTrip` | Demo Mode on (real watch disconnects), walks routes, Demo Mode off, real watch back |
+| `testBluetoothOffOnRecovery` | turns phone Bluetooth off then on in Settings; restored on exit |
+| `testSelectSpeechModel` | changes the selected speech model; may download hundreds of MB |
+| `testTranscribeRecording` | saves a new transcript revision for `ZSW_RECORDING` |
+| `testTranscriptEditRestore` | appends text, saves, restores the original (adds revisions) |
+| `testRecordingArchiveDeleteRestore` | archive/unarchive, delete, restore; ends as it started |
+
+Do not flash, reset or recover the watch while running background or
+reconnection flows. Flows stop at the first failed check and attach a
+screenshot named after the step.
+
+## Missing accessibility identifiers
+
+The Flutter UI sets no `Semantics(identifier:)`, so flows match labels and
+tooltips. They break if those strings change. Spots marked `MISSING-ID` in
+the Swift file would benefit most from identifiers: the switches on sensor,
+Demo Mode and voice-policy rows (found by row position), the Log Viewer
+streaming switch, the model selector dropdown (tapped at its top line),
+watchface background tiles and the Reset to Default button.
+
+## Owned AMS media fixture
+
+`python3 scripts/companion_hil/ios_media_fixture.py <new-dir>` writes a page
+with two quiet generated tones that publish unique track titles through
+MediaSession. Serve its parent with `http_fixture.py`, open it in iPhone
+Safari and tap Start owned audio. Watch Music controls should then log
+`remote-play`, `remote-pause`, `remote-next` and `remote-previous` requests
+(404 responses are expected; the request log records the callback). Check the
+phone player and watch metadata, then stop the audio.
+
+## What was dropped from the ad-hoc driver
+
+The earlier `/tmp` driver had ~150 one-shot steps. Dropped: steps tied to
+specific fixture files on one phone (named recordings, firmware zips,
+imported GGUF models, reminder/calendar/timer fixtures, photos), Safari
+download/Files navigation by screen coordinates, App Switcher force-quit by
+coordinates, Airplane/Wi-Fi toggles, AccessorySetupKit migration steps,
+first-launch permission checks against a separately signed copy, and
+watch-specific shell probes (`kernel thread stacks`, `voice_memo status`).
