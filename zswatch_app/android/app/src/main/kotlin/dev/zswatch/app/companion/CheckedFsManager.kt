@@ -4,6 +4,7 @@ import io.runtime.mcumgr.McuMgrTransport
 import io.runtime.mcumgr.exception.McuMgrException
 import io.runtime.mcumgr.managers.FsManager
 import io.runtime.mcumgr.response.fs.McuMgrFsDownloadResponse
+import io.runtime.mcumgr.response.fs.McuMgrFsSha256Response
 
 class FileChunkMismatchException(message: String) : McuMgrException(message)
 
@@ -29,4 +30,10 @@ class CheckedFsManager(
             throw FileChunkMismatchException("File length mismatch: returned=${response.len} expected=$expectedSize")
         return response
     }
+
+    /** SHA-256 of a file range. The SDK's blocking variant uses a 2.5 s timeout,
+     * shorter than the watch needs to hash a large part of a recording. */
+    fun rangeSha256(name: String, offset: Int, length: Int): McuMgrFsSha256Response =
+        send(OP_READ, 2, mapOf<String, Any>("name" to name, "type" to "sha256", "off" to offset, "len" to length),
+            30000L, McuMgrFsSha256Response::class.java)
 }

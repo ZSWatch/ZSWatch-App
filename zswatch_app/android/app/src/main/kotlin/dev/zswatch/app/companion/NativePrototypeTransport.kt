@@ -714,6 +714,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     // example after bond state drifted) never receives, so its cached GATT table
     // keeps lacking SMP. Clear the cache and reconnect like a service change.
     private var smpRefreshAttempts = 0
+    private val repairExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
     private fun refreshStaleGatt(session: Long) {
         if (!runtime.owns(session) || smpRefreshAttempts >= 2) return
         smpRefreshAttempts++
@@ -1108,7 +1109,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                         android.util.Log.d("ZSWPrototypeTransfer", "session=$session transfer=$transferId file=${metadata["filename"]} requested=$requested returned=$returned bytes=${data.size} sha256=${ReceiptFiles.sha(data)}")
                     }
                     val path = "/user/recordings/${metadata["filename"]}.zsw_opus"
-                    transfer = manager.fileDownload(path,
+                    val callback =
                         object : DownloadCallback {
                             private fun deliver(action: () -> Unit) { handler.post {
                                 if (runtime.owns(session) && downloading && fileOperation == transferId) safely(action)
@@ -1134,11 +1135,32 @@ class NativePrototypeTransport(private val context: Context, private val handler
                                     override fun onResponse(response: McuMgrFsSha256Response) = deliver {
                                         val watchSha = response.output?.joinToString("") { "%02x".format(it.toInt() and 255) }
                                         if (response.isSuccess && watchSha == ReceiptFiles.sha(bytes)) publish(bytes, verified = true)
+                                        else if (response.isSuccess && watchSha != null) repair(bytes, watchSha)
                                         else retryUnverified(watchSha)
                                     }
                                     // Older firmware without fs hash support: keep the watch copy.
                                     override fun onError(error: McuMgrException) = deliver { publish(bytes, verified = false) }
                                 })
+                            }
+
+                            // Re-read only the ranges whose hash differs from the watch (blocking SDK calls).
+                            private fun repair(bytes: ByteArray, watchSha: String) {
+                                fun hex(response: McuMgrFsSha256Response) =
+                                    if (response.isSuccess) response.output?.joinToString("") { "%02x".format(it.toInt() and 255) } else null
+                                repairExecutor.execute {
+                                    val repaired = runCatching {
+                                        PrototypeRangeRepair(
+                                            watchSha = { offset, length ->
+                                                runCatching { hex(manager.rangeSha256(path, offset, length)) }
+                                                    .onFailure { android.util.Log.w("ZSWPrototypeTransfer", "range_sha256 off=$offset len=$length ${it.javaClass.simpleName}") }
+                                                    .getOrNull()
+                                            },
+                                            read = { offset -> runCatching { manager.download(path, offset).data }.getOrNull() },
+                                        ).repair(bytes) && ReceiptFiles.sha(bytes) == watchSha
+                                    }.getOrDefault(false)
+                                    android.util.Log.i("ZSWPrototypeTransfer", "file=${metadata["filename"]} range_repair=$repaired")
+                                    deliver { if (repaired) publish(bytes, verified = true) else retryUnverified(watchSha) }
+                                }
                             }
 
                             private fun retryUnverified(watchSha: String?) {
@@ -1163,7 +1185,15 @@ class NativePrototypeTransport(private val context: Context, private val handler
                                 finishFile(key, receipt, null)
                                 downloadNext()
                             }
-                        })
+                        }
+                    // Retries a lost chunk instead of failing the whole recording.
+                    val download = PrototypeChunkedDownload((metadata["size_bytes"] as Number).toInt(), { offset ->
+                        val response = manager.download(path, offset)
+                        if (!response.isSuccess) throw McuMgrException("Download error at $offset")
+                        response.data ?: throw McuMgrException("Missing chunk at $offset")
+                    })
+                    transfer = download
+                    repairExecutor.execute { download.run(callback) }
                     handler.postDelayed({
                         if (runtime.owns(session) && downloading && fileOperation == transferId) safely {
                             finishFile(key, metadata, "transfer_timeout")
