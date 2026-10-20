@@ -282,4 +282,125 @@ void main() {
     expect(calls.map((c) => c.method), ['prepareShell', 'executeShell']);
     await tester.pumpWidget(const SizedBox());
   });
+
+  Future<void> openVoiceTest(WidgetTester tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        nativeCompanionRuntimeProvider.overrideWithValue(true),
+        companionSnapshotProvider.overrideWith((ref) => Stream.value(ready)),
+        watchServiceProvider.overrideWith(
+          (ref) => throw StateError('Legacy BLE owner'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(companionSnapshotProvider.future);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: ShellScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Quick Actions'));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(
+      find.text('Voice Memo Test (phone speaks)'),
+      find.ancestor(
+        of: find.text('Power Status'),
+        matching: find.byType(ListView),
+      ),
+      const Offset(0, -400),
+    );
+    await tester.tap(find.text('Voice Memo Test (phone speaks)'));
+    await tester.pump();
+  }
+
+  List<Object?> voiceCommands() => calls
+      .where((call) => call.method == 'executeShell')
+      .map((call) => (call.arguments as Map)['command'])
+      .toList();
+
+  testWidgets('voice test stops after an uncertain start reply', (
+    tester,
+  ) async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'prepareShell') {
+        return {'version': 1, 'generation': 7, 'prepared_from_generation': 7};
+      }
+      if ((call.arguments as Map)['command'] == 'voice_memo start') {
+        throw PlatformException(code: 'transport', message: 'Reply lost');
+      }
+      return reply();
+    });
+    await openVoiceTest(tester);
+    await tester.pumpAndSettle();
+    expect(voiceCommands(), ['voice_memo start', 'voice_memo stop']);
+    expect(find.textContaining('Start failed:'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('rejected voice start does not stop an existing recording', (
+    tester,
+  ) async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'prepareShell') {
+        return {'version': 1, 'generation': 7, 'prepared_from_generation': 7};
+      }
+      return {...reply(), 'return_code': -1, 'output': 'Already recording'};
+    });
+    await openVoiceTest(tester);
+    await tester.pumpAndSettle();
+    expect(voiceCommands(), ['voice_memo start']);
+    expect(find.text('Start failed: Already recording'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('voice cleanup preserves the speech error when stop also fails', (
+    tester,
+  ) async {
+    const speech = MethodChannel('dev.zswatch.app/test_speech');
+    messenger.setMockMethodCallHandler(speech, (_) async {
+      throw PlatformException(code: 'speech', message: 'Engine unavailable');
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(speech, null));
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'prepareShell') {
+        return {'version': 1, 'generation': 7, 'prepared_from_generation': 7};
+      }
+      if ((call.arguments as Map)['command'] == 'voice_memo stop') {
+        throw PlatformException(code: 'transport', message: 'Stop reply lost');
+      }
+      return reply();
+    });
+    await openVoiceTest(tester);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pumpAndSettle();
+    expect(voiceCommands(), ['voice_memo start', 'voice_memo stop']);
+    expect(find.text('Speech failed: Engine unavailable'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('stalled phone speech still attempts to stop the recording', (
+    tester,
+  ) async {
+    const speech = MethodChannel('dev.zswatch.app/test_speech');
+    final playback = Completer<Object?>();
+    messenger.setMockMethodCallHandler(speech, (_) => playback.future);
+    addTearDown(() => messenger.setMockMethodCallHandler(speech, null));
+    await openVoiceTest(tester);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 36));
+    await tester.pumpAndSettle();
+    expect(voiceCommands(), ['voice_memo start', 'voice_memo stop']);
+    expect(
+      find.textContaining('Speech failed: TimeoutException'),
+      findsOneWidget,
+    );
+    playback.complete(null);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

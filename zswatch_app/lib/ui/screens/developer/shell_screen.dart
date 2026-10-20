@@ -485,21 +485,40 @@ const _voiceTestPhrase =
 /// so the recording, sync, transcription and AI flow can be tested hands-free.
 Future<(String, bool)> _voiceMemoTest(WidgetRef ref) async {
   final shell = ref.read(shellServiceProvider);
-  final start = await shell.execute('voice_memo start');
-  if (start.returnCode != 0) return ('Start failed: ${start.output}', true);
   String? speechError;
+  var mayBeRecording = true;
   try {
-    // Give the watch microphone a moment to settle before speaking.
-    await Future<void>.delayed(const Duration(seconds: 1));
-    await _testSpeech.invokeMethod<void>('speak', {'text': _voiceTestPhrase});
-    await Future<void>.delayed(const Duration(seconds: 1));
-  } on MissingPluginException {
-    speechError = 'Phone speech is only available on iOS';
-  } on PlatformException catch (e) {
-    speechError = 'Speech failed: ${e.message}';
+    final start = await shell.execute('voice_memo start');
+    if (start.returnCode != 0) {
+      mayBeRecording = false;
+      return ('Start failed: ${start.output}', true);
+    }
+    try {
+      // Give the watch microphone a moment to settle before speaking.
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await _testSpeech
+          .invokeMethod<void>('speak', {'text': _voiceTestPhrase})
+          .timeout(const Duration(seconds: 35));
+      await Future<void>.delayed(const Duration(seconds: 1));
+    } on MissingPluginException {
+      speechError = 'Phone speech is not available on this platform';
+    } on PlatformException catch (e) {
+      speechError = 'Speech failed: ${e.message}';
+    } catch (e) {
+      speechError = 'Speech failed: $e';
+    }
+  } catch (e) {
+    // A lost reply does not prove the watch rejected the start command.
+    speechError = 'Start failed: $e';
   } finally {
-    final stop = await shell.execute('voice_memo stop');
-    if (stop.returnCode != 0) speechError ??= 'Stop failed: ${stop.output}';
+    if (mayBeRecording) {
+      try {
+        final stop = await shell.execute('voice_memo stop');
+        if (stop.returnCode != 0) speechError ??= 'Stop failed: ${stop.output}';
+      } catch (e) {
+        speechError ??= 'Stop failed: $e';
+      }
+    }
   }
   if (speechError != null) return (speechError, true);
   return ('Recorded: "$_voiceTestPhrase"', false);
