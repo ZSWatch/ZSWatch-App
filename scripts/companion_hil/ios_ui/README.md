@@ -80,6 +80,28 @@ A flow whose required variable is unset is skipped.
 Put firmware/resource packages into Files yourself first (Safari download,
 AirDrop, Finder file sharing). The flows only pick them.
 
+Without touching the phone, push a package into the app's own container
+instead; the firmware screen then offers **Use pushed file: NAME** (shown only
+while such files exist):
+
+```sh
+xcrun devicectl device copy to --device "$ZSW_PHONE_UDID" --domain-type appDataContainer \
+  --domain-identifier dev.zswatch.companion --source dfu_application.zip \
+  --destination "Library/Application Support/dev_drop/dfu_application.zip"
+```
+
+A local build with a changed boot banner (e.g. an extra conf with
+`CONFIG_NCS_APPLICATION_BOOT_BANNER_STRING="ZSWatch DFU-TEST"`) shows on the
+watch UART which image runs after the update.
+
+## Hands-free voice memo
+
+Developer > Shell > Quick Actions > **Voice Memo Test (phone speaks)** runs
+`voice_memo start`, speaks a fixed reminder phrase through the iPhone speaker
+(iOS text-to-speech) and runs `voice_memo stop`. With the AI options on, the
+recording then goes through sync, transcription, analysis and delivery to the
+watch like a spoken memo. Keep the phone next to the watch with media volume up.
+
 ## Flows
 
 **Read-only** (no watch or phone state change beyond navigation):

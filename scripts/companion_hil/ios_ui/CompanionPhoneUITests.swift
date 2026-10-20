@@ -626,15 +626,19 @@ final class CompanionPhoneUITests: XCTestCase {
         try require(isOn(radio), "Bluetooth must start on")
         defer {
             settingsApp.activate()
-            if radio.exists && !isOn(radio) { radio.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap() }
+            // The radio can take a while to report on; tapping before that turns it off again.
+            let settled = NSPredicate(format: "value == %@", "1")
+            if radio.exists && XCTWaiter.wait(for: [expectation(for: settled, evaluatedWith: radio)], timeout: 20) != .completed {
+                radio.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            }
             app.activate()
         }
-        try flip(radio, to: false)
+        try flip(radio, to: false, timeout: 30)
         app.activate()
         try require(containing("Bluetooth is off").waitForExistence(timeout: 10), "App did not report Bluetooth off", capture: "bt-off")
         Thread.sleep(forTimeInterval: 8)
         settingsApp.activate()
-        try flip(radio, to: true)
+        try flip(radio, to: true, timeout: 30)
         app.activate()
         try require(app.buttons["Disconnect"].waitForExistence(timeout: 45), "No reconnection after Bluetooth on", capture: "bt-on")
     }
@@ -712,7 +716,14 @@ final class CompanionPhoneUITests: XCTestCase {
         try connectedHome()
         try tap(app.buttons["Restart Watch"], "Restart Watch")
         try tap(app.buttons["Restart"], "Restart confirmation")
-        try require(exact("Restart command sent to watch").waitForExistence(timeout: 20), "No restart acknowledgement")
+        // The dashboard is replaced by the start page as soon as the link drops,
+        // often before its snackbar is shown; either proves the restart started.
+        let disconnect = app.buttons["Disconnect"]
+        let deadline = Date().addingTimeInterval(20)
+        while Date() < deadline && !exact("Restart command sent to watch").exists && disconnect.exists {
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+        try require(Date() < deadline, "No restart acknowledgement", capture: "restart-ack")
         Thread.sleep(forTimeInterval: 8)
         try require(app.buttons["Disconnect"].waitForExistence(timeout: 90), "Watch did not reconnect", capture: "restart")
     }
