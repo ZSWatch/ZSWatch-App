@@ -277,6 +277,7 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
                 for (final history in _sensorHistory.values) {
                   history.clear();
                 }
+                _fusionSamples = 0;
               });
             },
           ),

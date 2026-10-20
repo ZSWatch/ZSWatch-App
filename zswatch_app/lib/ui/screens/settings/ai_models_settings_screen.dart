@@ -817,16 +817,20 @@ class _AiModelSelector extends ConsumerStatefulWidget {
 }
 
 class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
-  void _refreshProviders() {
-    ref.invalidate(llmAvailableModelsProvider);
-    ref.invalidate(selectedLlmModelInfoProvider);
-    ref.invalidate(llmModelDownloadedProvider);
-    ref.invalidate(llmModelSizeProvider);
-    ref.invalidate(llmServiceStateProvider);
+  void _refreshProviders([ProviderContainer? container]) {
+    final invalidate = container?.invalidate ?? ref.invalidate;
+    invalidate(llmAvailableModelsProvider);
+    invalidate(selectedLlmModelInfoProvider);
+    invalidate(llmModelDownloadedProvider);
+    invalidate(llmModelSizeProvider);
+    invalidate(llmServiceStateProvider);
   }
 
   Future<void> _downloadModel() async {
     final llm = ref.read(llmServiceProvider);
+    // The download outlives this page; refresh the cached status through the
+    // container, or the page shows "Not downloaded" until the app restarts.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await llm.downloadModel();
       if (mounted) {
@@ -834,7 +838,7 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
           context,
         ).showSnackBar(const SnackBar(content: Text('Model downloaded')));
       }
-      _refreshProviders();
+      _refreshProviders(container);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
