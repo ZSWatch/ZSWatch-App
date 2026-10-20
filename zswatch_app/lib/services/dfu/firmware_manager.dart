@@ -48,16 +48,22 @@ class FirmwareManager {
     return hardwareVersion.substring(0, slashIndex);
   }
 
-  /// Nordic manifests use the base board name for WatchDK's default revision.
-  /// app/boards/zswatch/watchdk/board.yml defines only revision 1 as the default.
+  /// Nordic manifests use the base board name for the default revision.
+  /// Defaults come from each board.yml in app/boards/zswatch.
   /// Other board families and explicit revisions remain distinct.
+  static const _defaultBoardRevisions = {
+    'watchdk': 'watchdk@1',
+    'zswatch': 'zswatch@1',
+    'zswatch_legacy': 'zswatch_legacy@5',
+  };
+
   static bool firmwareBoardMatches(
     String? declaredBoard,
     String? hardwareVersion,
   ) {
     String? canonical(String? name) {
       final prefix = boardPrefixFromHardwareVersion(name);
-      return prefix == 'watchdk' ? 'watchdk@1' : prefix;
+      return _defaultBoardRevisions[prefix] ?? prefix;
     }
 
     final declared = canonical(declaredBoard),
