@@ -52,11 +52,14 @@ class FirmwareSdkContractTest {
         response.images=null
         assertThrows(FirmwareVerificationUnavailable::class.java){FirmwareSdkContract.checkActive(targets,response)}
     }
-    @Test fun currentWatchImageStateCannotProveAnUnreportedNetworkCore() {
-        val targets=listOf(FirmwareTarget(0,76,"ab".repeat(32)),FirmwareTarget(1,76,"ab".repeat(32)),FirmwareTarget(2,76,"cd".repeat(32)))
+    @Test fun unreportedNetworkCoreIsLeftToMcuboot() {
+        val targets=listOf(FirmwareTarget(0,76,"ab".repeat(32)),FirmwareTarget(1,76,"ef".repeat(32)),FirmwareTarget(2,76,"cd".repeat(32)))
         val response=McuMgrImageStateResponse()
+        // The nRF5340 app core cannot list the network core's primary slot.
         response.images=arrayOf(installed(0,0xab.toByte(),true),installed(2,0xcd.toByte(),true))
-        val absent=assertThrows(FirmwareVerificationUnavailable::class.java){FirmwareSdkContract.checkActive(targets,response)}
-        assertEquals(listOf(1),absent.missingIndices)
+        FirmwareSdkContract.checkActive(targets,response)
+        // When the watch does report image 1, it must match.
+        response.images=arrayOf(installed(0,0xab.toByte(),true),installed(1,0x00,true),installed(2,0xcd.toByte(),true))
+        assertThrows(IllegalStateException::class.java){FirmwareSdkContract.checkActive(targets,response)}
     }
 }

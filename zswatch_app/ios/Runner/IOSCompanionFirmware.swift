@@ -108,7 +108,9 @@ final class IOSCompanionFirmware {
     sdk { sdk in ImageManager(transport: sdk).list { response, error in owner.queue.async {
       guard self.current(token) else { return }
       guard error == nil, response?.getError() == nil, let reported = response?.images, reported.count <= 16 else { self.abort("image_state_rejected"); return }
-      guard self.targets.allSatisfy({ target in reported.contains { $0.image == UInt64(target.index) } }) else { self.abort("boot_check_unavailable"); return }
+      let reportedIndices = Set(reported.map { Int($0.image) })
+      guard self.targets.allSatisfy({ target in reportedIndices.contains(target.index) ||
+        !CompanionFirmwareContract.needsReport(target, reportedIndices: reportedIndices) }) else { self.abort("boot_check_unavailable"); return }
       if let target = self.targets.first(where: { $0.index == 0 }) {
         self.transferExpected = !reported.contains { $0.image == UInt64(target.index) && $0.active &&
           $0.hash.map { String(format: "%02x", $0) }.joined() == target.hash }

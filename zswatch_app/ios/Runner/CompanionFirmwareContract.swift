@@ -20,7 +20,16 @@ enum CompanionFirmwareContract {
       throw CompanionFailure.invalid("One to three distinct SDK firmware images required")
     }
   }
-  static func checkActive(_ targets: [Target], reports: [Report]) throws {
+  /// The nRF5340 app core cannot read the network core's primary slot (it is in
+  /// ram_flash), so image 1 is usually missing from the image list. MCUboot
+  /// verifies that image while copying it to the network core.
+  static let unreportedNetworkImage = 1
+  static func needsReport(_ target: Target, reportedIndices: Set<Int>) -> Bool {
+    target.index != unreportedNetworkImage || reportedIndices.contains(target.index)
+  }
+  static func checkActive(_ allTargets: [Target], reports: [Report]) throws {
+    let reported = Set(reports.map(\.index))
+    let targets = allTargets.filter { needsReport($0, reportedIndices: reported) }
     guard targets.allSatisfy({ target in reports.contains { $0.index == target.index } }) else {
       throw CompanionFailure.unavailable("boot_check_unavailable")
     }
