@@ -255,7 +255,16 @@ Memo: "uh eh um"
 Memo: "Set a timer for 5 minutes"
 {"route":"timer_alarm"}
 
+Memo: "Sätt en timer på 10 minuter"
+{"route":"timer_alarm"}
+
+Memo: "Väck mig klockan sju"
+{"route":"timer_alarm"}
+
 Memo: "Remind me to call the dentist at 3 pm"
+{"route":"voice_memo"}
+
+Memo: "Påminn mig om 10 minuter att gå ut"
 {"route":"voice_memo"}
 
 Memo: "Buy milk"

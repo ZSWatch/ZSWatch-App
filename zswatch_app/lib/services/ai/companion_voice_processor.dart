@@ -120,7 +120,8 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
     final analyzer =
         (analyzerFactory?.call() ??
               LlmService(isCancelled: () => control.isCancelled))
-          ..selectModel(models[1]);
+          ..selectModel(models[1])
+          ..referenceTime = recording.timestampUtc.toLocal();
     llm = analyzer;
     if (!await analyzer.isModelDownloaded()) {
       throw PlatformException(code: 'MODEL_MISSING');
