@@ -473,7 +473,11 @@ class LlmService {
     }
 
     imported.sort((a, b) => a.displayName.compareTo(b.displayName));
-    return [...catalogModels, ...imported];
+    // LiteRT-LM only has an Android runtime.
+    return [
+      ...catalogModels,
+      ...imported,
+    ].where((m) => !m.isLiteRtLm || Platform.isAndroid).toList();
   }
 
   void selectModel(String modelId) {
