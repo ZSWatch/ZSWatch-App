@@ -39,6 +39,7 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
   StreamSubscription<SensorFusionData>? _fusionSubscription;
   SensorFusionData? _latestFusionData;
   SensorFusionData? _orientationOffset;
+  int _fusionSamples = 0;
 
   @override
   void initState() {
@@ -125,6 +126,7 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
           if (!mounted) return;
           setState(() {
             _latestFusionData = data;
+            _fusionSamples++;
           });
         });
       } else {
@@ -455,9 +457,11 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
   }
 
   Widget _buildStatusBar() {
-    final activeSensors = _enabledSensors.values.where((e) => e).length;
+    final activeSensors =
+        _enabledSensors.values.where((e) => e).length +
+        (_fusionEnabled ? 1 : 0);
     final totalSamples = _sensorHistory.values.fold<int>(
-      0,
+      _fusionSamples,
       (sum, list) => sum + list.length,
     );
 
