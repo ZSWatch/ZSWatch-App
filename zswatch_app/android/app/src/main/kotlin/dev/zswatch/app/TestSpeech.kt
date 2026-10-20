@@ -2,6 +2,8 @@ package dev.zswatch.app
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioManager
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
@@ -15,7 +17,7 @@ import java.util.Locale
  * recording on the watch). `speak` replies once the utterance has finished.
  * Same channel as the iOS TestSpeech in AppDelegate.swift.
  */
-class TestSpeech(context: Context, messenger: BinaryMessenger) {
+class TestSpeech(private val context: Context, messenger: BinaryMessenger) {
     private val main = Handler(Looper.getMainLooper())
     private val channel = MethodChannel(messenger, "dev.zswatch.app/test_speech")
     private var ready = false
@@ -50,7 +52,15 @@ class TestSpeech(context: Context, messenger: BinaryMessenger) {
                     }
                     pending = result
                     val id = (++utterance).toString()
-                    if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, id) != TextToSpeech.SUCCESS) {
+                    // "volume" is the loudness as a share of the maximum, so scale by the media volume.
+                    val audio = context.getSystemService(AudioManager::class.java)
+                    val system = audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() /
+                        audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    val target = call.argument<Double>("volume")?.toFloat() ?: 1f
+                    val params = Bundle().apply {
+                        putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, minOf(1f, target / maxOf(system, 0.01f)))
+                    }
+                    if (tts.speak(text, TextToSpeech.QUEUE_FLUSH, params, id) != TextToSpeech.SUCCESS) {
                         finish(id, "The speech engine rejected playback")
                     } else {
                         // Always let Dart stop the watch recording, even if the
