@@ -267,8 +267,30 @@ final class IOSCompanionFirmware {
       let sdk = McuMgrBleTransport(uuid); sdk.chunkSendDataToMtuSize = true; sdk.retryOnMissingResponse = false
       owner.queue.sync { self.transport = sdk }
       let value = "boot-\(token.uuidString.prefix(8))"
+      self.bootEcho(sdk, value: value, token: token, centralWaits: 8)
+    }
+  }
+  /// A new SDK transport reports its central manager as not ready for a short
+  /// while after creation, although the NUS owner is already connected. Wait
+  /// for it on the same transport, as IOSCompanionSmp does for preparation.
+  private func bootEcho(_ sdk: McuMgrBleTransport, value: String, token: UUID, centralWaits: Int) {
+    guard let owner else { return }
+    DispatchQueue.main.async {
       DefaultManager(transport: sdk).echo(value) { response, error in owner.queue.async {
         guard self.current(token) else { return }
+        var centralStarting = false
+        if let radio = error as? McuMgrBleTransportError {
+          switch radio {
+          case .centralManagerNotReady, .centralManagerPoweredOff: centralStarting = true
+          default: break
+          }
+        }
+        if centralWaits > 0, centralStarting {
+          owner.queue.asyncAfter(deadline: .now() + 0.25) {
+            if self.current(token) { self.bootEcho(sdk, value: value, token: token, centralWaits: centralWaits - 1) }
+          }
+          return
+        }
         guard error == nil, response?.getError() == nil, response?.response == value else {
           sdk.invalidate(); self.transport = nil; self.checking = false
           if self.checkAttempts < 3 {
