@@ -1,6 +1,7 @@
 package dev.zswatch.app.companion
 
 import android.app.Activity
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
@@ -23,10 +24,13 @@ class PrototypeAssociation(private val activity: Activity) {
     companion object {
         const val REQUEST = 61003
 
-        internal fun connectedWatch(devices: List<BluetoothDevice>): String? = devices
+        /** The single connected, bonded watch, ignoring watches the user forgot:
+         *  their Bluetooth pairing is kept, so otherwise Add watch would pick the
+         *  forgotten watch again instead of offering the picker. */
+        internal fun connectedWatch(devices: List<BluetoothDevice>, forgotten: Set<String> = emptySet()): String? = devices
             .filter { it.bondState == BluetoothDevice.BOND_BONDED &&
                 it.name?.contains("ZSWatch", ignoreCase = true) == true }
-            .map { it.address.uppercase() }.distinct().singleOrNull()
+            .map { it.address.uppercase() }.distinct().filter { it !in forgotten }.singleOrNull()
     }
     private class Pending(val result: MethodChannel.Result, val address: String?, val generation: Long?) {
         var completing = false
@@ -35,7 +39,7 @@ class PrototypeAssociation(private val activity: Activity) {
     private var pending: Pending? = null
     private var disposed = false
 
-    fun discover(generation: Long, result: MethodChannel.Result) {
+    fun discover(generation: Long, forgotten: Set<String>, result: MethodChannel.Result) {
         // Android's HID connection can survive app-data clearing. That watch is
         // no longer advertising; CDM can confirm a bonded address without a scan.
         // Never arbitrarily choose between multiple connected watches.
@@ -44,7 +48,7 @@ class PrototypeAssociation(private val activity: Activity) {
             val connected = if (bluetooth == null) emptyList() else
                 bluetooth.getConnectedDevices(BluetoothProfile.GATT) +
                     bluetooth.getConnectedDevices(BluetoothProfile.GATT_SERVER)
-            begin(connectedWatch(connected), generation, result)
+            begin(connectedWatch(connected, forgotten), generation, result)
         } catch (error: Exception) {
             result.error("ASSOCIATION_FAILED", error.message, null)
         }
@@ -54,6 +58,17 @@ class PrototypeAssociation(private val activity: Activity) {
     private fun begin(selected: String?, generation: Long?, result: MethodChannel.Result) {
         if (disposed) { result.error("DETACHED", "Watch picker view detached", null); return }
         if (pending != null) { result.error("BUSY", "Watch picker already pending", null); return }
+        // The companion device picker cannot find anything with Bluetooth off; it
+        // would just spin. Ask the system to turn it on and let the user retry.
+        val adapter = activity.getSystemService(BluetoothManager::class.java)?.adapter
+        if (adapter != null && !adapter.isEnabled) {
+            try {
+                activity.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            } catch (_: Exception) {
+                // Without permission or a handler, the message below still explains it.
+            }
+            result.error("BLUETOOTH_OFF", "Turn on Bluetooth, then tap Find watch again", null); return
+        }
         val operation = Pending(result, selected, generation)
         try {
             val manager = PrototypePresence.manager(activity) ?: error("Watch discovery requires Android 12+ and companion device setup support")
