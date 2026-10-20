@@ -247,6 +247,11 @@ class LlmService {
 
   final bool Function()? _isCancelled;
 
+  /// When the speech was recorded. Relative times ("tomorrow", "in 10
+  /// minutes") resolve against it, not against when analysis runs.
+  DateTime? referenceTime;
+  DateTime get _now => referenceTime ?? DateTime.now();
+
   void _checkCancelled() {
     if (_isCancelled?.call() == true) {
       throw PlatformException(code: 'CANCELLED');
@@ -1119,11 +1124,44 @@ class LlmService {
       final promptTemplate = classifyPromptOverride?.trim();
       String? routeResult;
 
-      if (promptTemplate == null || promptTemplate.isEmpty) {
+      if (promptTemplate != null && promptTemplate.isNotEmpty) {
+        // Custom template replaces routing.
+      } else if ((routeResult =
+              KeywordRouter.route(transcript) ??
+              KeywordRouter.route(effectiveTranscript)) !=
+          null) {
+        debugPrint('[LlmService] Router: route=$routeResult (keywords)');
+        final seconds =
+            KeywordRouter.timerSeconds(transcript) ??
+            KeywordRouter.timerSeconds(effectiveTranscript);
+        if (seconds != null) {
+          _stateSubject.add(
+            _stateSubject.value.copyWith(status: LlmServiceStatus.ready),
+          );
+          final timer = _buildTranscriptResultFromChronoExtractions([
+            ChronoLlmExtraction(
+              intent: 'timer',
+              title: '',
+              durationSeconds: seconds,
+            ),
+          ], '');
+          return TranscriptResult(
+            summary: timer.summary,
+            category: timer.category,
+            actions: timer.actions,
+            actionChronoDetails: timer.actionChronoDetails,
+            extractedIntent: 'timer',
+            originalTranscription: transcript,
+            correctedTranscription: correctedTranscription,
+            correctionMetrics: correctionMetrics,
+          );
+        }
+      } else {
         // Run the router prompt to decide timer_alarm vs voice_memo
         final routerPrompt = ChronoPromptTemplate.render(
           ChronoPromptTemplate.routerTemplate,
           transcript: effectiveTranscript,
+          now: _now,
         );
         final routerGen = await _generate(
           routerPrompt,
@@ -1185,6 +1223,7 @@ class LlmService {
         prompt = ChronoPromptTemplate.render(
           ChronoPromptTemplate.timerAlarmTemplate,
           transcript: effectiveTranscript,
+          now: _now,
         );
         promptStrategy = 'router→$routeResult';
       } else {
@@ -1323,7 +1362,11 @@ class LlmService {
     String template, {
     required String transcript,
   }) {
-    return ChronoPromptTemplate.render(template, transcript: transcript);
+    return ChronoPromptTemplate.render(
+      template,
+      transcript: transcript,
+      now: _now,
+    );
   }
 
   /// Word-count threshold for brain dump mode. Transcripts with more
@@ -1332,7 +1375,7 @@ class LlmService {
   static const int brainDumpWordThreshold = 50;
 
   String _buildBrainDumpPrompt(String transcript) {
-    final localNow = DateTime.now();
+    final localNow = _now;
     final weekday = const [
       'Monday',
       'Tuesday',
@@ -1576,7 +1619,8 @@ JSON:
     while (attempts < _maxStructuredOutputAttempts) {
       attempts++;
       final genResult = await _generate(
-        prompt,
+        // fllama reuses the whole cached prompt and only repeats the end token.
+        attempts == 1 ? prompt : '$prompt\n',
         overrideMaxTokens: overrideMaxTokens,
         onPartialResponse: onProgress == null
             ? null
@@ -1754,6 +1798,9 @@ JSON:
 
       if (extraction.intent == 'timer') {
         // Timer: duration-based, no datetime resolution needed
+        final title = extraction.title.isNotEmpty
+            ? extraction.title
+            : _friendlySummary(extraction, raw);
         actions.add(
           ExtractedActionResult(
             type: 'timer',
@@ -1774,7 +1821,10 @@ JSON:
       final englishExpression = extraction.datetimeExpressionEnglish;
       final resolved = englishExpression == null
           ? null
-          : _timeExpressionResolver.resolve(englishExpression);
+          : _timeExpressionResolver.resolve(
+              englishExpression,
+              referenceDate: _now,
+            );
 
       firstResolvedDateTime ??= resolved?.dateTime.toIso8601String();
       firstResolverMethod ??= resolved?.method;

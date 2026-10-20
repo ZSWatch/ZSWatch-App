@@ -288,6 +288,8 @@ class _UncertainRouterAnalyzer extends Fake implements LlmService {
   final _AnalysisMode mode;
   bool? discardValidatedSpeech;
   bool disposed = false;
+  @override
+  DateTime? referenceTime;
 
   @override
   void selectModel(String modelId) {}
