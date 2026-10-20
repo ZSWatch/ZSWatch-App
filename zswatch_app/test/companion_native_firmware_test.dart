@@ -716,6 +716,17 @@ void main() {
     },
   );
 
+  test('Nordic default board names match only their default revision', () {
+    bool m(String declared, String watch) =>
+        FirmwareManager.firmwareBoardMatches(declared, watch);
+    expect(m('zswatch', 'zswatch@1/nrf5340/cpuapp'), true);
+    expect(m('watchdk', 'watchdk@1/nrf5340/cpuapp'), true);
+    expect(m('zswatch', 'zswatch@2/nrf5340/cpuapp'), false);
+    expect(m('zswatch', 'watchdk@1/nrf5340/cpuapp'), false);
+    expect(m('zswatch_legacy', 'zswatch_legacy@5/nrf5340/cpuapp'), true);
+    expect(m('zswatch_legacy', 'zswatch_legacy@4/nrf5340/cpuapp'), false);
+  });
+
   test(
     'board mismatch, duplicate indices, ambiguous package and changed file reject before preparing SMP',
     () async {
