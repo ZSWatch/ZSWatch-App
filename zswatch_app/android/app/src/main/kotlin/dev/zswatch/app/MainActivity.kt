@@ -53,6 +53,7 @@ class MainActivity : FlutterActivity() {
     )
     
     private var liteRtLmBridge: LiteRtLmBridge? = null
+    private var testSpeech: TestSpeech? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,6 +114,7 @@ class MainActivity : FlutterActivity() {
         setupLifecycleAndPowerChannel(flutterEngine)
         setupLlmComputeChannel(flutterEngine)
         setupProductivityChannel(flutterEngine)
+        testSpeech = TestSpeech(this, flutterEngine.dartExecutor.binaryMessenger)
         
         liteRtLmBridge = LiteRtLmBridge(this)
         liteRtLmBridge!!.setup(flutterEngine)
@@ -1017,6 +1019,8 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         companionPrototypeBridge?.dispose()
         companionPrototypeBridge = null
+        testSpeech?.dispose()
+        testSpeech = null
         LifecycleLogger.log("MainActivity", "onDestroy companionObserverDetached=true")
         super.onDestroy()
     }

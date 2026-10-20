@@ -86,7 +86,7 @@ while such files exist):
 
 ```sh
 xcrun devicectl device copy to --device "$ZSW_PHONE_UDID" --domain-type appDataContainer \
-  --domain-identifier dev.zswatch.companion --source dfu_application.zip \
+  --domain-identifier "${ZSW_BUNDLE_ID:-dev.zswatch.companion}" --source dfu_application.zip \
   --destination "Library/Application Support/dev_drop/dfu_application.zip"
 ```
 
@@ -97,10 +97,24 @@ watch UART which image runs after the update.
 ## Hands-free voice memo
 
 Developer > Shell > Quick Actions > **Voice Memo Test (phone speaks)** runs
-`voice_memo start`, speaks a fixed reminder phrase through the iPhone speaker
-(iOS text-to-speech) and runs `voice_memo stop`. With the AI options on, the
+`voice_memo start`, speaks a fixed reminder phrase through the phone speaker
+(iOS or Android text-to-speech) and runs `voice_memo stop`. With the AI options on, the
 recording then goes through sync, transcription, analysis and delivery to the
 watch like a spoken memo. Keep the phone next to the watch with media volume up.
+Playback has a bounded wait so a stalled speech engine still reaches the stop
+attempt. A failed stop is reported; check the watch before retrying.
+
+On Android, packages can be pushed into the release app's external files
+directory without `run-as`:
+
+```sh
+adb -s "$ZSW_ANDROID_SERIAL" shell mkdir -p /sdcard/Android/data/com.zswatch.app/files/dev_drop
+adb -s "$ZSW_ANDROID_SERIAL" push dfu_application.zip /sdcard/Android/data/com.zswatch.app/files/dev_drop/
+```
+
+The same **Use pushed file** control offers these packages. If a pushed file is
+not readable by the app, use `adb shell chmod 666` on that lab package. Remove
+the pushed package when testing is complete.
 
 ## Flows
 

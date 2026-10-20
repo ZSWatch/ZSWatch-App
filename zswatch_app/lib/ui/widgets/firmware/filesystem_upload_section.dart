@@ -98,7 +98,8 @@ class FilesystemUploadSection extends StatelessWidget {
 }
 
 /// Packages pushed into `Application Support/dev_drop` from a computer, e.g.
-/// `xcrun devicectl device copy to --domain-type appDataContainer ...`.
+/// `xcrun devicectl device copy to --domain-type appDataContainer ...`, or on
+/// Android `adb push` to `Android/data/<package>/files/dev_drop`.
 /// Lets hardware tests run a firmware update without the document picker.
 /// Shows nothing unless such files exist.
 class _PushedFiles extends StatelessWidget {
@@ -107,18 +108,28 @@ class _PushedFiles extends StatelessWidget {
   const _PushedFiles({required this.onFileSelected});
 
   static Future<List<File>> _list() async {
-    final dir = Directory(
-      '${(await getApplicationSupportDirectory()).path}/dev_drop',
-    );
-    if (!dir.existsSync()) return [];
-    final files = await dir
-        .list()
-        .where(
-          (e) =>
-              e is File && (e.path.endsWith('.zip') || e.path.endsWith('.bin')),
-        )
-        .cast<File>()
-        .toList();
+    // Android: adb cannot write a release app's internal storage, but it can
+    // write its external files directory.
+    final roots = [
+      await getApplicationSupportDirectory(),
+      if (Platform.isAndroid) await getExternalStorageDirectory(),
+    ].whereType<Directory>();
+    final files = <File>[];
+    for (final root in roots) {
+      final dir = Directory('${root.path}/dev_drop');
+      if (!dir.existsSync()) continue;
+      files.addAll(
+        await dir
+            .list()
+            .where(
+              (e) =>
+                  e is File &&
+                  (e.path.endsWith('.zip') || e.path.endsWith('.bin')),
+            )
+            .cast<File>()
+            .toList(),
+      );
+    }
     files.sort((a, b) => a.path.compareTo(b.path));
     return files;
   }
