@@ -52,6 +52,41 @@ final class IOSCompanionActions: NSObject, EKEventViewDelegate {
       } catch { reply(FlutterError(code: "ACTION_FAILED", message: error.localizedDescription, details: nil)) }
     }
   }
+  /// Review & create with the default draft, after the undo window ended.
+  func autoCreate(_ id: String, index: Int, draft: [String: Any]) {
+    DispatchQueue.main.async {
+      self.handle(["jobId": id, "index": index, "operation": "create", "draft": draft]) { value in
+        if let error = value as? FlutterError { NSLog("[IOSCompanionActions] Auto-create %@/%d failed: %@", id, index, error.message ?? "") }
+      }
+    }
+  }
+  /// Same defaults as the app's Review & create. Nil for notes (tasks without
+  /// a time) and for timed types without one; those stay in the app.
+  static func autoDraft(_ action: [String: Any]) -> [String: Any]? {
+    guard let type = action["type"] as? String, let title = action["title"] as? String else { return nil }
+    var draft: [String: Any] = ["actionType": type, "title": title, "skipUi": true]
+    draft["notes"] = action["notes"] as? String; draft["location"] = action["location"] as? String
+    if type == "reminder" { draft["reminderMinutes"] = 0 }
+    if type == "timer" {
+      guard let seconds = CompanionRecordingFiles.integer(action["duration_seconds"]), seconds > 0 else { return nil }
+      draft["durationSeconds"] = seconds; return draft
+    }
+    let start = (action["start_time"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? action["due_date"] as? String
+    guard let start, let date = localDate(start) else { return nil }
+    let ms = Int(date.timeIntervalSince1970 * 1000)
+    draft["scheduledAtMillis"] = ms
+    if type == "calendar_event" { draft["endAtMillis"] = ms + 1_800_000 }
+    return draft
+  }
+  private static func localDate(_ text: String) -> Date? {
+    if let date = ISO8601DateFormatter().date(from: text) { return date }
+    let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = .current
+    for format in ["yyyy-MM-dd'T'HH:mm:ss.SSS", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd"] {
+      formatter.dateFormat = format
+      if let date = formatter.date(from: text) { return date }
+    }
+    return nil
+  }
   private func openEvent(_ identifier: String, _ key: String, _ reply: @escaping (Any?) -> Void) {
     authorize("calendar_event") { granted in
       guard granted else { reply(FlutterError(code: "PERMISSION_DENIED", message: "Calendar access is required to open this event", details: nil)); return }

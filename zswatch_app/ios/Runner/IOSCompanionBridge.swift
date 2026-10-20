@@ -188,6 +188,14 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
                 id.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw CompanionFailure.invalid("Voice job required") }
           if call.method == "cancelVoiceJob" { try voice.cancel(id) }
           reply(["version": 1, "job_id": id, "job": try voice.jobs.detail(id)])
+        case "configureVoiceActions":
+          guard let autoCreate = args["auto_create"] as? Bool else { throw CompanionFailure.invalid("Voice action policy required") }
+          try owner.publish("voice_actions", ["voice_actions": ["auto_create": autoCreate]])
+          reply(owner.snapshot())
+        case "undoVoiceResult":
+          guard let voice = owner.voice, let id = args["job_id"] as? String,
+                id.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw CompanionFailure.invalid("Voice job required") }
+          reply(["version": 1, "undone": voice.undo(id)])
         case "configureVoiceProcessing":
           guard let voice = owner.voice else { throw CompanionFailure.unavailable("Voice job storage unavailable") }
           try voice.configure(args); reply(owner.snapshot())

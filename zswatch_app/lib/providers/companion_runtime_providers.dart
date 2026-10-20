@@ -13,6 +13,8 @@ import '../data/models/companion_gps_status.dart';
 import '../data/models/companion_watchface_status.dart';
 import 'watch_providers.dart' show databaseProvider;
 import 'demo_mode_provider.dart';
+import 'settings_providers.dart'
+    show autoCreateActionsProvider, selectedProductivityCalendarIdProvider;
 
 /// Mobile UI observes the platform owner without creating a legacy BLE session.
 bool get useNativeCompanionRuntime =>
@@ -140,6 +142,27 @@ final companionRecordingsProvider =
         return List<CompanionRecording>.unmodifiable(records);
       });
     });
+
+/// Keeps the native owner's auto-create setting and calendar in sync; the
+/// owner creates actions after the undo window without Flutter running.
+final companionVoiceActionsSyncProvider = Provider<void>((ref) {
+  if (!ref.watch(nativeCompanionRuntimeProvider)) return;
+  final client = ref.watch(companionClientProvider);
+  void sync() => unawaited(
+    client
+        .configureVoiceActions(
+          autoCreate: ref.read(autoCreateActionsProvider),
+          calendarId: ref.read(selectedProductivityCalendarIdProvider),
+        )
+        .catchError(
+          (Object error) =>
+              debugPrint('[CompanionVoiceActions] Sync failed: $error'),
+        ),
+  );
+  ref.listen(autoCreateActionsProvider, (_, _) => sync());
+  ref.listen(selectedProductivityCalendarIdProvider, (_, _) => sync());
+  sync();
+});
 
 /// One EventChannel subscription shared by all Flutter observers. Native emits
 /// an initial snapshot on listen, so an additional read cannot race that stream.

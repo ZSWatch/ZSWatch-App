@@ -834,6 +834,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
             if (PrototypeVoiceResult.matches(packet, message)) {
                 jobs.acknowledge(watch, envelope.getString("result_id"), "accepted")
                 store.update("voice_result_accepted")
+                CompanionVoiceActions.resultReady(context, envelope.getString("job_id"))
                 break
             }
         }
@@ -1042,6 +1043,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
             }
             recordingInbox.receive(message)
             receiveVoiceResultAck(message)
+            if (message.optString("t") == "voice_memo" && message.optString("action") == "undo_last" &&
+                store.control()["phase"] == "ready") {
+                CompanionVoiceActions.undoRecording(context, store.control()["address"] as String, message.optString("filename"))
+            }
         }
         downloadNext()
     }

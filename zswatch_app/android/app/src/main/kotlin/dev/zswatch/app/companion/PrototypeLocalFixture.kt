@@ -167,8 +167,10 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
                         }
                     }
                     validated.fold({ result ->
-                        if (jobs.complete(claim, received, result, null))
+                        if (jobs.complete(claim, received, result, null)) {
                             LifecycleLogger.log("CompanionLocalJobs", "result_committed pluginReady=true activityRequired=false")
+                            CompanionVoiceActions.resultReady(context, claim.id)
+                        }
                     }, {
                         val code = (response.exceptionOrNull() as? PrototypeDartWorker.WorkerFailure)?.code
                         if (code == "CANCELLED" && jobs.state(claim.id).getString("state") == "cancelled") {

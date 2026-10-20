@@ -29,7 +29,6 @@ object PrototypeVoiceResult {
             .put("action_type", first?.optString("type") ?: "")
             .put("datetime", bounded(first?.optString("start_time")?.takeIf { it.isNotEmpty() }
                 ?: first?.optString("due_date") ?: "", 31))
-            .put("draft", true)
     }
 
     fun matches(packet: JSONObject, ack: JSONObject): Boolean =

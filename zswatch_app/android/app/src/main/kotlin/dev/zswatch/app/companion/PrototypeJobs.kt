@@ -253,7 +253,8 @@ class PrototypeJobs(private val store: PrototypeStore) {
         commit("job_deferred", jobs); return true
     }
 
-    fun complete(claim: Claim, now: Long, result: JSONObject, remoteId: String?): Boolean {
+    fun complete(claim: Claim, now: Long, result: JSONObject, remoteId: String?,
+                 wallNow: Long = System.currentTimeMillis()): Boolean {
         val transcriptionOnly = claim.spec.optString("pipeline_revision") == "transcribe-v1"
         validateResult(result, transcriptionOnly)
         val jobs = jobs(); val item = owned(jobs, claim, now) ?: return false
@@ -278,6 +279,7 @@ class PrototypeJobs(private val store: PrototypeStore) {
         outbox.put(resultId, JSONObject().put("job_id", claim.id).put("watch_id", spec.getString("watch_id"))
             .put("payload", canonical(envelope)).put("state", "pending"))
         item.put("result", result).put("state", "result_ready").put("lease_until", JSONObject.NULL).put("last_error", JSONObject.NULL)
+            .put("undo_until", wallNow + UNDO_WINDOW_MS)
         // Result + outbox share one flushed rename. No watch delivery/action is implied.
         commit("job_result_committed", jobs, outbox); return true
     }
@@ -310,12 +312,47 @@ class PrototypeJobs(private val store: PrototypeStore) {
         .map { box.getJSONObject(it) }.filter { it.getString("watch_id") == watchId && it.getString("state") == "pending" }.toList() }
 
     /** Only call for a negotiated application receipt ACK; never for ATT completion. */
-    fun acknowledge(watchId: String, resultId: String, status: String): Boolean {
+    fun acknowledge(watchId: String, resultId: String, status: String, wallNow: Long = System.currentTimeMillis()): Boolean {
         if (status != "accepted") return false
         val box = outbox(); val delivery = box.optJSONObject(resultId) ?: return false
         if (delivery.getString("watch_id") != watchId || delivery.getString("state") == "cancelled") return false
-        val jobs = jobs(); jobs.getJSONObject(delivery.getString("job_id")).put("state", "delivered")
+        val jobs = jobs(); val item = jobs.getJSONObject(delivery.getString("job_id")).put("state", "delivered")
+        // The watch shows its Undo from now on; give it the whole window.
+        if (item.has("undo_until")) item.put("undo_until", maxOf(item.getLong("undo_until"), wallNow + UNDO_WINDOW_MS))
         delivery.put("state", "acked"); commit("job_delivery_acked", jobs, box); return true
+    }
+
+    /** Undo from the watch or phone: nothing from this result is created and the watch is not told again. */
+    fun undo(id: String): Boolean {
+        val jobs = jobs(); val item = jobs.optJSONObject(id) ?: return false
+        if (item.getString("state") !in listOf("result_ready", "delivered") || !item.has("undo_until") ||
+            item.optBoolean("undone") || item.optBoolean("auto_created")) return false
+        val box = outbox()
+        for (resultId in box.keys()) {
+            val delivery = box.getJSONObject(resultId)
+            if (delivery.getString("job_id") == id && delivery.getString("state") == "pending") delivery.put("state", "cancelled")
+        }
+        val states = actionStates(item)
+        for (i in 0 until item.getJSONObject("result").getJSONArray("actions").length())
+            if (!states.has(i.toString())) states.put(i.toString(), JSONObject().put("state", "dismissed"))
+        item.put("undone", true).put("action_revision", item.optLong("action_revision") + 1)
+        commit("voice_result_undone", jobs, box); return true
+    }
+
+    /** Selected results whose undo window has ended and that were neither undone nor auto-created. */
+    fun undoExpired(wallNow: Long): List<String> = undoPending().filter { it.second <= wallNow }.map { it.first }
+
+    fun nextUndoDeadline(): Long? = undoPending().minOfOrNull { it.second }
+
+    private fun undoPending(): List<Pair<String, Long>> = jobs().let { jobs ->
+        jobs.keys().asSequence().map { it to jobs.getJSONObject(it) }.filter { (_, item) ->
+            item.getString("state") in listOf("result_ready", "delivered") && item.optBoolean("selected") &&
+                item.has("undo_until") && !item.optBoolean("undone") && !item.optBoolean("auto_created")
+        }.map { (id, item) -> id to item.getLong("undo_until") }.toList()
+    }
+
+    fun markAutoCreated(id: String) {
+        val jobs = jobs(); jobs.getJSONObject(id).put("auto_created", true); commit("voice_result_auto_created", jobs)
     }
 
     fun summary(): List<Map<String, Any?>> = identities().map { id ->
@@ -329,6 +366,8 @@ class PrototypeJobs(private val store: PrototypeStore) {
             "generation" to spec.getLong("generation"),
             "processing" to !item.isNull("lease_until"), "transcript_saved" to item.has("transcript"),
             "action_revision" to item.optLong("action_revision"),
+            "undo_until" to if (item.has("undo_until")) item.getLong("undo_until") else null,
+            "undone" to item.optBoolean("undone"), "auto_created" to item.optBoolean("auto_created"),
             "next_attempt" to item.getLong("next_attempt"), "attempts" to item.getInt("attempts"),
             "last_error" to if (item.isNull("last_error")) null else item.getString("last_error"))
     }
@@ -337,6 +376,8 @@ class PrototypeJobs(private val store: PrototypeStore) {
         private val ACTIVE = listOf("ready", "waiting_remote", "blocked")
         private const val ACTIVE_LIMIT = 100
         private const val TOTAL_LIMIT = 2000
+        /** Matches the watch popup's auto-dismiss (AUTO_DISMISS_MS). */
+        const val UNDO_WINDOW_MS = 20_000L
         val TRANSIENT_EXECUTION_ERRORS = listOf("execution_not_allowed", "execution_interrupted")
         private val fields = setOf("version", "watch_id", "recording_id", "input_sha256", "backend", "provider",
             "model", "pipeline_revision", "generation", "upload_authorized")

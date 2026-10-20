@@ -22,6 +22,9 @@ import UserNotifications
     let restored = (launchOptions?[.bluetoothCentrals] as? [String])?.contains(IOSCompanionCoordinator.restorationID) == true
     companion = IOSCompanionCoordinator(root: root, restoredLaunch: restored)
     companionActions = IOSCompanionActions(owner: companion, presenter: { [weak self] in self?.window?.rootViewController })
+    companion.actions = companionActions
+    VoiceUndoNotification.register()
+    UNUserNotificationCenter.current().delegate = self
     BGTaskScheduler.shared.register(forTaskWithIdentifier: IOSVoiceCoordinator.backgroundID, using: companion.queue) { [weak self] task in
       guard let task = task as? BGProcessingTask, let owner = self?.companion else { task.setTaskCompleted(success: false); return }
       guard let voice = owner.voice else { task.setTaskCompleted(success: false); return }
@@ -45,6 +48,21 @@ import UserNotifications
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  override func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                       withCompletionHandler completionHandler: @escaping () -> Void) {
+    guard response.notification.request.content.categoryIdentifier == VoiceUndoNotification.category,
+          let id = response.notification.request.content.userInfo["voice_job_id"] as? String else {
+      super.userNotificationCenter(center, didReceive: response, withCompletionHandler: completionHandler); return
+    }
+    guard response.actionIdentifier == VoiceUndoNotification.undoAction else { completionHandler(); return }
+    companion.queue.async { [companion] in companion?.voice?.undo(id); DispatchQueue.main.async(execute: completionHandler) }
+  }
+
+  override func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                       withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+    completionHandler([.banner, .list, .sound])
   }
 
   override func applicationWillResignActive(_ application: UIApplication) {

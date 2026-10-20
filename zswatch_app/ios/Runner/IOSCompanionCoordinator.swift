@@ -10,6 +10,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   let queue = DispatchQueue(label: "dev.zswatch.companion", qos: .userInitiated)
   let journal: CompanionJournal
   private(set) var voice: IOSVoiceCoordinator?
+  weak var actions: IOSCompanionActions?
   private(set) var inbox: IOSRecordingInbox?
   lazy var sensors = CompanionSensors(
     later: { [weak self] delay, work in self?.queue.asyncAfter(deadline: .now() + delay, execute: work) },
@@ -197,8 +198,11 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
         try? self.publish("watchface_process_interrupted", ["watchface_operation": old])
       }
       self.firmware.recover()
-      do { self.voice = try IOSVoiceCoordinator(owner: self, root: root) }
-      catch { try? self.publish("voice_storage_unavailable", ["voice_error": "Voice job storage unavailable"]) }
+      do {
+        self.voice = try IOSVoiceCoordinator(owner: self, root: root)
+        // Results whose undo window ended while the app was not running.
+        self.voice?.scheduleUndo()
+      } catch { try? self.publish("voice_storage_unavailable", ["voice_error": "Voice job storage unavailable"]) }
       self.inbox = IOSRecordingInbox(owner: self, root: root)
       self.inbox?.recover()
       if (self.journal.fields["http_pending_count"] as? Int ?? 0) > 0 {
@@ -786,6 +790,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     if http.receive(value, generation: journal.generation) { return }
     if smpOwner?.receiveWatchface(value) == true { return }
     if voice?.receiveAck(value) == true { return }
+    if voice?.receiveUndo(value) == true { return }
     if inbox?.receive(value) == true { voice?.deliverResults(); return }
     if type == "ver" {
       var info: [String: Any] = ["version_generation": journal.generation]
