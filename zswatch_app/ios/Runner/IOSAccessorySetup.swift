@@ -8,6 +8,7 @@ protocol CompanionAccessorySetup: AnyObject {
   var identifiers: Set<UUID> { get }
   var presenting: Bool { get }
   func choose(existing: UUID?, completion: @escaping (Result<UUID, Error>) -> Void)
+  func remove(_ id: UUID)
 }
 
 /// Accessory authorization belongs to the process, independently of Flutter.
@@ -61,6 +62,15 @@ final class IOSAccessorySetup: CompanionAccessorySetup {
     let done = completion; completion = nil; selected = nil; migrating = nil; pickerError = nil
     done?(result)
     changed()
+  }
+
+  /// Drops the iPhone's accessory authorization so the picker offers the watch again.
+  func remove(_ id: UUID) {
+    guard let accessory = session.accessories.first(where: { $0.bluetoothIdentifier == id }) else { return }
+    session.removeAccessory(accessory) { [weak self] error in
+      if let error { NSLog("[IOSAccessorySetup] removeAccessory failed: %@", error.localizedDescription) }
+      self?.queue.async { self?.refresh() }
+    }
   }
 
   func choose(existing: UUID?, completion: @escaping (Result<UUID, Error>) -> Void) {

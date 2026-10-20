@@ -477,6 +477,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     try journal.forget(id)
     if selected { firmware.abort("forgotten") }
     if selected { retryToken += 1; scanStop(); closeLink(); phase = "stopped" }
+    if let uuid = UUID(uuidString: id) { accessorySetup?.remove(uuid) }
     try changed("watch_forgotten")
   }
 
