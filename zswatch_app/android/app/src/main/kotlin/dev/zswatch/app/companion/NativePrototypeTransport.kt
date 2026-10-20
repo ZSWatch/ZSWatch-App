@@ -547,6 +547,14 @@ class NativePrototypeTransport(private val context: Context, private val handler
             }
             override fun onServiceChanged(client: BluetoothGatt) = accept(client) {
                 if (bonding != null) return@accept // No cached ATT handles have been used yet.
+                if (!servicesHandled) {
+                    // A bonded reconnect can report Service Changed immediately
+                    // after CONNECTED. No handles have been adopted yet. Closing
+                    // GATT here interrupts Android's cache refresh and can leave
+                    // subsequent clients stuck in GATTC_DISCOVER_ST.
+                    discover(client, session)
+                    return@accept
+                }
                 // Enabling/disabling the firmware's SMP service changes ATT handles.
                 // Fence the old NUS/SDK objects and rediscover on a fresh session.
                 lost(session, "GATT services changed")
@@ -636,6 +644,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     private fun discover(client: BluetoothGatt, session: Long) {
         runtime.phase(session, "discovering")
+        // Android can put a reconnected link on a ~500 ms interval before the
+        // watch asks for its short one; a full discovery then misses the
+        // deadline. The watch returns to its idle interval afterwards itself.
+        client.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
         check(client.discoverServices()) { "GATT discovery rejected" }
         deadline(session, 15000, "Service discovery timed out")
     }
