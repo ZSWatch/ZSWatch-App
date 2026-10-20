@@ -112,6 +112,23 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         snapshot(result::success) { result.error("PROCESSING_POLICY_FAILED", it, null) }
                     } catch (error: Exception) { PrototypeHub.main.post { result.error("PROCESSING_POLICY_FAILED", error.message, null) } }
                 }
+                "configureVoiceActions" -> PrototypeHub.worker.post {
+                    try {
+                        val args = call.arguments as Map<*, *>
+                        val calendar = (args["calendar_id"] as? Number)?.toLong()
+                        PrototypeHub.journal(context).update("voice_actions_changed", mapOf("voice_actions" to
+                            mapOf("auto_create" to (args["auto_create"] as Boolean), "calendar_id" to calendar)))
+                        snapshot(result::success) { result.error("VOICE_ACTIONS_FAILED", it, null) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("VOICE_ACTIONS_FAILED", error.message, null) } }
+                }
+                "undoVoiceResult" -> PrototypeHub.worker.post {
+                    try {
+                        val id = call.argument<String>("job_id") ?: error("Job ID required")
+                        require(Regex("[a-f0-9]{64}").matches(id))
+                        val undone = CompanionVoiceActions.undo(context, id)
+                        PrototypeHub.main.post { result.success(mapOf("version" to 1, "undone" to undone)) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("JOB_FAILED", error.message, null) } }
+                }
                 "voiceJob", "cancelVoiceJob" -> PrototypeHub.worker.post {
                     try {
                         val id = call.argument<String>("job_id") ?: error("Job ID required")

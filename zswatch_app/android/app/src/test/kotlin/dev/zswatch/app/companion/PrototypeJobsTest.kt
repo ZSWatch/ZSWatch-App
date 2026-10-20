@@ -122,6 +122,46 @@ class PrototypeJobsTest {
             .map { it["job_id"] }.toSet())
     }
 
+    @Test fun undoWindowStartsAtResultAndRestartsWhenTheWatchReceivesIt() {
+        val (jobs, id) = finishedVoice()
+        val committed = jobs.state(id).getLong("undo_until")
+        assertTrue(jobs.undoExpired(committed - 1).isEmpty())
+        assertEquals(listOf(id), jobs.undoExpired(committed))
+        val delivery = JSONObject(jobs.pending("fixture-watch").single().getString("payload"))
+        assertTrue(jobs.acknowledge("fixture-watch", delivery.getString("result_id"), "accepted", committed + 5000))
+        assertEquals(committed + 5000 + PrototypeJobs.UNDO_WINDOW_MS, jobs.state(id).getLong("undo_until"))
+        assertTrue(jobs.undoExpired(committed + 5000).isEmpty())
+        jobs.markAutoCreated(id)
+        assertNull(PrototypeJobs(store()).nextUndoDeadline())
+        assertFalse(jobs.undo(id))
+    }
+
+    @Test fun undoDismissesEveryActionAndStopsWatchDelivery() {
+        val (jobs, id) = finishedVoice()
+        assertTrue(jobs.undo(id))
+        val reopened = PrototypeJobs(store())
+        assertTrue(reopened.state(id).getBoolean("undone"))
+        assertEquals("dismissed", reopened.state(id).getJSONObject("action_states").getJSONObject("0").getString("state"))
+        assertTrue(reopened.pending("fixture-watch").isEmpty())
+        assertTrue(reopened.undoExpired(Long.MAX_VALUE).isEmpty())
+        assertFalse(reopened.undo(id))
+    }
+
+    @Test fun autoCreateDraftsMatchReviewDefaultsAndSkipUnscheduledItems() {
+        fun action(type: String) = JSONObject().put("type", type).put("title", "Milk")
+        assertNull(CompanionVoiceActions.draft(action("task"), null))
+        assertNull(CompanionVoiceActions.draft(action("reminder"), null))
+        assertNull(CompanionVoiceActions.draft(action("timer"), null))
+        val reminder = CompanionVoiceActions.draft(action("reminder").put("due_date", "2026-10-21T09:00:00"), 7)!!
+        assertEquals(java.time.LocalDateTime.parse("2026-10-21T09:00:00").atZone(java.time.ZoneId.systemDefault())
+            .toInstant().toEpochMilli(), reminder.getLong("scheduledAtMillis"))
+        assertEquals(0, reminder.getInt("reminderMinutes"))
+        assertEquals(7L, reminder.getLong("calendarId"))
+        val event = CompanionVoiceActions.draft(action("calendar_event").put("start_time", "2026-10-21T09:00:00+02:00"), null)!!
+        assertEquals(event.getLong("scheduledAtMillis") + 30 * 60 * 1000L, event.getLong("endAtMillis"))
+        assertEquals(300L, CompanionVoiceActions.draft(action("timer").put("duration_seconds", 300), null)!!.getLong("durationSeconds"))
+    }
+
     @Test fun deliveryAckNeverConfirmsAnActionAndCalendarRecoveryUsesConfirmedInput() {
         val (jobs, id) = finishedVoice()
         val delivery = JSONObject(jobs.pending("fixture-watch").single().getString("payload"))

@@ -147,6 +147,8 @@ class CompanionPrototypeService : Service() {
                 }
                 localFixture = PrototypeLocalFixture(applicationContext, this).also { it.startMaintenance() }
                 PrototypeHub.worker.post(notificationMaintenance)
+                // Results whose undo window ended while the app was not running.
+                PrototypeHub.worker.post { CompanionVoiceActions.schedule(applicationContext) }
             }
         }
     }

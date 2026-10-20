@@ -494,6 +494,31 @@ class CompanionPrototypeClient {
     }),
   );
 
+  /// Whether voice results create their actions when the undo window ends,
+  /// and which Android calendar they go to.
+  Future<void> configureVoiceActions({
+    required bool autoCreate,
+    int? calendarId,
+  }) async {
+    await methods.invokeMethod<Object?>('configureVoiceActions', {
+      'version': 1,
+      'auto_create': autoCreate,
+      'calendar_id': calendarId,
+    });
+  }
+
+  /// Same as Undo on the watch: nothing from this result is created.
+  Future<bool> undoVoiceResult(String id) async {
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(id)) {
+      throw const FormatException('Invalid processing job');
+    }
+    final result = await methods.invokeMethod<Object?>('undoVoiceResult', {
+      'version': 1,
+      'job_id': id,
+    });
+    return result is Map && result['undone'] == true;
+  }
+
   Future<CompanionPrototypeSnapshot> setRecordingSync(bool enabled) async =>
       CompanionPrototypeSnapshot.decode(
         await methods.invokeMethod<Object?>('setRecordingSync', {

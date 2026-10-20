@@ -133,7 +133,7 @@ void main() {
         expect(
           find.textContaining(
             preferSaved
-                ? 'Processed • Accepted by watch'
+                ? 'Processed • Shown on watch'
                 : blocked
                 ? 'Selected model not downloaded'
                 : 'Processing failed',

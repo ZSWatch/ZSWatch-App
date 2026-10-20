@@ -17,7 +17,7 @@ class PrototypeVoiceResultTest {
         val packet = PrototypeVoiceResult.packet(envelope(), "owned_sample")
         assertTrue(packet.getString("text").toByteArray(Charsets.UTF_8).size <= 127)
         assertFalse(packet.getString("text").contains('\uFFFD'))
-        assertTrue(packet.getBoolean("draft"))
+        assertFalse(packet.has("draft"))
         assertFalse(packet.has("actions"))
         assertEquals(PrototypeJobs.sha(PrototypeJobs.canonical(result())), packet.getString("result_sha256"))
     }

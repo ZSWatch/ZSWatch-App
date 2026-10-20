@@ -656,8 +656,10 @@ class _CompanionVoiceMemosViewState
                 ? 'Analyzing'
                 : 'Transcribing'
           : 'Queued',
-    'result_ready' => 'Processed • Waiting for watch acceptance',
-    'delivered' => 'Processed • Accepted by watch',
+    'result_ready' ||
+    'delivered' when job['undone'] == true => 'Processed • Undone',
+    'result_ready' => 'Processed • Waiting for watch',
+    'delivered' => 'Processed • Shown on watch',
     'cancelled' => 'Cancelled',
     'failed' => switch (job['last_error']) {
       'no_speech' => 'No speech detected',

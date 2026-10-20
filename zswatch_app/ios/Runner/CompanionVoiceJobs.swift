@@ -40,7 +40,8 @@ final class CompanionVoiceJobs {
         result["category"] = body["category"] ?? ""
         result["action_types"] = (body["actions"] as? [[String: Any]] ?? []).compactMap { $0["type"] as? String }
       }
-      for key in ["attempts", "deferred_attempts", "next_attempt", "last_error", "action_revision"] { result[key] = item[key] ?? NSNull() }
+      for key in ["attempts", "deferred_attempts", "next_attempt", "last_error", "action_revision", "undo_until"] { result[key] = item[key] ?? NSNull() }
+      result["undone"] = item["undone"] as? Bool ?? false; result["auto_created"] = item["auto_created"] as? Bool ?? false
       return result
     }
   }
@@ -230,6 +231,7 @@ final class CompanionVoiceJobs {
     try Self.validate(result, transcriptionOnly: only)
     var next = jobs; next[claim.id]?["result"] = result; next[claim.id]?["lease_until"] = NSNull(); next[claim.id]?["last_error"] = NSNull()
     next[claim.id]?["state"] = only ? "transcribed" : "result_ready"
+    if !only { next[claim.id]?["undo_until"] = CompanionJournal.now + Self.undoWindowMs }
     if only { next[claim.id]?["transcript"] = result["transcript"] }
     try commit("voice_result_committed", next); return true
   }
@@ -301,7 +303,8 @@ final class CompanionVoiceJobs {
     action["state"] = "undone"; try saveAction(id, index: index, state: action, event: "voice_action_undone")
   }
   func deliveryPacket(_ id: String, filename: String) throws -> [String: Any] {
-    guard let item = jobs[id], item["state"] as? String == "result_ready", let spec = item["spec"] as? [String: Any],
+    guard let item = jobs[id], item["state"] as? String == "result_ready", item["undone"] as? Bool != true,
+          let spec = item["spec"] as? [String: Any],
           let result = item["result"] as? [String: Any], let summary = result["summary"] as? String,
           let generation = spec["generation"] as? Int, (1...0xffffffff).contains(generation),
           let identity = spec["recording_id"] as? String,
@@ -312,7 +315,7 @@ final class CompanionVoiceJobs {
       for char in text { if (value + String(char)).utf8.count > size { break }; value.append(char) }
       return value
     }
-    return ["t": "voice_memo", "action": "result", "version": 1, "draft": true,
+    return ["t": "voice_memo", "action": "result", "version": 1,
       "result_id": Self.sha("result-v1:" + id), "recording_key": Self.sha(identity),
       "result_sha256": Self.sha(try Self.canonical(result)), "generation": generation, "filename": filename,
       "text": bounded(summary, 127), "action_type": first?["type"] as? String ?? "",
@@ -326,7 +329,34 @@ final class CompanionVoiceJobs {
       guard let value = ack[key] as? String, value == packet[key] as? String else { return false }
     }
     guard CompanionRecordingFiles.integer(ack["generation"]) == packet["generation"] as? Int else { return false }
-    var next = jobs; next[id]?["state"] = "delivered"; try commit("voice_delivery_acked", next); return true
+    var next = jobs; next[id]?["state"] = "delivered"
+    // The watch shows its Undo from now on; give it the whole window.
+    if let until = next[id]?["undo_until"] as? Int { next[id]?["undo_until"] = max(until, CompanionJournal.now + Self.undoWindowMs) }
+    try commit("voice_delivery_acked", next); return true
+  }
+  /// Matches the watch popup's auto-dismiss (AUTO_DISMISS_MS).
+  static let undoWindowMs = 20_000
+  /// Undo from the watch or phone: nothing from this result is created and the watch is not told again.
+  func undo(_ id: String) throws -> Bool {
+    guard var item = jobs[id], ["result_ready", "delivered"].contains(item["state"] as? String ?? ""), item["undo_until"] is Int,
+          item["undone"] as? Bool != true, item["auto_created"] as? Bool != true,
+          let actions = (item["result"] as? [String: Any])?["actions"] as? [[String: Any]] else { return false }
+    var states = item["action_states"] as? [String: [String: Any]] ?? [:]
+    for index in actions.indices where states[String(index)] == nil { states[String(index)] = ["state": "dismissed"] }
+    item["action_states"] = states; item["undone"] = true
+    item["action_revision"] = (item["action_revision"] as? Int ?? 0) + 1
+    var next = jobs; next[id] = item; try commit("voice_result_undone", next); return true
+  }
+  /// Selected results whose undo window has ended and that were neither undone nor auto-created.
+  func undoPending() -> [(id: String, until: Int)] {
+    jobs.compactMap { id, item in
+      guard ["result_ready", "delivered"].contains(item["state"] as? String ?? ""), item["selected"] as? Bool == true,
+            let until = item["undo_until"] as? Int, item["undone"] as? Bool != true, item["auto_created"] as? Bool != true else { return nil }
+      return (id, until)
+    }
+  }
+  func markAutoCreated(_ id: String) throws {
+    var next = jobs; next[id]?["auto_created"] = true; try commit("voice_result_auto_created", next)
   }
   func detail(_ id: String) throws -> [String: Any] {
     guard var item = jobs[id] else { throw CompanionFailure.invalid("Unknown voice job") }

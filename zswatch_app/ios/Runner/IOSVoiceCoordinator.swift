@@ -1,5 +1,7 @@
 import BackgroundTasks
 import Foundation
+import UIKit
+import UserNotifications
 
 /// Scheduling policy is native; inference and local model selection stay Dart.
 final class IOSVoiceCoordinator {
@@ -15,6 +17,8 @@ final class IOSVoiceCoordinator {
   private var deliveries: [String: (generation: Int, count: Int, token: UUID)] = [:]
   private var claim: CompanionVoiceJobs.Claim?
   private var executing = false
+  private var undoTimer: DispatchWorkItem?
+  private var undoBackgroundTask: UIBackgroundTaskIdentifier = .invalid
   init(owner: IOSCompanionCoordinator, root: URL) throws {
     self.owner = owner; files = CompanionRecordingFiles(root: root)
     jobs = try CompanionVoiceJobs(journal: owner.journal); worker = IOSDartVoiceWorker(queue: owner.queue)
@@ -168,10 +172,80 @@ final class IOSVoiceCoordinator {
             let identity = spec["recording_id"] as? String,
             let filename = (owner.journal.fields["recordings"] as? [String: [String: Any]])?[identity]?["filename"] as? String else { continue }
       if (try? jobs.acknowledge(id, ack: message, filename: filename)) == true {
-        deliveries.removeValue(forKey: id); owner.journalChanged(); break
+        deliveries.removeValue(forKey: id); owner.journalChanged(); resultReady(id); break
       }
     }
     return true
+  }
+  /// Undo on the watch popup for [filename].
+  @discardableResult func receiveUndo(_ message: [String: Any]) -> Bool {
+    guard message["t"] as? String == "voice_memo", message["action"] as? String == "undo_last", let owner else { return false }
+    let filename = message["filename"] as? String
+    let records = owner.journal.fields["recordings"] as? [String: [String: Any]] ?? [:]
+    if let id = jobs.jobs.first(where: { _, item in
+      guard item["selected"] as? Bool == true, let spec = item["spec"] as? [String: Any],
+            spec["watch_id"] as? String == owner.journal.address, let identity = spec["recording_id"] as? String else { return false }
+      return records[identity]?["filename"] as? String == filename
+    })?.key { undo(id) }
+    return true
+  }
+  @discardableResult func undo(_ id: String) -> Bool {
+    let undone = (try? jobs.undo(id)) == true
+    if undone { VoiceUndoNotification.remove(id); owner?.journalChanged(); scheduleUndo() }
+    return undone
+  }
+  /// A result is ready or the watch received it: (re)start the phone Undo and the creation timer.
+  func resultReady(_ id: String) {
+    guard let item = jobs.jobs[id], let result = item["result"] as? [String: Any], let until = item["undo_until"] as? Int,
+          item["selected"] as? Bool == true, item["undone"] as? Bool != true, item["auto_created"] as? Bool != true else { scheduleUndo(); return }
+    let actions = result["actions"] as? [[String: Any]] ?? []
+    if autoCreateEnabled, actions.contains(where: { IOSCompanionActions.autoDraft($0) != nil }) {
+      VoiceUndoNotification.show(id, result: result, until: until)
+    }
+    scheduleUndo()
+  }
+  private var autoCreateEnabled: Bool {
+    (owner?.journal.fields["voice_actions"] as? [String: Any])?["auto_create"] as? Bool != false
+  }
+  /// Runs createExpired when the next window ends; background time keeps a suspended app alive for it.
+  func scheduleUndo() {
+    undoTimer?.cancel(); undoTimer = nil
+    guard let next = jobs.undoPending().map(\.until).min() else { endUndoBackgroundTask(); return }
+    if undoBackgroundTask == .invalid {
+      DispatchQueue.main.async {
+        guard self.undoBackgroundTask == .invalid else { return }
+        self.undoBackgroundTask = UIApplication.shared.beginBackgroundTask(withName: "voice-undo-window") { [weak self] in
+          self?.endUndoBackgroundTask()
+        }
+      }
+    }
+    let work = DispatchWorkItem { [weak self] in self?.createExpired(); self?.scheduleUndo() }
+    undoTimer = work
+    owner?.queue.asyncAfter(deadline: .now() + .milliseconds(max(0, next - CompanionJournal.now)), execute: work)
+  }
+  private func endUndoBackgroundTask() {
+    DispatchQueue.main.async {
+      guard self.undoBackgroundTask != .invalid else { return }
+      UIApplication.shared.endBackgroundTask(self.undoBackgroundTask); self.undoBackgroundTask = .invalid
+    }
+  }
+  /// Creates every schedulable action of results whose undo window ended.
+  func createExpired() {
+    guard let owner else { return }
+    for (id, until) in jobs.undoPending() where until <= CompanionJournal.now {
+      VoiceUndoNotification.remove(id)
+      let item = jobs.jobs[id] ?? [:]
+      let actions = (item["result"] as? [String: Any])?["actions"] as? [[String: Any]] ?? []
+      let handled = item["action_states"] as? [String: Any] ?? [:]
+      try? jobs.markAutoCreated(id)
+      // Off: the result stays for Review & create in the app.
+      guard autoCreateEnabled else { continue }
+      for (index, action) in actions.enumerated() where handled[String(index)] == nil {
+        guard let draft = IOSCompanionActions.autoDraft(action) else { continue }
+        owner.actions?.autoCreate(id, index: index, draft: draft)
+      }
+    }
+    owner.journalChanged()
   }
   func advance() {
     guard let owner, owner.journal.loadError == nil, !executing else { return }
@@ -200,7 +274,7 @@ final class IOSVoiceCoordinator {
             do {
               let response = try result.get()
               guard let body = response["result"] as? [String: Any] else { throw IOSDartVoiceWorker.Failure(code: "INVALID_RESULT") }
-              _ = try self.jobs.complete(claimed, result: body)
+              if try self.jobs.complete(claimed, result: body) { self.resultReady(claimed.id) }
             } catch {
               let code = (error as? IOSDartVoiceWorker.Failure)?.code ?? "PROCESSING_FAILED"
               try? self.jobs.fail(claimed.id, code: code == "NO_SPEECH" ? "no_speech" : code.lowercased(), blocked: code == "MODEL_MISSING")
@@ -218,5 +292,31 @@ final class IOSVoiceCoordinator {
       try? jobs.fail(id, code: "input_unavailable", blocked: true); owner.journalChanged()
       owner.queue.async { self.advance() }
     }
+  }
+}
+
+/// Phone-side Undo for a voice result, shown for the same window as the watch popup.
+enum VoiceUndoNotification {
+  static let category = "zswatch.voice.result"
+  static let undoAction = "UNDO"
+  static func identifier(_ id: String) -> String { "zswatch.voice.undo." + id }
+  static func register() {
+    let undo = UNNotificationAction(identifier: undoAction, title: "Undo", options: [.destructive])
+    UNUserNotificationCenter.current().setNotificationCategories([
+      UNNotificationCategory(identifier: category, actions: [undo], intentIdentifiers: [], options: [])])
+  }
+  static func show(_ id: String, result: [String: Any], until: Int) {
+    let first = (result["actions"] as? [[String: Any]])?.first
+    let content = UNMutableNotificationContent()
+    content.title = result["summary"] as? String ?? "Voice memo"
+    content.body = [first?["type"] as? String, (first?["start_time"] as? String) ?? (first?["due_date"] as? String)]
+      .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " • ")
+    content.categoryIdentifier = category
+    content.userInfo = ["voice_job_id": id]
+    UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: identifier(id), content: content, trigger: nil))
+  }
+  static func remove(_ id: String) {
+    UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [identifier(id)])
+    UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier(id)])
   }
 }
