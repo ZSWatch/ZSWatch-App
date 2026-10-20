@@ -19,10 +19,13 @@ internal object FirmwareSdkContract {
     fun checkActive(targets: List<FirmwareTarget>, response: McuMgrImageStateResponse) {
         check(response.isSuccess) { "Image state rejected" }
         val reported = response.images?.toList() ?: emptyList()
-        val missing = targets.map { it.index }.filter { index -> reported.none { it.image == index } }
+        // The nRF5340 app core cannot read the network core's primary slot (ram_flash),
+        // so image 1 is usually not listed; MCUboot verifies it while copying it over.
+        val checked = targets.filter { target -> target.index != 1 || reported.any { it.image == 1 } }
+        val missing = checked.map { it.index }.filter { index -> reported.none { it.image == index } }
         if (missing.isNotEmpty()) throw FirmwareVerificationUnavailable(missing)
         val active = reported.filter { it.active }
-        check(targets.all { target -> active.any { image -> image.image == target.index &&
+        check(checked.all { target -> active.any { image -> image.image == target.index &&
             image.hash?.joinToString("") { byte -> "%02x".format(byte) } == target.hash } }) { "Active firmware does not match selection" }
     }
 }
