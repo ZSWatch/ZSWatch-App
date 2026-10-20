@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -431,6 +432,13 @@ class _QuickActionsTab extends ConsumerWidget {
           ref: ref,
         ),
         _QuickActionCard(
+          icon: Icons.campaign,
+          title: 'Voice Memo Test (phone speaks)',
+          command: 'voice_memo start, speech, voice_memo stop',
+          ref: ref,
+          action: () => _voiceMemoTest(ref),
+        ),
+        _QuickActionCard(
           icon: Icons.system_update,
           title: 'Enter Bootloader',
           command: 'boot start',
@@ -468,6 +476,35 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+const _testSpeech = MethodChannel('dev.zswatch.app/test_speech');
+const _voiceTestPhrase =
+    'Remind me to buy milk tomorrow at nine in the morning. '
+    'Also note that the automated voice memo test worked.';
+
+/// Records a voice memo on the watch while the phone speaks a known phrase,
+/// so the recording, sync, transcription and AI flow can be tested hands-free.
+Future<(String, bool)> _voiceMemoTest(WidgetRef ref) async {
+  final shell = ref.read(shellServiceProvider);
+  final start = await shell.execute('voice_memo start');
+  if (start.returnCode != 0) return ('Start failed: ${start.output}', true);
+  String? speechError;
+  try {
+    // Give the watch microphone a moment to settle before speaking.
+    await Future<void>.delayed(const Duration(seconds: 1));
+    await _testSpeech.invokeMethod<void>('speak', {'text': _voiceTestPhrase});
+    await Future<void>.delayed(const Duration(seconds: 1));
+  } on MissingPluginException {
+    speechError = 'Phone speech is only available on iOS';
+  } on PlatformException catch (e) {
+    speechError = 'Speech failed: ${e.message}';
+  } finally {
+    final stop = await shell.execute('voice_memo stop');
+    if (stop.returnCode != 0) speechError ??= 'Stop failed: ${stop.output}';
+  }
+  if (speechError != null) return (speechError, true);
+  return ('Recorded: "$_voiceTestPhrase"', false);
+}
+
 class _QuickActionCard extends StatefulWidget {
   final IconData icon;
   final String title;
@@ -475,12 +512,16 @@ class _QuickActionCard extends StatefulWidget {
   final WidgetRef ref;
   final bool isDestructive;
 
+  /// Runs instead of [command]; returns the output and whether it failed.
+  final Future<(String, bool)> Function()? action;
+
   const _QuickActionCard({
     required this.icon,
     required this.title,
     required this.command,
     required this.ref,
     this.isDestructive = false,
+    this.action,
   });
 
   @override
@@ -524,6 +565,18 @@ class _QuickActionCardState extends State<_QuickActionCard> {
     });
 
     try {
+      final action = widget.action;
+      if (action != null) {
+        final (output, failed) = await action();
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _result = output;
+            _isError = failed;
+          });
+        }
+        return;
+      }
       final shellService = widget.ref.read(shellServiceProvider);
       final result = await shellService.execute(widget.command);
       if (mounted) {
