@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/theme/app_theme.dart';
 
@@ -46,6 +49,7 @@ class FilesystemUploadSection extends StatelessWidget {
             ),
           ),
         ),
+        _PushedFiles(onFileSelected: onFileSelected),
         const SizedBox(height: AppTheme.spacingSm),
         Text(
           'Select a firmware package .zip or lvgl_resources_raw.bin.',
@@ -90,5 +94,53 @@ class FilesystemUploadSection extends StatelessWidget {
         );
       }
     }
+  }
+}
+
+/// Packages pushed into `Application Support/dev_drop` from a computer, e.g.
+/// `xcrun devicectl device copy to --domain-type appDataContainer ...`.
+/// Lets hardware tests run a firmware update without the document picker.
+/// Shows nothing unless such files exist.
+class _PushedFiles extends StatelessWidget {
+  final void Function(String) onFileSelected;
+
+  const _PushedFiles({required this.onFileSelected});
+
+  static Future<List<File>> _list() async {
+    final dir = Directory(
+      '${(await getApplicationSupportDirectory()).path}/dev_drop',
+    );
+    if (!dir.existsSync()) return [];
+    final files = await dir
+        .list()
+        .where(
+          (e) =>
+              e is File && (e.path.endsWith('.zip') || e.path.endsWith('.bin')),
+        )
+        .cast<File>()
+        .toList();
+    files.sort((a, b) => a.path.compareTo(b.path));
+    return files;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<File>>(
+      future: _list(),
+      builder: (context, snapshot) {
+        final files = snapshot.data ?? const <File>[];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final file in files)
+              TextButton.icon(
+                onPressed: () => onFileSelected(file.path),
+                icon: const Icon(Icons.developer_mode),
+                label: Text('Use pushed file: ${file.uri.pathSegments.last}'),
+              ),
+          ],
+        );
+      },
+    );
   }
 }
