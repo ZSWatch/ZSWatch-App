@@ -890,6 +890,14 @@ class FirmwareManager {
       final archive = ZipDecoder().decodeBytes(bytes);
 
       final extractDir = await _getDownloadDirectory();
+      // A new package replaces any earlier selection; drop its extracted
+      // images instead of keeping ~1.5 MB per update forever.
+      await for (final entity in extractDir.list()) {
+        if (entity is Directory &&
+            path.basename(entity.path).startsWith('extracted_')) {
+          await entity.delete(recursive: true);
+        }
+      }
       final extractPath = path.join(
         extractDir.path,
         'extracted_${DateTime.now().millisecondsSinceEpoch}',
