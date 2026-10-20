@@ -1,3 +1,4 @@
+import AVFoundation
 import EventKit
 import BackgroundTasks
 import Flutter
@@ -11,6 +12,7 @@ import UserNotifications
   private var companion: IOSCompanionCoordinator!
   private var companionActions: IOSCompanionActions?
   private var companionBridge: IOSCompanionBridge?
+  private var testSpeech: TestSpeech?
 
   override func application(
     _ application: UIApplication,
@@ -39,6 +41,7 @@ import UserNotifications
       channel.setMethodCallHandler { [weak self] call, result in
         self?.handleProductivityCall(call, result: result)
       }
+      testSpeech = TestSpeech(messenger: controller.binaryMessenger)
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
@@ -360,5 +363,52 @@ import UserNotifications
     } else {
       eventStore.requestAccess(to: .reminder, completion: completion)
     }
+  }
+}
+
+/// Speaks text through the phone speaker for hardware tests (e.g. voice memo
+/// recording on the watch). `speak` replies once the utterance has finished.
+final class TestSpeech: NSObject, AVSpeechSynthesizerDelegate {
+  private let channel: FlutterMethodChannel
+  private let synthesizer = AVSpeechSynthesizer()
+  private var pending: FlutterResult?
+
+  init(messenger: FlutterBinaryMessenger) {
+    channel = FlutterMethodChannel(name: "dev.zswatch.app/test_speech", binaryMessenger: messenger)
+    super.init()
+    synthesizer.delegate = self
+    channel.setMethodCallHandler { [weak self] call, result in self?.handle(call, result: result) }
+  }
+
+  private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard call.method == "speak", let args = call.arguments as? [String: Any],
+          let text = args["text"] as? String else {
+      result(FlutterMethodNotImplemented); return
+    }
+    guard pending == nil else {
+      result(FlutterError(code: "busy", message: "Already speaking", details: nil)); return
+    }
+    do {
+      try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+      try AVAudioSession.sharedInstance().setActive(true)
+    } catch {
+      result(FlutterError(code: "audio_session", message: error.localizedDescription, details: nil)); return
+    }
+    pending = result
+    let utterance = AVSpeechUtterance(string: text)
+    utterance.voice = AVSpeechSynthesisVoice(language: args["language"] as? String ?? "en-US")
+    utterance.volume = 1.0
+    synthesizer.speak(utterance)
+  }
+
+  private func finish(_ value: Any?) {
+    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    let done = pending; pending = nil
+    done?(value)
+  }
+
+  func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) { finish(nil) }
+  func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+    finish(FlutterError(code: "cancelled", message: "Speech cancelled", details: nil))
   }
 }
