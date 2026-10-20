@@ -288,7 +288,9 @@ class LlmService {
       displayName: 'Gemma 4 E2B · LiteRT-LM',
       family: 'Gemma-4-E2B',
       filename: 'gemma-4-E2B-it.litertlm',
-      expectedSizeBytes: 2900 * 1024 * 1024,
+      downloadUrl:
+          'https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm',
+      expectedSizeBytes: 2468 * 1024 * 1024,
       isLiteRtLm: true,
       benchmarkScore: 46,
       benchmarkTotal: 49,
