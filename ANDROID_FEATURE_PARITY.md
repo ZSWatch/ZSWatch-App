@@ -95,3 +95,49 @@ statuses, and the existing Model Benchmark was visible. No model inference,
 permission change, firmware flash or long test was performed for this check.
 The developer companion connection action also reuses the ordinary permission
 and database-initialization callback. This closes its former schema-init bypass.
+
+
+## Integration follow-up, 2026-10-20
+
+App PR [#6](https://github.com/ZSWatch/ZSWatch-App/pull/6) now includes the
+Android continuation of the iOS DFU/voice HIL session. A Service Changed event
+received during initial GATT discovery now retries discovery on that same
+instance; events after adopting handles still fence and reconnect. The previous
+early close left Android in discovery indefinitely. The owner requests high
+connection priority during setup. Bluetooth-off onboarding opens the system
+enable prompt, and the connected-watch shortcut excludes forgotten watches.
+Android also supports the pushed-package and phone-speaks developer hooks.
+Model download status survives leaving the page, missing-model feedback expires,
+and clearing sensor history resets the fusion sample count.
+
+On OnePlus NE2213 / Android 16, a three-image update from the marker build to the
+regular fixes build completed and passed the app's image verification without
+manual recovery. The early Service Changed rediscovery completed in 236 ms.
+Ordinary Restart Watch, automatic Bluetooth off/on recovery, and a 20-second
+Home/background return passed at MTU 247. Background return retained the same
+app PID. Sensor Fusion produced live quaternion/Euler values and hundreds of
+samples; stopping and clearing history passed. The other sensor types were not
+retested in this continuation. Eight-second fusion current averaged 1.289 mA;
+a later 25-second idle observation averaged 0.145 mA. These short captures do
+not establish battery-life or endurance acceptance.
+
+Voice processing is enabled with Whisper Small Q5_1 Multilingual, Qwen2.5 1.5B
+Q4_K_M, transcription correction, automatic processing and analysis all on.
+The 11.9-second phone-speaks recording synced natively, but Whisper returned
+`*BANG*`; Qwen reported `analysis_empty`. This is **not** a successful spoken
+reminder flow. The verified source audio contains a clipped microphone startup
+transient. The same model reproduces the result locally; removing the first
+500 ms recovers the reminder phrase, with inaccuracies. A proposed capture-side
+microphone settling fix is prepared separately and has not been applied to the
+firmware repository. Firmware modification awaits user authorization under
+AGENTS.md. The tested release APK was restored after temporary debug access to
+inspect this owned test recording; originals were retained.
+
+Validation: Flutter analyze clean; the earlier full suite passed 357 tests, and
+16 affected tests passed after the follow-ups, including four new speech
+cleanup/error/timeout cases. The Android app unit suite passed 276 tests; the
+release APK built and installed successfully. Tested release SHA-256:
+`28cbfa6f57bf1bd15c73d1a11c0f30e3f364a445ff874cd0b0e9519efebb1060`.
+Evidence and the proposed microphone patch are under the gitignored
+`.companion-hil-runs/2026-10-20-codex-android/` directory. These results are scoped
+to this integration session and do not close the remaining parity inventory.
