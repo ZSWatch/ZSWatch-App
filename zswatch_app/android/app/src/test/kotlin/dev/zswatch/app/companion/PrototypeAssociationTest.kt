@@ -22,5 +22,9 @@ class PrototypeAssociationTest {
         assertNull(PrototypeAssociation.connectedWatch(listOf(device("11:22:33:44:55:66", null))))
         assertNull(PrototypeAssociation.connectedWatch(listOf(device("11:22:33:44:55:66", "ZSWatch", false))))
         assertNull(PrototypeAssociation.connectedWatch(listOf(watch, device("11:22:33:44:55:66", "ZSWatch"))))
+        // A forgotten watch keeps its pairing; it must not be chosen again.
+        assertNull(PrototypeAssociation.connectedWatch(listOf(watch), setOf("AA:BB:CC:DD:EE:FF")))
+        assertEquals("11:22:33:44:55:66", PrototypeAssociation.connectedWatch(
+            listOf(watch, device("11:22:33:44:55:66", "ZSWatch")), setOf("AA:BB:CC:DD:EE:FF")))
     }
 }

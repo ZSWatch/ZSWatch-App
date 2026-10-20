@@ -73,7 +73,7 @@ class _CompanionScanViewState extends ConsumerState<CompanionScanView> {
       if (mounted && failure.code != 'CANCELLED') {
         setState(() {
           permissionDenied = isIos && failure.code == 'BLUETOOTH_PERMISSION';
-          error = isIos
+          error = isIos || failure.code == 'BLUETOOTH_OFF'
               ? failure.message ?? 'Could not find or connect to your watch'
               : 'Could not find or connect to your watch';
         });

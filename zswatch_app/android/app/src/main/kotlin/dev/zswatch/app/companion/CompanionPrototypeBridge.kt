@@ -151,7 +151,9 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         check(PrototypeDiscovery.canSelect(state, CompanionPrototypeService.instance?.runtime?.active == true, generation)) {
                             "Disconnect before choosing another watch"
                         }
-                        PrototypeHub.main.post { association.discover(generation, result) }
+                        val forgotten = (state["forgotten_watches"] as? Map<*, *>)?.keys
+                            ?.map { it.toString().uppercase() }?.toSet() ?: emptySet()
+                        PrototypeHub.main.post { association.discover(generation, forgotten, result) }
                     } catch (error: Exception) {
                         PrototypeHub.main.post { result.error("DISCOVERY_FAILED", error.message, null) }
                     }
