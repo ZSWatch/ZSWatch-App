@@ -50,6 +50,9 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(missing),
+              // A SnackBar with an action stays until dismissed by default and
+              // then covers e.g. the firmware update buttons on other screens.
+              persist: false,
               action: SnackBarAction(
                 label: 'Download models',
                 onPressed: () => context.push(AppRoutes.aiModels),
