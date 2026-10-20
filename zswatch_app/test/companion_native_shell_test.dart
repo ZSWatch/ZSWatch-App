@@ -312,6 +312,8 @@ void main() {
       ),
       const Offset(0, -400),
     );
+    await tester.ensureVisible(find.text('Voice Memo Test (phone speaks)'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Voice Memo Test (phone speaks)'));
     await tester.pump();
   }

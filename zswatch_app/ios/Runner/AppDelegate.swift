@@ -415,7 +415,10 @@ final class TestSpeech: NSObject, AVSpeechSynthesizerDelegate {
     pending = result
     let utterance = AVSpeechUtterance(string: text)
     utterance.voice = AVSpeechSynthesisVoice(language: args["language"] as? String ?? "en-US")
-    utterance.volume = 1.0
+    // "volume" is the loudness as a share of the maximum, so scale by the system volume.
+    let target = Float(args["volume"] as? Double ?? 1.0)
+    let system = max(AVAudioSession.sharedInstance().outputVolume, 0.01)
+    utterance.volume = min(1.0, target / system)
     synthesizer.speak(utterance)
   }
 

@@ -431,13 +431,15 @@ class _QuickActionsTab extends ConsumerWidget {
           command: 'voice_memo status',
           ref: ref,
         ),
-        _QuickActionCard(
-          icon: Icons.campaign,
-          title: 'Voice Memo Test (phone speaks)',
-          command: 'voice_memo start, speech, voice_memo stop',
-          ref: ref,
-          action: () => _voiceMemoTest(ref),
-        ),
+        const _VoiceTestVolume(),
+        for (final (title, phrase, language) in _voiceTestPhrases)
+          _QuickActionCard(
+            icon: Icons.campaign,
+            title: title,
+            command: 'voice_memo start, speech, voice_memo stop',
+            ref: ref,
+            action: () => _voiceMemoTest(ref, phrase, language),
+          ),
         _QuickActionCard(
           icon: Icons.system_update,
           title: 'Enter Bootloader',
@@ -477,13 +479,55 @@ class _SectionHeader extends StatelessWidget {
 }
 
 const _testSpeech = MethodChannel('dev.zswatch.app/test_speech');
-const _voiceTestPhrase =
+
+/// Loudness of the test speech as a share of the phone's maximum.
+final _voiceTestVolume = ValueNotifier<double>(0.3);
+
+class _VoiceTestVolume extends StatelessWidget {
+  const _VoiceTestVolume();
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<double>(
+    valueListenable: _voiceTestVolume,
+    builder: (context, volume, _) => Padding(
+      padding: const EdgeInsets.only(bottom: AppTheme.spacingSm),
+      child: SegmentedButton<double>(
+        segments: [
+          for (final level in const [0.3, 0.4, 0.5])
+            ButtonSegment(
+              value: level,
+              label: Text('Speech ${(level * 100).round()}%'),
+            ),
+        ],
+        selected: {volume},
+        onSelectionChanged: (value) => _voiceTestVolume.value = value.single,
+      ),
+    ),
+  );
+}
+
+const _voiceTestPhrases = [
+  (
+    'Voice Memo Test (phone speaks)',
     'Remind me to buy milk tomorrow at nine in the morning. '
-    'Also note that the automated voice memo test worked.';
+        'Also note that the automated voice memo test worked.',
+    'en-US',
+  ),
+  ('Voice Memo Test: Swedish timer', 'Sätt en timer på tio minuter.', 'sv-SE'),
+  (
+    'Voice Memo Test: Swedish reminder',
+    'Påminn mig i morgon klockan tio att köpa mjölk.',
+    'sv-SE',
+  ),
+];
 
 /// Records a voice memo on the watch while the phone speaks a known phrase,
 /// so the recording, sync, transcription and AI flow can be tested hands-free.
-Future<(String, bool)> _voiceMemoTest(WidgetRef ref) async {
+Future<(String, bool)> _voiceMemoTest(
+  WidgetRef ref,
+  String phrase,
+  String language,
+) async {
   final shell = ref.read(shellServiceProvider);
   String? speechError;
   var mayBeRecording = true;
@@ -497,7 +541,11 @@ Future<(String, bool)> _voiceMemoTest(WidgetRef ref) async {
       // Give the watch microphone a moment to settle before speaking.
       await Future<void>.delayed(const Duration(seconds: 1));
       await _testSpeech
-          .invokeMethod<void>('speak', {'text': _voiceTestPhrase})
+          .invokeMethod<void>('speak', {
+            'text': phrase,
+            'language': language,
+            'volume': _voiceTestVolume.value,
+          })
           .timeout(const Duration(seconds: 35));
       await Future<void>.delayed(const Duration(seconds: 1));
     } on MissingPluginException {
@@ -521,7 +569,7 @@ Future<(String, bool)> _voiceMemoTest(WidgetRef ref) async {
     }
   }
   if (speechError != null) return (speechError, true);
-  return ('Recorded: "$_voiceTestPhrase"', false);
+  return ('Recorded: "$phrase"', false);
 }
 
 class _QuickActionCard extends StatefulWidget {
