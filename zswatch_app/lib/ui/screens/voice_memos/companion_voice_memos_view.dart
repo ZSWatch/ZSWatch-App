@@ -101,7 +101,7 @@ class _CompanionVoiceMemosViewState
               autofocus: true,
               maxLength: multiline ? 16000 : 64,
               maxLines: multiline ? 10 : 1,
-              decoration: multiline
+              decoration: multiline && LlmService.localModelsSupported
                   ? const InputDecoration(
                       helperText:
                           'Analyze again to update the summary and action drafts.',
@@ -625,7 +625,12 @@ class _CompanionVoiceMemosViewState
                           TextButton(
                             onPressed: () {
                               Navigator.pop(context);
-                              processRecording(recording);
+                              processRecording(
+                                recording,
+                                operation: LlmService.localModelsSupported
+                                    ? 'process'
+                                    : 'transcribe',
+                              );
                             },
                             child: const Text('Retry processing'),
                           ),
@@ -1066,13 +1071,14 @@ class _CompanionVoiceMemosViewState
                       ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              tooltip: 'Process recording locally',
-                              onPressed: canProcess
-                                  ? () => processRecording(item)
-                                  : null,
-                              icon: const Icon(Icons.auto_awesome),
-                            ),
+                            if (LlmService.localModelsSupported)
+                              IconButton(
+                                tooltip: 'Process recording locally',
+                                onPressed: canProcess
+                                    ? () => processRecording(item)
+                                    : null,
+                                icon: const Icon(Icons.auto_awesome),
+                              ),
                             PopupMenuButton<String>(
                               key: ValueKey('recording-menu:${item.identity}'),
                               tooltip: 'Transcription actions',
@@ -1088,10 +1094,11 @@ class _CompanionVoiceMemosViewState
                                   value: 'retranscribe',
                                   child: Text('Re-transcribe'),
                                 ),
-                                const PopupMenuItem(
-                                  value: 'reanalyze',
-                                  child: Text('Re-analyze transcript'),
-                                ),
+                                if (LlmService.localModelsSupported)
+                                  const PopupMenuItem(
+                                    value: 'reanalyze',
+                                    child: Text('Re-analyze transcript'),
+                                  ),
                                 const PopupMenuItem(
                                   value: 'export',
                                   child: Text('Export audio'),

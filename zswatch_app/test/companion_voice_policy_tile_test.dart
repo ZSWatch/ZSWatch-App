@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -202,4 +203,69 @@ void main() {
       }
     },
   );
+
+  testWidgets('iOS only transcribes and never needs an LLM', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    final calls = <MethodCall>[];
+    final fields = <String, Object?>{
+      'version': 1,
+      'owner': 'ios_companion_native',
+      'platform': 'ios',
+      'runtime_active': true,
+      'protocol_ready': true,
+      'phase': 'ready',
+      'generation': 1,
+      'event_cursor': 0,
+      'events': <Object?>[],
+      'recordings': <String, Object?>{},
+      'address': 'FE88C737-593F-DB9B-732D-E11FF4C463F5',
+      'desired_running': true,
+      'voice_processing_policy': {'analysis_enabled': true},
+    };
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return fields;
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          companionSnapshotProvider.overrideWith(
+            (ref) => Stream.value(CompanionPrototypeSnapshot.decode(fields)),
+          ),
+          transcriptionEngineTypeProvider.overrideWith(
+            (ref) => TranscriptionEngineTypeNotifier(null),
+          ),
+          selectedAiModelIdProvider.overrideWith(
+            (ref) => SelectedAiModelIdNotifier(null),
+          ),
+          aiCorrectionEnabledProvider.overrideWith(
+            (ref) => AiCorrectionEnabledNotifier(null),
+          ),
+          transcriptionModelStatusProvider.overrideWith(
+            (ref, type) async => const TranscriptionModelLocalStatus(
+              downloaded: true,
+              localSizeBytes: null,
+              localPath: '/owned/model.bin',
+            ),
+          ),
+          llmModelDownloadedProvider.overrideWith((ref) async => false),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(body: CompanionVoicePolicyTile()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Analyze after transcription'), findsNothing);
+    await tester.tap(
+      find.widgetWithText(
+        SwitchListTile,
+        'Automatically process new recordings',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect((calls.single.arguments as Map)['analysis_enabled'], false);
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
 }

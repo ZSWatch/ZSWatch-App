@@ -6,6 +6,7 @@ import '../../providers/ai_providers.dart';
 import '../../providers/companion_runtime_providers.dart';
 import '../../providers/settings_providers.dart';
 import '../../providers/voice_memo_providers.dart';
+import '../../services/ai/llm_service.dart';
 import '../navigation/app_router.dart';
 
 /// Explicit opt-in. Saving preferences never starts inference in this isolate.
@@ -27,12 +28,13 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
     final llm = ref.read(selectedAiModelIdProvider);
     final correct = ref.read(aiCorrectionEnabledProvider);
     final analyzeEnabled =
-        analyze ??
-        (snapshot?.fields['voice_processing_policy'] is Map
-            ? (snapshot!.fields['voice_processing_policy']
-                      as Map)['analysis_enabled'] !=
-                  false
-            : true);
+        LlmService.localModelsSupported &&
+        (analyze ??
+            (snapshot?.fields['voice_processing_policy'] is Map
+                ? (snapshot!.fields['voice_processing_policy']
+                          as Map)['analysis_enabled'] !=
+                      false
+                : true));
     setState(() => _saving = true);
     try {
       if (enabled) {
@@ -106,22 +108,26 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
       children: [
         SwitchListTile(
           title: const Text('Automatically process new recordings'),
-          subtitle: const Text(
-            'Uses the selected local models. Audio stays on this phone. '
+          subtitle: Text(
+            '${LlmService.localModelsSupported ? 'Uses the selected local models' : 'Transcribes with the selected speech model'}. '
+            'Audio stays on this phone. '
             'Existing recordings are processed manually. Turning this off '
             'leaves already queued jobs running.',
           ),
           value: enabled,
           onChanged: !_saving && (enabled || canSave) ? _save : null,
         ),
-        SwitchListTile(
-          title: const Text('Analyze after transcription'),
-          subtitle: const Text(
-            'Turn off to automatically transcribe without an LLM.',
+        if (LlmService.localModelsSupported)
+          SwitchListTile(
+            title: const Text('Analyze after transcription'),
+            subtitle: const Text(
+              'Turn off to automatically transcribe without an LLM.',
+            ),
+            value: policy['analysis_enabled'] != false,
+            onChanged: canSave
+                ? (value) => _save(enabled, analyze: value)
+                : null,
           ),
-          value: policy['analysis_enabled'] != false,
-          onChanged: canSave ? (value) => _save(enabled, analyze: value) : null,
-        ),
         if (enabled && changed)
           ListTile(
             title: const Text('Model selection has changed'),

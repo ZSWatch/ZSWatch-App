@@ -41,8 +41,8 @@ final class IOSVoiceCoordinator {
     guard let watch = args["watch_id"] as? String, UUID(uuidString: watch)?.uuidString == watch,
           let enabled = args["enabled"] as? Bool, let stt = args["transcription_model"] as? String,
           let llm = args["analysis_model"] as? String, let correct = args["correct_transcription"] as? Bool,
-          let analyze = args["analysis_enabled"] as? Bool, let owner else { throw CompanionFailure.invalid("Voice policy required") }
-    var config = try CompanionVoiceJobs.configuration(stt, llm, correct, analyze: analyze)
+          let owner else { throw CompanionFailure.invalid("Voice policy required") }
+    var config = try CompanionVoiceJobs.configuration(stt, llm, correct, analyze: false)
     config["watch_id"] = watch; config["enabled"] = enabled
     try owner.publish("voice_processing_policy", ["voice_processing_policy": config])
   }
@@ -121,7 +121,7 @@ final class IOSVoiceCoordinator {
       guard let request = receipt["processing_request"] as? [String: Any],
             let stt = request["transcription_model"] as? String, let llm = request["analysis_model"] as? String,
             let correct = request["correct_transcription"] as? Bool else { continue }
-      let model = "\(stt)|\(llm)|\(correct)"; let revision = request["analysis_enabled"] as? Bool == false ? "transcribe-v1" : "voice-v1"
+      let model = "\(stt)|\(llm)|\(correct)"; let revision = "transcribe-v1"
       if jobs.jobs.values.contains(where: {
         guard let spec = $0["spec"] as? [String: Any] else { return false }
         return spec["recording_id"] as? String == identity && spec["model"] as? String == model &&
@@ -129,7 +129,7 @@ final class IOSVoiceCoordinator {
       }) { continue }
       do {
         _ = try jobs.start(identity: identity, receipt: receipt, stt: stt, llm: llm, correct: correct,
-          operation: revision == "transcribe-v1" ? "transcribe" : "process")
+          operation: "transcribe")
         owner.journalChanged()
       } catch { /* Capacity/model errors leave the verified recording intact. */ }
     }
