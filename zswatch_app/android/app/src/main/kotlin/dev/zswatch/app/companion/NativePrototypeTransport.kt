@@ -477,6 +477,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var awaitingMtu = false
     private var linkConnected = false
     private var servicesHandled = false
+    private var servicesStale = false
+    private var rediscovering = false
     private var bonding: PrototypeBonding? = null
     private var bondReceiver: BroadcastReceiver? = null
     private val recordingInbox = PrototypeRecordingInbox(store, { deleteRecordingOnWatch(it) }) {
@@ -555,13 +557,24 @@ class NativePrototypeTransport(private val context: Context, private val handler
                     discover(client, session)
                     return@accept
                 }
-                // Enabling/disabling the firmware's SMP service changes ATT handles.
-                // Fence the old NUS/SDK objects and rediscover on a fresh session.
-                lost(session, "GATT services changed")
+                // The watch adds/removes its SMP service around every SMP use.
+                // Rediscover on this link; the Nordic SDK has its own client.
+                servicesStale = true
+                pump()
             }
             override fun onServicesDiscovered(client: BluetoothGatt, status: Int) = accept(client) {
                 if (bonding != null) return@accept
                 check(status == BluetoothGatt.GATT_SUCCESS) { "GATT discovery failed: $status" }
+                if (rediscovering) {
+                    rediscovering = false
+                    operation++
+                    val service = client.getService(NUS) ?: error("NUS service unavailable")
+                    tx = service.getCharacteristic(TX) ?: error("NUS write characteristic unavailable")
+                    val rx = service.getCharacteristic(RX) ?: error("NUS notify characteristic unavailable")
+                    check(client.setCharacteristicNotification(rx, true)) { "Notify registration failed" }
+                    pump()
+                    return@accept
+                }
                 if (servicesHandled) return@accept
                 servicesHandled = true
                 val service = client.getService(NUS) ?: error("NUS service unavailable")
@@ -900,9 +913,17 @@ class NativePrototypeTransport(private val context: Context, private val handler
     }
 
     private fun pump() {
-        if (writing || readingBattery || sensors.busy) return
+        if (writing || readingBattery || sensors.busy || rediscovering) return
         val client = gatt ?: return
         if (store.control()["phase"] != "ready") return
+        if (servicesStale) {
+            // Old characteristic objects stay valid until this returns.
+            servicesStale = false
+            rediscovering = true
+            check(client.discoverServices()) { "GATT rediscovery rejected" }
+            deadline(token, 15000, "Service rediscovery timed out")
+            return
+        }
         if (pumpSensor(client)) return
         if (writes.isEmpty()) return
         val characteristic = tx ?: return
@@ -1284,6 +1305,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         sensors.reset(token, emptySet())
         awaitingMtu = false; payloadSize = 20
         linkConnected = false; servicesHandled = false
+        servicesStale = false; rediscovering = false
         runCatching { transfer?.cancel() }; transfer = null
         runCatching { fileTransport?.release() }; fileTransport = null
         val previous = gatt; gatt = null; tx = null
