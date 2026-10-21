@@ -644,6 +644,17 @@ final class CompanionPhoneUITests: XCTestCase {
         try home()
     }
 
+    /// Cancels all queued on-device voice jobs from AI models settings.
+    func testCancelLocalJobs() throws {
+        try connectedHome()
+        try openVoiceModels()
+        let cancel = try reveal(exact("Cancel all"), "Cancel all")
+        try tap(cancel, "Cancel all")
+        try tap(app.buttons["Cancel jobs"].firstMatch, "Cancel jobs")
+        try require(any("label CONTAINS 'on-device job'").waitForNonExistence(timeout: 60),
+                    "On-device jobs still queued", capture: "cancel-local")
+    }
+
     /// Records the Swedish timer memo from Shell → Quick Actions, then stays on
     /// the home screen for `ZSW_BACKGROUND_SECONDS` while it is processed.
     /// The native journal holds the timings.
