@@ -283,6 +283,10 @@ class LlmService {
   final TimeExpressionResolver _timeExpressionResolver =
       TimeExpressionResolver();
   final ChronoLlmParser _chronoLlmParser = const ChronoLlmParser();
+  late final ChronoExtractionPipeline _pipeline = ChronoExtractionPipeline(
+    parser: _chronoLlmParser,
+    resolver: _timeExpressionResolver,
+  );
 
   static const String defaultModelId = 'qwen25_1_5b_q4_k_m';
   // Models ordered by benchmark score (best first).
@@ -1501,8 +1505,7 @@ JSON:
     while (attempts < _maxStructuredOutputAttempts) {
       attempts++;
       final genResult = await _generate(
-        // fllama reuses the whole cached prompt and only repeats the end token.
-        attempts == 1 ? prompt : '$prompt\n',
+        attempts == 1 ? prompt : ChronoExtractionPipeline.retryPrompt(prompt),
         overrideMaxTokens: overrideMaxTokens,
         onPartialResponse: onProgress == null
             ? null
@@ -1516,7 +1519,7 @@ JSON:
 
       final needsRetry =
           _shouldRetryStructuredOutput(raw, parsed) ||
-          (transcript != null && _copiedFromExamples(raw, transcript));
+          (transcript != null && _pipeline.copiedFromExamples(raw, transcript));
 
       if (!needsRetry || attempts >= _maxStructuredOutputAttempts) {
         break;
@@ -1558,23 +1561,6 @@ JSON:
     } on FormatException {
       return false;
     }
-  }
-
-  /// Small models sometimes return a prompt example verbatim. Its time
-  /// phrase then shares no word with the memo.
-  bool _copiedFromExamples(String raw, String transcript) {
-    List<String> words(String text) => text
-        .toLowerCase()
-        .split(RegExp(r'[^\p{L}\p{N}]+', unicode: true))
-        .where((w) => w.isNotEmpty)
-        .toList();
-    final memo = words(transcript).toSet();
-    return _chronoLlmParser.parse(raw).extractions.any((e) {
-      final phrase = e.datetimeExpressionOriginal;
-      return phrase != null &&
-          words(phrase).isNotEmpty &&
-          !words(phrase).any(memo.contains);
-    });
   }
 
   bool _shouldRetryStructuredOutput(String raw, TranscriptResult result) {
@@ -1680,36 +1666,16 @@ JSON:
   }
 
   TranscriptResult _buildTranscriptResultFromChronoExtractions(
-    List<ChronoLlmExtraction> parsed,
+    List<ChronoLlmExtraction> extractions,
     String raw,
   ) {
-    // Timers carry their duration as an English phrase; models get the
-    // arithmetic wrong more often than the translation.
-    final extractions = [
-      for (final e in parsed)
-        if (e.intent != 'timer')
-          e
-        else
-          ChronoLlmExtraction(
-            intent: e.intent,
-            title: e.title,
-            datetimeExpressionOriginal: e.datetimeExpressionOriginal,
-            datetimeExpressionEnglish: e.datetimeExpressionEnglish,
-            durationSeconds:
-                (e.datetimeExpressionEnglish == null
-                    ? null
-                    : _timeExpressionResolver.resolveDuration(
-                        e.datetimeExpressionEnglish!,
-                      )) ??
-                e.durationSeconds,
-          ),
-    ];
     final actions = <ExtractedActionResult>[];
     final chronoDetails = <ActionChronoDebug>[];
     String? firstResolvedDateTime;
     String? firstResolverMethod;
 
-    for (final extraction in extractions) {
+    final times = _pipeline.resolveTimes(extractions, _now);
+    for (final (index, extraction) in extractions.indexed) {
       final title = extraction.title.isNotEmpty ? extraction.title : raw.trim();
 
       if (extraction.intent == 'note') {
@@ -1754,13 +1720,7 @@ JSON:
         continue;
       }
 
-      final englishExpression = extraction.datetimeExpressionEnglish;
-      final resolved = englishExpression == null
-          ? null
-          : _timeExpressionResolver.resolve(
-              englishExpression,
-              referenceDate: _now,
-            );
+      final resolved = times[index];
 
       firstResolvedDateTime ??= resolved?.dateTime.toIso8601String();
       firstResolverMethod ??= resolved?.method;
@@ -1840,16 +1800,8 @@ JSON:
     final cleaned = _sanitizeModelOutput(raw);
 
     // Try parsing via chrono parser first (handles both array and object)
-    final chronoResult = _chronoLlmParser.parse(cleaned);
     final arrayStr = _chronoLlmParser.extractFirstJsonArray(cleaned);
-    final extractions = chronoResult.extractions
-        .where(
-          (e) =>
-              e.title.isNotEmpty ||
-              e.datetimeExpressionEnglish != null ||
-              e.durationSeconds != null,
-        )
-        .toList();
+    final extractions = _pipeline.extract(cleaned);
     if (extractions.isNotEmpty) {
       return _buildTranscriptResultFromChronoExtractions(extractions, raw);
     }

@@ -93,11 +93,29 @@ class TimeExpressionResolver {
         : '${(_tens.indexOf(m[1]!) + 2) * 10 + (m[2] == null ? 0 : _ones.indexOf(m[2]!))}',
   );
 
-  ResolvedTime? resolve(String expression, {DateTime? referenceDate}) {
+  /// [assumeDaytime]: a clock time from 1 to 7 without am/pm is in the
+  /// afternoon ("at 3" is rarely 3 am). Not for alarms.
+  ResolvedTime? resolve(
+    String expression, {
+    DateTime? referenceDate,
+    bool assumeDaytime = false,
+  }) {
     if (expression.trim().isEmpty) return null;
 
     final ref = referenceDate ?? DateTime.now();
-    final normalized = _normalize(expression);
+    var normalized = _normalize(expression);
+    if (assumeDaytime && !_dayPart.hasMatch(normalized)) {
+      final onlyClock = RegExp(
+        r'^(?:today\s+)?at\s+\d{1,2}(?::\d{2})?$',
+      ).hasMatch(normalized);
+      normalized = normalized.replaceAllMapped(_bareClock, (m) {
+        final hour = int.parse(m[2]!);
+        // A time-only "at 8" said at 10:15 means tonight, not tomorrow.
+        final laterToday =
+            onlyClock && hour < 12 && hour <= ref.hour && hour + 12 > ref.hour;
+        return (hour >= 1 && hour <= 7) || laterToday ? '${m[0]} pm' : m[0]!;
+      });
+    }
 
     final specific = _specificPatterns(normalized, ref);
     if (specific != null) {
@@ -188,34 +206,31 @@ class TimeExpressionResolver {
     return null;
   }
 
+  static final _dayPart = RegExp(
+    r'\b(am|pm|a\.m\.|p\.m\.|morning|noon|midnight|night|evening|afternoon|tonight)\b',
+  );
+
+  /// "at 3", "at 4:30" or "4:30", not followed by am/pm.
+  static final _bareClock = RegExp(
+    r'(\bat\s+|\b(?=\d{1,2}:\d{2}))(\d{1,2})(:\d{2})?\b(?!\s*(?:am|pm|a\.m|p\.m|[:.]\d))',
+  );
+
   String _normalize(String expression) {
-    var s = expression.trim().toLowerCase();
-
-    const numberWords = {
-      'one': '1',
-      'two': '2',
-      'three': '3',
-      'four': '4',
-      'five': '5',
-      'six': '6',
-      'seven': '7',
-      'eight': '8',
-      'nine': '9',
-      'ten': '10',
-      'eleven': '11',
-      'twelve': '12',
-      'thirteen': '13',
-      'fourteen': '14',
-      'fifteen': '15',
-      'twenty': '20',
-      'thirty': '30',
-      'forty': '40',
-      'fifty': '50',
-    };
-
-    for (final entry in numberWords.entries) {
-      s = s.replaceAllMapped(RegExp('\\b${entry.key}\\b'), (_) => entry.value);
-    }
+    var s = _englishNumbers(expression.trim().toLowerCase())
+        .replaceAllMapped(
+          RegExp(r'\bhalf past (\d{1,2})\b'),
+          (m) => '${m[1]}:30',
+        )
+        .replaceAllMapped(
+          RegExp(r'\bquarter past (\d{1,2})\b'),
+          (m) => '${m[1]}:15',
+        )
+        .replaceAllMapped(
+          RegExp(r'\bquarter to (\d{1,2})\b'),
+          (m) => '${(int.parse(m[1]!) + 10) % 12 + 1}:45',
+        )
+        .replaceAll(RegExp(r"\s*o'clock\b"), '');
+    if (RegExp(r'^\d{1,2}(:\d{2})?$').hasMatch(s)) s = 'at $s';
 
     return s;
   }
