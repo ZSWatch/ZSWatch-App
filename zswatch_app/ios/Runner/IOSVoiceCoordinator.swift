@@ -104,8 +104,10 @@ final class IOSVoiceCoordinator {
   }
   private func holdCloudLease(_ claimed: CompanionVoiceJobs.Claim) {
     cloudLease.hold("voice-cloud", acquired: { [weak self] granted, remaining in
-      try? self?.owner?.publish("voice_cloud_lease", ["voice_execution": ["mode": "cloud_lease", "granted": granted,
-        "remaining_s": remaining.isFinite ? Int(remaining) : -1, "granted_utc_ms": CompanionJournal.now]])
+      guard let owner = self?.owner else { return }
+      let state: [String: Any] = ["mode": "cloud_lease", "granted": granted,
+        "remaining_s": remaining < 86_400 ? Int(remaining) : -1, "granted_utc_ms": CompanionJournal.now]
+      owner.queue.async { try? owner.publish("voice_cloud_lease", ["voice_execution": state]) }
     }, expired: { [weak self] in
       guard let self, let owner = self.owner else { return }
       owner.queue.async {
@@ -290,12 +292,13 @@ final class IOSVoiceCoordinator {
     scheduleRetry()
     let awake = foreground || background != nil
     let now = CompanionJournal.now
-    guard let id = jobs.jobs.sorted(by: { $0.key < $1.key }).first(where: {
-      let cloud = CompanionVoiceJobs.isCloudJob($0.value["spec"] as? [String: Any])
-      return $0.value["state"] as? String == "ready" && ($0.value["lease_until"] as? Int ?? 0) <= now &&
-        (CompanionRecordingFiles.integer($0.value["next_attempt"]) ?? 0) <= now &&
-        (cloud ? online : awake)
-    })?.key else {
+    // Cloud jobs take seconds, so they go ahead of slow local ones.
+    let runnable = jobs.jobs.filter {
+      $0.value["state"] as? String == "ready" && ($0.value["lease_until"] as? Int ?? 0) <= now &&
+        (CompanionRecordingFiles.integer($0.value["next_attempt"]) ?? 0) <= now
+    }.map { (id: $0.key, cloud: CompanionVoiceJobs.isCloudJob($0.value["spec"] as? [String: Any])) }
+    guard let id = runnable.filter({ $0.cloud ? online : awake })
+      .min(by: { ($0.cloud ? 0 : 1, $0.id) < ($1.cloud ? 0 : 1, $1.id) })?.id else {
       if !awake { schedule() }
       if let background { self.background = nil; background.setTaskCompleted(success: !backgroundFailed) }
       return
