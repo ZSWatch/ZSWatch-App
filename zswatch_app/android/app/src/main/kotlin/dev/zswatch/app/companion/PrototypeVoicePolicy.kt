@@ -2,8 +2,10 @@ package dev.zswatch.app.companion
 
 /** Captures the user's selected local configuration when a new recording arrives. */
 object PrototypeVoicePolicy {
+    private val CLOUD_MODEL = Regex("openrouter:[A-Za-z0-9._:/-]{1,200}")
+    fun isCloud(model: String) = model.startsWith("openrouter:")
     fun configuration(stt: String, llm: String, correct: Boolean, analyze: Boolean = true): Map<String, Any> {
-        require(stt.matches(Regex("[a-zA-Z0-9_]+")) && stt.length <= 128)
+        require((stt.matches(Regex("[a-zA-Z0-9_]+")) && stt.length <= 128) || stt.matches(CLOUD_MODEL))
         require(llm.isNotBlank() && llm.length <= 256 && !llm.contains('|'))
         return mapOf("transcription_model" to stt, "analysis_model" to llm, "correct_transcription" to correct,
             "analysis_enabled" to analyze)

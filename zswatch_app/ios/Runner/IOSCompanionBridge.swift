@@ -196,6 +196,21 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
           guard let voice = owner.voice, let id = args["job_id"] as? String,
                 id.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw CompanionFailure.invalid("Voice job required") }
           reply(["version": 1, "undone": voice.undo(id)])
+        case "setCloudCredential", "clearCloudCredential":
+          guard args["provider"] as? String == "openrouter" else { throw CompanionFailure.invalid("Unknown provider") }
+          if call.method == "clearCloudCredential" { CompanionCloudCredential.clear() }
+          else {
+            guard let key = args["key"] as? String, key.range(of: "^[A-Za-z0-9_-]{8,256}$", options: .regularExpression) != nil else {
+              throw CompanionFailure.invalid("Invalid key")
+            }
+            try CompanionCloudCredential.write(key)
+          }
+          owner.voice?.cloudCredentialChanged()
+          reply(["version": 1, "stored": CompanionCloudCredential.read() != nil])
+        case "cloudCredential":
+          guard args["provider"] as? String == "openrouter" else { throw CompanionFailure.invalid("Unknown provider") }
+          let key: Any = CompanionCloudCredential.read() ?? NSNull()
+          reply(["version": 1, "key": key])
         case "configureVoiceProcessing":
           guard let voice = owner.voice else { throw CompanionFailure.unavailable("Voice job storage unavailable") }
           try voice.configure(args); reply(owner.snapshot())

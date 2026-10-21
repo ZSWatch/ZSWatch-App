@@ -13,6 +13,11 @@
 //   --prompt-file <file>  Use this template text instead of --template
 //   --filter <text>       Only cases whose name contains text
 //   --out <file>          Write per-case results as JSON
+//   --model <id>          OpenRouter model id; uses OpenRouter with the app's
+//                         request (ZDR routing). Key from OPENROUTER_API_KEY
+//                         or ~/.config/zswatch/openrouter_key
+//   --reasoning <effort>  OpenRouter reasoning effort (default none, "off"
+//                         to omit it for models without the parameter)
 import 'dart:convert';
 import 'dart:io';
 
@@ -45,7 +50,11 @@ Future<void> main(List<String> args) async {
     if (set == 'real' || set == 'all') ...realWorldCases,
   ].where((c) => filter == null || c.name.contains(filter)).toList();
 
-  final client = _Client(url, sampling);
+  final model = arg('model');
+  final reasoning = arg('reasoning') ?? 'none';
+  final client = model != null
+      ? _OpenRouterClient(model, reasoning == 'off' ? null : reasoning)
+      : _Client(url, sampling);
   final pipeline = ChronoExtractionPipeline();
   final results = <Map<String, Object?>>[];
   final byCategory = <String, (int, int)>{};
@@ -111,6 +120,7 @@ Future<void> main(List<String> args) async {
     stdout.writeln('${category.padRight(10)} $pass/$total');
   }
   stdout.writeln('TOTAL      $passed/${results.length}  retries=$retries');
+  if (client is _OpenRouterClient) stdout.writeln(client.report());
 
   final out = arg('out');
   if (out != null) {
@@ -121,7 +131,12 @@ Future<void> main(List<String> args) async {
   client.close();
 }
 
-class _Client {
+abstract interface class _Completer {
+  Future<String> complete(String prompt);
+  void close();
+}
+
+class _Client implements _Completer {
   _Client(this.url, this.sampling);
 
   final String url;
@@ -129,6 +144,7 @@ class _Client {
   final _http = HttpClient();
 
   /// Sampling as the app sends it: fllama for GGUF models, LiteRT-LM for Gemma.
+  @override
   Future<String> complete(String prompt) async {
     for (var attempt = 0; ; attempt++) {
       try {
@@ -164,5 +180,74 @@ class _Client {
     return (choice['message'] as Map)['content'] as String;
   }
 
+  @override
+  void close() => _http.close();
+}
+
+/// The app's OpenRouter analysis request, with cost and latency totals.
+class _OpenRouterClient implements _Completer {
+  _OpenRouterClient(this.model, this.reasoning)
+    : key =
+          Platform.environment['OPENROUTER_API_KEY'] ??
+          File(
+            '${Platform.environment['HOME']}/.config/zswatch/openrouter_key',
+          ).readAsStringSync().trim();
+
+  final String model;
+  final String? reasoning;
+  final String key;
+  final _http = HttpClient();
+  final _latencies = <int>[];
+  var _cost = 0.0;
+
+  @override
+  Future<String> complete(String prompt) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await _complete(prompt);
+      } on OpenRouterFailure catch (e) {
+        if (e.kind != OpenRouterFailureKind.retry || attempt == 3) rethrow;
+      } on IOException {
+        if (attempt == 3) rethrow;
+      }
+      await Future<void>.delayed(Duration(seconds: 2 << attempt));
+    }
+  }
+
+  Future<String> _complete(String prompt) async {
+    final watch = Stopwatch()..start();
+    final request = await _http.postUrl(
+      Uri.parse('${OpenRouterRequest.baseUrl}/chat/completions'),
+    );
+    OpenRouterRequest.headers(key).forEach(request.headers.set);
+    request.add(
+      utf8.encode(
+        jsonEncode(
+          OpenRouterRequest.analysis(model, prompt, reasoningEffort: reasoning),
+        ),
+      ),
+    );
+    final response = await request.close();
+    final body =
+        jsonDecode(await response.transform(utf8.decoder).join())
+            as Map<String, Object?>;
+    final text = OpenRouterRequest.contentOf(response.statusCode, body);
+    _latencies.add(watch.elapsedMilliseconds);
+    final usage = body['usage'];
+    if (usage is Map && usage['cost'] is num) {
+      _cost += (usage['cost']! as num).toDouble();
+    }
+    return text;
+  }
+
+  String report() {
+    final sorted = [..._latencies]..sort();
+    int pct(double p) =>
+        sorted.isEmpty ? 0 : sorted[((sorted.length - 1) * p).round()];
+    return 'CALLS ${sorted.length}  COST \$${_cost.toStringAsFixed(4)}  '
+        'p50 ${pct(0.5)} ms  p95 ${pct(0.95)} ms';
+  }
+
+  @override
   void close() => _http.close();
 }

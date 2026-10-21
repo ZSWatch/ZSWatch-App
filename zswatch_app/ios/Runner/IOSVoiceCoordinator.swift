@@ -1,5 +1,7 @@
 import BackgroundTasks
 import Foundation
+import Network
+import Security
 import UIKit
 import UserNotifications
 
@@ -19,10 +21,26 @@ final class IOSVoiceCoordinator {
   private var executing = false
   private var undoTimer: DispatchWorkItem?
   private var undoBackgroundTask: UIBackgroundTaskIdentifier = .invalid
+  /// Cloud jobs are two HTTP calls: they run when the recording arrives, under this lease.
+  private let cloudLease = CompanionBackgroundLease()
+  private let network = NWPathMonitor()
+  private var online = true
+  private var retryTimer: DispatchWorkItem?
   init(owner: IOSCompanionCoordinator, root: URL) throws {
     self.owner = owner; files = CompanionRecordingFiles(root: root)
     jobs = try CompanionVoiceJobs(journal: owner.journal); worker = IOSDartVoiceWorker(queue: owner.queue)
     try jobs.recover()
+    network.pathUpdateHandler = { [weak self] path in
+      guard let self else { return }
+      let up = path.status == .satisfied
+      owner.queue.async { let was = self.online; self.online = up; if up && !was { self.advance() } }
+    }
+    network.start(queue: owner.queue)
+  }
+  /// The user's key changed: jobs that waited for one can run again.
+  func cloudCredentialChanged() {
+    if (try? jobs.unblockCloud()) == true { owner?.journalChanged() }
+    advance()
   }
   /// Diagnostic engine/plugin proof only: no audio, model or watch mutation.
   func verifyWorker(_ complete: @escaping (Result<[String: Any], Error>) -> Void) throws {
@@ -42,7 +60,8 @@ final class IOSVoiceCoordinator {
           let enabled = args["enabled"] as? Bool, let stt = args["transcription_model"] as? String,
           let llm = args["analysis_model"] as? String, let correct = args["correct_transcription"] as? Bool,
           let owner else { throw CompanionFailure.invalid("Voice policy required") }
-    var config = try CompanionVoiceJobs.configuration(stt, llm, correct, analyze: false)
+    let analyze = args["analysis_enabled"] as? Bool != false && CompanionVoiceJobs.isCloud(llm)
+    var config = try CompanionVoiceJobs.configuration(stt, llm, correct, analyze: analyze)
     config["watch_id"] = watch; config["enabled"] = enabled
     try owner.publish("voice_processing_policy", ["voice_processing_policy": config])
   }
@@ -79,8 +98,21 @@ final class IOSVoiceCoordinator {
   func foregrounded() { foreground = true; advance() }
   func inactive() {
     foreground = false
-    if background == nil { deferExecution("background_deferred") }
+    if let claim, CompanionVoiceJobs.isCloudJob(claim.spec) { holdCloudLease(claim) }
+    else if background == nil { deferExecution("background_deferred") }
     schedule()
+  }
+  private func holdCloudLease(_ claimed: CompanionVoiceJobs.Claim) {
+    cloudLease.hold("voice-cloud", acquired: { [weak self] granted, remaining in
+      try? self?.owner?.publish("voice_cloud_lease", ["voice_execution": ["mode": "cloud_lease", "granted": granted,
+        "remaining_s": remaining.isFinite ? Int(remaining) : -1, "granted_utc_ms": CompanionJournal.now]])
+    }, expired: { [weak self] in
+      guard let self, let owner = self.owner else { return }
+      owner.queue.async {
+        guard self.claim?.id == claimed.id, self.claim?.fence == claimed.fence, !self.foreground, self.background == nil else { return }
+        self.deferExecution("background_expired")
+      }
+    })
   }
   func stopped() { deferExecution("watch_session_stopped") }
   private func deferExecution(_ code: String) {
@@ -105,7 +137,10 @@ final class IOSVoiceCoordinator {
   private func schedule() {
     guard !scheduled, jobs.jobs.values.contains(where: { $0["state"] as? String == "ready" }) else { return }
     let request = BGProcessingTaskRequest(identifier: Self.backgroundID)
-    request.requiresExternalPower = false; request.requiresNetworkConnectivity = false
+    request.requiresExternalPower = false
+    request.requiresNetworkConnectivity = jobs.jobs.values.contains {
+      $0["state"] as? String == "ready" && CompanionVoiceJobs.isCloudJob($0["spec"] as? [String: Any])
+    }
     request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
     do {
       try BGTaskScheduler.shared.submit(request); scheduled = true
@@ -121,7 +156,9 @@ final class IOSVoiceCoordinator {
       guard let request = receipt["processing_request"] as? [String: Any],
             let stt = request["transcription_model"] as? String, let llm = request["analysis_model"] as? String,
             let correct = request["correct_transcription"] as? Bool else { continue }
-      let model = "\(stt)|\(llm)|\(correct)"; let revision = "transcribe-v1"
+      let model = "\(stt)|\(llm)|\(correct)"
+      let analyze = request["analysis_enabled"] as? Bool == true && CompanionVoiceJobs.isCloud(llm)
+      let revision = analyze ? "voice-v1" : "transcribe-v1"
       if jobs.jobs.values.contains(where: {
         guard let spec = $0["spec"] as? [String: Any] else { return false }
         return spec["recording_id"] as? String == identity && spec["model"] as? String == model &&
@@ -129,7 +166,7 @@ final class IOSVoiceCoordinator {
       }) { continue }
       do {
         _ = try jobs.start(identity: identity, receipt: receipt, stt: stt, llm: llm, correct: correct,
-          operation: "transcribe")
+          operation: analyze ? "process" : "transcribe")
         owner.journalChanged()
       } catch { /* Capacity/model errors leave the verified recording intact. */ }
     }
@@ -250,17 +287,36 @@ final class IOSVoiceCoordinator {
   func advance() {
     guard let owner, owner.journal.loadError == nil, !executing else { return }
     enqueueAutomatic()
-    guard foreground || background != nil else { schedule(); return }
-    guard let id = jobs.jobs.sorted(by: { $0.key < $1.key }).first(where: { $0.value["state"] as? String == "ready" && ($0.value["lease_until"] as? Int ?? 0) <= CompanionJournal.now })?.key else {
+    scheduleRetry()
+    let awake = foreground || background != nil
+    let now = CompanionJournal.now
+    guard let id = jobs.jobs.sorted(by: { $0.key < $1.key }).first(where: {
+      let cloud = CompanionVoiceJobs.isCloudJob($0.value["spec"] as? [String: Any])
+      return $0.value["state"] as? String == "ready" && ($0.value["lease_until"] as? Int ?? 0) <= now &&
+        (CompanionRecordingFiles.integer($0.value["next_attempt"]) ?? 0) <= now &&
+        (cloud ? online : awake)
+    })?.key else {
+      if !awake { schedule() }
       if let background { self.background = nil; background.setTaskCompleted(success: !backgroundFailed) }
       return
+    }
+    let cloud = CompanionVoiceJobs.isCloudJob(jobs.jobs[id]?["spec"] as? [String: Any])
+    var credentials: [String: Any] = [:]
+    if cloud {
+      guard let key = CompanionCloudCredential.read() else {
+        try? jobs.fail(id, code: "cloud_auth_missing", blocked: true); owner.journalChanged()
+        owner.queue.async { self.advance() }; return
+      }
+      credentials["openrouter_key"] = key
     }
     do {
       guard let claimed = try jobs.claim(id) else { owner.journalChanged(); owner.queue.async { self.advance() }; return }
       guard let identity = claimed.spec["recording_id"] as? String,
             let metadata = (owner.journal.fields["recordings"] as? [String: [String: Any]])?[identity] else { throw CompanionFailure.invalid("Recording input unavailable") }
       claim = claimed; executing = true; owner.journalChanged()
+      if cloud && !foreground && background == nil { holdCloudLease(claimed) }
       var input: [String: Any] = ["recording": metadata]
+      if cloud { input["credentials"] = credentials }
       if let transcript = jobs.jobs[id]?["transcript"] as? String { input["transcript"] = transcript }
       worker.execute(id: id, spec: claimed.spec, input: input,
         checkpoint: { [weak self] text in
@@ -270,6 +326,7 @@ final class IOSVoiceCoordinator {
           guard let self else { return }
           self.executing = false
           if self.claim?.id == claimed.id && self.claim?.fence == claimed.fence { self.claim = nil }
+          defer { if cloud { self.cloudLease.end() } }
           if self.jobs.owns(claimed) {
             do {
               let response = try result.get()
@@ -277,7 +334,17 @@ final class IOSVoiceCoordinator {
               if try self.jobs.complete(claimed, result: body) { self.resultReady(claimed.id) }
             } catch {
               let code = (error as? IOSDartVoiceWorker.Failure)?.code ?? "PROCESSING_FAILED"
-              try? self.jobs.fail(claimed.id, code: code == "NO_SPEECH" ? "no_speech" : code.lowercased(), blocked: code == "MODEL_MISSING")
+              switch code {
+              case "CLOUD_RETRY":
+                // Network or provider trouble: back off without spending an attempt.
+                let deferred = CompanionRecordingFiles.integer(self.jobs.jobs[claimed.id]?["deferred_attempts"]) ?? 0
+                let delays = [30_000, 120_000, 600_000, 1_800_000]
+                try? self.jobs.deferClaim(claimed, code: "cloud_retry", delayMs: delays[min(deferred, delays.count - 1)])
+              case "CLOUD_AUTH", "CLOUD_CREDITS":
+                try? self.jobs.fail(claimed.id, code: code.lowercased(), blocked: true)
+              default:
+                try? self.jobs.fail(claimed.id, code: code == "NO_SPEECH" ? "no_speech" : code.lowercased(), blocked: code == "MODEL_MISSING")
+              }
               self.backgroundFailed = true
             }
           }
@@ -293,6 +360,37 @@ final class IOSVoiceCoordinator {
       owner.queue.async { self.advance() }
     }
   }
+}
+
+extension IOSVoiceCoordinator {
+  /// Wake for the earliest deferred cloud retry while the process is alive.
+  fileprivate func scheduleRetry() {
+    retryTimer?.cancel(); retryTimer = nil
+    guard let at = jobs.nextAttempt, let owner else { return }
+    let work = DispatchWorkItem { [weak self] in self?.advance() }
+    retryTimer = work
+    owner.queue.asyncAfter(deadline: .now() + .milliseconds(max(0, at - CompanionJournal.now) + 50), execute: work)
+  }
+}
+
+/// The user's OpenRouter key. Readable after first unlock so background jobs can use it; never synced or backed up.
+enum CompanionCloudCredential {
+  private static let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+    kSecAttrService as String: "dev.zswatch.app.openrouter", kSecAttrAccount as String: "api_key"]
+  static func read() -> String? {
+    var q = query; q[kSecReturnData as String] = true; q[kSecMatchLimit as String] = kSecMatchLimitOne
+    var item: CFTypeRef?
+    guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess, let data = item as? Data,
+          let key = String(data: data, encoding: .utf8), !key.isEmpty else { return nil }
+    return key
+  }
+  static func write(_ key: String) throws {
+    SecItemDelete(query as CFDictionary)
+    var q = query; q[kSecValueData as String] = Data(key.utf8)
+    q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+    guard SecItemAdd(q as CFDictionary, nil) == errSecSuccess else { throw CompanionFailure.storage("Could not save the key") }
+  }
+  static func clear() { SecItemDelete(query as CFDictionary) }
 }
 
 /// Phone-side Undo for a voice result, shown for the same window as the watch popup.

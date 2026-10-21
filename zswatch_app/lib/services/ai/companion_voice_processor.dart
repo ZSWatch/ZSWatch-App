@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:chrono_ai_flow/chrono_ai_flow.dart';
 import 'package:flutter/services.dart';
 import 'package:whisper_ggml_plus/whisper_ggml_plus.dart';
 import 'package:path/path.dart' as p;
@@ -8,6 +9,7 @@ import '../voice_memo/transcription_engine.dart';
 import '../voice_memo/verified_companion_recording.dart';
 import '../voice_memo/ogg_opus_writer.dart';
 import 'llm_service.dart';
+import 'openrouter_client.dart';
 import 'voice_note_ai_pipeline.dart';
 
 /// Per-execution cancellation; durable job fencing stays in the native journal.
@@ -42,14 +44,18 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
   required Future<void> Function(String transcript) saveTranscript,
   CompanionVoiceCancellation? cancellation,
   LlmService Function()? analyzerFactory,
+  OpenRouterClient Function(String apiKey)? cloudFactory,
 }) async {
   final control = cancellation ?? CompanionVoiceCancellation();
   control.check();
   final spec = Map<String, Object?>.from(request['spec'] as Map);
+  final models = (spec['model'] as String? ?? '').split('|');
+  // Consent to upload is recorded in the job when it is created.
+  final cloud = models.any(isOpenRouterModel);
   if (request['version'] != 1 ||
       spec['provider'] != 'dart-voice-v1' ||
-      spec['backend'] != 'local' ||
-      spec['upload_authorized'] != false ||
+      spec['backend'] != (cloud ? 'openrouter' : 'local') ||
+      spec['upload_authorized'] != cloud ||
       !['voice-v1', 'transcribe-v1'].contains(spec['pipeline_revision'])) {
     throw const FormatException('Unsupported voice processing request');
   }
@@ -61,14 +67,25 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
       recording.watchId != spec['watch_id']) {
     throw const FormatException('Processing input differs from committed job');
   }
-  final models = (spec['model']! as String).split('|');
   if (models.length != 3 || !['true', 'false'].contains(models[2])) {
     throw const FormatException('Invalid processing configuration');
   }
-  final sttType = TranscriptionEngineType.values.byName(models[0]);
+  final cloudStt = isOpenRouterModel(models[0]);
+  final sttType = cloudStt
+      ? null
+      : TranscriptionEngineType.values.byName(models[0]);
+  OpenRouterClient? client;
+  if (cloud) {
+    final key = (request['credentials'] as Map?)?['openrouter_key'];
+    if (key is! String || key.isEmpty) {
+      throw PlatformException(code: 'CLOUD_AUTH');
+    }
+    client = (cloudFactory ?? OpenRouterClient.new)(key);
+  }
   TranscriptionEngine? engine;
   LlmService? llm;
   control.bind(() async {
+    client?.close();
     await Future.wait([
       if (engine != null) engine.cancel(),
       if (llm != null) llm.cancelProcessing(),
@@ -82,8 +99,17 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
     final verified = await loadVerifiedCompanionRecording(recording, support);
     control.check();
     var transcript = request['transcript'] as String?;
+    if (transcript == null && cloudStt) {
+      transcript = (await client!.transcribe(
+        openRouterModelId(models[0]),
+        OggOpusWriter.convert(verified.parsed),
+      )).trim();
+      control.check();
+      requireCompanionSpeech(transcript);
+      await saveTranscript(transcript);
+    }
     if (transcript == null) {
-      final transcriber = createTranscriptionEngine(sttType);
+      final transcriber = createTranscriptionEngine(sttType!);
       engine = transcriber;
       if (!await transcriber.isAvailable()) {
         throw PlatformException(code: 'MODEL_MISSING');
@@ -122,6 +148,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
               LlmService(isCancelled: () => control.isCancelled))
           ..selectModel(models[1])
           ..referenceTime = recording.timestampUtc.toLocal();
+    if (client != null) analyzer.useOpenRouter(client);
     llm = analyzer;
     if (!await analyzer.isModelDownloaded()) {
       throw PlatformException(code: 'MODEL_MISSING');
@@ -169,14 +196,34 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
           },
       ],
     };
+  } on OpenRouterFailure catch (e) {
+    control.check();
+    throw cloudPlatformException(e);
   } finally {
     control.unbind();
+    client?.close();
     if (engine != null) await _releaseTranscriber(engine);
     llm?.dispose();
     if (scratch != null && scratch.existsSync()) {
       await scratch.delete(recursive: true);
     }
   }
+}
+
+/// Native schedulers act on these codes: auth and credits block the job until
+/// the key changes, retry defers it without spending an attempt.
+PlatformException cloudPlatformException(OpenRouterFailure failure) {
+  final code = switch (failure.kind) {
+    OpenRouterFailureKind.auth => 'CLOUD_AUTH',
+    OpenRouterFailureKind.credits => 'CLOUD_CREDITS',
+    OpenRouterFailureKind.retry => 'CLOUD_RETRY',
+    OpenRouterFailureKind.rejected => 'CLOUD_REJECTED',
+  };
+  return PlatformException(
+    code: code,
+    message: failure.status?.toString(),
+    details: failure.retryAfter?.inSeconds,
+  );
 }
 
 /// Uses the same no-speech policy as interactive voice-note processing.
