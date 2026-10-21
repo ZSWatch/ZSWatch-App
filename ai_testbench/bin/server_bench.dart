@@ -133,7 +133,8 @@ class _Client {
     for (var attempt = 0; ; attempt++) {
       try {
         return await _complete(prompt);
-      } on SocketException {
+      } on Object catch (e) {
+        if (e is! SocketException && e is! HttpException) rethrow;
         if (attempt == 2) rethrow;
         await Future<void>.delayed(const Duration(seconds: 2));
       }
@@ -156,8 +157,10 @@ class _Client {
       }),
     );
     final response = await request.close();
-    final body = jsonDecode(await response.transform(utf8.decoder).join());
-    final choice = ((body as Map)['choices'] as List).first as Map;
+    final text = await response.transform(utf8.decoder).join();
+    final choices = (jsonDecode(text) as Map)['choices'] as List?;
+    if (choices == null) throw HttpException('Server error: $text');
+    final choice = choices.first as Map;
     return (choice['message'] as Map)['content'] as String;
   }
 
