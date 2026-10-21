@@ -85,12 +85,6 @@ Memo: "tandläkare den 15 mars klockan halv 10 och sen handla mat på vägen hem
 Memo: "remember to buy milk"
 [{"intent":"note","title":"buy milk","datetime_expression_original":null,"datetime_expression_english":null}]
 
-Memo: "Sätt en timer på 45 sekunder för teet"
-[{"intent":"timer","title":"teet","datetime_expression_original":"45 sekunder","datetime_expression_english":"45 seconds"}]
-
-Memo: "Weck mich um sieben zum Training"
-[{"intent":"alarm","title":"Training","datetime_expression_original":"um sieben","datetime_expression_english":"at 7"}]
-
 Memo: "köp bröd på vägen hem"
 [{"intent":"note","title":"köp bröd","datetime_expression_original":null,"datetime_expression_english":null}]
 
@@ -222,12 +216,6 @@ Memo: "Tomorrow at 3 pm call the electrician and also buy new light bulbs"
 
 Memo: "Ring tandläkaren imorgon klockan 9, köp presenter till kalaset och möte med chefen på fredag klockan 14"
 [{"intent":"reminder","title":"ring tandläkaren","datetime_expression_original":"imorgon klockan 9","datetime_expression_english":"tomorrow at 9"},{"intent":"note","title":"köp presenter","datetime_expression_original":null,"datetime_expression_english":null},{"intent":"event","title":"möte med chefen","datetime_expression_original":"på fredag klockan 14","datetime_expression_english":"on Friday at 2 pm"}]
-
-Memo: "Sätt en timer på 45 sekunder för teet"
-[{"intent":"timer","title":"teet","datetime_expression_original":"45 sekunder","datetime_expression_english":"45 seconds"}]
-
-Memo: "Weck mich um sieben zum Training"
-[{"intent":"alarm","title":"Training","datetime_expression_original":"um sieben","datetime_expression_english":"at 7"}]
 
 Memo: "köp bröd på vägen hem"
 [{"intent":"note","title":"köp bröd","datetime_expression_original":null,"datetime_expression_english":null}]

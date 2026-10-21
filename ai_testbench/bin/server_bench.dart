@@ -9,7 +9,8 @@
 //   --sampling <name>     fllama (app's llama.cpp path) or litert (Gemma)
 //   --template <name>     compact (what the app uses) or default
 //   --runs <n>            Repeat every case n times (default 1)
-//   --set <name>          base, real (realistic held-out cases) or all
+//   --set <name>          base, real, all (base + real) or heldout
+//   --prompt-file <file>  Use this template text instead of --template
 //   --filter <text>       Only cases whose name contains text
 //   --out <file>          Write per-case results as JSON
 import 'dart:convert';
@@ -17,6 +18,7 @@ import 'dart:io';
 
 import 'package:ai_testbench/benchmark/benchmark_cases.dart';
 import 'package:ai_testbench/benchmark/benchmark_scoring.dart';
+import 'package:ai_testbench/benchmark/held_out_cases.dart';
 import 'package:ai_testbench/benchmark/real_world_cases.dart';
 import 'package:chrono_ai_flow/chrono_ai_flow.dart';
 
@@ -28,15 +30,19 @@ Future<void> main(List<String> args) async {
 
   final url = arg('url') ?? 'http://127.0.0.1:8091';
   final sampling = arg('sampling') ?? 'fllama';
-  final template = arg('template') == 'default'
+  final promptFile = arg('prompt-file');
+  final template = promptFile != null
+      ? File(promptFile).readAsStringSync()
+      : arg('template') == 'default'
       ? ChronoPromptTemplate.defaultTemplate
       : ChronoPromptTemplate.compactTemplate;
   final runs = int.parse(arg('runs') ?? '1');
   final filter = arg('filter');
   final set = arg('set') ?? 'all';
   final cases = [
-    if (set != 'real') ...benchmarkCases,
-    if (set != 'base') ...realWorldCases,
+    if (set == 'heldout') ...heldOutCases,
+    if (set == 'base' || set == 'all') ...benchmarkCases,
+    if (set == 'real' || set == 'all') ...realWorldCases,
   ].where((c) => filter == null || c.name.contains(filter)).toList();
 
   final client = _Client(url, sampling);
