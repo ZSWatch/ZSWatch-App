@@ -31,6 +31,9 @@ final class CompanionPhoneUITests: XCTestCase {
         static var background: String { value("ZSW_BACKGROUND", "Aurora") }
         static var speechModel: String { value("ZSW_SPEECH_MODEL", "Whisper Small (English)") }
         static var backgroundSeconds: TimeInterval { TimeInterval(value("ZSW_BACKGROUND_SECONDS", "20")) ?? 20 }
+        static var llmModel: String { value("ZSW_LLM_MODEL", "Qwen3.5 2B") }
+        static var voiceTest: String { value("ZSW_VOICE_TEST", "Voice Memo Test: Swedish timer") }
+        static var speechVolume: String { value("ZSW_SPEECH_VOLUME", "30") }
     }
 
     private let routes: [(entry: String, heading: String)] = [
@@ -137,6 +140,7 @@ final class CompanionPhoneUITests: XCTestCase {
         for _ in 0..<6 {
             if connectedHomeVisible { return }
             if app.buttons["Connect"].exists && app.buttons["Settings"].exists { return }
+            if app.buttons["Cancel connection"].exists && app.buttons["Settings"].exists { return }
             if app.buttons["Close"].exists { app.buttons["Close"].tap() }
             else if app.buttons["Back"].exists { app.buttons["Back"].tap() }
             else if app.buttons["Cancel"].exists { app.buttons["Cancel"].firstMatch.tap() }
@@ -159,13 +163,23 @@ final class CompanionPhoneUITests: XCTestCase {
     }
 
     private func openSettings() throws {
+        app.activate()
+        // The start page keeps Settings while it is still connecting.
+        if app.buttons["Settings"].waitForExistence(timeout: 3) && app.buttons["Settings"].isHittable {
+            app.buttons["Settings"].tap()
+            return
+        }
         try home()
         try tap(app.buttons["Settings"], "Settings")
     }
 
     private func openVoiceModels() throws {
         try openSettings()
-        try reveal(prefix("Voice memo models"), "Voice memo models").tap()
+        let entry = try reveal(prefix("Voice memo models"), "Voice memo models")
+        // A tap while the list still scrolls only stops the scroll.
+        Thread.sleep(forTimeInterval: 1)
+        entry.tap()
+        if !prefix("Select model").waitForExistence(timeout: 5) && entry.exists { entry.tap() }
         try require(prefix("Select model").waitForExistence(timeout: 10), "Missing model settings", capture: "models")
     }
 
@@ -605,6 +619,72 @@ final class CompanionPhoneUITests: XCTestCase {
             try require(app.buttons["Delete"].firstMatch.waitForExistence(timeout: 900), "Model download did not finish", capture: "model-download")
         }
         screenshot("speech-model")
+        try home()
+    }
+
+    /// Selects `ZSW_LLM_MODEL` (display name substring) as the AI processing
+    /// model. The model file must already be on the phone. State: changes the
+    /// selected model.
+    func testSelectLlmModel() throws {
+        try openVoiceModels()
+        let selectors = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Select model"))
+        try require(selectors.count >= 2, "Missing AI model selector", capture: "llm-select")
+        let selector = try reveal(selectors.element(boundBy: 1), "AI model selector")
+        // MISSING-ID: same merged dropdown button as the speech model selector.
+        selector.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+        try tap(any("label CONTAINS %@", Config.llmModel), Config.llmModel)
+        Thread.sleep(forTimeInterval: 1)
+        try require(selectors.element(boundBy: 1).label.contains(Config.llmModel), "Selection not shown", capture: "llm-select")
+        screenshot("llm-model")
+        try? home()
+    }
+
+    /// Runs the Model Benchmark "Test AI" on `ZSW_AI_INPUT` with the selected
+    /// AI model: the voice memo prompt flow without a watch or speech model.
+    func testAiBenchmarkText() throws {
+        let text = try Config.required("ZSW_AI_INPUT")
+        try openVoiceModels()
+        // MISSING-ID: the only text input on the screen.
+        let input = app.descendants(matching: .any).matching(NSPredicate(format: "elementType == %d OR elementType == %d",
+            XCUIElement.ElementType.textField.rawValue, XCUIElement.ElementType.textView.rawValue)).firstMatch
+        let field = try reveal(input, "AI benchmark input")
+        // MISSING-ID: the merged node covers the whole benchmark card; the
+        // editable box sits below the Record/Reset row.
+        let reset = app.buttons["Reset"]
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: field.frame.midX, dy: reset.frame.maxY + 50)).tap()
+        try require(app.keyboards.firstMatch.waitForExistence(timeout: 5), "No keyboard for AI input", capture: "ai-input")
+        app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 200))
+        app.typeText(text)
+        // The keyboard stays up (Flutter keeps focus); scroll Test AI above it.
+        let run = app.buttons["Test AI"]
+        let keyboard = app.keyboards.firstMatch
+        for _ in 0..<6 where !(run.isHittable && run.frame.maxY < (keyboard.exists ? keyboard.frame.minY : app.frame.maxY)) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)))
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        try tap(run, "Test AI")
+        try require(containing("Category:").waitForExistence(timeout: 900), "No AI benchmark result", capture: "ai-benchmark")
+        try? reveal(containing("Actions:"), "AI benchmark result")
+        screenshot("ai-benchmark")
+        // MISSING-ID: the debug sheet close button has no label; swipe it down.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1))
+            .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98)))
+    }
+
+    /// Runs the Shell Quick Action `ZSW_VOICE_TEST`: the phone speaks a phrase
+    /// at `ZSW_SPEECH_VOLUME` % (30, 40 or 50) while the watch records. State:
+    /// creates a voice memo that the app syncs, transcribes and analyzes.
+    func testVoiceMemoQuickAction() throws {
+        let volume = Config.speechVolume
+        try require(["30", "40", "50"].contains(volume), "ZSW_SPEECH_VOLUME must be 30, 40 or 50")
+        try openDeveloperRoute("Shell", heading: "Shell")
+        try tap(prefix("Quick Actions"), "Quick Actions tab")
+        try tap(try reveal(prefix("Speech \(volume)%"), "Speech \(volume)%"), "Speech \(volume)%")
+        try tap(try reveal(prefix(Config.voiceTest), Config.voiceTest), Config.voiceTest)
+        try require(containing("Recorded:").waitForExistence(timeout: 60), "Voice test did not record", capture: "voice-test")
+        screenshot("voice-test")
         try home()
     }
 

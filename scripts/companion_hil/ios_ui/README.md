@@ -76,6 +76,9 @@ A flow whose required variable is unset is skipped.
 | `ZSW_SPEECH_MODEL` | `Whisper Small (English)` | `testSelectSpeechModel` |
 | `ZSW_SENSORS` | all sensors | `testSensorsStartStop`; comma-separated row labels |
 | `ZSW_BACKGROUND_SECONDS` | `20` | `testBackgroundReturn` (firmware background caps at 10) |
+| `ZSW_LLM_MODEL` | `Qwen3.5 2B` | `testSelectLlmModel`; part of the AI model display name |
+| `ZSW_VOICE_TEST` | `Voice Memo Test: Swedish timer` | `testVoiceMemoQuickAction`; Quick Action title |
+| `ZSW_SPEECH_VOLUME` | `30` | `testVoiceMemoQuickAction`; 30, 40 or 50 (never louder) |
 
 Put firmware/resource packages into Files yourself first (Safari download,
 AirDrop, Finder file sharing). The flows only pick them.
@@ -159,6 +162,8 @@ Upload resources before firmware: the firmware reboot cuts a resource upload.
 | `testDemoModeRoundTrip` | Demo Mode on (real watch disconnects), walks routes, Demo Mode off, real watch back |
 | `testBluetoothOffOnRecovery` | turns phone Bluetooth off then on in Settings; restored on exit |
 | `testSelectSpeechModel` | changes the selected speech model; may download hundreds of MB |
+| `testSelectLlmModel` | changes the selected AI model; the model file must already be on the phone |
+| `testVoiceMemoQuickAction` | phone speaks a test phrase while the watch records; the memo then syncs, transcribes and is analyzed |
 | `testTranscribeRecording` | saves a new transcript revision for `ZSW_RECORDING` |
 | `testTranscriptEditRestore` | appends text, saves, restores the original (adds revisions) |
 | `testRecordingArchiveDeleteRestore` | archive/unarchive, delete, restore; ends as it started |

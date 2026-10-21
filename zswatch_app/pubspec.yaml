@@ -83,7 +83,7 @@ dependencies:
   geolocator: ^13.0.2
 
   # Local LLM inference (llama.cpp via fllama)
-  # Git submodule (ZSWatch/fllama fork) with iOS ggml header-map fixes.
+  # Git submodule (ZSWatch/fllama fork), see third_party/fllama/PATCHES.md.
   fllama:
     path: ../third_party/fllama
   chrono_ai_flow:

@@ -305,6 +305,17 @@ class LlmService {
       benchmarkTotal: 49,
     ),
     LlmModelInfo(
+      id: 'gemma4_e2b_q4_k_m',
+      displayName: 'Gemma 4 E2B · Q4_K_M',
+      family: 'Gemma-4-E2B',
+      filename: 'gemma-4-E2B-it-Q4_K_M.gguf',
+      downloadUrl:
+          'https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf',
+      expectedSizeBytes: 2963 * 1024 * 1024,
+      benchmarkScore: 46,
+      benchmarkTotal: 49,
+    ),
+    LlmModelInfo(
       id: 'qwen35_2b_q4_k_m',
       displayName: 'Qwen3.5 2B Instruct · Q4_K_M',
       family: 'Qwen3.5-2B',
@@ -907,6 +918,27 @@ class LlmService {
     }
   }
 
+  /// Logs llama.cpp's own prompt/generation speed from the final response.
+  static void _logTimings(String responseJson) {
+    try {
+      // A streamed chat completion ends with a list of chunks; the last one
+      // carries the timings.
+      final decoded = jsonDecode(responseJson);
+      final last = decoded is List && decoded.isNotEmpty
+          ? decoded.last
+          : decoded;
+      final timings = last is Map<String, dynamic> ? last['timings'] : null;
+      if (timings is! Map<String, dynamic>) return;
+      String rate(Object? v) => v is num ? v.toStringAsFixed(1) : '?';
+      debugPrint(
+        '[LlmService] Timings: prompt ${timings['prompt_n']} tok '
+        '${timings['prompt_ms']} ms (${rate(timings['prompt_per_second'])} tok/s), '
+        'generation ${timings['predicted_n']} tok '
+        '${timings['predicted_ms']} ms (${rate(timings['predicted_per_second'])} tok/s)',
+      );
+    } catch (_) {}
+  }
+
   /// Low-level chat completion. Returns the raw text output and metrics.
   ///
   /// If [onPartialResponse] is provided, it is called after every token with
@@ -1024,6 +1056,7 @@ class LlmService {
         tokenCount++;
         onPartialResponse?.call(response, tokenCount);
         if (done && !completer.isCompleted) {
+          _logTimings(responseJson);
           completer.complete(response);
         }
       });

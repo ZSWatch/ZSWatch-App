@@ -29,10 +29,10 @@ packages:
     dependency: "direct main"
     description:
       name: archive
-      sha256: "2fde1607386ab523f7a36bb3e7edb43bd58e6edaf2ffb29d8a6d578b297fdbbd"
+      sha256: "0d58d1fa1fddf6588251ccf2819f3fb3b6d0452c1b2813ac7413a05592bfbefe"
       url: "https://pub.dev"
     source: hosted
-    version: "4.0.7"
+    version: "4.5.2"
   args:
     dependency: transitive
     description:
@@ -137,6 +137,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "8.12.1"
+  change_case:
+    dependency: transitive
+    description:
+      name: change_case
+      sha256: e41ef3df58521194ef8d7649928954805aeb08061917cf658322305e61568003
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   characters:
     dependency: transitive
     description:
@@ -948,6 +956,15 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.4.6"
+  native_prebuilt:
+    dependency: transitive
+    description:
+      path: "."
+      ref: dfe2a5bfeb95426e87f6243cab14f4affd879b38
+      resolved-ref: dfe2a5bfeb95426e87f6243cab14f4affd879b38
+      url: "https://github.com/Telosnex/native_prebuilt.git"
+    source: git
+    version: "0.1.0"
   native_toolchain_c:
     dependency: transitive
     description:
@@ -956,6 +973,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.17.5"
+  native_toolchain_cmake:
+    dependency: transitive
+    description:
+      name: native_toolchain_cmake
+      sha256: de90e8952bad0684bdcff4d674c53d961f5cd1fdcf3a0255a669a35986c4ac1d
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.7"
   objective_c:
     dependency: transitive
     description:
