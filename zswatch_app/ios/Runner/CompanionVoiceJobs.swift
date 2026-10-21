@@ -52,25 +52,24 @@ final class CompanionVoiceJobs {
       if item["state"] as? String == "ready" { item["last_error"] = "execution_interrupted" }
       next[id] = item
     }
+    // iOS has no local LLM: analysis jobs from older builds can never run.
+    for (id, item) in next where ["ready", "blocked"].contains(item["state"] as? String ?? "") &&
+      (item["spec"] as? [String: Any])?["pipeline_revision"] as? String == "voice-v1" {
+      next[id]?["state"] = "failed"; next[id]?["last_error"] = "analysis_unavailable"
+      next[id]?["fence"] = (item["fence"] as? Int ?? 0) + 1
+    }
     try commit("voice_process_recovered", next)
   }
   func start(identity: String, receipt: [String: Any], stt: String, llm: String, correct: Bool, operation: String) throws -> String {
-    guard ["process", "transcribe", "retranscribe", "reanalyze"].contains(operation),
-          receipt["state"] as? String == "downloaded", let hash = receipt["sha256"] as? String,
+    guard ["transcribe", "retranscribe"].contains(operation) else { throw CompanionFailure.unavailable("Analysis is not available on iOS") }
+    guard receipt["state"] as? String == "downloaded", let hash = receipt["sha256"] as? String,
           let address = receipt["address"] as? String else { throw CompanionFailure.invalid("Verified recording receipt required") }
     _ = try Self.configuration(stt, llm, correct)
-    let model = "\(stt)|\(llm)|\(correct)"; let revision = ["transcribe", "retranscribe"].contains(operation) ? "transcribe-v1" : "voice-v1"
+    let model = "\(stt)|\(llm)|\(correct)"; let revision = "transcribe-v1"
     let prior = jobs.filter { ($0.value["spec"] as? [String: Any])?["recording_id"] as? String == identity }
-    let selected = prior.values.first(where: { $0["selected"] as? Bool == true }) ?? prior.values.max(by: {
-      (($0["spec"] as? [String: Any])?["generation"] as? Int ?? 0) < (($1["spec"] as? [String: Any])?["generation"] as? Int ?? 0)
-    })
-    let transcript = (selected?["result"] as? [String: Any])?["transcript"] as? String ?? selected?["transcript"] as? String
-    let reuseTranscript = operation == "reanalyze" || (operation == "process" &&
-      (selected?["spec"] as? [String: Any])?["pipeline_revision"] as? String == "transcript-edit-v1")
-    guard operation != "reanalyze" || transcript?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else { throw CompanionFailure.unavailable("Transcribe this recording first") }
     var next = jobs
     func select(_ id: String) { for key in prior.keys { next[key]?["selected"] = key == id } }
-    if !["retranscribe", "reanalyze"].contains(operation), !reuseTranscript, let existing = prior.first(where: {
+    if operation != "retranscribe", let existing = prior.first(where: {
       let spec = $0.value["spec"] as? [String: Any]
       return spec?["model"] as? String == model && spec?["pipeline_revision"] as? String == revision &&
         spec?["input_sha256"] as? String == hash && !["failed", "cancelled"].contains($0.value["state"] as? String ?? "")
@@ -94,7 +93,6 @@ final class CompanionVoiceJobs {
     }
     var item: [String: Any] = ["spec": spec, "state": "ready", "fence": 0, "lease_until": NSNull(),
       "attempts": 0, "deferred_attempts": 0, "next_attempt": 0, "last_error": NSNull(), "remote_id": NSNull(), "selected": true]
-    if reuseTranscript { item["transcript"] = transcript }
     next[id] = item; try commit("voice_job_created", next); return id
   }
   // Finished jobs hold the user's transcripts and results; only pending work

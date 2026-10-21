@@ -64,8 +64,8 @@ post_install do |installer|
     end
 
     # Ensure all pods respect the minimum deployment target.
-    # ffmpeg_kit_flutter_new_min requires 14.0; fllama/whisper_ggml_plus
-    # require Metal (available since iOS 8) but benefit from 14.0+ APIs.
+    # ffmpeg_kit_flutter_new_min requires 14.0; whisper_ggml_plus
+    # requires Metal (available since iOS 8) but benefits from 14.0+ APIs.
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
     end

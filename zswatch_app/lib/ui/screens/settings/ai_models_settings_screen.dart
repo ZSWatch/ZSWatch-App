@@ -56,6 +56,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final native = ref.watch(nativeCompanionRuntimeProvider);
+    final localLlm = LlmService.localModelsSupported;
     return Scaffold(
       appBar: AppBar(title: const Text('Voice Memo AI')),
       body: ListView(
@@ -79,24 +80,26 @@ class AiModelsSettingsScreen extends ConsumerWidget {
           const Divider(height: 1),
           const SizedBox(height: 8),
 
-          // ---- AI Processing section ----
-          const _SectionHeader(
-            title: 'AI Processing Model',
-            subtitle: 'Local LLM for summarisation & classification',
-          ),
-          if (!native) const _AiTogglesTile(),
-          if (native)
-            SwitchListTile(
-              title: const Text('Correct transcription before analysis'),
-              value: ref.watch(aiCorrectionEnabledProvider),
-              onChanged: (value) => ref
-                  .read(aiCorrectionEnabledProvider.notifier)
-                  .setEnabled(value),
+          if (localLlm) ...[
+            // ---- AI Processing section ----
+            const _SectionHeader(
+              title: 'AI Processing Model',
+              subtitle: 'Local LLM for summarisation & classification',
             ),
-          const _AiModelSelector(),
-          const _ImportModelTile(),
+            if (!native) const _AiTogglesTile(),
+            if (native)
+              SwitchListTile(
+                title: const Text('Correct transcription before analysis'),
+                value: ref.watch(aiCorrectionEnabledProvider),
+                onChanged: (value) => ref
+                    .read(aiCorrectionEnabledProvider.notifier)
+                    .setEnabled(value),
+              ),
+            const _AiModelSelector(),
+            const _ImportModelTile(),
+          ],
           if (native) const CompanionVoicePolicyTile(),
-          if (native)
+          if (native && localLlm)
             const CompanionVoiceBatchButton(
               operation: 'process',
               label: 'Process all unprocessed',
@@ -120,7 +123,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             if (Platform.isAndroid) const _CalendarPickerTile(),
           ],
 
-          ...[
+          if (localLlm) ...[
             const SizedBox(height: 24),
             const Divider(height: 1),
             const SizedBox(height: 8),
@@ -131,11 +134,10 @@ class AiModelsSettingsScreen extends ConsumerWidget {
               subtitle: 'Test model performance on your device',
             ),
             const _BenchmarkSection(),
-
-            const SizedBox(height: 24),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
           ],
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
           // The existing Clock controls use the productivity channel only.
           // They do not depend on legacy BLE, repositories or local inference.
           ...[

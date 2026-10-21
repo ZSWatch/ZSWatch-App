@@ -40,8 +40,6 @@ PODS:
   - file_picker (0.0.1):
     - DKImagePickerController/PhotoGallery
     - Flutter
-  - fllama (0.0.1):
-    - Flutter
   - Flutter (1.0.0)
   - flutter_blue_plus_darwin (0.0.2):
     - Flutter
@@ -128,7 +126,6 @@ DEPENDENCIES:
   - audio_session (from `.symlinks/plugins/audio_session/ios`)
   - ffmpeg_kit_flutter_new_min (from `.symlinks/plugins/ffmpeg_kit_flutter_new_min/ios`)
   - file_picker (from `.symlinks/plugins/file_picker/ios`)
-  - fllama (from `.symlinks/plugins/fllama/ios`)
   - Flutter (from `Flutter`)
   - flutter_blue_plus_darwin (from `.symlinks/plugins/flutter_blue_plus_darwin/darwin`)
   - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
@@ -168,8 +165,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/ffmpeg_kit_flutter_new_min/ios"
   file_picker:
     :path: ".symlinks/plugins/file_picker/ios"
-  fllama:
-    :path: ".symlinks/plugins/fllama/ios"
   Flutter:
     :path: Flutter
   flutter_blue_plus_darwin:
@@ -223,7 +218,6 @@ SPEC CHECKSUMS:
   DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
   ffmpeg_kit_flutter_new_min: 85493896be79f45e846b5c9b23a3bf73eb284c4a
   file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be
-  fllama: 1ed87194cd058debb9eb06eb9a0e64033a40871d
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_blue_plus_darwin: 20a08bfeaa0f7804d524858d3d8744bcc1b6dbc3
   flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
@@ -251,6 +245,6 @@ SPEC CHECKSUMS:
   whisper_ggml_plus: a01d7b6bf1208c76137032b9d6c91b1d202038e4
   ZIPFoundation: b8c29ea7ae353b309bc810586181fd073cb3312c
 
-PODFILE CHECKSUM: 19e5cc3a5c54e23996e1060c1685d720ecec8f9b
+PODFILE CHECKSUM: c76b4e9d592d7bcd6d08daa0fca38e27a3b61e29
 
 COCOAPODS: 1.16.2

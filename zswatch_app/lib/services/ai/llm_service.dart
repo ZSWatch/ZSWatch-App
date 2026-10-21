@@ -288,6 +288,11 @@ class LlmService {
     resolver: _timeExpressionResolver,
   );
 
+  /// iOS can't run analysis right after a recording arrives in the
+  /// background, so a local LLM is Android only.
+  static bool get localModelsSupported =>
+      defaultTargetPlatform == TargetPlatform.android;
+
   static const String defaultModelId = 'qwen25_1_5b_q4_k_m';
   // Models ordered by benchmark score (best first).
   // Worst 3 removed: SmolLM3 (1/40), Llama-3.2-3B (25/40), Qwen3-1.7B (26/40).
@@ -450,6 +455,7 @@ class LlmService {
   static bool _isCustomModelId(String id) => id.startsWith('custom::');
 
   Future<List<LlmModelInfo>> availableModels() async {
+    if (!localModelsSupported) return const [];
     final importedDir = Directory(await _importedModelDir());
     final imported = <LlmModelInfo>[];
 
@@ -477,11 +483,7 @@ class LlmService {
     }
 
     imported.sort((a, b) => a.displayName.compareTo(b.displayName));
-    // LiteRT-LM only has an Android runtime.
-    return [
-      ...catalogModels,
-      ...imported,
-    ].where((m) => !m.isLiteRtLm || Platform.isAndroid).toList();
+    return [...catalogModels, ...imported];
   }
 
   void selectModel(String modelId) {

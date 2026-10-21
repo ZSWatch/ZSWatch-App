@@ -123,6 +123,10 @@ class _BatchState extends ConsumerState<CompanionVoiceBatchButton> {
 
   @override
   Widget build(BuildContext context) {
+    if (!LlmService.localModelsSupported &&
+        ['process', 'reanalyze'].contains(widget.operation)) {
+      return const SizedBox.shrink();
+    }
     final snapshot = ref.watch(companionSnapshotProvider).asData?.value;
     return ListTile(
       title: Text(widget.label),
