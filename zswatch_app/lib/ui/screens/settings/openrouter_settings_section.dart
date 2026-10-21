@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/openrouter_providers.dart';
+import '../../../services/ai/openrouter_client.dart';
 
 final _keysPage = Uri.parse('https://openrouter.ai/keys');
 final _creditsPage = Uri.parse('https://openrouter.ai/settings/credits');
@@ -54,6 +55,7 @@ class OpenRouterSettingsSection extends ConsumerWidget {
           ),
         ),
         const _WaitingJobsBanner(),
+        const _QueuedLocalJobs(),
         key.when(
           loading: () => const ListTile(title: Text('Reading key…')),
           error: (e, _) => ListTile(
@@ -126,6 +128,89 @@ class _WaitingJobsBanner extends ConsumerWidget {
                 child: const Text('Add credit'),
               )
             : null,
+      ),
+    );
+  }
+}
+
+/// On-device jobs queued before switching to OpenRouter keep running and
+/// delay new memos; this clears them in one go.
+class _QueuedLocalJobs extends ConsumerStatefulWidget {
+  const _QueuedLocalJobs();
+
+  @override
+  ConsumerState<_QueuedLocalJobs> createState() => _QueuedLocalJobsState();
+}
+
+class _QueuedLocalJobsState extends ConsumerState<_QueuedLocalJobs> {
+  bool _cancelling = false;
+
+  Future<void> _cancel(List<String> ids) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel on-device jobs?'),
+        content: Text(
+          '${ids.length} queued on-device '
+          '${ids.length == 1 ? 'job stops' : 'jobs stop'}. Recordings and '
+          'transcripts are kept and can be processed again later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cancel jobs'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _cancelling = true);
+    final client = ref.read(companionClientProvider);
+    var failed = 0;
+    for (final id in ids) {
+      try {
+        await client.voiceJob(id, cancel: true);
+      } catch (e) {
+        failed++;
+        debugPrint('[QueuedLocalJobs] cancel failed: $e');
+      }
+    }
+    if (!mounted) return;
+    setState(() => _cancelling = false);
+    if (failed > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not cancel $failed of ${ids.length}.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = ref.watch(companionSnapshotProvider).asData?.value;
+    final ids = [
+      for (final job in snapshot?.fields['voice_jobs'] as List? ?? const [])
+        if (job is Map &&
+            ['ready', 'blocked'].contains(job['state']) &&
+            job['job_id'] is String &&
+            !'${job['model']}'.split('|').any(isOpenRouterModel))
+          job['job_id'] as String,
+    ];
+    if (ids.isEmpty) return const SizedBox.shrink();
+    return ListTile(
+      leading: const Icon(Icons.hourglass_bottom),
+      title: Text(
+        '${ids.length} on-device ${ids.length == 1 ? 'job' : 'jobs'} queued',
+      ),
+      subtitle: const Text(
+        'They run before new memos when the app is open and slow them down.',
+      ),
+      trailing: TextButton(
+        onPressed: _cancelling ? null : () => _cancel(ids),
+        child: Text(_cancelling ? 'Cancelling…' : 'Cancel all'),
       ),
     );
   }
