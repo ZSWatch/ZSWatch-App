@@ -822,8 +822,18 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     if error != nil { lost("Watch write failed") } else { finishWrite(); pump() }
   }
   fileprivate func pump(_ item: CBPeripheral, _ generation: Int) { if owns(item, generation) { pump() } }
-  fileprivate func modified(_ item: CBPeripheral, _ generation: Int) {
+  fileprivate func modified(_ item: CBPeripheral, _ generation: Int, _ invalidated: [CBService]) {
     guard owns(item, generation) else { return }
+    let used = invalidated.contains { service in
+      service.uuid == Self.nus || service.uuid == CBUUID(string: "180F") ||
+        CompanionSensors.specs.contains { $0.service == service.uuid }
+    }
+    if phase == "ready" && !used {
+      // The watch adds/removes its SMP service around every SMP use. NUS
+      // stays valid; only the SDK's own transport needs to start over.
+      smpOwner?.sessionClosed(allowPreparationRecovery: true)
+      return
+    }
     do { try changed("services_fenced", ["generation": journal.generation + 1]) }
     catch { return }
     gpsRequested = false; gpsToken = UUID()
@@ -928,5 +938,5 @@ private final class CompanionLinkDelegate: NSObject, CBPeripheralDelegate {
   func peripheral(_ p: CBPeripheral, didUpdateValueFor c: CBCharacteristic, error: Error?) { owner?.value(p, generation, c, error) }
   func peripheral(_ p: CBPeripheral, didWriteValueFor c: CBCharacteristic, error: Error?) { owner?.writeCompleted(p, generation, c, error) }
   func peripheralIsReady(toSendWriteWithoutResponse p: CBPeripheral) { owner?.pump(p, generation) }
-  func peripheral(_ p: CBPeripheral, didModifyServices invalidatedServices: [CBService]) { owner?.modified(p, generation) }
+  func peripheral(_ p: CBPeripheral, didModifyServices invalidatedServices: [CBService]) { owner?.modified(p, generation, invalidatedServices) }
 }
