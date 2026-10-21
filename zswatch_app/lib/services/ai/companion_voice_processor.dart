@@ -134,7 +134,6 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
           )
         : await analyzer.processTranscript(
             transcript,
-            rejectNoSpeechRoute: false,
             correctTranscription: models[2] == 'true',
           );
     control.check();

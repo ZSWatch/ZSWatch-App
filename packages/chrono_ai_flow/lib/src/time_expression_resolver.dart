@@ -17,6 +17,82 @@ class TimeExpressionResolver {
     'sunday': 7,
   };
 
+  static final _durationPart = RegExp(
+    r'(\d+(?:\.\d+)?|an?)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)\b',
+  );
+
+  /// Seconds in an English duration such as "10 minutes", "1.5 hours" or
+  /// "1 hour and 30 minutes". Null when there is no duration.
+  int? resolveDuration(String expression) {
+    final normalized = _englishNumbers(expression.toLowerCase())
+        .replaceAll(RegExp(r'\bhalf an? hour\b'), '0.5 hours')
+        .replaceAllMapped(
+          RegExp(r'(\d+(?:\.\d+)?|an?)\s+and\s+a\s+half\s+(hour|minute)s?\b'),
+          (m) => '${(double.tryParse(m[1]!) ?? 1) + 0.5} ${m[2]}s',
+        )
+        .replaceAllMapped(
+          RegExp(r'(\d+(?:\.\d+)?|an?)\s+(hour|minute)s?\s+and\s+a\s+half\b'),
+          (m) => '${(double.tryParse(m[1]!) ?? 1) + 0.5} ${m[2]}s',
+        );
+    var seconds = 0.0;
+    for (final match in _durationPart.allMatches(normalized)) {
+      final amount = double.tryParse(match[1]!) ?? 1;
+      final unit = match[2]!;
+      seconds +=
+          amount *
+          (unit.startsWith('h')
+              ? 3600
+              : unit.startsWith('m')
+              ? 60
+              : 1);
+    }
+    return seconds > 0 ? seconds.round() : null;
+  }
+
+  static const _ones = [
+    'zero',
+    'one',
+    'two',
+    'three',
+    'four',
+    'five',
+    'six',
+    'seven',
+    'eight',
+    'nine',
+    'ten',
+    'eleven',
+    'twelve',
+    'thirteen',
+    'fourteen',
+    'fifteen',
+    'sixteen',
+    'seventeen',
+    'eighteen',
+    'nineteen',
+  ];
+  static const _tens = [
+    'twenty',
+    'thirty',
+    'forty',
+    'fifty',
+    'sixty',
+    'seventy',
+    'eighty',
+    'ninety',
+  ];
+
+  /// "twenty-five minutes" -> "25 minutes".
+  static String _englishNumbers(String text) => text.replaceAllMapped(
+    RegExp(
+      '\\b(?:(${_tens.join('|')})(?:[\\s-]+(${_ones.sublist(1, 10).join('|')}))?'
+      '|(${_ones.join('|')}))\\b',
+    ),
+    (m) => m[3] != null
+        ? '${_ones.indexOf(m[3]!)}'
+        : '${(_tens.indexOf(m[1]!) + 2) * 10 + (m[2] == null ? 0 : _ones.indexOf(m[2]!))}',
+  );
+
   ResolvedTime? resolve(String expression, {DateTime? referenceDate}) {
     if (expression.trim().isEmpty) return null;
 

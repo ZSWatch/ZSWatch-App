@@ -81,8 +81,10 @@ class ChronoLlmParser {
     }
 
     // Reject incomplete timer/alarm extractions — a timer needs a duration
-    // and an alarm needs at least one datetime expression.
-    if (intent == 'timer' && durationSeconds == null) {
+    // (in seconds or as an English phrase) and an alarm a datetime expression.
+    if (intent == 'timer' &&
+        durationSeconds == null &&
+        (datetimeEnglish == null || datetimeEnglish.isEmpty)) {
       return null;
     }
     if (intent == 'alarm' &&
