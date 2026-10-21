@@ -117,6 +117,16 @@ final class IOSVoiceCoordinator {
     })
   }
   func stopped() { deferExecution("watch_session_stopped") }
+  /// A local job can take a minute; a waiting cloud job takes seconds.
+  private func preemptLocalForCloud() {
+    guard executing, online, let current = claim, !CompanionVoiceJobs.isCloudJob(current.spec) else { return }
+    let now = CompanionJournal.now
+    guard jobs.jobs.values.contains(where: {
+      $0["state"] as? String == "ready" && CompanionVoiceJobs.isCloudJob($0["spec"] as? [String: Any]) &&
+        (CompanionRecordingFiles.integer($0["next_attempt"]) ?? 0) <= now
+    }) else { return }
+    deferExecution("cloud_preempted")
+  }
   private func deferExecution(_ code: String) {
     guard let current = claim else { return }
     try? jobs.deferClaim(current, code: code); claim = nil
@@ -287,6 +297,7 @@ final class IOSVoiceCoordinator {
     owner.journalChanged()
   }
   func advance() {
+    preemptLocalForCloud()
     guard let owner, owner.journal.loadError == nil, !executing else { return }
     enqueueAutomatic()
     scheduleRetry()

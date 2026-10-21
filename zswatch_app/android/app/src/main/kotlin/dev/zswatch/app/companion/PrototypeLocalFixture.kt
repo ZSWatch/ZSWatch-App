@@ -117,12 +117,30 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         }
     }
 
+    private fun isCloudJob(id: String) = jobs.state(id).getJSONObject("spec").optString("backend") == "openrouter"
+
+    /** A local job can take minutes; a waiting cloud job takes seconds. */
+    private fun preemptLocalForCloud(now: Long) {
+        val current = activeClaim ?: return
+        if (!busy || current.spec.optString("backend") == "openrouter") return
+        val waiting = jobs.identities().any { id ->
+            isCloudJob(id) && jobs.state(id).let { it.getString("state") == "ready" && it.optLong("next_attempt") <= now }
+        }
+        if (!waiting || !CompanionCloudCredential.online(context)) return
+        busy = false; activeClaim = null; execution++
+        engine?.close(); engine = null
+        jobs.defer(current, now, 0, "cloud_preempted", countAttempt = false)
+        LifecycleLogger.log("CompanionLocalJobs", "local_preempted_for_cloud")
+    }
+
     private fun advance() {
-        if (busy || !running()) return
+        if (!running()) return
         val now = System.currentTimeMillis() / 1000
+        preemptLocalForCloud(now)
+        if (busy) return
         val online by lazy { CompanionCloudCredential.online(context) }
         var key: String? = null
-        val claim = jobs.identities().asSequence().mapNotNull { id ->
+        val claim = jobs.identities().sortedBy { if (isCloudJob(it)) 0 else 1 }.asSequence().mapNotNull { id ->
             val spec = jobs.state(id).getJSONObject("spec")
             val real = spec.getString("provider") == "dart-voice-v1"
             val fixture = BuildConfig.DEBUG && spec.getString("provider") == "dart-fixture" &&
