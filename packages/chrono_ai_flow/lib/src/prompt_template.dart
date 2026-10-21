@@ -22,7 +22,7 @@ Return JSON only. Output MUST start with '[' and end with ']'. No text before or
 If the memo is noise, gibberish, a silence marker, or contains no meaningful words, return an empty array: []
 
 Your tasks per item:
-1. Detect intent: "reminder", "event", or "note".
+1. Detect intent: "reminder", "event", "note", "timer" or "alarm".
 2. Extract the time/date phrase exactly as it appears in the memo.
 3. Translate that time/date phrase into natural English. If already English, copy it.
 4. Extract a short title (the task or event, NOT the time part).
@@ -39,6 +39,9 @@ IMPORTANT — intent classification:
 - "reminder" = personal tasks/actions WITH a specific time — things you DO alone (call someone at 3 pm, pick up package at 5, go to gym at 8, take medicine at 8)
 - "note" = NO time/date mentioned — ideas, shopping lists, tasks without a deadline (buy bread, good idea about sensors, prototype a feature)
 - A task with NO time appearing alongside timed tasks is still a "note"
+- "timer" = start a timer or countdown for a duration. The duration goes in the datetime fields, in English with digits ("10 minutes").
+- "alarm" = set an alarm or wake-up at a clock time. No task to do.
+- "Remind me in 10 minutes to X" is a "reminder", not a "timer".
 
 Rules:
 - Multi-item date context: if a later item only mentions a time (e.g. "at 3 pm"), reuse the most recent date from a previous item. Example: "tomorrow at 8 am ... at 3 pm" → item 2 is "tomorrow at 3 pm".
@@ -56,7 +59,7 @@ Rules:
 Output JSON schema (always an array):
 [
   {
-    "intent": "reminder" | "event" | "note",
+    "intent": "reminder" | "event" | "note" | "timer" | "alarm",
     "title": "short task description in original language",
     "datetime_expression_original": "original time phrase" | null,
     "datetime_expression_english": "english translation of time phrase" | null
@@ -79,6 +82,12 @@ Memo: "tandläkare den 15 mars klockan halv 10 och sen handla mat på vägen hem
 
 Memo: "remember to buy milk"
 [{"intent":"note","title":"buy milk","datetime_expression_original":null,"datetime_expression_english":null}]
+
+Memo: "Sätt en timer på tre minuter"
+[{"intent":"timer","title":"","datetime_expression_original":"tre minuter","datetime_expression_english":"3 minutes"}]
+
+Memo: "Weck mich um sieben"
+[{"intent":"alarm","title":"","datetime_expression_original":"um sieben","datetime_expression_english":"7 am"}]
 
 Memo: "köp bröd på vägen hem"
 [{"intent":"note","title":"köp bröd","datetime_expression_original":null,"datetime_expression_english":null}]
@@ -152,7 +161,7 @@ Return JSON only. Output MUST start with '[' and end with ']'. No text before or
 If the memo is noise, gibberish, a silence marker, or contains no meaningful words, return an empty array: []
 
 Your tasks per item:
-1. Detect intent: "reminder", "event", or "note".
+1. Detect intent: "reminder", "event", "note", "timer" or "alarm".
 2. Extract the time/date phrase exactly as it appears in the memo.
 3. Translate that time/date phrase into natural English. If already English, copy it.
 4. Extract a short title (the task or event, NOT the time part).
@@ -169,6 +178,9 @@ IMPORTANT — intent classification:
 - "reminder" = personal tasks/actions WITH a specific time — things you DO alone
 - "note" = NO time/date mentioned — ideas, shopping lists, tasks without a deadline
 - A task with NO time appearing alongside timed tasks is still a "note"
+- "timer" = start a timer or countdown for a duration. The duration goes in the datetime fields, in English with digits ("10 minutes").
+- "alarm" = set an alarm or wake-up at a clock time. No task to do.
+- "Remind me in 10 minutes to X" is a "reminder", not a "timer".
 
 Rules:
 - Multi-item date context: if a later item only mentions a time (e.g. "at 3 pm"), reuse the most recent date from a previous item.
@@ -186,7 +198,7 @@ Rules:
 Output JSON schema (always an array):
 [
   {
-    "intent": "reminder" | "event" | "note",
+    "intent": "reminder" | "event" | "note" | "timer" | "alarm",
     "title": "short task description in original language",
     "datetime_expression_original": "original time phrase" | null,
     "datetime_expression_english": "english translation of time phrase" | null
@@ -206,6 +218,12 @@ Memo: "Tomorrow at 3 pm call the electrician and also buy new light bulbs"
 
 Memo: "Ring tandläkaren imorgon klockan 9, köp presenter till kalaset och möte med chefen på fredag klockan 14"
 [{"intent":"reminder","title":"ring tandläkaren","datetime_expression_original":"imorgon klockan 9","datetime_expression_english":"tomorrow at 9 am"},{"intent":"note","title":"köp presenter","datetime_expression_original":null,"datetime_expression_english":null},{"intent":"event","title":"möte med chefen","datetime_expression_original":"på fredag klockan 14","datetime_expression_english":"on Friday at 2 pm"}]
+
+Memo: "Sätt en timer på tre minuter"
+[{"intent":"timer","title":"","datetime_expression_original":"tre minuter","datetime_expression_english":"3 minutes"}]
+
+Memo: "Weck mich um sieben"
+[{"intent":"alarm","title":"","datetime_expression_original":"um sieben","datetime_expression_english":"7 am"}]
 
 Memo: "köp bröd på vägen hem"
 [{"intent":"note","title":"köp bröd","datetime_expression_original":null,"datetime_expression_english":null}]
@@ -255,16 +273,7 @@ Memo: "uh eh um"
 Memo: "Set a timer for 5 minutes"
 {"route":"timer_alarm"}
 
-Memo: "Sätt en timer på 10 minuter"
-{"route":"timer_alarm"}
-
-Memo: "Väck mig klockan sju"
-{"route":"timer_alarm"}
-
 Memo: "Remind me to call the dentist at 3 pm"
-{"route":"voice_memo"}
-
-Memo: "Påminn mig om 10 minuter att gå ut"
 {"route":"voice_memo"}
 
 Memo: "Buy milk"

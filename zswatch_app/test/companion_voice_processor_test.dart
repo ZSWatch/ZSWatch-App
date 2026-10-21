@@ -197,8 +197,7 @@ void main() {
           'empty analysis of valid speech is not reported as silent audio',
         _AnalysisMode.actionsOnly =>
           'actions without a summary keep their titles as the summary',
-        _AnalysisMode.summary =>
-          'validated bilingual checkpoints continue past an uncertain router',
+        _AnalysisMode.summary => 'validated speech is analyzed',
       },
       () async {
         final root = await Directory.systemTemp.createTemp('voice-analysis-');
@@ -219,7 +218,7 @@ void main() {
           'Den blå cykeln står i garaget. Kaffebönorna ligger på den översta hyllan.',
           'The blue bicycle is in the garage. The coffee beans are on the top shelf.',
         ]) {
-          final analyzer = _UncertainRouterAnalyzer(mode);
+          final analyzer = _FakeAnalyzer(mode);
           final processing = processCompanionVoiceRecording(
             {
               'version': 1,
@@ -270,7 +269,6 @@ void main() {
                   : isNotEmpty,
             );
           }
-          expect(analyzer.discardValidatedSpeech, isFalse);
           expect(analyzer.disposed, isTrue);
           expect(await File(recording.localPath!).readAsBytes(), original);
         }
@@ -279,14 +277,11 @@ void main() {
   }
 }
 
-/// Simulates the actual failing router: "none" discards the text unless the
-/// caller requests normal analysis of independently validated speech.
 enum _AnalysisMode { summary, empty, actionsOnly }
 
-class _UncertainRouterAnalyzer extends Fake implements LlmService {
-  _UncertainRouterAnalyzer(this.mode);
+class _FakeAnalyzer extends Fake implements LlmService {
+  _FakeAnalyzer(this.mode);
   final _AnalysisMode mode;
-  bool? discardValidatedSpeech;
   bool disposed = false;
   @override
   DateTime? referenceTime;
@@ -303,14 +298,10 @@ class _UncertainRouterAnalyzer extends Fake implements LlmService {
     bool correctTranscription = true,
     String? classifyPromptOverride,
     String? promptStrategyOverride,
-    bool rejectNoSpeechRoute = true,
     void Function(String phase, String partialResponse, int tokens)? onProgress,
   }) async {
-    discardValidatedSpeech = rejectNoSpeechRoute;
     return TranscriptResult(
-      summary: mode != _AnalysisMode.summary || rejectNoSpeechRoute
-          ? ''
-          : 'A saved factual note.',
+      summary: mode != _AnalysisMode.summary ? '' : 'A saved factual note.',
       category: 'note',
       actions: [
         if (mode == _AnalysisMode.actionsOnly)

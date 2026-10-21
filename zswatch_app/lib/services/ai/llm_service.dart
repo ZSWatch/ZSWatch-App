@@ -1061,9 +1061,6 @@ class LlmService {
     bool correctTranscription = true,
     String? classifyPromptOverride,
     String? promptStrategyOverride,
-    // The companion validates speech before checkpointing it. Its lightweight
-    // router must not discard a valid saved transcript (for example Swedish).
-    bool rejectNoSpeechRoute = true,
     void Function(String phase, String partialResponse, int tokens)? onProgress,
   }) async {
     _stateSubject.add(
@@ -1124,93 +1121,8 @@ class LlmService {
       // "Callback invoked after it has been deleted" crash.
       await Future<void>.delayed(const Duration(milliseconds: 500));
 
-      // --- Step 2: Route via lightweight pre-classifier ---
+      // --- Step 2: Extract items (timers and alarms included) ---
       final promptTemplate = classifyPromptOverride?.trim();
-      String? routeResult;
-
-      if (promptTemplate != null && promptTemplate.isNotEmpty) {
-        // Custom template replaces routing.
-      } else if ((routeResult =
-              KeywordRouter.route(transcript) ??
-              KeywordRouter.route(effectiveTranscript)) !=
-          null) {
-        debugPrint('[LlmService] Router: route=$routeResult (keywords)');
-        final seconds =
-            KeywordRouter.timerSeconds(transcript) ??
-            KeywordRouter.timerSeconds(effectiveTranscript);
-        if (seconds != null) {
-          _stateSubject.add(
-            _stateSubject.value.copyWith(status: LlmServiceStatus.ready),
-          );
-          final timer = _buildTranscriptResultFromChronoExtractions([
-            ChronoLlmExtraction(
-              intent: 'timer',
-              title: '',
-              durationSeconds: seconds,
-            ),
-          ], '');
-          return TranscriptResult(
-            summary: timer.summary,
-            category: timer.category,
-            actions: timer.actions,
-            actionChronoDetails: timer.actionChronoDetails,
-            extractedIntent: 'timer',
-            originalTranscription: transcript,
-            correctedTranscription: correctedTranscription,
-            correctionMetrics: correctionMetrics,
-          );
-        }
-      } else {
-        // Run the router prompt to decide timer_alarm vs voice_memo
-        final routerPrompt = ChronoPromptTemplate.render(
-          ChronoPromptTemplate.routerTemplate,
-          transcript: effectiveTranscript,
-          now: _now,
-        );
-        final routerGen = await _generate(
-          routerPrompt,
-          overrideMaxTokens: 32,
-          onPartialResponse: onProgress == null
-              ? null
-              : (partial, tokens) => onProgress('routing', partial, tokens),
-        );
-        routeResult = _parseRouterOutput(_sanitizeModelOutput(routerGen.text));
-        debugPrint(
-          '[LlmService] Router: route=$routeResult '
-          '(${routerGen.metrics.wallTime.inMilliseconds}ms)',
-        );
-
-        // Brief pause between inference calls
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-
-        // Only callers without an independently validated transcript allow the
-        // router to discard speech. Preserve other routes, including timers.
-        if (routeResult == 'none' && !rejectNoSpeechRoute) {
-          routeResult = 'voice_memo';
-          debugPrint(
-            '[LlmService] Router was uncertain; analyzing validated speech',
-          );
-        }
-        if (routeResult == 'none') {
-          debugPrint(
-            '[LlmService] Router returned "none" — no speech detected',
-          );
-          _stateSubject.add(
-            _stateSubject.value.copyWith(status: LlmServiceStatus.ready),
-          );
-          return TranscriptResult(
-            summary: '',
-            category: 'note',
-            actions: [],
-            originalTranscription: transcript,
-            correctedTranscription: correctedTranscription,
-            correctionMetrics: correctionMetrics,
-            actionChronoDetails: [],
-          );
-        }
-      }
-
-      // --- Step 3: Build the extraction prompt based on route ---
       final String prompt;
       final String promptStrategy;
 
@@ -1220,30 +1132,21 @@ class LlmService {
           transcript: effectiveTranscript,
         );
         promptStrategy = promptStrategyOverride ?? 'custom-template';
-      } else if (routeResult == 'timer_alarm' || routeResult == 'mixed') {
-        // For "mixed" inputs (e.g., "Set a timer for 5 min and buy milk"),
-        // use the timer/alarm template to avoid losing the timer/alarm intent.
-        // The non-timer items won't be extracted but the primary action is preserved.
-        prompt = ChronoPromptTemplate.render(
-          ChronoPromptTemplate.timerAlarmTemplate,
-          transcript: effectiveTranscript,
-          now: _now,
-        );
-        promptStrategy = 'router→$routeResult';
       } else {
         prompt = _buildClassifyPrompt(
           effectiveTranscript,
           effectiveCtx: effectiveCtx,
         );
         promptStrategy = usesFullPrompt(effectiveCtx)
-            ? 'router→voice_memo/full'
+            ? 'full'
             : usesEmergencyCompactPrompt(effectiveCtx)
-            ? 'router→voice_memo/emergency-compact'
-            : 'router→voice_memo/compact';
+            ? 'emergency-compact'
+            : 'compact';
       }
 
       final structuredResult = await _generateStructuredJsonWithRetry(
         prompt,
+        transcript: effectiveTranscript,
         promptStrategy: promptStrategy,
         phase: 'classifying',
         onProgress: onProgress,
@@ -1332,34 +1235,8 @@ class LlmService {
   }
 
   String _buildClassifyPrompt(String transcript, {int? effectiveCtx}) {
-    // Use the standard 3-intent template (reminder/event/note).
-    // Timer/alarm cases are handled by the two-stage router in processTranscript.
     const template = ChronoPromptTemplate.compactTemplate;
     return _renderClassifyPromptTemplate(template, transcript: transcript);
-  }
-
-  /// Parse the router prompt output into a route string.
-  String _parseRouterOutput(String raw) {
-    try {
-      final start = raw.indexOf('{');
-      if (start == -1) return 'voice_memo';
-      final end = raw.lastIndexOf('}');
-      if (end == -1) return 'voice_memo';
-      final decoded =
-          jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
-      final route = (decoded['route'] as String?)?.trim().toLowerCase() ?? '';
-      if (const {
-        'timer_alarm',
-        'voice_memo',
-        'mixed',
-        'none',
-      }.contains(route)) {
-        return route;
-      }
-      return 'voice_memo';
-    } catch (_) {
-      return 'voice_memo';
-    }
   }
 
   String _renderClassifyPromptTemplate(
@@ -1605,6 +1482,7 @@ JSON:
   >
   _generateStructuredJsonWithRetry(
     String prompt, {
+    String? transcript,
     int? overrideMaxTokens,
     required String promptStrategy,
     String phase = 'classifying',
@@ -1636,7 +1514,9 @@ JSON:
       totalWallTime += genResult.metrics.wallTime;
       totalCompletionTokens += genResult.metrics.completionTokens;
 
-      final needsRetry = _shouldRetryStructuredOutput(raw, parsed);
+      final needsRetry =
+          _shouldRetryStructuredOutput(raw, parsed) ||
+          (transcript != null && _copiedFromExamples(raw, transcript));
 
       if (!needsRetry || attempts >= _maxStructuredOutputAttempts) {
         break;
@@ -1672,8 +1552,39 @@ JSON:
     return _chronoLlmParser.sanitizeModelOutput(raw);
   }
 
+  static bool _isJsonList(String text) {
+    try {
+      return jsonDecode(text) is List;
+    } on FormatException {
+      return false;
+    }
+  }
+
+  /// Small models sometimes return a prompt example verbatim. Its time
+  /// phrase then shares no word with the memo.
+  bool _copiedFromExamples(String raw, String transcript) {
+    List<String> words(String text) => text
+        .toLowerCase()
+        .split(RegExp(r'[^\p{L}\p{N}]+', unicode: true))
+        .where((w) => w.isNotEmpty)
+        .toList();
+    final memo = words(transcript).toSet();
+    return _chronoLlmParser.parse(raw).extractions.any((e) {
+      final phrase = e.datetimeExpressionOriginal;
+      return phrase != null &&
+          words(phrase).isNotEmpty &&
+          !words(phrase).any(memo.contains);
+    });
+  }
+
   bool _shouldRetryStructuredOutput(String raw, TranscriptResult result) {
     final cleaned = _sanitizeModelOutput(raw);
+    // "[]" or only empty notes: the memo had nothing to extract.
+    if (result.summary.isEmpty &&
+        result.actions.isEmpty &&
+        _chronoLlmParser.extractFirstJsonArray(cleaned) != null) {
+      return false;
+    }
     final jsonStr =
         _chronoLlmParser.extractFirstJsonArray(cleaned) ??
         _extractFirstJsonObject(cleaned);
@@ -1769,9 +1680,30 @@ JSON:
   }
 
   TranscriptResult _buildTranscriptResultFromChronoExtractions(
-    List<ChronoLlmExtraction> extractions,
+    List<ChronoLlmExtraction> parsed,
     String raw,
   ) {
+    // Timers carry their duration as an English phrase; models get the
+    // arithmetic wrong more often than the translation.
+    final extractions = [
+      for (final e in parsed)
+        if (e.intent != 'timer')
+          e
+        else
+          ChronoLlmExtraction(
+            intent: e.intent,
+            title: e.title,
+            datetimeExpressionOriginal: e.datetimeExpressionOriginal,
+            datetimeExpressionEnglish: e.datetimeExpressionEnglish,
+            durationSeconds:
+                (e.datetimeExpressionEnglish == null
+                    ? null
+                    : _timeExpressionResolver.resolveDuration(
+                        e.datetimeExpressionEnglish!,
+                      )) ??
+                e.durationSeconds,
+          ),
+    ];
     final actions = <ExtractedActionResult>[];
     final chronoDetails = <ActionChronoDebug>[];
     String? firstResolvedDateTime;
@@ -1909,11 +1841,21 @@ JSON:
 
     // Try parsing via chrono parser first (handles both array and object)
     final chronoResult = _chronoLlmParser.parse(cleaned);
-    if (chronoResult.extractions.isNotEmpty) {
-      return _buildTranscriptResultFromChronoExtractions(
-        chronoResult.extractions,
-        raw,
-      );
+    final arrayStr = _chronoLlmParser.extractFirstJsonArray(cleaned);
+    final extractions = chronoResult.extractions
+        .where(
+          (e) =>
+              e.title.isNotEmpty ||
+              e.datetimeExpressionEnglish != null ||
+              e.durationSeconds != null,
+        )
+        .toList();
+    if (extractions.isNotEmpty) {
+      return _buildTranscriptResultFromChronoExtractions(extractions, raw);
+    }
+    if (arrayStr != null && _isJsonList(arrayStr)) {
+      // A valid array without content (noise, silence markers).
+      return const TranscriptResult(summary: '', category: 'note');
     }
 
     final jsonStr = _extractFirstJsonObject(cleaned);
