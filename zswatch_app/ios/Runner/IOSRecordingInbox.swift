@@ -128,8 +128,12 @@ final class IOSRecordingInbox {
           }
         } else if next.count < 4096 {
           var metadata = original
-          if let policy = owner.journal.fields["voice_processing_policy"] as? [String: Any],
-             policy["enabled"] as? Bool == true, policy["watch_id"] as? String == owner.journal.address {
+          // The watch's Ask AI questions are always answered, even with memo processing off.
+          let name = original["filename"] as? String ?? ""
+          let question = name.hasPrefix("ask_") || name.hasPrefix("askr_")
+          if var policy = owner.journal.fields["voice_processing_policy"] as? [String: Any],
+             policy["enabled"] as? Bool == true || question, policy["watch_id"] as? String == owner.journal.address {
+            if question { policy["analysis_enabled"] = true }
             metadata["processing_request"] = policy
           }
           next[key] = metadata

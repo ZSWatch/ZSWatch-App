@@ -167,6 +167,14 @@ class OpenRouterClient {
     ),
   );
 
+  Future<String> chat(
+    String model,
+    String system,
+    List<Map<String, String>> messages,
+  ) async => (await _chat(
+    OpenRouterRequest.conversation(model, system, messages),
+  )).trim();
+
   Future<OpenRouterKeyInfo> keyInfo() async {
     final response = await _send(
       () => _http.get(

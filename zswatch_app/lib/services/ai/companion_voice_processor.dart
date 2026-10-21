@@ -8,6 +8,7 @@ import '../../data/models/companion_recording.dart';
 import '../voice_memo/transcription_engine.dart';
 import '../voice_memo/verified_companion_recording.dart';
 import '../voice_memo/ogg_opus_writer.dart';
+import 'companion_ask_processor.dart';
 import 'llm_service.dart';
 import 'openrouter_client.dart';
 import 'voice_note_ai_pipeline.dart';
@@ -74,9 +75,31 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
   final sttType = cloudStt
       ? null
       : TranscriptionEngineType.values.byName(models[0]);
+  final key = (request['credentials'] as Map?)?['openrouter_key'];
+  final ask = askKindOf(recording.filename);
+  if (ask != null) {
+    // Without a key the answer explains what to set up.
+    final asker = cloud && key is String && key.isNotEmpty
+        ? (cloudFactory ?? OpenRouterClient.new)(key)
+        : null;
+    try {
+      return await answerCompanionQuestion(
+        recording: recording,
+        kind: ask,
+        models: models,
+        client: asker,
+        support: Directory(
+          await (await getApplicationSupportDirectory()).resolveSymbolicLinks(),
+        ),
+        saveTranscript: saveTranscript,
+        control: control,
+      );
+    } finally {
+      asker?.close();
+    }
+  }
   OpenRouterClient? client;
   if (cloud) {
-    final key = (request['credentials'] as Map?)?['openrouter_key'];
     if (key is! String || key.isEmpty) {
       throw PlatformException(code: 'CLOUD_AUTH');
     }
@@ -129,7 +152,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
       requireCompanionSpeech(transcript);
       // Complete this platform persistence callback before starting analysis.
       await saveTranscript(transcript);
-      await _releaseTranscriber(transcriber);
+      await releaseCompanionTranscriber(transcriber);
       engine = null;
     }
     control.check();
@@ -142,6 +165,27 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
         'category': '',
         'actions': <Object?>[],
       };
+    }
+    if (client != null &&
+        request['transcript'] == null &&
+        isOpenRouterModel(models[1])) {
+      final answer = await answerIfQuestion(
+        transcript: transcript,
+        watchId: recording.watchId,
+        model: openRouterModelId(models[1]),
+        client: client,
+        support: support,
+      );
+      control.check();
+      if (answer != null) {
+        return {
+          'version': 1,
+          'transcript': transcript,
+          'summary': answer,
+          'category': askAiCategory,
+          'actions': <Object?>[],
+        };
+      }
     }
     final analyzer =
         (analyzerFactory?.call() ??
@@ -202,7 +246,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
   } finally {
     control.unbind();
     client?.close();
-    if (engine != null) await _releaseTranscriber(engine);
+    if (engine != null) await releaseCompanionTranscriber(engine);
     llm?.dispose();
     if (scratch != null && scratch.existsSync()) {
       await scratch.delete(recursive: true);
@@ -236,7 +280,7 @@ void requireCompanionSpeech(String transcript) {
 
 /// Free the native Whisper context before loading an analysis model. Closing a
 /// Dart stream alone does not release the package's process-global model cache.
-Future<void> _releaseTranscriber(TranscriptionEngine engine) async {
+Future<void> releaseCompanionTranscriber(TranscriptionEngine engine) async {
   engine.dispose();
   if (engine is WhisperEngine || engine is CustomGgmlWhisperEngine) {
     await const Whisper(model: WhisperModel.base).dispose();
