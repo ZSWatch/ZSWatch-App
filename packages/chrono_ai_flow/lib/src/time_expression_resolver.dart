@@ -117,6 +117,8 @@ class TimeExpressionResolver {
       });
     }
 
+    normalized = _withMonth(normalized, ref);
+
     final specific = _specificPatterns(normalized, ref);
     if (specific != null) {
       return ResolvedTime(dateTime: specific, method: 'regex');
@@ -233,6 +235,34 @@ class TimeExpressionResolver {
     if (RegExp(r'^\d{1,2}(:\d{2})?$').hasMatch(s)) s = 'at $s';
 
     return s;
+  }
+
+  static const _months = [
+    'january',
+    'february',
+    'march',
+    'april',
+    'may',
+    'june',
+    'july',
+    'august',
+    'september',
+    'october',
+    'november',
+    'december',
+  ];
+
+  /// "the 24th" without a month is the next 24th; chrono reads it as today.
+  static String _withMonth(String expr, DateTime ref) {
+    if (_months.any(expr.contains)) return expr;
+    return expr.replaceFirstMapped(
+      RegExp(r'\b(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b'),
+      (m) {
+        final day = int.parse(m[1]!);
+        final month = day >= ref.day ? ref.month : ref.month % 12 + 1;
+        return '${_months[month - 1]} $day';
+      },
+    );
   }
 
   DateTime? _specificPatterns(String expr, DateTime ref) {

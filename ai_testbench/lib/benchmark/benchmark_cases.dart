@@ -157,10 +157,10 @@ final benchmarkCases = <BenchmarkCase>[
   ),
   BenchmarkCase.single(
     name: 'sv_note_no_time',
-    transcript: 'Köp mjölk och bröd på vägen hem.',
+    transcript: 'Köp ägg och smör när du går förbi affären.',
     expectedIntent: 'note',
     expectTime: false,
-    titleLanguageKeywords: ['köp', 'mjölk', 'bröd'],
+    titleLanguageKeywords: ['köp', 'ägg', 'smör'],
   ),
   BenchmarkCase.single(
     name: 'sv_note_idea',
@@ -172,11 +172,11 @@ final benchmarkCases = <BenchmarkCase>[
   ),
   BenchmarkCase.single(
     name: 'sv_event_specific_date',
-    transcript: 'Tandläkare den 15 mars klockan halv 10.',
+    transcript: 'Optiker den 17 mars klockan halv 2.',
     expectedIntent: 'event',
     expectTime: true,
-    titleLanguageKeywords: ['tandläkare'],
-    expectedDateTime: DateTime(2026, 3, 15, 9, 30),
+    titleLanguageKeywords: ['optiker'],
+    expectedDateTime: DateTime(2026, 3, 17, 13, 30),
   ),
 
   // ── German single-item cases (native language title validation) ───
@@ -408,25 +408,25 @@ final benchmarkCases = <BenchmarkCase>[
   BenchmarkCase(
     name: 'sv_multi_three_items',
     transcript:
-        'Ring tandläkaren imorgon klockan 9, köp presenter till kalaset och '
-        'möte med chefen på fredag klockan 14.',
+        'Mejla hyresvärden imorgon klockan 11, köp blommor till mormor och '
+        'lunch med Erik på fredag klockan 12.',
     expectedItems: [
       ExpectedItem(
         expectedIntent: 'reminder',
         expectTime: true,
-        titleLanguageKeywords: ['tandläkare', 'ring'],
-        expectedDateTime: DateTime(2026, 3, 12, 9, 0),
+        titleLanguageKeywords: ['hyresvärd', 'mejla'],
+        expectedDateTime: DateTime(2026, 3, 12, 11, 0),
       ),
       ExpectedItem(
         expectedIntent: 'note',
         expectTime: false,
-        titleLanguageKeywords: ['present', 'kalas'],
+        titleLanguageKeywords: ['blommor', 'mormor'],
       ),
       ExpectedItem(
         expectedIntent: 'event',
         expectTime: true,
-        titleLanguageKeywords: ['möte', 'chef'],
-        expectedDateTime: DateTime(2026, 3, 13, 14, 0),
+        titleLanguageKeywords: ['lunch', 'erik'],
+        expectedDateTime: DateTime(2026, 3, 13, 12, 0),
       ),
     ],
   ),
@@ -545,17 +545,17 @@ final benchmarkCases = <BenchmarkCase>[
   BenchmarkCase(
     name: 'en_multi_reminder_and_note',
     transcript:
-        'Call the plumber at 3 pm tomorrow and also buy new light bulbs.',
+        'Renew the parking permit on Thursday at 4 pm, oh and we need dish soap.',
     expectedItems: [
       ExpectedItem(
         expectedIntent: 'reminder',
         expectTime: true,
-        titleLanguageKeywords: ['plumber'],
+        titleLanguageKeywords: ['parking', 'permit'],
       ),
       ExpectedItem(
         expectedIntent: 'note',
         expectTime: false,
-        titleLanguageKeywords: ['light', 'bulb'],
+        titleLanguageKeywords: ['soap'],
       ),
     ],
   ),
@@ -599,18 +599,18 @@ final benchmarkCases = <BenchmarkCase>[
   BenchmarkCase(
     name: 'sv_multi_event_and_note',
     transcript:
-        'Tandläkare den 15 mars klockan halv 10 och sen handla mat på vägen hem.',
+        'Frisören den 20 mars klockan halv 4 och sen hämta ut medicinen.',
     expectedItems: [
       ExpectedItem(
         expectedIntent: 'event',
         expectTime: true,
-        titleLanguageKeywords: ['tandläkare'],
-        expectedDateTime: DateTime(2026, 3, 15, 9, 30),
+        titleLanguageKeywords: ['frisör'],
+        expectedDateTime: DateTime(2026, 3, 20, 15, 30),
       ),
       ExpectedItem(
         expectedIntent: 'note',
         expectTime: false,
-        titleLanguageKeywords: ['handla'],
+        titleLanguageKeywords: ['medicin'],
       ),
     ],
   ),

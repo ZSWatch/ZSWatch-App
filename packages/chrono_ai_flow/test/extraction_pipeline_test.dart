@@ -88,6 +88,8 @@ void main() {
       );
       expect(at('alarm', "7 o'clock"), DateTime(2026, 3, 12, 7));
       expect(at('reminder', '8'), DateTime(2026, 3, 11, 20));
+      expect(at('event', 'on the 24th at 6 pm'), DateTime(2026, 3, 24, 18));
+      expect(at('event', 'the 2nd at 9 am'), DateTime(2026, 4, 2, 9));
     });
 
     test('a later time-only item keeps the earlier date', () {
