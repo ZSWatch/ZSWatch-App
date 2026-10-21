@@ -77,6 +77,48 @@ abstract final class OpenRouterRequest {
     'usage': {'include': true},
   };
 
+  /// System prompt for questions asked on the watch. [now] grounds "today".
+  static String askPrompt(DateTime now) =>
+      'You answer questions spoken on a smartwatch. The question was '
+      'transcribed from speech and may contain recognition errors; answer what '
+      'was most likely meant. Reply in the language of the question (usually '
+      'Swedish or English). Keep it short: at most three sentences and 400 '
+      'characters, plain text only, no markdown, lists or emoji. If you are '
+      'unsure, say so briefly. The local time is ${now.toIso8601String()}.';
+
+  /// Reply of [routePrompt] for speech that is not a question.
+  static const String memoMarker = 'MEMO';
+
+  /// Like [askPrompt], but for any voice memo: answers questions and replies
+  /// [memoMarker] for notes, tasks, reminders, events, timers and alarms.
+  static String routePrompt(DateTime now) =>
+      '${askPrompt(now)} If the speech is not a question or a request for '
+      'information, but something to save or schedule (a note, task, '
+      'reminder, calendar event, timer or alarm), reply with exactly '
+      '$memoMarker and nothing else.';
+
+  /// A chat turn with earlier [messages] (`role`/`content` maps), oldest first.
+  static Map<String, Object?> conversation(
+    String model,
+    String system,
+    List<Map<String, String>> messages, {
+    int maxTokens = 400,
+    String? reasoningEffort = 'none',
+  }) => {
+    'model': model,
+    'messages': [
+      {'role': 'system', 'content': system},
+      ...messages,
+    ],
+    'max_tokens': maxTokens,
+    'temperature': 0.3,
+    'reasoning': ?(reasoningEffort == null
+        ? null
+        : {'effort': reasoningEffort, 'exclude': true}),
+    'provider': privateRouting,
+    'usage': {'include': true},
+  };
+
   static String _stripNoThink(String prompt) =>
       prompt.replaceAll(RegExp(r'^/no_think\n?', multiLine: true), '');
 

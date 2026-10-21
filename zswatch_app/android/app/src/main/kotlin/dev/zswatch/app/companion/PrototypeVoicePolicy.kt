@@ -11,11 +11,15 @@ object PrototypeVoicePolicy {
             "analysis_enabled" to analyze)
     }
 
-    fun recordingRequest(policy: Any?, watchId: String): Map<String, Any>? {
+    /** The watch's Ask AI questions are always answered, even with memo processing off. */
+    fun isQuestion(filename: String) = filename.startsWith("ask_") || filename.startsWith("askr_")
+
+    fun recordingRequest(policy: Any?, watchId: String, filename: String = ""): Map<String, Any>? {
         val value = policy as? Map<*, *> ?: return null
-        if (value["enabled"] != true || value["watch_id"] != watchId) return null
+        val question = isQuestion(filename)
+        if ((value["enabled"] != true && !question) || value["watch_id"] != watchId) return null
         return configuration(value["transcription_model"] as String, value["analysis_model"] as String,
-            value["correct_transcription"] as Boolean, value["analysis_enabled"] != false)
+            value["correct_transcription"] as Boolean, question || value["analysis_enabled"] != false)
     }
 
     fun model(request: Map<*, *>): String {

@@ -440,6 +440,20 @@ class _QuickActionsTab extends ConsumerWidget {
             ref: ref,
             action: () => _voiceMemoTest(ref, phrase, language),
           ),
+        for (final (title, phrase, start) in _askTestPhrases)
+          _QuickActionCard(
+            icon: Icons.question_answer,
+            title: title,
+            command: '$start, speech, ask send',
+            ref: ref,
+            action: () => _voiceMemoTest(
+              ref,
+              phrase,
+              'en-US',
+              start: start,
+              stop: 'ask send',
+            ),
+          ),
         _QuickActionCard(
           icon: Icons.system_update,
           title: 'Enter Bootloader',
@@ -519,6 +533,22 @@ const _voiceTestPhrases = [
     'Påminn mig i morgon klockan tio att köpa mjölk.',
     'sv-SE',
   ),
+  // With OpenRouter this memo is answered like an Ask AI question.
+  (
+    'Voice Memo Test: question',
+    'How many minutes are there in one day?',
+    'en-US',
+  ),
+];
+
+/// Drives the watch's Ask AI app through its `ask` shell command.
+const _askTestPhrases = [
+  (
+    'Ask AI Test (phone speaks)',
+    'What is the highest mountain in Sweden?',
+    'ask new',
+  ),
+  ('Ask AI Reply Test (phone speaks)', 'And how high is it?', 'ask reply'),
 ];
 
 /// Records a voice memo on the watch while the phone speaks a known phrase,
@@ -526,16 +556,18 @@ const _voiceTestPhrases = [
 Future<(String, bool)> _voiceMemoTest(
   WidgetRef ref,
   String phrase,
-  String language,
-) async {
+  String language, {
+  String start = 'voice_memo start',
+  String stop = 'voice_memo stop',
+}) async {
   final shell = ref.read(shellServiceProvider);
   String? speechError;
   var mayBeRecording = true;
   try {
-    final start = await shell.execute('voice_memo start');
-    if (start.returnCode != 0) {
+    final started = await shell.execute(start);
+    if (started.returnCode != 0) {
       mayBeRecording = false;
-      return ('Start failed: ${start.output}', true);
+      return ('Start failed: ${started.output}', true);
     }
     try {
       // Give the watch microphone a moment to settle before speaking.
@@ -561,8 +593,10 @@ Future<(String, bool)> _voiceMemoTest(
   } finally {
     if (mayBeRecording) {
       try {
-        final stop = await shell.execute('voice_memo stop');
-        if (stop.returnCode != 0) speechError ??= 'Stop failed: ${stop.output}';
+        final stopped = await shell.execute(stop);
+        if (stopped.returnCode != 0) {
+          speechError ??= 'Stop failed: ${stopped.output}';
+        }
       } catch (e) {
         speechError ??= 'Stop failed: $e';
       }

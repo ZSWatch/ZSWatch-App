@@ -670,6 +670,41 @@ final class CompanionPhoneUITests: XCTestCase {
         try sendToBackground(for: Config.backgroundSeconds)
     }
 
+    /// Asks the watch's Ask AI app a spoken question and waits for the answer.
+    /// Needs an OpenRouter key in the app.
+    func testAskAI() throws {
+        try askAndAwaitAnswer("Ask AI Test (phone speaks)")
+    }
+
+    /// Follow-up to `testAskAI` within its conversation window.
+    func testAskAIReply() throws {
+        try askAndAwaitAnswer("Ask AI Reply Test (phone speaks)")
+    }
+
+    /// Records a question as an ordinary memo; OpenRouter should answer it.
+    func testMemoQuestionRouting() throws {
+        try askAndAwaitAnswer("Voice Memo Test: question")
+    }
+
+    private func askAndAwaitAnswer(_ action: String) throws {
+        try connectedHome()
+        try openDeveloperRoute("Shell", heading: "Shell")
+        try tap(containing("Quick Actions"), "Quick Actions")
+        try tap(try reveal(containing(action), action), action)
+        try require(containing("Recorded: ").waitForExistence(timeout: 60), "Question was not recorded", capture: "ask")
+        print("HIL_ASK_RECORDED")
+        // state 3 is the answer screen.
+        for _ in 0..<12 {
+            try shell("ask state", expect: "state=")
+            if containing("state=3").exists {
+                print("HIL_ASK_ANSWERED")
+                return
+            }
+            Thread.sleep(forTimeInterval: 10)
+        }
+        try require(false, "No answer on the watch", capture: "ask-timeout")
+    }
+
     // MARK: - Background and radio recovery
 
     /// Home for `ZSW_BACKGROUND_SECONDS`, reopen, expect connected Home.

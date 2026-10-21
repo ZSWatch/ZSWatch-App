@@ -85,7 +85,7 @@ class PrototypeRecordingInbox(
             return Queued.OK
         }
         if (!store.hasRecordRoom(key)) return Queued.FULL
-        val request = PrototypeVoicePolicy.recordingRequest(store.control()["voice_processing_policy"], address)
+        val request = PrototypeVoicePolicy.recordingRequest(store.control()["voice_processing_policy"], address, name)
         store.putRecord(key, mapOf("address" to address, "filename" to name, "timestamp" to timestamp,
             "size_bytes" to size, "duration_ms" to duration, "state" to "pending") +
             (request?.let { mapOf("processing_request" to it) } ?: emptyMap()))

@@ -13,9 +13,10 @@ Future<CompanionRecording> seedCompanionRecording(
   Uint8List? bytes,
   String state = 'downloaded',
   int duration = 100,
+  String filename = 'memo_001',
 }) async {
   final raw = bytes ?? buildZswOpusFile();
-  final identity = '$watch:memo_001:1700000000:${raw.length}:$duration';
+  final identity = '$watch:$filename:1700000000:${raw.length}:$duration';
   final key = sha256.convert(utf8.encode(identity));
   final source = File(
     '${root.path}/companion-prototype/recordings/$key.zsw_opus',
@@ -24,7 +25,7 @@ Future<CompanionRecording> seedCompanionRecording(
   await source.writeAsBytes(raw, flush: true);
   return CompanionRecording.decode(identity, {
     'address': watch,
-    'filename': 'memo_001',
+    'filename': filename,
     'timestamp': 1700000000,
     'duration_ms': duration,
     'size_bytes': raw.length,

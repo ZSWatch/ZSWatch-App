@@ -240,7 +240,11 @@ void main() {
             client: MockClient((http) async {
               final body = jsonDecode(http.body) as Map<String, Object?>;
               models.add(body['model']! as String);
-              final message = (body['messages']! as List).single as Map;
+              final messages = body['messages']! as List;
+              if ((messages.first as Map)['role'] == 'system') {
+                return _json(_reply('MEMO'));
+              }
+              final message = messages.single as Map;
               if (message['content'] is List) {
                 final audio =
                     ((message['content'] as List)[1] as Map)['input_audio']
@@ -269,7 +273,7 @@ void main() {
           );
         },
       );
-      expect(models, ['google/stt', 'google/llm']);
+      expect(models, ['google/stt', 'google/llm', 'google/llm']);
       expect(saved, ['Starta en timer på tio minuter']);
       final action = (result['actions']! as List).single as Map;
       expect(action['type'], 'timer');
