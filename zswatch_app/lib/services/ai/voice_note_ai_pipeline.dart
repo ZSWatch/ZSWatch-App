@@ -1,3 +1,4 @@
+import 'package:chrono_ai_flow/chrono_ai_flow.dart';
 import 'package:flutter/foundation.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -344,35 +345,8 @@ class VoiceNoteAiPipeline {
 
   /// Detects common Whisper no-speech / hallucination patterns so we can skip
   /// LLM inference entirely.
-  static bool isNoSpeechTranscript(String transcript) {
-    final t = transcript.trim();
-
-    final lower = t.toLowerCase();
-
-    // Whisper explicit no-speech markers
-    const noSpeechMarkers = [
-      '[blank_audio]',
-      '[no speech]',
-      '<no speech>',
-      '(no speech)',
-      '[silence]',
-      '<|nospeech|>',
-      '[music]',
-      '(music)',
-    ];
-    for (final marker in noSpeechMarkers) {
-      if (lower.contains(marker)) return true;
-    }
-
-    // Pure punctuation / music symbols / whitespace
-    final stripped = t.replaceAll(
-      RegExp(r'[\s\p{P}\p{S}]+', unicode: true),
-      '',
-    );
-    if (stripped.isEmpty) return true;
-
-    return false;
-  }
+  static bool isNoSpeechTranscript(String transcript) =>
+      ChronoExtractionPipeline.isNoSpeech(transcript);
 
   DateTime? _tryParseDate(String? value) {
     if (value == null || value.trim().isEmpty) return null;

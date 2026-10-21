@@ -1,4 +1,5 @@
 export 'src/correction_prompt_template.dart';
+export 'src/extraction_pipeline.dart';
 export 'src/models.dart';
 export 'src/prompt_template.dart';
 export 'src/parser.dart';

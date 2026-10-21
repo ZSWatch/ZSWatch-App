@@ -51,7 +51,9 @@ Rules:
 - Copy the original time phrase exactly. Fill "datetime_expression_english" whenever "datetime_expression_original" is not null.
 - If the memo is in English, copy the same phrase to both datetime fields.
 - If no time/date for an item, set both datetime fields to null.
-- Translate time expressions to natural English. Convert 24-hour to 12-hour. Use PM for afternoon/evening context.
+- Translate time expressions to natural English. Convert 24-hour to 12-hour ("14" = "2 pm").
+- Write am/pm only if the memo says it (24-hour time, morning, evening, tonight). Otherwise keep the bare clock time ("klockan 9" = "at 9").
+- Half hours count toward the next hour and are written with digits: "halv 10" / "halb 10" = "9:30", never "half past".
 - Do NOT add "next" to weekday translations unless the original explicitly says "next" / "nästa" / "nächsten".
 - Deadlines ARE time expressions: "by Friday", "senast fredag", "bis Freitag" → extract them.
 - NOT time expressions: locations ("at the store"), vague conditions ("when I get home", "after lunch"), words that look like time but aren't ("boka tid" = book appointment)
@@ -78,16 +80,16 @@ Memo: "påminn mig imorgon klockan 10 att köpa mjölk"
 [{"intent":"reminder","title":"köpa mjölk","datetime_expression_original":"imorgon klockan 10","datetime_expression_english":"tomorrow at 10 am"}]
 
 Memo: "tandläkare den 15 mars klockan halv 10 och sen handla mat på vägen hem"
-[{"intent":"event","title":"tandläkare","datetime_expression_original":"den 15 mars klockan halv 10","datetime_expression_english":"March 15th at 9:30 am"},{"intent":"note","title":"handla mat","datetime_expression_original":null,"datetime_expression_english":null}]
+[{"intent":"event","title":"tandläkare","datetime_expression_original":"den 15 mars klockan halv 10","datetime_expression_english":"March 15th at 9:30"},{"intent":"note","title":"handla mat","datetime_expression_original":null,"datetime_expression_english":null}]
 
 Memo: "remember to buy milk"
 [{"intent":"note","title":"buy milk","datetime_expression_original":null,"datetime_expression_english":null}]
 
-Memo: "Sätt en timer på tre minuter"
-[{"intent":"timer","title":"","datetime_expression_original":"tre minuter","datetime_expression_english":"3 minutes"}]
+Memo: "Sätt en timer på 45 sekunder för teet"
+[{"intent":"timer","title":"teet","datetime_expression_original":"45 sekunder","datetime_expression_english":"45 seconds"}]
 
-Memo: "Weck mich um sieben"
-[{"intent":"alarm","title":"","datetime_expression_original":"um sieben","datetime_expression_english":"7 am"}]
+Memo: "Weck mich um sieben zum Training"
+[{"intent":"alarm","title":"Training","datetime_expression_original":"um sieben","datetime_expression_english":"at 7"}]
 
 Memo: "köp bröd på vägen hem"
 [{"intent":"note","title":"köp bröd","datetime_expression_original":null,"datetime_expression_english":null}]
@@ -123,7 +125,7 @@ Memo: "Hämta barnen imorgon klockan halv 5"
 [{"intent":"reminder","title":"hämta barnen","datetime_expression_original":"imorgon klockan halv 5","datetime_expression_english":"tomorrow at 4:30 pm"}]
 
 Memo: "Ring tandläkaren imorgon klockan 9, köp presenter till kalaset och möte med chefen på fredag klockan 14"
-[{"intent":"reminder","title":"ring tandläkaren","datetime_expression_original":"imorgon klockan 9","datetime_expression_english":"tomorrow at 9 am"},{"intent":"note","title":"köp presenter","datetime_expression_original":null,"datetime_expression_english":null},{"intent":"event","title":"möte med chefen","datetime_expression_original":"på fredag klockan 14","datetime_expression_english":"on Friday at 2 pm"}]
+[{"intent":"reminder","title":"ring tandläkaren","datetime_expression_original":"imorgon klockan 9","datetime_expression_english":"tomorrow at 9"},{"intent":"note","title":"köp presenter","datetime_expression_original":null,"datetime_expression_english":null},{"intent":"event","title":"möte med chefen","datetime_expression_original":"på fredag klockan 14","datetime_expression_english":"on Friday at 2 pm"}]
 
 Memo: "Team standup tomorrow at 9:15 and I should prototype the new notification system"
 [{"intent":"event","title":"team standup","datetime_expression_original":"tomorrow at 9:15","datetime_expression_english":"tomorrow at 9:15 am"},{"intent":"note","title":"prototype notification system","datetime_expression_original":null,"datetime_expression_english":null}]
@@ -190,7 +192,9 @@ Rules:
 - Copy the original time phrase exactly. Fill "datetime_expression_english" whenever "datetime_expression_original" is not null.
 - If the memo is in English, copy the same phrase to both datetime fields.
 - If no time/date for an item, set both datetime fields to null.
-- Translate time expressions to natural English. Convert 24-hour to 12-hour. Use PM for afternoon/evening context.
+- Translate time expressions to natural English. Convert 24-hour to 12-hour ("14" = "2 pm").
+- Write am/pm only if the memo says it (24-hour time, morning, evening, tonight). Otherwise keep the bare clock time ("klockan 9" = "at 9").
+- Half hours count toward the next hour and are written with digits: "halv 10" / "halb 10" = "9:30", never "half past".
 - Do NOT add "next" to weekday translations unless the original explicitly says "next" / "nästa" / "nächsten".
 - Deadlines ARE time expressions: "by Friday", "senast fredag", "bis Freitag" → extract them.
 - NOT time expressions: locations ("at the store"), vague conditions ("when I get home", "after lunch"), words that look like time but aren't ("boka tid" = book appointment)
@@ -211,19 +215,19 @@ Memo: "Remind me tomorrow at 10 am to buy milk"
 [{"intent":"reminder","title":"buy milk","datetime_expression_original":"tomorrow at 10 am","datetime_expression_english":"tomorrow at 10 am"}]
 
 Memo: "tandläkare den 15 mars klockan halv 10 och sen handla mat på vägen hem"
-[{"intent":"event","title":"tandläkare","datetime_expression_original":"den 15 mars klockan halv 10","datetime_expression_english":"March 15th at 9:30 am"},{"intent":"note","title":"handla mat","datetime_expression_original":null,"datetime_expression_english":null}]
+[{"intent":"event","title":"tandläkare","datetime_expression_original":"den 15 mars klockan halv 10","datetime_expression_english":"March 15th at 9:30"},{"intent":"note","title":"handla mat","datetime_expression_original":null,"datetime_expression_english":null}]
 
 Memo: "Tomorrow at 3 pm call the electrician and also buy new light bulbs"
 [{"intent":"reminder","title":"call the electrician","datetime_expression_original":"tomorrow at 3 pm","datetime_expression_english":"tomorrow at 3 pm"},{"intent":"note","title":"buy new light bulbs","datetime_expression_original":null,"datetime_expression_english":null}]
 
 Memo: "Ring tandläkaren imorgon klockan 9, köp presenter till kalaset och möte med chefen på fredag klockan 14"
-[{"intent":"reminder","title":"ring tandläkaren","datetime_expression_original":"imorgon klockan 9","datetime_expression_english":"tomorrow at 9 am"},{"intent":"note","title":"köp presenter","datetime_expression_original":null,"datetime_expression_english":null},{"intent":"event","title":"möte med chefen","datetime_expression_original":"på fredag klockan 14","datetime_expression_english":"on Friday at 2 pm"}]
+[{"intent":"reminder","title":"ring tandläkaren","datetime_expression_original":"imorgon klockan 9","datetime_expression_english":"tomorrow at 9"},{"intent":"note","title":"köp presenter","datetime_expression_original":null,"datetime_expression_english":null},{"intent":"event","title":"möte med chefen","datetime_expression_original":"på fredag klockan 14","datetime_expression_english":"on Friday at 2 pm"}]
 
-Memo: "Sätt en timer på tre minuter"
-[{"intent":"timer","title":"","datetime_expression_original":"tre minuter","datetime_expression_english":"3 minutes"}]
+Memo: "Sätt en timer på 45 sekunder för teet"
+[{"intent":"timer","title":"teet","datetime_expression_original":"45 sekunder","datetime_expression_english":"45 seconds"}]
 
-Memo: "Weck mich um sieben"
-[{"intent":"alarm","title":"","datetime_expression_original":"um sieben","datetime_expression_english":"7 am"}]
+Memo: "Weck mich um sieben zum Training"
+[{"intent":"alarm","title":"Training","datetime_expression_original":"um sieben","datetime_expression_english":"at 7"}]
 
 Memo: "köp bröd på vägen hem"
 [{"intent":"note","title":"köp bröd","datetime_expression_original":null,"datetime_expression_english":null}]
