@@ -74,8 +74,9 @@ A flow whose required variable is unset is skipped.
 | `ZSW_RECORDING` | required | recording/transcript flows; search text that must match exactly one recording |
 | `ZSW_BACKGROUND` | `Aurora` | `testWatchfaceApplyBundledBackground` |
 | `ZSW_SPEECH_MODEL` | `Whisper Small (English)` | `testSelectSpeechModel` |
+| `ZSW_OPENROUTER_KEY` | required | `testOpenRouterSetup`; pass it from a file (`$(cat ~/.config/zswatch/openrouter_key)`), never commit it |
 | `ZSW_SENSORS` | all sensors | `testSensorsStartStop`; comma-separated row labels |
-| `ZSW_BACKGROUND_SECONDS` | `20` | `testBackgroundReturn` (firmware background caps at 10) |
+| `ZSW_BACKGROUND_SECONDS` | `20` | `testBackgroundReturn`, `testVoiceMemoBackground` (firmware background caps at 10) |
 
 Put firmware/resource packages into Files yourself first (Safari download,
 AirDrop, Finder file sharing). The flows only pick them.

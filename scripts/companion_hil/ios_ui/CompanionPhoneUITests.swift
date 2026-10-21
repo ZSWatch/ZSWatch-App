@@ -165,8 +165,20 @@ final class CompanionPhoneUITests: XCTestCase {
 
     private func openVoiceModels() throws {
         try openSettings()
-        try reveal(prefix("Voice memo models"), "Voice memo models").tap()
-        try require(prefix("Select model").waitForExistence(timeout: 10), "Missing model settings", capture: "models")
+        let screen = prefix("Experimental: on-device processing")
+        // A tap during the reveal scroll's settle can be dropped; tap again.
+        for _ in 0..<2 where !screen.exists {
+            try reveal(prefix("Voice memo models"), "Voice memo models").tap()
+            _ = screen.waitForExistence(timeout: 5)
+        }
+        try require(screen.waitForExistence(timeout: 5), "Missing model settings", capture: "models")
+    }
+
+    /// Local model pickers are behind the experimental on-device switch.
+    private func openOnDeviceModels() throws {
+        try openVoiceModels()
+        try flip(try switchOnRow("Experimental: on-device processing"), to: true)
+        try require(prefix("Select model").waitForExistence(timeout: 10), "Missing local model settings", capture: "models")
     }
 
     private func openDeveloperRoute(_ menu: String, heading: String) throws {
@@ -592,7 +604,7 @@ final class CompanionPhoneUITests: XCTestCase {
     /// Selects `ZSW_SPEECH_MODEL` and downloads it if needed. State: changes
     /// the selected model and may download several hundred MB.
     func testSelectSpeechModel() throws {
-        try openVoiceModels()
+        try openOnDeviceModels()
         let selector = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Select model")).firstMatch
         // MISSING-ID: the dropdown's tap target is the top line of the merged button.
         selector.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
@@ -606,6 +618,45 @@ final class CompanionPhoneUITests: XCTestCase {
         }
         screenshot("speech-model")
         try home()
+    }
+
+    /// Pastes `ZSW_OPENROUTER_KEY` (once) and turns on automatic OpenRouter processing.
+    /// State: stores the key in the app and changes the voice policy.
+    func testOpenRouterSetup() throws {
+        let key = try Config.required("ZSW_OPENROUTER_KEY")
+        try connectedHome()
+        try openVoiceModels()
+        try flip(try switchOnRow("Experimental: on-device processing"), to: false)
+        if !prefix("OpenRouter key saved").waitForExistence(timeout: 3) {
+            // Flutter exposes the obscured field as a secure or a plain text field.
+            let field = app.descendants(matching: .any).matching(NSPredicate(format: "elementType == %d OR elementType == %d",
+                XCUIElement.ElementType.secureTextField.rawValue, XCUIElement.ElementType.textField.rawValue)).firstMatch
+            try tap(field, "API key field")
+            field.typeText(key)
+            try tap(exact("Verify and save"), "Verify and save")
+            try require(prefix("OpenRouter key saved").waitForExistence(timeout: 30), "Key not accepted", capture: "openrouter-key")
+        }
+        let automatic = try switchOnRow("Automatically process new recordings")
+        try flip(automatic, to: true)
+        if exact("Apply").exists { try tap(exact("Apply"), "Apply") }
+        Thread.sleep(forTimeInterval: 1)
+        screenshot("openrouter-setup")
+        try home()
+    }
+
+    /// Records the Swedish timer memo from Shell → Quick Actions, then stays on
+    /// the home screen for `ZSW_BACKGROUND_SECONDS` while it is processed.
+    /// The native journal holds the timings.
+    func testVoiceMemoBackground() throws {
+        try connectedHome()
+        try openDeveloperRoute("Shell", heading: "Shell")
+        try tap(containing("Quick Actions"), "Quick Actions")
+        let card = try reveal(containing("Voice Memo Test: Swedish timer"), "Swedish timer")
+        try tap(card, "Swedish timer")
+        print("HIL_MEMO_STARTED")
+        try require(containing("Recorded: ").waitForExistence(timeout: 60), "Memo was not recorded", capture: "memo")
+        print("HIL_MEMO_RECORDED")
+        try sendToBackground(for: Config.backgroundSeconds)
     }
 
     // MARK: - Background and radio recovery
