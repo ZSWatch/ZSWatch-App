@@ -4,9 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../providers/ai_providers.dart';
 import '../../providers/companion_runtime_providers.dart';
-import '../../providers/settings_providers.dart';
+import '../../providers/openrouter_providers.dart';
 import '../../providers/voice_memo_providers.dart';
-import '../../services/ai/llm_service.dart';
+import '../../services/voice_memo/transcription_engine.dart';
 import '../navigation/app_router.dart';
 
 /// Explicit opt-in. Saving preferences never starts inference in this isolate.
@@ -24,11 +24,9 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
     final snapshot = ref.read(companionSnapshotProvider).asData?.value;
     final watch = snapshot?.watch;
     if (watch == null) return;
-    final stt = ref.read(transcriptionEngineTypeProvider);
-    final llm = ref.read(selectedAiModelIdProvider);
-    final correct = ref.read(aiCorrectionEnabledProvider);
+    final config = ref.read(voiceModelConfigProvider);
     final analyzeEnabled =
-        LlmService.localModelsSupported &&
+        config.canAnalyze &&
         (analyze ??
             (snapshot?.fields['voice_processing_policy'] is Map
                 ? (snapshot!.fields['voice_processing_policy']
@@ -37,9 +35,29 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
                 : true));
     setState(() => _saving = true);
     try {
-      if (enabled) {
+      if (enabled && config.cloud) {
+        final key = await ref.read(companionClientProvider).cloudCredential();
+        if (!mounted) return;
+        if (key == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Add an OpenRouter key before enabling automatic processing.',
+              ),
+              persist: false,
+              action: SnackBarAction(
+                label: 'Add key',
+                onPressed: () => context.push(AppRoutes.aiModels),
+              ),
+            ),
+          );
+          return;
+        }
+      } else if (enabled) {
         final speech = await ref.read(
-          transcriptionModelStatusProvider(stt).future,
+          transcriptionModelStatusProvider(
+            TranscriptionEngineType.values.byName(config.transcriptionModel),
+          ).future,
         );
         final missing = !speech.downloaded
             ? 'Download the selected speech model before enabling automatic processing.'
@@ -69,9 +87,9 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
           .configureVoiceProcessing(
             watchId: watch.id,
             enabled: enabled,
-            transcriptionModel: stt.name,
-            analysisModel: llm,
-            correctTranscription: correct,
+            transcriptionModel: config.transcriptionModel,
+            analysisModel: config.analysisModel,
+            correctTranscription: config.correctTranscription,
             analyze: analyzeEnabled,
           );
     } catch (error) {
@@ -94,12 +112,11 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
     final policy = raw is Map ? raw : const <Object?, Object?>{};
     final enabled =
         policy['enabled'] == true && policy['watch_id'] == snapshot?.watch?.id;
+    final config = ref.watch(voiceModelConfigProvider);
     final changed =
-        policy['transcription_model'] !=
-            ref.watch(transcriptionEngineTypeProvider).name ||
-        policy['analysis_model'] != ref.watch(selectedAiModelIdProvider) ||
-        policy['correct_transcription'] !=
-            ref.watch(aiCorrectionEnabledProvider);
+        policy['transcription_model'] != config.transcriptionModel ||
+        policy['analysis_model'] != config.analysisModel ||
+        policy['correct_transcription'] != config.correctTranscription;
     final canSave =
         !_saving &&
         snapshot?.watch != null &&
@@ -109,15 +126,14 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
         SwitchListTile(
           title: const Text('Automatically process new recordings'),
           subtitle: Text(
-            '${LlmService.localModelsSupported ? 'Uses the selected local models' : 'Transcribes with the selected speech model'}. '
-            'Audio stays on this phone. '
+            '${config.cloud ? 'Sends each new recording to OpenRouter with zero data retention, right after it arrives.' : '${config.canAnalyze ? 'Uses the selected local models' : 'Transcribes with the selected speech model'}. Audio stays on this phone.'} '
             'Existing recordings are processed manually. Turning this off '
             'leaves already queued jobs running.',
           ),
           value: enabled,
           onChanged: !_saving && (enabled || canSave) ? _save : null,
         ),
-        if (LlmService.localModelsSupported)
+        if (config.canAnalyze)
           SwitchListTile(
             title: const Text('Analyze after transcription'),
             subtitle: const Text(

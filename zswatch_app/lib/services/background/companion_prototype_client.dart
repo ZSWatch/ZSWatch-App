@@ -494,6 +494,25 @@ class CompanionPrototypeClient {
     }),
   );
 
+  /// Stores the user's OpenRouter key in the native owner (Keychain/Keystore)
+  /// and queues jobs that waited for one. Null clears it.
+  Future<void> setCloudCredential(String? key) async {
+    await methods.invokeMethod<Object?>(
+      key == null ? 'clearCloudCredential' : 'setCloudCredential',
+      {'version': 1, 'provider': 'openrouter', 'key': ?key},
+    );
+  }
+
+  /// The stored OpenRouter key, for checking its usage in settings.
+  Future<String?> cloudCredential() async {
+    final result = await methods.invokeMethod<Object?>('cloudCredential', {
+      'version': 1,
+      'provider': 'openrouter',
+    });
+    final key = result is Map ? result['key'] : null;
+    return key is String && key.isNotEmpty ? key : null;
+  }
+
   /// Whether voice results create their actions when the undo window ends,
   /// and which Android calendar they go to.
   Future<void> configureVoiceActions({

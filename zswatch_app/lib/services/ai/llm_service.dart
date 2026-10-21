@@ -14,6 +14,7 @@ import 'package:rxdart/rxdart.dart';
 import 'ai_debug_info.dart';
 import 'litert_lm_service.dart';
 import 'llm_compute_service.dart';
+import 'openrouter_client.dart';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -389,6 +390,14 @@ class LlmService {
 
   // ---- Internal state ----
   String? _modelPath;
+
+  /// Set when the selected model is an `openrouter:` id.
+  String? _cloudModel;
+  OpenRouterClient? _cloud;
+  bool get isCloud => _cloudModel != null;
+
+  /// The client cloud models use; the caller owns the key and its lifetime.
+  void useOpenRouter(OpenRouterClient client) => _cloud = client;
   int _runningRequestId = -1;
   int? _deviceMemoryMB;
 
@@ -491,6 +500,13 @@ class LlmService {
       '[LlmService] selectModel($modelId) called (was: $_selectedModelId)',
     );
     _selectedModelId = modelId;
+    if (isOpenRouterModel(modelId)) {
+      _cloudModel = openRouterModelId(modelId);
+      _selectedModelName = 'OpenRouter · $_cloudModel';
+      _modelPath = null;
+      return;
+    }
+    _cloudModel = null;
     final builtIn = catalogModels.where((m) => m.id == modelId).firstOrNull;
     _selectedModelName =
         builtIn?.displayName ??
@@ -546,6 +562,7 @@ class LlmService {
 
   /// Whether the model file is present on disk.
   Future<bool> isModelDownloaded({String? modelId}) async {
+    if (isOpenRouterModel(modelId ?? _selectedModelId)) return _cloud != null;
     final model =
         await _resolveModelById(modelId ?? _selectedModelId) ??
         catalogModels.first;
@@ -922,6 +939,9 @@ class LlmService {
     // a previous phase) before starting a new one.  This reduces the window
     // for the "Callback invoked after it has been deleted" crash.
     _checkCancelled();
+    if (_cloudModel != null) {
+      return _generateCloud(prompt, overrideMaxTokens ?? maxTokens);
+    }
     cancelInference();
     debugPrint(
       '[LlmService] _generate: _selectedModelId=$_selectedModelId _modelPath=$_modelPath',
@@ -1057,6 +1077,32 @@ class LlmService {
     return (text: text, metrics: metrics);
   }
 
+  Future<({String text, LlmInferenceMetrics metrics})> _generateCloud(
+    String prompt,
+    int maxTokens,
+  ) async {
+    final cloud = _cloud;
+    if (cloud == null) {
+      throw const OpenRouterFailure(OpenRouterFailureKind.auth, 'No key');
+    }
+    final stopwatch = Stopwatch()..start();
+    final text = (await cloud.analyze(
+      _cloudModel!,
+      prompt,
+      maxTokens: maxTokens,
+    )).trim();
+    _checkCancelled();
+    return (
+      text: text,
+      metrics: LlmInferenceMetrics(
+        modelName: _selectedModelName,
+        rawPrompt: prompt,
+        rawResponse: text,
+        wallTime: stopwatch.elapsed,
+      ),
+    );
+  }
+
   /// Process a voice memo transcript: optionally correct transcription errors,
   /// then classify + summarise in a single LLM pass, and parse the structured
   /// JSON output.
@@ -1080,9 +1126,11 @@ class LlmService {
       );
 
       // Pre-compute effective context size so we can select the right prompt.
-      final modelInfo = await _ensureModel();
-      final preParams = await _computeInferenceParams(modelInfo);
-      final effectiveCtx = preParams.contextSize;
+      var effectiveCtx = defaultTargetContextSize;
+      if (!isCloud) {
+        final modelInfo = await _ensureModel();
+        effectiveCtx = (await _computeInferenceParams(modelInfo)).contextSize;
+      }
 
       String effectiveTranscript = transcript;
       LlmInferenceMetrics? correctionMetrics;
@@ -1125,7 +1173,9 @@ class LlmService {
       // the next fllamaChat call triggers cleanup of the previous logger
       // NativeCallable while C++ may still be invoking it, causing a fatal
       // "Callback invoked after it has been deleted" crash.
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (!isCloud) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
 
       // --- Step 2: Extract items (timers and alarms included) ---
       final promptTemplate = classifyPromptOverride?.trim();
@@ -1204,6 +1254,7 @@ class LlmService {
 
   /// Cancel a running inference (best-effort).
   Future<void> cancelProcessing() async {
+    _cloud?.close();
     cancelInference();
     if (_liteRtLmLock != null) await _liteRtLmService.cancel();
   }
@@ -1227,7 +1278,8 @@ class LlmService {
 
   void dispose() {
     cancelInference();
-    _liteRtLmService.dispose();
+    // The iOS worker has no LiteRT channel; only release an engine we loaded.
+    if (_liteRtLmService.isLoaded) unawaited(_liteRtLmService.dispose());
     _stateSubject.close();
   }
 
@@ -1392,7 +1444,9 @@ JSON:
         }
       }
 
-      await Future<void>.delayed(const Duration(milliseconds: 500));
+      if (!isCloud) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
 
       // --- Step 2: Brain dump extraction prompt ---
       final prompt = _buildBrainDumpPrompt(effectiveTranscript);

@@ -25,6 +25,10 @@ abstract final class SettingsKeys {
       'selected_productivity_calendar_id';
   static const String autoCreateActions = 'auto_create_actions';
   static const String aiCorrectionEnabled = 'ai_correction_enabled';
+  static const String onDeviceProcessing = 'voice_on_device_processing';
+  static const String openRouterSttModel = 'openrouter_stt_model';
+  static const String openRouterAnalysisModel = 'openrouter_analysis_model';
+  static const String openRouterModelsCache = 'openrouter_models_cache';
   static const String coredumpServerUrl = 'coredump_server_url';
   static const String coredumpUseLatestElf = 'coredump_use_latest_elf';
 }

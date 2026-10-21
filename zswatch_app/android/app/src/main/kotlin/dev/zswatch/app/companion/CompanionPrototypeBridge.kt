@@ -112,6 +112,25 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         snapshot(result::success) { result.error("PROCESSING_POLICY_FAILED", it, null) }
                     } catch (error: Exception) { PrototypeHub.main.post { result.error("PROCESSING_POLICY_FAILED", error.message, null) } }
                 }
+                "setCloudCredential", "clearCloudCredential", "cloudCredential" -> PrototypeHub.worker.post {
+                    try {
+                        val args = call.arguments as Map<*, *>
+                        require(args["provider"] == "openrouter") { "Unknown provider" }
+                        when (call.method) {
+                            "setCloudCredential" -> {
+                                val key = args["key"] as? String ?: error("Key required")
+                                require(Regex("[A-Za-z0-9_-]{8,256}").matches(key)) { "Invalid key" }
+                                CompanionCloudCredential.write(context, key)
+                            }
+                            "clearCloudCredential" -> CompanionCloudCredential.clear(context)
+                        }
+                        val key = CompanionCloudCredential.read(context)
+                        if (call.method != "cloudCredential" && PrototypeJobs(PrototypeHub.jobJournal(context)).unblockCloud())
+                            LifecycleLogger.log("CompanionLocalJobs", "cloud_unblocked")
+                        PrototypeHub.main.post { result.success(mapOf("version" to 1, "stored" to (key != null),
+                            "key" to if (call.method == "cloudCredential") key else null)) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("CREDENTIAL_FAILED", error.message, null) } }
+                }
                 "configureVoiceActions" -> PrototypeHub.worker.post {
                     try {
                         val args = call.arguments as Map<*, *>

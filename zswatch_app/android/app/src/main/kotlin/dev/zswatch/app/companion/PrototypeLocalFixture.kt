@@ -59,6 +59,7 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         require(receipt["sha256"] == metadata["sha256"] && receipt["address"] == service.runtime!!.store.control()["address"])
         val model = "$stt|$llm|$correct"
         val revision = if (operation in listOf("transcribe", "retranscribe")) "transcribe-v1" else "voice-v1"
+        val cloud = PrototypeVoicePolicy.isCloud(stt) || PrototypeVoicePolicy.isCloud(llm)
         val previous = jobs.identities().map { jobs.state(it) }.filter { it.getJSONObject("spec").getString("recording_id") == identity }
         val selected = previous.firstOrNull { it.optBoolean("selected") }
             ?: previous.maxByOrNull { it.getJSONObject("spec").getLong("generation") }
@@ -78,8 +79,8 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         }
         val next = (previous.maxOfOrNull { it.getJSONObject("spec").getLong("generation") } ?: 0) + 1
         val spec = JSONObject().put("version", 1).put("watch_id", receipt["address"]).put("recording_id", identity)
-            .put("input_sha256", receipt["sha256"]).put("backend", "local").put("provider", "dart-voice-v1")
-            .put("model", model).put("pipeline_revision", revision).put("generation", next).put("upload_authorized", false)
+            .put("input_sha256", receipt["sha256"]).put("backend", if (cloud) "openrouter" else "local").put("provider", "dart-voice-v1")
+            .put("model", model).put("pipeline_revision", revision).put("generation", next).put("upload_authorized", cloud)
         val id = jobs.create(spec, if (operation == "reanalyze") transcript else null); advance(); return id
     }
 
@@ -119,15 +120,31 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
     private fun advance() {
         if (busy || !running()) return
         val now = System.currentTimeMillis() / 1000
+        val online by lazy { CompanionCloudCredential.online(context) }
+        var key: String? = null
         val claim = jobs.identities().asSequence().mapNotNull { id ->
             val spec = jobs.state(id).getJSONObject("spec")
             val real = spec.getString("provider") == "dart-voice-v1"
             val fixture = BuildConfig.DEBUG && spec.getString("provider") == "dart-fixture" &&
                 PrototypeHub.jobJournal(context).control()["local_fixture_enabled"] == true
-            if (spec.getString("backend") != "local" || (!real && !fixture) || spec.getBoolean("upload_authorized") ||
+            val cloud = real && spec.getString("backend") == "openrouter"
+            if (spec.getString("backend") !in PrototypeJobs.DART_BACKENDS || (!real && !fixture) ||
+                spec.getBoolean("upload_authorized") != cloud ||
                 spec.getString("watch_id") != (if (real) service.runtime!!.store.control()["address"] else "fixture-watch")) null
+            else if (cloud && jobs.state(id).getString("state") != "ready") null
+            // Offline cloud jobs stay queued without spending an attempt.
+            else if (cloud && !online) null
+            else if (cloud) {
+                key = CompanionCloudCredential.read(context)
+                val claimed = jobs.claim(id, now, leaseSeconds = 300, maxAttempts = 5)
+                if (claimed != null && key == null) {
+                    jobs.defer(claimed, now, 0, "cloud_auth_missing", blocked = true)
+                    null
+                } else claimed
+            }
             else jobs.claim(id, now, leaseSeconds = if (real) 900 else 60, maxAttempts = 5)
         }.firstOrNull() ?: return
+        val cloudKey = key.takeIf { claim.spec.getString("backend") == "openrouter" }
         busy = true
         activeClaim = claim
         val operation = ++execution
@@ -150,7 +167,9 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
                 return
             }
             val input = if (real) mapOf("recording" to service.runtime!!.store.record(claim.spec.getString("recording_id")),
-                "transcript" to jobs.state(claim.id).optString("transcript").takeIf { it.isNotEmpty() }) else emptyMap()
+                "transcript" to jobs.state(claim.id).optString("transcript").takeIf { it.isNotEmpty() }) +
+                (if (cloudKey != null) mapOf("credentials" to mapOf("openrouter_key" to cloudKey)) else emptyMap())
+                else emptyMap()
             currentEngine.execute(claim, input, checkpoint = { text ->
                 running() && busy && execution == operation && jobs.checkpointTranscript(claim, System.currentTimeMillis() / 1000, text)
             }) { response ->
@@ -177,11 +196,26 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
                             LifecycleLogger.log("CompanionLocalJobs", "processing_cancelled")
                             return@fold
                         }
-                        val permanent = code in listOf("NO_SPEECH", "MODEL_MISSING", "ANALYSIS_EMPTY")
+                        when (code) {
+                            "CLOUD_RETRY" -> {
+                                // Network or provider trouble: back off without spending an attempt.
+                                val delay = listOf(30L, 120L, 600L, 1800L)[minOf(jobs.state(claim.id).optInt("deferred_attempts"), 3)]
+                                jobs.defer(claim, received, delay, "cloud_retry", countAttempt = false)
+                                LifecycleLogger.log("CompanionLocalJobs", "cloud_retry delay=$delay")
+                                return@fold
+                            }
+                            "CLOUD_AUTH", "CLOUD_CREDITS" -> {
+                                jobs.defer(claim, received, 0, code.lowercase(), blocked = true)
+                                LifecycleLogger.log("CompanionLocalJobs", "cloud_blocked reason=${code.lowercase()}")
+                                return@fold
+                            }
+                        }
+                        val permanent = code in listOf("NO_SPEECH", "MODEL_MISSING", "ANALYSIS_EMPTY", "CLOUD_REJECTED")
                         val label = if (response.isSuccess) "invalid_dart_result" else when (code) {
                             "NO_SPEECH" -> "no_speech"
                             "MODEL_MISSING" -> "model_missing"
                             "ANALYSIS_EMPTY" -> "analysis_empty"
+                            "CLOUD_REJECTED" -> "cloud_rejected"
                             else -> "dart_worker_failed"
                         }
                         jobs.defer(claim, received, 10, label, maxAttempts = if (response.isSuccess || permanent) 1 else 5)

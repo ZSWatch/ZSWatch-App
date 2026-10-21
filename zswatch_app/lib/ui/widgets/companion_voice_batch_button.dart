@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/companion_runtime_providers.dart';
+import '../../providers/openrouter_providers.dart';
 import '../../providers/settings_providers.dart';
-import '../../services/ai/llm_service.dart';
-import '../../services/voice_memo/transcription_engine.dart';
+import '../../services/ai/voice_model_config.dart';
 
 /// Queues existing native receipts; the shared worker owns model execution.
 class CompanionVoiceBatchButton extends ConsumerStatefulWidget {
@@ -83,20 +83,15 @@ class _BatchState extends ConsumerState<CompanionVoiceBatchButton> {
     setState(() => busy = true);
     var queued = 0;
     try {
-      final prefs = await ref.read(sharedPreferencesProvider.future);
+      final config = VoiceModelConfig.fromPrefs(
+        await ref.read(sharedPreferencesProvider.future),
+      );
       for (final recording in items) {
-        await ref.read(companionClientProvider).processRecording({
-          'identity': recording.identity,
-          'operation': widget.operation,
-          'transcription_model':
-              prefs.getString(SettingsKeys.transcriptionEngineType) ??
-              TranscriptionEngineType.whisperTinyEn.name,
-          'analysis_model':
-              prefs.getString(SettingsKeys.selectedAiModelId) ??
-              LlmService.defaultModelId,
-          'correct_transcription':
-              prefs.getBool(SettingsKeys.aiCorrectionEnabled) ?? false,
-        });
+        await ref
+            .read(companionClientProvider)
+            .processRecording(
+              config.processingRequest(recording.identity, widget.operation),
+            );
         queued++;
       }
       if (mounted) {
@@ -123,7 +118,7 @@ class _BatchState extends ConsumerState<CompanionVoiceBatchButton> {
 
   @override
   Widget build(BuildContext context) {
-    if (!LlmService.localModelsSupported &&
+    if (!ref.watch(voiceModelConfigProvider).canAnalyze &&
         ['process', 'reanalyze'].contains(widget.operation)) {
       return const SizedBox.shrink();
     }

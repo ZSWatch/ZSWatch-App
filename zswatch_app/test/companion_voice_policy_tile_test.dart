@@ -6,12 +6,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/ai_providers.dart';
+import 'package:zswatch_app/providers/openrouter_providers.dart';
 import 'package:zswatch_app/providers/settings_providers.dart';
 import 'package:zswatch_app/providers/voice_memo_providers.dart';
 import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/services/voice_memo/transcription_engine.dart';
 import 'package:zswatch_app/ui/widgets/companion_voice_policy_tile.dart';
+
+final _onDevice = onDeviceProcessingProvider.overrideWith(
+  (ref) => PrefBoolNotifier(null, SettingsKeys.onDeviceProcessing, true),
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +54,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            _onDevice,
             companionSnapshotProvider.overrideWith((ref) => values.stream),
             watchServiceProvider.overrideWith(
               (ref) => throw StateError('No Dart BLE'),
@@ -149,6 +155,7 @@ void main() {
           ProviderScope(
             key: ValueKey(flags),
             overrides: [
+              _onDevice,
               companionSnapshotProvider.overrideWith(
                 (ref) =>
                     Stream.value(CompanionPrototypeSnapshot.decode(fields)),
@@ -204,7 +211,9 @@ void main() {
     },
   );
 
-  testWidgets('iOS only transcribes and never needs an LLM', (tester) async {
+  testWidgets('iOS on-device only transcribes and never needs an LLM', (
+    tester,
+  ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     final calls = <MethodCall>[];
     final fields = <String, Object?>{
@@ -229,6 +238,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          _onDevice,
           companionSnapshotProvider.overrideWith(
             (ref) => Stream.value(CompanionPrototypeSnapshot.decode(fields)),
           ),
@@ -266,6 +276,90 @@ void main() {
     await tester.pumpAndSettle();
     expect((calls.single.arguments as Map)['analysis_enabled'], false);
     await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('OpenRouter by default: needs a key, then analyzes on iOS', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    for (final key in [null, 'sk-or-v1-test']) {
+      final calls = <MethodCall>[];
+      final fields = <String, Object?>{
+        'version': 1,
+        'owner': 'ios_companion_native',
+        'platform': 'ios',
+        'runtime_active': true,
+        'protocol_ready': true,
+        'phase': 'ready',
+        'generation': 1,
+        'event_cursor': 0,
+        'events': <Object?>[],
+        'recordings': <String, Object?>{},
+        'address': 'FE88C737-593F-DB9B-732D-E11FF4C463F5',
+        'desired_running': true,
+      };
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        if (call.method == 'cloudCredential') {
+          return {'version': 1, 'key': key};
+        }
+        return fields;
+      });
+      await tester.pumpWidget(
+        ProviderScope(
+          key: ValueKey(key),
+          overrides: [
+            companionSnapshotProvider.overrideWith(
+              (ref) => Stream.value(CompanionPrototypeSnapshot.decode(fields)),
+            ),
+            onDeviceProcessingProvider.overrideWith(
+              (ref) => PrefBoolNotifier(
+                null,
+                SettingsKeys.onDeviceProcessing,
+                false,
+              ),
+            ),
+            openRouterSttModelProvider.overrideWith(
+              (ref) => PrefStringNotifier(null, 'stt', 'google/stt'),
+            ),
+            openRouterAnalysisModelProvider.overrideWith(
+              (ref) => PrefStringNotifier(null, 'llm', 'google/llm'),
+            ),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: CompanionVoicePolicyTile()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+      expect(find.text('Analyze after transcription'), findsOneWidget);
+      await tester.tap(
+        find.widgetWithText(
+          SwitchListTile,
+          'Automatically process new recordings',
+        ),
+      );
+      await tester.pumpAndSettle();
+      if (key == null) {
+        expect(calls.map((c) => c.method), ['cloudCredential']);
+        expect(find.text('Add key'), findsOneWidget);
+      } else {
+        expect(calls.last.method, 'configureVoiceProcessing');
+        expect(calls.last.arguments, {
+          'version': 1,
+          'watch_id': 'FE88C737-593F-DB9B-732D-E11FF4C463F5',
+          'enabled': true,
+          'transcription_model': 'openrouter:google/stt',
+          'analysis_model': 'openrouter:google/llm',
+          'correct_transcription': false,
+          'analysis_enabled': true,
+        });
+      }
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    }
     debugDefaultTargetPlatformOverride = null;
   });
 }

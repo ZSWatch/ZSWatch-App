@@ -14,7 +14,10 @@ import '../../../data/models/companion_recording.dart';
 import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/ai_providers.dart';
+import '../../../providers/openrouter_providers.dart';
 import '../../../services/ai/llm_service.dart';
+import '../../../services/ai/openrouter_client.dart';
+import '../../../services/ai/voice_model_config.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../../services/voice_memo/voice_memo_file_store.dart';
 import '../../../providers/companion_recording_import_providers.dart';
@@ -101,7 +104,8 @@ class _CompanionVoiceMemosViewState
               autofocus: true,
               maxLength: multiline ? 16000 : 64,
               maxLines: multiline ? 10 : 1,
-              decoration: multiline && LlmService.localModelsSupported
+              decoration:
+                  multiline && ref.read(voiceModelConfigProvider).canAnalyze
                   ? const InputDecoration(
                       helperText:
                           'Analyze again to update the summary and action drafts.',
@@ -310,7 +314,8 @@ class _CompanionVoiceMemosViewState
         'retranscribe',
       ].contains(operation);
       final prefs = await ref.read(sharedPreferencesProvider.future);
-      final llmModels = transcriptionOnly
+      final config = VoiceModelConfig.fromPrefs(prefs);
+      final llmModels = transcriptionOnly || config.cloud
           ? <LlmModelInfo>[]
           : await ref.read(llmAvailableModelsProvider.future);
       var selectedStt =
@@ -320,8 +325,13 @@ class _CompanionVoiceMemosViewState
           prefs.getString(SettingsKeys.selectedAiModelId) ??
           LlmService.defaultModelId;
       if (!transcriptionOnly &&
+          !config.cloud &&
           !llmModels.any((model) => model.id == selectedLlm)) {
         selectedLlm = LlmService.defaultModelId;
+      }
+      if (config.cloud) {
+        selectedStt = config.transcriptionModel;
+        selectedLlm = config.analysisModel;
       }
       if (!mounted) return;
       final accepted = await showDialog<bool>(
@@ -332,15 +342,21 @@ class _CompanionVoiceMemosViewState
               'transcribe' => 'Transcribe recording',
               'retranscribe' => 'Re-transcribe recording',
               'reanalyze' => 'Re-analyze transcript',
-              _ => 'Process recording locally',
+              _ =>
+                config.cloud
+                    ? 'Process recording'
+                    : 'Process recording locally',
             }),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  'Uses models already downloaded on this phone. Audio stays on the phone.',
+                Text(
+                  config.cloud
+                      ? 'Sends the ${operation == 'reanalyze' ? 'transcript' : 'recording'} to OpenRouter '
+                            '(${openRouterModelId(config.analysisModel)}) with zero data retention.'
+                      : 'Uses models already downloaded on this phone. Audio stays on the phone.',
                 ),
-                if (operation != 'reanalyze')
+                if (operation != 'reanalyze' && !config.cloud)
                   DropdownButton<String>(
                     isExpanded: true,
                     value: selectedStt,
@@ -360,7 +376,7 @@ class _CompanionVoiceMemosViewState
                       }
                     },
                   ),
-                if (!transcriptionOnly)
+                if (!transcriptionOnly && !config.cloud)
                   DropdownButton<String>(
                     isExpanded: true,
                     value: selectedLlm,
@@ -401,13 +417,15 @@ class _CompanionVoiceMemosViewState
         'operation': operation,
         'transcription_model': selectedStt,
         'analysis_model': selectedLlm,
-        'correct_transcription':
-            prefs.getBool(SettingsKeys.aiCorrectionEnabled) ?? false,
+        'correct_transcription': config.correctTranscription,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Local processing queued. You can close the app.'),
+          SnackBar(
+            content: Text(
+              '${config.cloud ? 'Processing' : 'Local processing'} queued. '
+              'You can close the app.',
+            ),
           ),
         );
       }
@@ -627,7 +645,10 @@ class _CompanionVoiceMemosViewState
                               Navigator.pop(context);
                               processRecording(
                                 recording,
-                                operation: LlmService.localModelsSupported
+                                operation:
+                                    ref
+                                        .read(voiceModelConfigProvider)
+                                        .canAnalyze
                                     ? 'process'
                                     : 'transcribe',
                               );
@@ -1071,7 +1092,7 @@ class _CompanionVoiceMemosViewState
                       ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (LlmService.localModelsSupported)
+                            if (ref.watch(voiceModelConfigProvider).canAnalyze)
                               IconButton(
                                 tooltip: 'Process recording locally',
                                 onPressed: canProcess
@@ -1094,7 +1115,9 @@ class _CompanionVoiceMemosViewState
                                   value: 'retranscribe',
                                   child: Text('Re-transcribe'),
                                 ),
-                                if (LlmService.localModelsSupported)
+                                if (ref
+                                    .watch(voiceModelConfigProvider)
+                                    .canAnalyze)
                                   const PopupMenuItem(
                                     value: 'reanalyze',
                                     child: Text('Re-analyze transcript'),

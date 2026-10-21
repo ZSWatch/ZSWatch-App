@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/ai_providers.dart';
 import '../../../providers/companion_runtime_providers.dart';
+import '../../../providers/openrouter_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/voice_memo_providers.dart';
 import '../../../services/ai/ai_debug_info.dart';
@@ -23,6 +24,7 @@ import '../../../services/voice_memo/transcription_engine.dart';
 import '../../widgets/ai_debug_widgets.dart';
 import '../../widgets/companion_voice_policy_tile.dart';
 import '../../widgets/companion_voice_batch_button.dart';
+import 'openrouter_settings_section.dart';
 
 // ---------------------------------------------------------------------------
 // Benchmark provider (screen-scoped singleton)
@@ -56,29 +58,52 @@ class AiModelsSettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final native = ref.watch(nativeCompanionRuntimeProvider);
-    final localLlm = LlmService.localModelsSupported;
+    // OpenRouter runs only through the native companion's jobs.
+    final onDevice = !native || ref.watch(onDeviceProcessingProvider);
+    final localLlm = LlmService.localModelsSupported && onDevice;
     return Scaffold(
       appBar: AppBar(title: const Text('Voice Memo AI')),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 32),
         children: [
+          if (native) ...[
+            if (!onDevice) const OpenRouterSettingsSection(),
+            SwitchListTile(
+              title: const Text('Experimental: on-device processing'),
+              subtitle: Text(
+                LlmService.localModelsSupported
+                    ? 'Transcribe with Whisper and analyze with a local model '
+                          'instead of OpenRouter. Slower; audio stays on '
+                          'this phone.'
+                    : 'Transcribe with Whisper instead of OpenRouter. '
+                          'Transcription only, no reminders or timers; '
+                          'audio stays on this phone.',
+              ),
+              value: onDevice,
+              onChanged: (value) =>
+                  ref.read(onDeviceProcessingProvider.notifier).set(value),
+            ),
+            const Divider(height: 1),
+          ],
           // ---- Transcription section ----
-          const _SectionHeader(
-            title: 'Transcription Model',
-            subtitle: 'Speech-to-text engine used for voice memos',
-          ),
-          const _TranscriptionModelSelector(),
-          if (native)
-            const CompanionVoiceBatchButton(
-              operation: 'retranscribe',
-              label: 'Re-transcribe all with selected model',
-            )
-          else
-            const _RetranscribeButton(),
+          if (onDevice) ...[
+            const _SectionHeader(
+              title: 'Transcription Model',
+              subtitle: 'Speech-to-text engine used for voice memos',
+            ),
+            const _TranscriptionModelSelector(),
+            if (native)
+              const CompanionVoiceBatchButton(
+                operation: 'retranscribe',
+                label: 'Re-transcribe all with selected model',
+              )
+            else
+              const _RetranscribeButton(),
 
-          const SizedBox(height: 24),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
+            const SizedBox(height: 24),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+          ],
 
           if (localLlm) ...[
             // ---- AI Processing section ----
@@ -99,7 +124,7 @@ class AiModelsSettingsScreen extends ConsumerWidget {
             const _ImportModelTile(),
           ],
           if (native) const CompanionVoicePolicyTile(),
-          if (native && localLlm)
+          if (native && (localLlm || !onDevice))
             const CompanionVoiceBatchButton(
               operation: 'process',
               label: 'Process all unprocessed',

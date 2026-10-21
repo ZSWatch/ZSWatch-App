@@ -192,7 +192,7 @@ class PrototypeJobs(private val store: PrototypeStore) {
                 changed = true
                 continue
             }
-            if (item.getJSONObject("spec").getString("backend") != "local" || item.isNull("lease_until") ||
+            if (item.getJSONObject("spec").getString("backend") !in DART_BACKENDS || item.isNull("lease_until") ||
                 item.getString("state") != "ready") continue
             item.put("fence", item.getLong("fence") + 1).put("lease_until", JSONObject.NULL)
                 .put("next_attempt", 0L).put("last_error", "execution_interrupted")
@@ -248,6 +248,7 @@ class PrototypeJobs(private val store: PrototypeStore) {
         require(delay >= 0 && maxAttempts > 0)
         val jobs = jobs(); val item = owned(jobs, claim, now) ?: return false
         val attempts = item.getInt("attempts") - if (error == "server_pending" || !countAttempt) 1 else 0
+        if (!countAttempt) item.put("deferred_attempts", item.optInt("deferred_attempts") + 1)
         item.put("attempts", attempts).put("lease_until", JSONObject.NULL).put("next_attempt", now + delay)
             .put("last_error", error).put("state", if (blocked) "blocked" else if (attempts >= maxAttempts) "failed" else item.getString("state"))
         commit("job_deferred", jobs); return true
@@ -263,7 +264,7 @@ class PrototypeJobs(private val store: PrototypeStore) {
         val spec = item.getJSONObject("spec")
         require(spec.getString("backend") != "remote" || remoteId != null)
         if (transcriptionOnly) {
-            require(spec.getString("provider") == "dart-voice-v1" && spec.getString("backend") == "local")
+            require(spec.getString("provider") == "dart-voice-v1" && spec.getString("backend") in DART_BACKENDS)
             item.put("result", result).put("transcript", result.getString("transcript"))
                 .put("state", "transcribed").put("lease_until", JSONObject.NULL).put("last_error", JSONObject.NULL)
             // A transcript is phone data, not an AI popup/action for the watch.
@@ -300,11 +301,20 @@ class PrototypeJobs(private val store: PrototypeStore) {
         }
     }
 
+    /** A new key or top-up: queue every job that waited for it. */
+    fun unblockCloud(): Boolean {
+        val ids = identities().filter { id -> state(id).let {
+            it.getString("state") == "blocked" && it.optString("last_error").startsWith("cloud_") } }
+        for (id in ids) refreshCredentials(id)
+        return ids.isNotEmpty()
+    }
+
     fun refreshCredentials(id: String): Boolean {
         val jobs = jobs(); val item = jobs.getJSONObject(id)
         if (item.getString("state") != "blocked") return false
         item.put("state", if (item.isNull("remote_id")) "ready" else "waiting_remote").put("fence", item.getLong("fence") + 1)
             .put("lease_until", JSONObject.NULL).put("next_attempt", 0L).put("attempts", 0).put("last_error", JSONObject.NULL)
+            .put("deferred_attempts", 0)
         commit("job_credentials_refreshed", jobs); return true
     }
 
@@ -374,6 +384,8 @@ class PrototypeJobs(private val store: PrototypeStore) {
 
     companion object {
         private val ACTIVE = listOf("ready", "waiting_remote", "blocked")
+        /** Backends the shared Dart worker executes; openrouter jobs upload with consent. */
+        val DART_BACKENDS = listOf("local", "openrouter")
         private const val ACTIVE_LIMIT = 100
         private const val TOTAL_LIMIT = 2000
         /** Matches the watch popup's auto-dismiss (AUTO_DISMISS_MS). */
@@ -390,8 +402,8 @@ class PrototypeJobs(private val store: PrototypeStore) {
                 require(spec.get(name) is String && spec.getString(name).isNotEmpty() && spec.getString(name).length <= 1024)
             require(spec.get("input_sha256") is String && Regex("[a-f0-9]{64}").matches(spec.getString("input_sha256")))
             require(integer(spec.get("generation")) && spec.getLong("generation") >= 1)
-            require(spec.get("backend") in listOf("local", "remote") && spec.get("upload_authorized") is Boolean)
-            require(spec.getString("backend") != "remote" || spec.getBoolean("upload_authorized"))
+            require(spec.get("backend") in listOf("local", "remote", "openrouter") && spec.get("upload_authorized") is Boolean)
+            require(spec.getString("backend") == "local" || spec.getBoolean("upload_authorized"))
             return sha(canonical(spec))
         }
         fun validateResult(result: JSONObject, transcriptionOnly: Boolean = false) {

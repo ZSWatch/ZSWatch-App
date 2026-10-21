@@ -19,8 +19,12 @@ final class CompanionVoiceJobs {
     return String(data: data, encoding: .utf8)!
   }
   static func sha(_ text: String) -> String { CompanionRecordingFiles.sha(Data(text.utf8)) }
+  static let cloudPrefix = "openrouter:"
+  static func isCloud(_ model: String) -> Bool { model.hasPrefix(cloudPrefix) }
+  /// Jobs whose models run on OpenRouter; the key is passed per execution.
+  static func isCloudJob(_ spec: [String: Any]?) -> Bool { spec?["backend"] as? String == "openrouter" }
   static func configuration(_ stt: String, _ llm: String, _ correct: Bool, analyze: Bool = true) throws -> [String: Any] {
-    guard stt.range(of: "^[A-Za-z0-9_]{1,128}$", options: .regularExpression) != nil,
+    guard stt.range(of: "^([A-Za-z0-9_]{1,128}|openrouter:[A-Za-z0-9._:/-]{1,200})$", options: .regularExpression) != nil,
           !llm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, llm.utf8.count <= 256, !llm.contains("|") else {
       throw CompanionFailure.invalid("Invalid local model configuration")
     }
@@ -52,24 +56,35 @@ final class CompanionVoiceJobs {
       if item["state"] as? String == "ready" { item["last_error"] = "execution_interrupted" }
       next[id] = item
     }
-    // iOS has no local LLM: analysis jobs from older builds can never run.
+    // iOS has no local LLM: local analysis jobs from older builds can never run.
     for (id, item) in next where ["ready", "blocked"].contains(item["state"] as? String ?? "") &&
-      (item["spec"] as? [String: Any])?["pipeline_revision"] as? String == "voice-v1" {
+      (item["spec"] as? [String: Any])?["pipeline_revision"] as? String == "voice-v1" && !Self.isCloudJob(item["spec"] as? [String: Any]) {
       next[id]?["state"] = "failed"; next[id]?["last_error"] = "analysis_unavailable"
       next[id]?["fence"] = (item["fence"] as? Int ?? 0) + 1
     }
     try commit("voice_process_recovered", next)
   }
   func start(identity: String, receipt: [String: Any], stt: String, llm: String, correct: Bool, operation: String) throws -> String {
-    guard ["transcribe", "retranscribe"].contains(operation) else { throw CompanionFailure.unavailable("Analysis is not available on iOS") }
+    let transcribeOnly = ["transcribe", "retranscribe"].contains(operation)
+    guard transcribeOnly || (["process", "reanalyze"].contains(operation) && Self.isCloud(llm)) else {
+      throw CompanionFailure.unavailable("On-device analysis is not available on iOS")
+    }
     guard receipt["state"] as? String == "downloaded", let hash = receipt["sha256"] as? String,
           let address = receipt["address"] as? String else { throw CompanionFailure.invalid("Verified recording receipt required") }
     _ = try Self.configuration(stt, llm, correct)
-    let model = "\(stt)|\(llm)|\(correct)"; let revision = "transcribe-v1"
+    let model = "\(stt)|\(llm)|\(correct)"; let revision = transcribeOnly ? "transcribe-v1" : "voice-v1"
+    let cloud = Self.isCloud(stt) || Self.isCloud(llm)
     let prior = jobs.filter { ($0.value["spec"] as? [String: Any])?["recording_id"] as? String == identity }
+    let selected = prior.values.first(where: { $0["selected"] as? Bool == true }) ?? prior.values.max(by: {
+      (($0["spec"] as? [String: Any])?["generation"] as? Int ?? 0) < (($1["spec"] as? [String: Any])?["generation"] as? Int ?? 0)
+    })
+    let transcript = (selected?["result"] as? [String: Any])?["transcript"] as? String ?? selected?["transcript"] as? String
+    let reuseTranscript = operation == "reanalyze" || (operation == "process" &&
+      (selected?["spec"] as? [String: Any])?["pipeline_revision"] as? String == "transcript-edit-v1")
+    guard operation != "reanalyze" || transcript?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else { throw CompanionFailure.unavailable("Transcribe this recording first") }
     var next = jobs
     func select(_ id: String) { for key in prior.keys { next[key]?["selected"] = key == id } }
-    if operation != "retranscribe", let existing = prior.first(where: {
+    if !["retranscribe", "reanalyze"].contains(operation), !reuseTranscript, let existing = prior.first(where: {
       let spec = $0.value["spec"] as? [String: Any]
       return spec?["model"] as? String == model && spec?["pipeline_revision"] as? String == revision &&
         spec?["input_sha256"] as? String == hash && !["failed", "cancelled"].contains($0.value["state"] as? String ?? "")
@@ -82,8 +97,8 @@ final class CompanionVoiceJobs {
     guard Self.hasRoom(next) else { throw CompanionFailure.unavailable("Voice job capacity reached") }
     let generation = (prior.values.map { ($0["spec"] as? [String: Any])?["generation"] as? Int ?? 0 }.max() ?? 0) + 1
     let spec: [String: Any] = ["version": 1, "watch_id": address, "recording_id": identity, "input_sha256": hash,
-      "backend": "local", "provider": "dart-voice-v1", "model": model, "pipeline_revision": revision,
-      "generation": generation, "upload_authorized": false]
+      "backend": cloud ? "openrouter" : "local", "provider": "dart-voice-v1", "model": model, "pipeline_revision": revision,
+      "generation": generation, "upload_authorized": cloud]
     let id = Self.sha(try Self.canonical(spec))
     for key in prior.keys {
       next[key]?["selected"] = false
@@ -93,6 +108,7 @@ final class CompanionVoiceJobs {
     }
     var item: [String: Any] = ["spec": spec, "state": "ready", "fence": 0, "lease_until": NSNull(),
       "attempts": 0, "deferred_attempts": 0, "next_attempt": 0, "last_error": NSNull(), "remote_id": NSNull(), "selected": true]
+    if reuseTranscript { item["transcript"] = transcript }
     next[id] = item; try commit("voice_job_created", next); return id
   }
   // Finished jobs hold the user's transcripts and results; only pending work
@@ -116,6 +132,7 @@ final class CompanionVoiceJobs {
   }
   func claim(_ id: String) throws -> Claim? {
     guard var item = jobs[id], item["state"] as? String == "ready", (item["lease_until"] as? Int ?? 0) <= CompanionJournal.now,
+          (CompanionRecordingFiles.integer(item["next_attempt"]) ?? 0) <= CompanionJournal.now,
           let spec = item["spec"] as? [String: Any] else { return nil }
     let attempts = (item["attempts"] as? Int ?? 0) + 1
     // Deliberate lifecycle pauses fence/cancel work but are not inference
@@ -138,9 +155,10 @@ final class CompanionVoiceJobs {
     if let saved = jobs[claim.id]?["transcript"] as? String, saved != transcript { throw CompanionFailure.invalid("Transcript checkpoint changed") }
     var next = jobs; next[claim.id]?["transcript"] = transcript; try commit("voice_transcript_committed", next); return true
   }
-  func deferClaim(_ claim: Claim, code: String) throws {
+  func deferClaim(_ claim: Claim, code: String, delayMs: Int = 0) throws {
     guard jobs[claim.id]?["state"] as? String == "ready", jobs[claim.id]?["fence"] as? Int == claim.fence else { return }
     var next = jobs; next[claim.id]?["fence"] = claim.fence + 1; next[claim.id]?["lease_until"] = NSNull(); next[claim.id]?["last_error"] = code
+    next[claim.id]?["next_attempt"] = delayMs > 0 ? CompanionJournal.now + delayMs : 0
     next[claim.id]?["deferred_attempts"] = (jobs[claim.id]?["deferred_attempts"] as? Int ?? 0) + 1
     try commit("voice_execution_deferred", next)
   }
@@ -149,6 +167,21 @@ final class CompanionVoiceJobs {
     var next = jobs; next[id]?["state"] = blocked ? "blocked" : "failed"; next[id]?["lease_until"] = NSNull(); next[id]?["last_error"] = code
     next[id]?["fence"] = (jobs[id]?["fence"] as? Int ?? 0) + 1
     try commit("voice_job_failed", next)
+  }
+  /// A new key or top-up: queue every job that waited for it.
+  @discardableResult func unblockCloud() throws -> Bool {
+    var next = jobs; var changed = false
+    for (id, item) in jobs where item["state"] as? String == "blocked" && (item["last_error"] as? String ?? "").hasPrefix("cloud_") {
+      next[id]?["state"] = "ready"; next[id]?["last_error"] = NSNull(); next[id]?["attempts"] = 0
+      next[id]?["deferred_attempts"] = 0; next[id]?["next_attempt"] = 0; changed = true
+    }
+    if changed { try commit("voice_cloud_unblocked", next) }
+    return changed
+  }
+  /// Earliest time a deferred ready job may run again.
+  var nextAttempt: Int? {
+    jobs.values.filter { $0["state"] as? String == "ready" }.compactMap { CompanionRecordingFiles.integer($0["next_attempt"]) }
+      .filter { $0 > CompanionJournal.now }.min()
   }
   func cancel(_ id: String) throws {
     guard jobs[id] != nil else { throw CompanionFailure.invalid("Unknown voice job") }
