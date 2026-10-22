@@ -12,8 +12,9 @@ import 'openrouter_providers.dart';
 import 'settings_providers.dart';
 import 'voice_memo_providers.dart';
 
-/// Applies the models chosen in settings to enabled automatic processing, so
-/// e.g. leaving on-device processing or adding a key needs no "Apply".
+/// Saves the models chosen in settings to the native voice policy, so e.g.
+/// leaving on-device processing or adding a key needs no "Apply". Chat
+/// questions use the saved models also while automatic processing is off.
 final companionVoicePolicySyncProvider = Provider<void>((ref) {
   if (!ref.watch(nativeCompanionRuntimeProvider) ||
       ref.watch(demoModeProvider) ||
@@ -24,30 +25,35 @@ final companionVoicePolicySyncProvider = Provider<void>((ref) {
   final snapshot = ref.watch(companionSnapshotProvider).asData?.value;
   final watch = snapshot?.watch;
   final raw = snapshot?.fields['voice_processing_policy'];
+  final policy = raw is Map ? raw : null;
+  final enabled = policy?['enabled'] == true;
   if (watch == null ||
-      raw is! Map ||
-      raw['enabled'] != true ||
-      raw['watch_id'] != watch.id ||
-      snapshot?.fields['desired_running'] != true) {
+      snapshot?.fields['desired_running'] != true ||
+      // Leave automatic processing of another watch alone.
+      (enabled && policy?['watch_id'] != watch.id)) {
     return;
   }
   final config = ref.watch(voiceModelConfigProvider);
-  final hasKey = ref.watch(openRouterKeyProvider).valueOrNull != null;
-  if (raw['transcription_model'] == config.transcriptionModel &&
-      raw['analysis_model'] == config.analysisModel &&
-      raw['correct_transcription'] == config.correctTranscription) {
+  if (policy != null &&
+      policy['transcription_model'] == config.transcriptionModel &&
+      policy['analysis_model'] == config.analysisModel &&
+      policy['correct_transcription'] == config.correctTranscription) {
     return;
   }
-  if (config.cloud && !hasKey) return;
-  final analyze = config.canAnalyze && raw['analysis_enabled'] != false;
+  if (enabled &&
+      config.cloud &&
+      ref.watch(openRouterKeyProvider).valueOrNull == null) {
+    return;
+  }
+  final analyze = config.canAnalyze && policy?['analysis_enabled'] != false;
   final attempt = ref.read(_voicePolicySyncAttemptProvider);
   final signature =
-      '${watch.id}|${config.transcriptionModel}|${config.analysisModel}|'
-      '${config.correctTranscription}|$analyze';
+      '${watch.id}|$enabled|${config.transcriptionModel}|'
+      '${config.analysisModel}|${config.correctTranscription}|$analyze';
   // A failed apply is not retried until the choice changes.
   if (attempt.signature == signature) return;
   attempt.signature = signature;
-  unawaited(_apply(ref, watch.id, config, analyze));
+  unawaited(_apply(ref, watch.id, config, enabled, analyze));
 });
 
 class _VoicePolicySyncAttempt {
@@ -62,10 +68,11 @@ Future<void> _apply(
   Ref ref,
   String watchId,
   VoiceModelConfig config,
+  bool enabled,
   bool analyze,
 ) async {
   try {
-    if (!config.cloud) {
+    if (enabled && !config.cloud) {
       // Local models must be downloaded; otherwise "Apply" stays visible.
       final speech = await ref.read(
         transcriptionModelStatusProvider(
@@ -81,7 +88,7 @@ Future<void> _apply(
         .read(companionClientProvider)
         .configureVoiceProcessing(
           watchId: watchId,
-          enabled: true,
+          enabled: enabled,
           transcriptionModel: config.transcriptionModel,
           analysisModel: config.analysisModel,
           correctTranscription: config.correctTranscription,
