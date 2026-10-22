@@ -345,6 +345,32 @@ final class CompanionPhoneUITests: XCTestCase {
         try require(app.buttons["Disconnect"].waitForExistence(timeout: 60), "Connect did not return", capture: "reconnect")
     }
 
+    /// The permission setup screen after the first connection (pref unset):
+    /// allows location from it and leaves with Skip/Done.
+    func testPermissionsSetup() throws {
+        app.activate()
+        let connect = app.buttons["Connect"]
+        if connect.waitForExistence(timeout: 10) { connect.tap() }
+        try require(exact("Set up ZSWatch").waitForExistence(timeout: 90), "No setup screen", capture: "no-setup")
+        screenshot("setup")
+        let allow = app.buttons["Allow"].firstMatch
+        if allow.exists {
+            allow.tap()
+            for label in ["Allow While Using App", "Change to Always Allow", "Allow"] {
+                let button = springboard.buttons[label]
+                if button.waitForExistence(timeout: 5) {
+                    screenshot("prompt-\(label)", springboard)
+                    button.tap()
+                }
+            }
+            Thread.sleep(forTimeInterval: 2)
+            screenshot("after-allow")
+        }
+        let leave = app.buttons["Done"].exists ? app.buttons["Done"] : app.buttons["Skip for now"]
+        try tap(leave, "leave setup")
+        try require(app.buttons["Disconnect"].waitForExistence(timeout: 10), "Not back on Home", capture: "after-setup")
+    }
+
     /// Developer > Find watch makes the watch buzz.
     func testFindWatch() throws {
         try openRoute("Developer", heading: "Developer Tools")
