@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -25,6 +26,11 @@ import 'companion_permissions_summary.dart';
 /// Displays:
 /// - DFU settings (keep screen on)
 /// - About section (app version, links)
+final _appVersionProvider = FutureProvider<String>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return '${info.version} (${info.buildNumber})';
+});
+
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -33,8 +39,6 @@ class SettingsScreen extends ConsumerWidget {
       'https://github.com/ZSWatch/ZSWatch-App'; // <-- Change to app repo
   static const String _firmwareGithubUrl =
       'https://github.com/ZSWatch/ZSWatch'; // <-- Change to firmware repo
-  static const String _appVersion = '1.0.0';
-  static const String _buildNumber = '1';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -149,8 +153,7 @@ class SettingsScreen extends ConsumerWidget {
               color: AppTheme.textSecondary,
             ),
             title: 'App Version',
-            subtitle: '$_appVersion ($_buildNumber)',
-            onTap: () => _showVersionDialog(context),
+            subtitle: ref.watch(_appVersionProvider).valueOrNull ?? '',
           ),
           _SettingsTile(
             leading: const Icon(
@@ -181,7 +184,10 @@ class SettingsScreen extends ConsumerWidget {
             title: 'Licenses',
             subtitle: 'Open source licenses',
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showLicensesPage(context),
+            onTap: () => _showLicensesPage(
+              context,
+              ref.read(_appVersionProvider).valueOrNull,
+            ),
           ),
 
           const Divider(height: 32),
@@ -267,35 +273,11 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showVersionDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('App Version'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _InfoRow(label: 'Version', value: _appVersion),
-            _InfoRow(label: 'Build', value: _buildNumber),
-            _InfoRow(label: 'Platform', value: 'Flutter'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLicensesPage(BuildContext context) {
+  void _showLicensesPage(BuildContext context, String? version) {
     showLicensePage(
       context: context,
       applicationName: 'ZSWatch Companion',
-      applicationVersion: '$_appVersion ($_buildNumber)',
+      applicationVersion: version,
       applicationIcon: Padding(
         padding: const EdgeInsets.all(8.0),
         child: SvgPicture.asset(
@@ -433,32 +415,6 @@ class _SettingsTile extends StatelessWidget {
       ),
       trailing: trailing,
       onTap: onTap,
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
-          ),
-          Text(value, style: Theme.of(context).textTheme.bodyMedium),
-        ],
-      ),
     );
   }
 }
