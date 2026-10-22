@@ -53,7 +53,9 @@ final companionVoicePolicySyncProvider = Provider<void>((ref) {
   // A failed apply is not retried until the choice changes.
   if (attempt.signature == signature) return;
   attempt.signature = signature;
-  unawaited(_apply(ref, watch.id, config, enabled, analyze));
+  unawaited(
+    _apply(ref, attempt, signature, watch.id, config, enabled, analyze),
+  );
 });
 
 class _VoicePolicySyncAttempt {
@@ -66,6 +68,8 @@ final _voicePolicySyncAttemptProvider = Provider<_VoicePolicySyncAttempt>(
 
 Future<void> _apply(
   Ref ref,
+  _VoicePolicySyncAttempt attempt,
+  String signature,
   String watchId,
   VoiceModelConfig config,
   bool enabled,
@@ -83,6 +87,8 @@ Future<void> _apply(
           (analyze && !await ref.read(llmModelDownloadedProvider.future))) {
         return;
       }
+      // A newer choice may have been saved while this one waited.
+      if (attempt.signature != signature) return;
     }
     await ref
         .read(companionClientProvider)
