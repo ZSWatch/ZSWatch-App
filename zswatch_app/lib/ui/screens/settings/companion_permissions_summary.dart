@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/companion_runtime_providers.dart';
+import '../../../providers/foreground_service_providers.dart';
 import '../../../providers/companion_permission_setup_providers.dart';
 import 'location_permission_guidance.dart';
 
@@ -159,9 +160,10 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
                   'battery_exemption',
                   'Battery optimization',
                   'Allow background operation',
-                  () async {
-                    await Permission.ignoreBatteryOptimizations.request();
-                  },
+                  // Play restricts the direct exemption request.
+                  () => ref
+                      .read(foregroundServiceProvider)
+                      .openBatteryOptimizationSettings(),
                 ),
               ListTile(
                 title: Text(
