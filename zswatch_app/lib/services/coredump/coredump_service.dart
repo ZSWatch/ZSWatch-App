@@ -57,11 +57,11 @@ class CoredumpAnalysisState {
 
 /// Orchestrates the full coredump analysis pipeline:
 /// 1. Enable SMP on the watch
-/// 2. Download /user/coredump.txt via MCUmgr FS
+/// 2. Download /lvgl_lfs/coredump.txt via MCUmgr FS
 /// 3. Upload to backend for analysis
 /// 4. Return backtrace/registers
 class CoredumpService {
-  static const String _coredumpPath = '/user/coredump.txt';
+  static const String _coredumpPath = '/lvgl_lfs/coredump.txt';
 
   final WatchService? _watchService;
   final Future<Uint8List> Function()? _nativeDownload;
