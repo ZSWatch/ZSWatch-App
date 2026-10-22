@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../providers/companion_runtime_providers.dart';
 
 final companionPermissionsStatusProvider = FutureProvider.autoDispose((ref) {
@@ -80,6 +81,31 @@ List<CompanionPermission> companionPermissions() => [
       },
     ),
 ];
+
+/// One permission row, used by Settings and the setup screen.
+class CompanionPermissionTile extends StatelessWidget {
+  const CompanionPermissionTile({
+    super.key,
+    required this.permission,
+    required this.granted,
+    this.onAllow,
+  });
+
+  final CompanionPermission permission;
+  final bool granted;
+  final VoidCallback? onAllow;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(permission.title),
+      subtitle: Text(permission.description),
+      trailing: granted
+          ? const Icon(Icons.check_circle, color: AppTheme.successColor)
+          : FilledButton.tonal(onPressed: onAllow, child: const Text('Allow')),
+    );
+  }
+}
 
 /// Runs permission requests one at a time and re-reads the status after
 /// each request and when the user comes back from system settings.

@@ -17,14 +17,10 @@ class CompanionPermissionsSummary extends ConsumerStatefulWidget {
 class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
     with WidgetsBindingObserver, CompanionPermissionRequests {
   Widget permission(Map<String, bool> status, CompanionPermission permission) {
-    final granted = status[permission.key] == true;
-    return ListTile(
-      title: Text(permission.title),
-      subtitle: Text(
-        '${granted ? 'Granted' : 'Not granted'} · ${permission.description}',
-      ),
-      trailing: Icon(granted ? Icons.check_circle_outline : Icons.open_in_new),
-      onTap: busy ? null : () => request(() => permission.request(ref)),
+    return CompanionPermissionTile(
+      permission: permission,
+      granted: status[permission.key] == true,
+      onAllow: busy ? null : () => request(() => permission.request(ref)),
     );
   }
 

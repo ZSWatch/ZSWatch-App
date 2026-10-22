@@ -70,17 +70,10 @@ class _SetupState extends ConsumerState<CompanionPermissionsSetupScreen>
           for (final p in rows)
             Card(
               margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                title: Text(p.title),
-                subtitle: Text(p.description),
-                trailing: status?[p.key] == true
-                    ? const Icon(Icons.check_circle_outline)
-                    : FilledButton(
-                        onPressed: busy
-                            ? null
-                            : () => request(() => p.request(ref)),
-                        child: const Text('Allow'),
-                      ),
+              child: CompanionPermissionTile(
+                permission: p,
+                granted: status?[p.key] == true,
+                onAllow: busy ? null : () => request(() => p.request(ref)),
               ),
             ),
           Card(
