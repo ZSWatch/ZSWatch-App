@@ -68,7 +68,7 @@ List<CompanionPermission> companionPermissions() => [
   CompanionPermission(
     'background_location',
     'Background location',
-    'Location while the app is in the background',
+    'ZSWatch collects location data to send weather and GPS to your watch, even when the app is closed or not in use.',
     (ref) => ref.read(companionGpsPermissionsProvider)(),
   ),
   if (!_isIos)

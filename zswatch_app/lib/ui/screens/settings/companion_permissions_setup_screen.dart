@@ -12,7 +12,7 @@ const permissionsSetupShownKey = 'permissionsSetupShown';
 final _locationPermission = CompanionPermission(
   'background_location',
   'Location',
-  'Weather and GPS on the watch, also while the app is closed',
+  'ZSWatch collects location data to send weather and GPS to your watch, even when the app is closed or not in use.',
   (ref) async {
     final whenInUse = await Permission.locationWhenInUse.request();
     if (whenInUse.isPermanentlyDenied) {
