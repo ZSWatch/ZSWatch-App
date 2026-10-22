@@ -126,10 +126,16 @@ class _DeveloperToolsBody extends ConsumerWidget {
           children: [
             Expanded(
               child: native
-                  ? const CompanionFindWatchButton()
+                  ? CompanionFindWatchButton(
+                      builder: (onPressed) => _BlendActionChip(
+                        icon: Icons.vibration,
+                        label: 'Find watch',
+                        onTap: onPressed,
+                      ),
+                    )
                   : _BlendActionChip(
                       icon: Icons.vibration,
-                      label: 'Find',
+                      label: 'Find watch',
                       onTap: connection.isConnected
                           ? () async {
                               final watchService = ref.read(
