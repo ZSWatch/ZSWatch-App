@@ -681,15 +681,15 @@ final class CompanionPhoneUITests: XCTestCase {
         try sendToBackground(for: Config.backgroundSeconds)
     }
 
-    /// Asks the watch's Ask AI app a spoken question and waits for the answer.
+    /// Asks the watch's Chat app a spoken question and waits for the answer.
     /// Needs an OpenRouter key in the app.
     func testAskAI() throws {
-        try recordQuestion("Ask AI Test (phone speaks)")
+        try recordQuestion("Chat Test (phone speaks)")
     }
 
     /// Follow-up to `testAskAI` within its conversation window.
     func testAskAIReply() throws {
-        try recordQuestion("Ask AI Reply Test (phone speaks)")
+        try recordQuestion("Chat Reply Test (phone speaks)")
     }
 
     /// Records a question as an ordinary memo; OpenRouter should answer it.

@@ -533,7 +533,7 @@ const _voiceTestPhrases = [
     'Påminn mig i morgon klockan tio att köpa mjölk.',
     'sv-SE',
   ),
-  // With OpenRouter this memo is answered like an Ask AI question.
+  // With OpenRouter this memo is answered like a Chat question.
   (
     'Voice Memo Test: question',
     'How many minutes are there in one day?',
@@ -541,14 +541,14 @@ const _voiceTestPhrases = [
   ),
 ];
 
-/// Drives the watch's Ask AI app through its `ask` shell command.
+/// Drives the watch's Chat app through its `ask` shell command.
 const _askTestPhrases = [
   (
-    'Ask AI Test (phone speaks)',
+    'Chat Test (phone speaks)',
     'What is the highest mountain in Sweden?',
     'ask new',
   ),
-  ('Ask AI Reply Test (phone speaks)', 'And how high is it?', 'ask reply'),
+  ('Chat Reply Test (phone speaks)', 'And how high is it?', 'ask reply'),
 ];
 
 /// Records a voice memo on the watch while the phone speaks a known phrase,
