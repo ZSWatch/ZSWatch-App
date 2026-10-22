@@ -432,6 +432,57 @@ final class CompanionPhoneUITests: XCTestCase {
         try require(app.buttons["Disconnect"].waitForExistence(timeout: 45), "Real watch not restored after demo", capture: "demo-exit")
     }
 
+    /// Store screenshots with the real watch, attached as `store-<screen>`.
+    /// Needs a connected watch and a recording that mentions milk.
+    func testStoreScreenshots() throws {
+        try connectedHome()
+        // The crash banner only hides; the coredump stays on the watch.
+        let crash = containing("Crash Detected")
+        if crash.exists {
+            // MISSING-ID: the banner's close button has no label.
+            let window = app.windows.firstMatch.frame
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: window.width * 0.86, dy: crash.frame.midY)).tap()
+        }
+        Thread.sleep(forTimeInterval: 2)
+        screenshot("store-home")
+        for route in routes {
+            try tap(exact(route.entry), "\(route.entry) entry (store)")
+            try require(exact(route.heading).waitForExistence(timeout: 10), "Missing \(route.heading)")
+            if route.entry == "Health" { try tap(prefix("Week"), "Week range") }
+            Thread.sleep(forTimeInterval: 3)
+            screenshot("store-\(route.entry)")
+            if route.entry == "Voice" {
+                let field = app.textFields.firstMatch
+                field.tap(); field.typeText("milk\n")
+                Thread.sleep(forTimeInterval: 2)
+                screenshot("store-VoiceSearch")
+                let row = any("label BEGINSWITH '2026'")
+                if row.exists {
+                    try reveal(row, "milk memo").tap()
+                    Thread.sleep(forTimeInterval: 2)
+                    screenshot("store-VoiceDetail")
+                    if app.buttons["Close"].exists { app.buttons["Close"].tap() }
+                }
+            }
+            app.buttons["Back"].tap()
+        }
+        try tap(prefix("Update Firmware"), "Update Firmware")
+        if app.buttons["Done"].waitForExistence(timeout: 3) {
+            app.buttons["Done"].tap()
+            try tap(prefix("Update Firmware"), "Update Firmware again")
+        }
+        let empty = containing("Tap refresh to fetch from GitHub")
+        if empty.waitForExistence(timeout: 3) { empty.tap() }
+        Thread.sleep(forTimeInterval: 6)
+        screenshot("store-Firmware")
+        try home()
+        try openVoiceModels()
+        Thread.sleep(forTimeInterval: 2)
+        screenshot("store-VoiceAI")
+        try home()
+    }
+
     // MARK: - Firmware and resources
 
     /// Selects `ZSW_FW_PACKAGE` (file name prefix) from Files. No upload.
