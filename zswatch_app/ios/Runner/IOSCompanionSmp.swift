@@ -259,7 +259,7 @@ final class IOSCompanionSmp {
     try prepare(generation) { result in
       do {
         guard let current = try result.get()["generation"] as? Int else { throw CompanionFailure.invalid("Invalid preparation") }
-        try self.readDiagnostic(current, path: "/user/coredump.txt", complete: complete)
+        try self.readDiagnostic(current, path: "/lvgl_lfs/coredump.txt", complete: complete)
       } catch { complete(.failure(error)) }
     }
   }

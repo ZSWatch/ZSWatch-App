@@ -23,7 +23,7 @@ class CoredumpApiService {
 
   /// Analyze a coredump by uploading its text content to the backend.
   ///
-  /// [coredumpTxt] — raw contents of /user/coredump.txt from the watch
+  /// [coredumpTxt] — raw contents of /lvgl_lfs/coredump.txt from the watch
   /// [summary] — crash summary with FW version, commit SHA, etc.
   Future<CoredumpAnalysis> analyze({
     required String coredumpTxt,

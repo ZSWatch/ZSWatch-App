@@ -22,7 +22,7 @@ class PrototypeLogFilesTest {
         r.status(3); r.downloads.single()(Result.success(byteArrayOf(1, 2, 3)))
         assertArrayEquals(byteArrayOf(1, 2, 3), r.results.single().getOrThrow().bytes)
         assertFalse(PrototypeLogFiles.COREDUMP_PATH in PrototypeLogFiles.paths)
-        assertThrows(IllegalArgumentException::class.java) { Rig().start("/user/coredump.txt/../recordings/x") }
+        assertThrows(IllegalArgumentException::class.java) { Rig().start("/lvgl_lfs/coredump.txt/../recordings/x") }
         val oversized = Rig(); oversized.start(PrototypeLogFiles.COREDUMP_PATH)
         oversized.status(PrototypeLogFiles.MAX_BYTES + 1)
         assertTrue(oversized.results.single().isFailure); assertTrue(oversized.downloads.isEmpty())
