@@ -712,8 +712,7 @@ final class CompanionPhoneUITests: XCTestCase {
     /// The native journal holds the timings.
     func testVoiceMemoBackground() throws {
         try connectedHome()
-        try openDeveloperRoute("Shell", heading: "Shell")
-        try tap(containing("Quick Actions"), "Quick Actions")
+        try openShellTestTab()
         let card = try reveal(containing("Voice Memo Test: Swedish timer"), "Swedish timer")
         try tap(card, "Swedish timer")
         print("HIL_MEMO_STARTED")
@@ -738,10 +737,22 @@ final class CompanionPhoneUITests: XCTestCase {
         try recordQuestion("Voice Memo Test: question")
     }
 
+    /// Shell → Test; the tab can be scrolled out of view on narrow phones.
+    private func openShellTestTab() throws {
+        try openDeveloperRoute("Shell", heading: "Shell")
+        let tab = any("label BEGINSWITH %@ AND label CONTAINS %@", "Test", "Tab")
+        let bar = containing("Quick Actions")
+        for _ in 0..<3 where !(tab.exists && tab.isHittable) {
+            bar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.15)))
+            Thread.sleep(forTimeInterval: 0.5)
+        }
+        try tap(tab, "Test tab")
+    }
+
     private func recordQuestion(_ action: String) throws {
         try connectedHome()
-        try openDeveloperRoute("Shell", heading: "Shell")
-        try tap(containing("Quick Actions"), "Quick Actions")
+        try openShellTestTab()
         try tap(try reveal(containing(action), action), action)
         try require(containing("Recorded: ").waitForExistence(timeout: 60), "Question was not recorded", capture: "chat")
         print("HIL_ASK_RECORDED")

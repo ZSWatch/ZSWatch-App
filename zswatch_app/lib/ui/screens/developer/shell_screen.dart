@@ -33,7 +33,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(_onTabChanged);
     _enableSmp();
   }
@@ -147,6 +147,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
             Tab(icon: Icon(Icons.flash_on, size: 18), text: 'Quick Actions'),
             Tab(icon: Icon(Icons.gamepad, size: 18), text: 'Remote'),
             Tab(icon: Icon(Icons.monitor_heart, size: 18), text: 'Monitor'),
+            Tab(icon: Icon(Icons.science, size: 18), text: 'Test'),
           ],
         ),
       ),
@@ -169,6 +170,7 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
                       _QuickActionsTab(),
                       _RemoteControlTab(),
                       _LiveMonitorTab(),
+                      _TestTab(),
                     ],
                   ),
                 ),
@@ -431,6 +433,39 @@ class _QuickActionsTab extends ConsumerWidget {
           command: 'voice_memo status',
           ref: ref,
         ),
+        _QuickActionCard(
+          icon: Icons.system_update,
+          title: 'Enter Bootloader',
+          command: 'boot start',
+          ref: ref,
+          isDestructive: true,
+        ),
+        _QuickActionCard(
+          icon: Icons.restore,
+          title: 'Factory Reset',
+          command: 'factory_reset',
+          ref: ref,
+          isDestructive: true,
+        ),
+      ],
+    );
+  }
+}
+
+/// Hands-free tests: the watch records while the phone speaks a phrase.
+class _TestTab extends ConsumerWidget {
+  const _TestTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListView(
+      padding: const EdgeInsets.all(AppTheme.spacingMd),
+      children: [
+        const _SectionHeader(
+          title:
+              'For testing: starts a recording on the watch and lets the '
+              'phone speak a phrase into it.',
+        ),
         const _VoiceTestVolume(),
         for (final (title, phrase, language) in _voiceTestPhrases)
           _QuickActionCard(
@@ -454,20 +489,6 @@ class _QuickActionsTab extends ConsumerWidget {
               stop: 'chat send',
             ),
           ),
-        _QuickActionCard(
-          icon: Icons.system_update,
-          title: 'Enter Bootloader',
-          command: 'boot start',
-          ref: ref,
-          isDestructive: true,
-        ),
-        _QuickActionCard(
-          icon: Icons.restore,
-          title: 'Factory Reset',
-          command: 'factory_reset',
-          ref: ref,
-          isDestructive: true,
-        ),
       ],
     );
   }
