@@ -167,12 +167,17 @@ class DashboardScreen extends ConsumerWidget {
               onRestartWatch: (native || ref.watch(hasSmpServiceProvider))
                   ? () => _restartWatch(context, ref)
                   : null,
+              findWatch: native
+                  ? CompanionFindWatchButton(
+                      builder: (onPressed) => OutlinedButton.icon(
+                        onPressed: onPressed,
+                        icon: const Icon(Icons.vibration, size: 18),
+                        label: const Text('Find watch'),
+                        style: compactButtonStyle(context),
+                      ),
+                    )
+                  : null,
             ),
-
-            if (native) ...[
-              const SizedBox(height: AppTheme.spacingSm),
-              const CompanionFindWatchButton(),
-            ],
 
             const SizedBox(height: AppTheme.spacingMd),
 
@@ -465,15 +470,24 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
+ButtonStyle compactButtonStyle(BuildContext context) =>
+    OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 36),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      textStyle: Theme.of(context).textTheme.labelMedium,
+    );
+
 class _QuickActionsSection extends StatelessWidget {
   final VoidCallback? onFirmwareUpdate;
   final VoidCallback onDisconnect;
   final VoidCallback? onRestartWatch;
+  final Widget? findWatch;
 
   const _QuickActionsSection({
     required this.onFirmwareUpdate,
     required this.onDisconnect,
     this.onRestartWatch,
+    this.findWatch,
   });
 
   @override
@@ -523,21 +537,24 @@ class _QuickActionsSection extends StatelessWidget {
             ),
           ],
         ),
-        if (onRestartWatch != null) ...[
+        if (onRestartWatch != null || findWatch != null) ...[
           const SizedBox(height: AppTheme.spacingSm),
-          SizedBox(
-            height: 48,
-            child: OutlinedButton.icon(
-              onPressed: onRestartWatch,
-              icon: const Icon(Icons.restart_alt, size: 18),
-              label: const Text('Restart Watch'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 12,
+          // Secondary actions: one compact row.
+          Row(
+            children: [
+              if (onRestartWatch != null)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onRestartWatch,
+                    icon: const Icon(Icons.restart_alt, size: 18),
+                    label: const Text('Restart Watch'),
+                    style: compactButtonStyle(context),
+                  ),
                 ),
-              ),
-            ),
+              if (onRestartWatch != null && findWatch != null)
+                const SizedBox(width: AppTheme.spacingSm),
+              if (findWatch != null) Expanded(child: findWatch!),
+            ],
           ),
         ],
       ],
