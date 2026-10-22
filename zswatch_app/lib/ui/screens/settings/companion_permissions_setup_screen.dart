@@ -69,6 +69,7 @@ class _SetupState extends ConsumerState<CompanionPermissionsSetupScreen>
           const SizedBox(height: 16),
           for (final p in rows)
             Card(
+              margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
                 title: Text(p.title),
                 subtitle: Text(p.description),
@@ -83,6 +84,7 @@ class _SetupState extends ConsumerState<CompanionPermissionsSetupScreen>
               ),
             ),
           Card(
+            margin: const EdgeInsets.only(bottom: 12),
             child: ListTile(
               leading: const Icon(Icons.mic_none),
               title: const Text('Voice memos and Chat'),
