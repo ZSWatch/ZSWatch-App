@@ -11,6 +11,7 @@ import 'data/models/connection_state.dart';
 import 'providers/analytics_providers.dart';
 import 'providers/ble_providers.dart';
 import 'providers/companion_runtime_providers.dart';
+import 'providers/companion_voice_policy_providers.dart';
 import 'providers/companion_watch_providers.dart';
 import 'providers/coredump_providers.dart';
 import 'providers/demo_mode_provider.dart';
@@ -191,6 +192,7 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     if (ref.watch(nativeCompanionRuntimeProvider)) {
       ref.watch(companionWatchPersistenceProvider);
       ref.watch(companionTelemetryUpdatesProvider);
+      ref.watch(companionVoicePolicySyncProvider);
       // Make dropped (too large) watch messages visible so we notice if they happen.
       ref.listen(companionSnapshotProvider, (previous, next) {
         final previousSnapshot = previous?.asData?.value;
