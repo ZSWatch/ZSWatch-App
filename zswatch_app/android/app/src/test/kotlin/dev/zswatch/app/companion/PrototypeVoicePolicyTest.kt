@@ -62,6 +62,12 @@ class PrototypeVoicePolicyTest {
             PrototypeVoicePolicy.recordingRequest(changed, "watch-a")!!))
         assertEquals("kbWhisperBase|qwen|false", PrototypeVoicePolicy.model(request))
     }
+    @Test fun questionsUseThePolicyOfAnyWatch() {
+        val policy = PrototypeVoicePolicy.configuration("kbWhisperBase", "openrouter:m", false) +
+            mapOf("watch_id" to "watch-a", "enabled" to false)
+        assertNull(PrototypeVoicePolicy.recordingRequest(policy, "watch-b", "20261022_103603"))
+        assertNotNull(PrototypeVoicePolicy.recordingRequest(policy, "watch-b", "ask_20261022_103603"))
+    }
 
     @Test(expected = IllegalArgumentException::class)
     fun rejectsAmbiguousModelEncoding() {
