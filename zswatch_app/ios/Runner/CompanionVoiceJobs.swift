@@ -245,7 +245,8 @@ final class CompanionVoiceJobs {
           CompanionRecordingFiles.integer(result["version"]) == 1,
           let transcript = result["transcript"] as? String, let summary = result["summary"] as? String,
           let category = result["category"] as? String, let actions = result["actions"] as? [[String: Any]], actions.count <= 64,
-          !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          // An Ask AI answer to silence or a setup problem has no transcript.
+          category == "ask_ai" || !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
           transcriptionOnly ? summary.isEmpty && category.isEmpty && actions.isEmpty : !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
           (try canonical(result)).utf8.count <= 65536 else { throw CompanionFailure.invalid("Invalid voice result") }
     for action in actions {
