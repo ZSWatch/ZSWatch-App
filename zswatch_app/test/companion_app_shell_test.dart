@@ -4,6 +4,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:chrono_ai_flow/chrono_ai_flow.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zswatch_app/app.dart';
@@ -57,6 +58,16 @@ Map<String, Object?> snapshot({bool active = false, bool ready = false}) => {
   'recording_sync_enabled': false,
   'notifications_enabled': true,
   'notification_packages': ['com.zswatch.app'],
+  // The default models are already saved, so the app has nothing to apply.
+  'voice_processing_policy': {
+    'enabled': false,
+    'watch_id': 'AA:BB:CC:DD:EE:FF',
+    'transcription_model':
+        'openrouter:${OpenRouterRequest.defaultTranscriptionModel}',
+    'analysis_model': 'openrouter:${OpenRouterRequest.defaultAnalysisModel}',
+    'correct_transcription': false,
+    'analysis_enabled': true,
+  },
   'watch_info': {
     'address': 'AA:BB:CC:DD:EE:FF',
     'first_seen_ms': 1000,
