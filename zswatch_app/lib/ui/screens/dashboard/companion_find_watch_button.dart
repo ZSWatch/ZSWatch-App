@@ -5,7 +5,10 @@ import '../../../providers/companion_runtime_providers.dart';
 
 /// Only the explicit action crosses the bridge; the native service owns timing.
 class CompanionFindWatchButton extends ConsumerStatefulWidget {
-  const CompanionFindWatchButton({super.key});
+  const CompanionFindWatchButton({super.key, this.builder});
+
+  /// Builds the button in the caller's style; an outlined button otherwise.
+  final Widget Function(VoidCallback? onPressed)? builder;
 
   @override
   ConsumerState<CompanionFindWatchButton> createState() => _FindWatchState();
@@ -39,10 +42,12 @@ class _FindWatchState extends ConsumerState<CompanionFindWatchButton> {
     final snapshot = ref.watch(companionSnapshotProvider).asData?.value;
     final ready =
         snapshot?.runtimeActive == true && snapshot?.protocolReady == true;
-    return OutlinedButton.icon(
-      onPressed: ready && !busy ? () => find(snapshot!.generation) : null,
-      icon: const Icon(Icons.vibration),
-      label: const Text('Find watch'),
-    );
+    final onPressed = ready && !busy ? () => find(snapshot!.generation) : null;
+    return widget.builder?.call(onPressed) ??
+        OutlinedButton.icon(
+          onPressed: onPressed,
+          icon: const Icon(Icons.vibration, size: 18),
+          label: const Text('Find watch'),
+        );
   }
 }
