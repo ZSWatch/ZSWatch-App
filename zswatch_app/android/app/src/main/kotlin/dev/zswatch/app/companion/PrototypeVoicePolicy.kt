@@ -17,7 +17,8 @@ object PrototypeVoicePolicy {
     fun recordingRequest(policy: Any?, watchId: String, filename: String = ""): Map<String, Any>? {
         val value = policy as? Map<*, *> ?: return null
         val question = isQuestion(filename)
-        if ((value["enabled"] != true && !question) || value["watch_id"] != watchId) return null
+        // Questions use the last saved models, also ones saved for another watch.
+        if (!question && (value["enabled"] != true || value["watch_id"] != watchId)) return null
         return configuration(value["transcription_model"] as String, value["analysis_model"] as String,
             value["correct_transcription"] as Boolean, question || value["analysis_enabled"] != false)
     }
