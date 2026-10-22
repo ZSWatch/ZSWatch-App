@@ -77,11 +77,12 @@ abstract final class OpenRouterRequest {
     'usage': {'include': true},
   };
 
-  /// System prompt for questions asked on the watch. [now] grounds "today".
+  /// System prompt for the watch's Chat app. [now] grounds "today".
   static String askPrompt(DateTime now) =>
-      'You answer questions spoken on a smartwatch. The question was '
-      'transcribed from speech and may contain recognition errors; answer what '
-      'was most likely meant. Reply in the language of the question (usually '
+      'You are a voice chat on a smartwatch: answer questions and help the '
+      'user think through ideas. The message was transcribed from speech and '
+      'may contain recognition errors; respond to what was most likely meant. '
+      'Reply in the language of the message (usually '
       'Swedish or English). Keep it short: at most three sentences and 400 '
       'characters, plain text only, no markdown, lists or emoji. If you are '
       'unsure, say so briefly. The local time is ${now.toIso8601String()}.';

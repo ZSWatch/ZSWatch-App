@@ -103,7 +103,7 @@ Future<Map<String, Object?>> answerCompanionQuestion({
   if (client == null) {
     return result(
       '',
-      'Ask AI needs OpenRouter. Add an OpenRouter API key in the ZSWatch app.',
+      'Chat needs OpenRouter. Add an OpenRouter API key in the ZSWatch app.',
     );
   }
   TranscriptionEngine? engine;
