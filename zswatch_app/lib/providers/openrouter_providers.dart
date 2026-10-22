@@ -84,9 +84,11 @@ final voiceModelConfigProvider = Provider<VoiceModelConfig>((ref) {
 
 /// The key stored by the native owner; null when none is set.
 final openRouterKeyProvider =
-    StateNotifierProvider<OpenRouterKeyNotifier, AsyncValue<String?>>(
-      OpenRouterKeyNotifier.new,
-    );
+    StateNotifierProvider<OpenRouterKeyNotifier, AsyncValue<String?>>((ref) {
+      // Reload when Demo Mode swaps the client.
+      ref.watch(companionClientProvider);
+      return OpenRouterKeyNotifier(ref);
+    });
 
 class OpenRouterKeyNotifier extends StateNotifier<AsyncValue<String?>> {
   OpenRouterKeyNotifier(this._ref) : super(const AsyncValue.loading()) {
