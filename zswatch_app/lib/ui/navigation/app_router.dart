@@ -28,6 +28,7 @@ import '../screens/health/heart_rate_screen.dart';
 import '../screens/notifications/notification_settings_screen.dart';
 import '../screens/onboarding/permission_onboarding_screen.dart';
 import '../screens/settings/ai_models_settings_screen.dart';
+import '../screens/settings/companion_permissions_setup_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/start/start_page_screen.dart';
 import '../screens/voice_memos/alarms_timers_screen.dart';
@@ -64,6 +65,7 @@ abstract final class AppRoutes {
 
   // Settings sub-routes
   static const String aiModels = '/settings/ai-models';
+  static const String permissionsSetup = '/permissions-setup';
 
   // Watchface
   static const String watchfaceBackground = '/watchface-background';
@@ -133,6 +135,10 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.aiModels,
         builder: (context, state) => const AiModelsSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.permissionsSetup,
+        builder: (context, state) => const CompanionPermissionsSetupScreen(),
       ),
       GoRoute(
         path: AppRoutes.companionRuntime,

@@ -21,10 +21,12 @@ import 'providers/gps_providers.dart';
 import 'providers/http_providers.dart';
 import 'providers/notification_providers.dart';
 import 'providers/permission_providers.dart';
+import 'providers/settings_providers.dart';
 import 'providers/voice_memo_providers.dart';
 import 'services/background/foreground_service.dart';
 import 'providers/watch_service_provider.dart';
 import 'ui/navigation/app_router.dart';
+import 'ui/screens/settings/companion_permissions_setup_screen.dart';
 
 /// Main application widget
 ///
@@ -39,6 +41,7 @@ class ZSWatchApp extends ConsumerStatefulWidget {
 class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     with WidgetsBindingObserver {
   GoRouter? _nativeRouter;
+  bool _permissionsSetupChecked = false;
 
   @override
   void initState() {
@@ -65,6 +68,24 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
       unawaited(_initializeVoiceRecovery());
       _initializeBle();
     });
+  }
+
+  /// Offers the missing permissions once, after the first connection.
+  Future<void> _offerPermissionsSetup() async {
+    if (_permissionsSetupChecked || ref.read(demoModeProvider)) return;
+    _permissionsSetupChecked = true;
+    try {
+      final prefs = await ref.read(sharedPreferencesProvider.future);
+      if (prefs.getBool(permissionsSetupShownKey) == true) return;
+      final status = await ref.read(companionClientProvider).permissionStatus();
+      await prefs.setBool(permissionsSetupShownKey, true);
+      if (companionSetupPermissions().every((p) => status[p.key] == true)) {
+        return;
+      }
+      unawaited(_nativeRouter?.push(AppRoutes.permissionsSetup));
+    } catch (error) {
+      debugPrint('[PermissionsSetup] Not offered: $error');
+    }
   }
 
   Future<void> _initializeVoiceRecovery() async {
@@ -193,6 +214,11 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
       ref.watch(companionWatchPersistenceProvider);
       ref.watch(companionTelemetryUpdatesProvider);
       ref.watch(companionVoicePolicySyncProvider);
+      ref.listen(companionSnapshotProvider, (_, next) {
+        if (next.asData?.value.protocolReady == true) {
+          unawaited(_offerPermissionsSetup());
+        }
+      });
       // Make dropped (too large) watch messages visible so we notice if they happen.
       ref.listen(companionSnapshotProvider, (previous, next) {
         final previousSnapshot = previous?.asData?.value;

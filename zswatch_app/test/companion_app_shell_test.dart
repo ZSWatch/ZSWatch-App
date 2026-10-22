@@ -31,6 +31,7 @@ import 'package:zswatch_app/providers/voice_memo_providers.dart';
 import 'package:zswatch_app/providers/watch_providers.dart' as database;
 import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/ui/navigation/app_router.dart';
+import 'package:zswatch_app/ui/screens/settings/companion_permissions_setup_screen.dart';
 import 'package:zswatch_app/ui/screens/dashboard/dashboard_screen.dart';
 
 import 'support/host_sqlite.dart';
@@ -77,6 +78,8 @@ Map<String, Object?> snapshot({bool active = false, bool ready = false}) => {
     'status_generation': 10,
   },
 };
+
+const setupShown = <String, Object>{permissionsSetupShownKey: true};
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -202,6 +205,8 @@ void main() {
           as GoRouter;
 
   setUp(() {
+    // The permission setup screen has its own tests.
+    SharedPreferences.setMockInitialValues(setupShown);
     calls.clear();
     metadataWrites.clear();
     subscriptions.clear();
@@ -303,7 +308,7 @@ void main() {
   testWidgets(
     'native settings enters isolated demo and all six entrances remain usable',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues(setupShown);
       await tester.binding.setSurfaceSize(const Size(1000, 2400));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await mount(tester, snapshot());
@@ -404,9 +409,69 @@ void main() {
   });
 
   testWidgets(
-    'Transcribe-only and batch controls queue natively without an LLM',
+    'Permission setup opens once after the first connection without prompting',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
+      final prompts = <MethodCall>[];
+      messenger.setMockMethodCallHandler(
+        const MethodChannel('flutter.baseflow.com/permissions/methods'),
+        (call) async {
+          prompts.add(call);
+          return null;
+        },
+      );
+      await mount(tester, snapshot(active: true, ready: true));
+      expect(find.byType(CompanionPermissionsSetupScreen), findsOneWidget);
+      expect(find.text('Location'), findsOneWidget);
+      expect(find.text('Notification access'), findsOneWidget);
+      expect(find.text('App notifications'), findsNothing);
+      expect(find.text('Voice memos and Chat'), findsOneWidget);
+      expect(prompts, isEmpty);
+      expect(calls.where((c) => c.method == 'notificationDiagnostic'), isEmpty);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(permissionsSetupShownKey), isTrue);
+
+      await tester.tap(find.text('Skip for now'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CompanionPermissionsSetupScreen), findsNothing);
+      await emit(tester, snapshot(active: true));
+      await emit(tester, snapshot(active: true, ready: true));
+      await tester.pumpAndSettle();
+      expect(find.byType(CompanionPermissionsSetupScreen), findsNothing);
+      expect(forbidden, isEmpty);
+    },
+  );
+
+  testWidgets('Permission setup stays closed when everything is granted', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final status = {
+      'version': 1,
+      for (final key in [
+        'bluetooth',
+        'notifications',
+        'notification_access',
+        'location',
+        'background_location',
+        'battery_exemption',
+      ])
+        key: true,
+    };
+    messenger.setMockMethodCallHandler(methods, (call) async {
+      calls.add(call);
+      return call.method == 'permissionStatus' ? status : saved;
+    });
+    await mount(tester, snapshot(active: true, ready: true));
+    expect(find.byType(CompanionPermissionsSetupScreen), findsNothing);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(permissionsSetupShownKey), isTrue);
+  });
+
+  testWidgets(
+    'Transcribe-only and batch controls queue natively without an LLM',
+    (tester) async {
+      SharedPreferences.setMockInitialValues(setupShown);
       await tester.binding.setSurfaceSize(const Size(1000, 2200));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final state = snapshot(active: true, ready: true);
@@ -1013,7 +1078,7 @@ void main() {
   testWidgets(
     'native Settings keeps common preferences without legacy startup or automatic permission requests',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues(setupShown);
       await tester.binding.setSurfaceSize(const Size(800, 2400));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       const permissions = MethodChannel(

@@ -3,11 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../../../providers/companion_runtime_providers.dart';
-
-final companionPermissionsStatusProvider = FutureProvider.autoDispose((ref) {
-  return ref.watch(companionClientProvider).permissionStatus();
-});
+import 'companion_permissions.dart';
 
 /// Read-only on entry; permission prompts happen only after an explicit tap.
 class CompanionPermissionsSummary extends ConsumerStatefulWidget {
@@ -19,62 +15,16 @@ class CompanionPermissionsSummary extends ConsumerStatefulWidget {
 }
 
 class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
-    with WidgetsBindingObserver {
-  bool busy = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      ref.invalidate(companionPermissionsStatusProvider);
-    }
-  }
-
-  Future<void> request(Future<void> Function() action) async {
-    setState(() => busy = true);
-    try {
-      await action();
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open permission settings: $error')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => busy = false);
-        ref.invalidate(companionPermissionsStatusProvider);
-      }
-    }
-  }
-
-  Widget permission(
-    Map<String, bool> status,
-    String key,
-    String title,
-    String description,
-    Future<void> Function() action,
-  ) {
+    with WidgetsBindingObserver, CompanionPermissionRequests {
+  Widget permission(Map<String, bool> status, CompanionPermission permission) {
+    final granted = status[permission.key] == true;
     return ListTile(
-      title: Text(title),
+      title: Text(permission.title),
       subtitle: Text(
-        '${status[key] == true ? 'Granted' : 'Not granted'} · $description',
+        '${granted ? 'Granted' : 'Not granted'} · ${permission.description}',
       ),
-      trailing: Icon(
-        status[key] == true ? Icons.check_circle_outline : Icons.open_in_new,
-      ),
-      onTap: busy ? null : () => request(action),
+      trailing: Icon(granted ? Icons.check_circle_outline : Icons.open_in_new),
+      onTap: busy ? null : () => request(() => permission.request(ref)),
     );
   }
 
@@ -93,66 +43,7 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
                   : '${status.values.where((v) => v).length} of ${status.length} granted',
             ),
             children: [
-              permission(
-                status,
-                'bluetooth',
-                'Bluetooth connection',
-                'Communicate with your watch',
-                ref.read(companionConnectionPermissionsProvider),
-              ),
-              permission(
-                status,
-                'notifications',
-                'App notifications',
-                isIos
-                    ? 'Timers, alarms and app alerts'
-                    : 'Background connection indicator',
-                () async {
-                  final result = await Permission.notification.request();
-                  if (!result.isGranted) await openAppSettings();
-                },
-              ),
-              if (!isIos)
-                permission(
-                  status,
-                  'notification_access',
-                  'Notification access',
-                  'Forward phone notifications',
-                  () async {
-                    await ref
-                        .read(companionClientProvider)
-                        .notificationDiagnostic(requestAccess: true);
-                  },
-                ),
-              permission(
-                status,
-                'location',
-                'Location',
-                'Location for watch weather and GPS',
-                () async {
-                  final result = await Permission.locationWhenInUse.request();
-                  if (!result.isGranted) await openAppSettings();
-                },
-              ),
-              permission(
-                status,
-                'background_location',
-                'Background location',
-                'Location while the app is in the background',
-                () async {
-                  await ref.read(companionGpsPermissionsProvider)();
-                },
-              ),
-              if (!isIos)
-                permission(
-                  status,
-                  'battery_exemption',
-                  'Battery optimization',
-                  'Allow background operation',
-                  () async {
-                    await Permission.ignoreBatteryOptimizations.request();
-                  },
-                ),
+              for (final p in companionPermissions()) permission(status, p),
               ListTile(
                 title: Text(
                   isIos
