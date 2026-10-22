@@ -644,6 +644,17 @@ final class CompanionPhoneUITests: XCTestCase {
         try home()
     }
 
+    /// Turns on automatic processing for the connected watch (it is per watch).
+    /// State: changes the voice policy.
+    func testAutoProcessOn() throws {
+        try connectedHome()
+        try openVoiceModels()
+        try flip(try switchOnRow("Automatically process new recordings"), to: true)
+        if exact("Apply").exists { try tap(exact("Apply"), "Apply") }
+        Thread.sleep(forTimeInterval: 1)
+        try home()
+    }
+
     /// Cancels all queued on-device voice jobs from AI models settings.
     func testCancelLocalJobs() throws {
         try connectedHome()
@@ -673,36 +684,28 @@ final class CompanionPhoneUITests: XCTestCase {
     /// Asks the watch's Ask AI app a spoken question and waits for the answer.
     /// Needs an OpenRouter key in the app.
     func testAskAI() throws {
-        try askAndAwaitAnswer("Ask AI Test (phone speaks)")
+        try recordQuestion("Ask AI Test (phone speaks)")
     }
 
     /// Follow-up to `testAskAI` within its conversation window.
     func testAskAIReply() throws {
-        try askAndAwaitAnswer("Ask AI Reply Test (phone speaks)")
+        try recordQuestion("Ask AI Reply Test (phone speaks)")
     }
 
     /// Records a question as an ordinary memo; OpenRouter should answer it.
     func testMemoQuestionRouting() throws {
-        try askAndAwaitAnswer("Voice Memo Test: question")
+        try recordQuestion("Voice Memo Test: question")
     }
 
-    private func askAndAwaitAnswer(_ action: String) throws {
+    private func recordQuestion(_ action: String) throws {
         try connectedHome()
         try openDeveloperRoute("Shell", heading: "Shell")
         try tap(containing("Quick Actions"), "Quick Actions")
         try tap(try reveal(containing(action), action), action)
         try require(containing("Recorded: ").waitForExistence(timeout: 60), "Question was not recorded", capture: "ask")
         print("HIL_ASK_RECORDED")
-        // state 3 is the answer screen.
-        for _ in 0..<12 {
-            try shell("ask state", expect: "state=")
-            if containing("state=3").exists {
-                print("HIL_ASK_ANSWERED")
-                return
-            }
-            Thread.sleep(forTimeInterval: 10)
-        }
-        try require(false, "No answer on the watch", capture: "ask-timeout")
+        // The answer is checked on the watch (`ask state`) or in the native journal.
+        Thread.sleep(forTimeInterval: Config.backgroundSeconds)
     }
 
     // MARK: - Background and radio recovery
