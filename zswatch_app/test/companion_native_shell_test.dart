@@ -302,16 +302,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Quick Actions'));
+    await tester.ensureVisible(find.text('Test'));
+    await tester.tap(find.text('Test'));
     await tester.pumpAndSettle();
-    await tester.dragUntilVisible(
-      find.text('Voice Memo Test (phone speaks)'),
-      find.ancestor(
-        of: find.text('Power Status'),
-        matching: find.byType(ListView),
-      ),
-      const Offset(0, -400),
-    );
     await tester.ensureVisible(find.text('Voice Memo Test (phone speaks)'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Voice Memo Test (phone speaks)'));
