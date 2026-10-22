@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../data/models/connection_state.dart';
 import '../../../providers/companion_runtime_providers.dart';
+import '../../../providers/demo_mode_provider.dart';
 import '../../../providers/ios_telemetry_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../navigation/app_router.dart';
@@ -35,6 +36,7 @@ class CompanionConnectionSettings extends ConsumerWidget {
             ),
           ),
         if (snapshot?.isIos == true &&
+            !ref.watch(demoModeProvider) &&
             ref.watch(iosTelemetryProjectionStateProvider).hasError)
           ListTile(
             leading: const Icon(Icons.sync_problem),

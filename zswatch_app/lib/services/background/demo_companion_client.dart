@@ -67,6 +67,9 @@ class _DemoMethods extends MethodChannel {
           'listener_connected': false,
           'apps': <Object?>[],
         };
+      // No OpenRouter key in Demo Mode.
+      case 'cloudCredential':
+        value = {'version': 1};
       case 'sensorState':
         value = {
           'version': 1,
