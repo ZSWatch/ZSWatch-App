@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:zswatch_app/data/models/companion_recording.dart';
-import 'package:zswatch_app/services/ai/companion_ask_processor.dart';
+import 'package:zswatch_app/services/ai/companion_chat_processor.dart';
 import 'package:zswatch_app/services/ai/companion_voice_processor.dart';
 import 'package:zswatch_app/services/ai/openrouter_client.dart';
 
@@ -34,15 +34,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('recording names select the question kind', () {
-    expect(askKindOf('ask_20261022_001349'), AskKind.question);
-    expect(askKindOf('askr_20261022_001349'), AskKind.reply);
-    expect(askKindOf('20261022_001349'), isNull);
-    expect(askKindOf('REC_004'), isNull);
+    expect(chatKindOf('chat_20261022_001349'), ChatKind.question);
+    expect(chatKindOf('chatr_20261022_001349'), ChatKind.reply);
+    expect(chatKindOf('20261022_001349'), isNull);
+    expect(chatKindOf('REC_004'), isNull);
   });
 
-  group('AskConversationStore', () {
+  group('ChatConversationStore', () {
     late Directory root;
-    late AskConversationStore store;
+    late ChatConversationStore store;
     final start = DateTime.utc(2026, 10, 22, 2);
     final messages = [
       {'role': 'user', 'content': 'q'},
@@ -50,8 +50,8 @@ void main() {
     ];
 
     setUp(() async {
-      root = await Directory.systemTemp.createTemp('ask-store-');
-      store = AskConversationStore(File('${root.path}/c.json'));
+      root = await Directory.systemTemp.createTemp('chat-store-');
+      store = ChatConversationStore(File('${root.path}/c.json'));
     });
     tearDown(() => root.delete(recursive: true));
 
@@ -59,18 +59,18 @@ void main() {
       await store.save('W', messages, start);
       final soon = start.add(const Duration(seconds: 50));
       final late = start.add(const Duration(seconds: 70));
-      expect(await store.load('W', AskKind.question, soon), messages);
-      expect(await store.load('W', AskKind.question, late), isEmpty);
-      expect(await store.load('W', AskKind.reply, late), messages);
-      expect(await store.load('other', AskKind.reply, soon), isEmpty);
+      expect(await store.load('W', ChatKind.question, soon), messages);
+      expect(await store.load('W', ChatKind.question, late), isEmpty);
+      expect(await store.load('W', ChatKind.reply, late), messages);
+      expect(await store.load('other', ChatKind.reply, soon), isEmpty);
     });
 
     test('keeps only the latest messages', () async {
       await store.save('W', [
         for (var i = 0; i < 20; i++) {'role': 'user', 'content': '$i'},
       ], start);
-      final kept = await store.load('W', AskKind.reply, start);
-      expect(kept.length, AskConversationStore.maxMessages);
+      final kept = await store.load('W', ChatKind.reply, start);
+      expect(kept.length, ChatConversationStore.maxMessages);
       expect(kept.last['content'], '19');
     });
   });
@@ -82,7 +82,7 @@ void main() {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
     setUp(() async {
-      root = await Directory.systemTemp.createTemp('ask-voice-');
+      root = await Directory.systemTemp.createTemp('chat-voice-');
       messenger.setMockMethodCallHandler(paths, (call) async => root.path);
     });
     tearDown(() async {
@@ -144,20 +144,20 @@ void main() {
       final chats = <List<Object?>>[];
       final first = await seedCompanionRecording(
         root,
-        filename: 'ask_20261022_001349',
+        filename: 'chat_20261022_001349',
       );
       final result = await processCompanionVoiceRecording(
         request(first),
         saveTranscript: (_) async {},
         cloudFactory: fake('Hur högt är Kebnekaise?', (_) => '2 097 meter.'),
       );
-      expect(result['category'], askAiCategory);
+      expect(result['category'], chatCategory);
       expect(result['summary'], '2 097 meter.');
       expect(result['transcript'], 'Hur högt är Kebnekaise?');
 
       final reply = await seedCompanionRecording(
         root,
-        filename: 'askr_20261022_001410',
+        filename: 'chatr_20261022_001410',
       );
       await processCompanionVoiceRecording(
         request(reply),
@@ -177,21 +177,21 @@ void main() {
     test('without OpenRouter a question explains the setup', () async {
       final recording = await seedCompanionRecording(
         root,
-        filename: 'ask_20261022_001349',
+        filename: 'chat_20261022_001349',
       );
       final result = await processCompanionVoiceRecording(
         request(recording, cloud: false, key: null),
         saveTranscript: (_) async => fail('Nothing to transcribe'),
         cloudFactory: (_) => fail('No client without OpenRouter'),
       );
-      expect(result['category'], askAiCategory);
+      expect(result['category'], chatCategory);
       expect(result['summary'], contains('OpenRouter'));
     });
 
     test('provider failures still answer the watch', () async {
       final recording = await seedCompanionRecording(
         root,
-        filename: 'ask_20261022_001349',
+        filename: 'chat_20261022_001349',
       );
       final result = await processCompanionVoiceRecording(
         request(recording),
@@ -216,7 +216,7 @@ void main() {
               : fail('Not analysed as a memo'),
         ),
       );
-      expect(result['category'], askAiCategory);
+      expect(result['category'], chatCategory);
       expect(result['summary'], 'Klockan är 10:00 i Tokyo.');
       expect(result['actions'], isEmpty);
     });

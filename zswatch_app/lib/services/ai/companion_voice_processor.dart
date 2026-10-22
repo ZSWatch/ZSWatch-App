@@ -8,7 +8,7 @@ import '../../data/models/companion_recording.dart';
 import '../voice_memo/transcription_engine.dart';
 import '../voice_memo/verified_companion_recording.dart';
 import '../voice_memo/ogg_opus_writer.dart';
-import 'companion_ask_processor.dart';
+import 'companion_chat_processor.dart';
 import 'llm_service.dart';
 import 'openrouter_client.dart';
 import 'voice_note_ai_pipeline.dart';
@@ -76,18 +76,18 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
       ? null
       : TranscriptionEngineType.values.byName(models[0]);
   final key = (request['credentials'] as Map?)?['openrouter_key'];
-  final ask = askKindOf(recording.filename);
-  if (ask != null) {
+  final chatKind = chatKindOf(recording.filename);
+  if (chatKind != null) {
     // Without a key the answer explains what to set up.
-    final asker = cloud && key is String && key.isNotEmpty
+    final chatClient = cloud && key is String && key.isNotEmpty
         ? (cloudFactory ?? OpenRouterClient.new)(key)
         : null;
     try {
       return await answerCompanionQuestion(
         recording: recording,
-        kind: ask,
+        kind: chatKind,
         models: models,
-        client: asker,
+        client: chatClient,
         support: Directory(
           await (await getApplicationSupportDirectory()).resolveSymbolicLinks(),
         ),
@@ -95,7 +95,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
         control: control,
       );
     } finally {
-      asker?.close();
+      chatClient?.close();
     }
   }
   OpenRouterClient? client;
@@ -182,7 +182,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
           'version': 1,
           'transcript': transcript,
           'summary': answer,
-          'category': askAiCategory,
+          'category': chatCategory,
           'actions': <Object?>[],
         };
       }

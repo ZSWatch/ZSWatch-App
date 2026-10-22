@@ -13,23 +13,23 @@ import '../voice_memo/verified_companion_recording.dart';
 import 'companion_voice_processor.dart';
 import 'openrouter_client.dart';
 
-/// The watch's Ask AI app names recordings `ask_...` for a new question and
-/// `askr_...` for a reply to the answer it shows.
-enum AskKind { question, reply }
+/// The watch's Chat app names recordings `chat_...` for a new question and
+/// `chatr_...` for a reply to the answer it shows.
+enum ChatKind { question, reply }
 
-AskKind? askKindOf(String filename) {
-  if (filename.startsWith('askr_')) return AskKind.reply;
-  if (filename.startsWith('ask_')) return AskKind.question;
+ChatKind? chatKindOf(String filename) {
+  if (filename.startsWith('chatr_')) return ChatKind.reply;
+  if (filename.startsWith('chat_')) return ChatKind.question;
   return null;
 }
 
-/// Category the native owners use to send the result as an Ask AI answer.
-const askAiCategory = 'ask_ai';
+/// Category the native owners use to send the result as an Chat answer.
+const chatCategory = 'chat';
 
 /// Keeps one conversation per phone. A new question continues it only shortly
 /// after the last answer; a reply continues it for longer.
-class AskConversationStore {
-  AskConversationStore(this.file);
+class ChatConversationStore {
+  ChatConversationStore(this.file);
 
   static const questionWindow = Duration(minutes: 1);
   static const replyWindow = Duration(minutes: 10);
@@ -39,7 +39,7 @@ class AskConversationStore {
 
   Future<List<Map<String, String>>> load(
     String watchId,
-    AskKind kind,
+    ChatKind kind,
     DateTime now,
   ) async {
     try {
@@ -48,7 +48,7 @@ class AskConversationStore {
       final updated = DateTime.fromMillisecondsSinceEpoch(
         value['updated_ms'] as int,
       );
-      final window = kind == AskKind.reply ? replyWindow : questionWindow;
+      final window = kind == ChatKind.reply ? replyWindow : questionWindow;
       if (now.difference(updated) > window) return [];
       return [
         for (final m in value['messages'] as List)
@@ -85,7 +85,7 @@ class AskConversationStore {
 /// instead of a failed job, since a late retry of a question is useless.
 Future<Map<String, Object?>> answerCompanionQuestion({
   required CompanionRecording recording,
-  required AskKind kind,
+  required ChatKind kind,
   required List<String> models,
   required OpenRouterClient? client,
   required Directory support,
@@ -97,7 +97,7 @@ Future<Map<String, Object?>> answerCompanionQuestion({
     'version': 1,
     'transcript': question,
     'summary': answer,
-    'category': askAiCategory,
+    'category': chatCategory,
     'actions': <Object?>[],
   };
   if (client == null) {
@@ -131,7 +131,7 @@ Future<Map<String, Object?>> answerCompanionQuestion({
 
 Future<Map<String, Object?>> _answer(
   CompanionRecording recording,
-  AskKind kind,
+  ChatKind kind,
   List<String> models,
   OpenRouterClient client,
   Directory support,
@@ -165,8 +165,8 @@ Future<Map<String, Object?>> _answer(
     return result('', _failureText(e));
   }
   control.check();
-  final store = AskConversationStore(
-    File(p.join(support.path, askConversationFile)),
+  final store = ChatConversationStore(
+    File(p.join(support.path, chatConversationFile)),
   );
   final now = clock();
   final history = await store.load(recording.watchId, kind, now);
@@ -181,7 +181,7 @@ Future<Map<String, Object?>> _answer(
   try {
     answer = await client.chat(
       model,
-      OpenRouterRequest.askPrompt(now),
+      OpenRouterRequest.chatPrompt(now),
       messages,
     );
   } on OpenRouterFailure catch (e) {
@@ -195,7 +195,7 @@ Future<Map<String, Object?>> _answer(
     {'role': 'assistant', 'content': answer},
   ], clock());
   debugPrint(
-    '[CompanionAsk] answered ${kind.name} with ${history.length} earlier messages',
+    '[CompanionChat] answered ${kind.name} with ${history.length} earlier messages',
   );
   return result(question, answer);
 }
@@ -222,7 +222,7 @@ Future<String?> answerIfQuestion({
       messages,
     );
   } on OpenRouterFailure catch (e) {
-    debugPrint('[CompanionAsk] routing failed, keeping memo: ${e.kind.name}');
+    debugPrint('[CompanionChat] routing failed, keeping memo: ${e.kind.name}');
     return null;
   }
   final cleaned = answer.trim();
@@ -232,8 +232,8 @@ Future<String?> answerIfQuestion({
     return null;
   }
   // Start a conversation so the watch's Reply can follow up.
-  await AskConversationStore(
-    File(p.join(support.path, askConversationFile)),
+  await ChatConversationStore(
+    File(p.join(support.path, chatConversationFile)),
   ).save(watchId, [
     ...messages,
     {'role': 'assistant', 'content': cleaned},
@@ -241,7 +241,7 @@ Future<String?> answerIfQuestion({
   return cleaned;
 }
 
-const askConversationFile = 'ask_ai_conversation.json';
+const chatConversationFile = 'chat_conversation.json';
 
 String _failureText(OpenRouterFailure failure) => switch (failure.kind) {
   OpenRouterFailureKind.auth =>
@@ -269,7 +269,7 @@ Future<String> _transcribe(
     TranscriptionEngineType.values.byName(sttModel),
   );
   onEngine(engine);
-  final scratch = await Directory.systemTemp.createTemp('companion-ask-');
+  final scratch = await Directory.systemTemp.createTemp('companion-chat-');
   try {
     if (!await engine.isAvailable()) {
       throw PlatformException(code: 'MODEL_MISSING');

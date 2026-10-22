@@ -245,8 +245,8 @@ final class CompanionVoiceJobs {
           CompanionRecordingFiles.integer(result["version"]) == 1,
           let transcript = result["transcript"] as? String, let summary = result["summary"] as? String,
           let category = result["category"] as? String, let actions = result["actions"] as? [[String: Any]], actions.count <= 64,
-          // An Ask AI answer to silence or a setup problem has no transcript.
-          category == "ask_ai" || !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+          // An Chat answer to silence or a setup problem has no transcript.
+          category == "chat" || !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
           transcriptionOnly ? summary.isEmpty && category.isEmpty && actions.isEmpty : !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
           (try canonical(result)).utf8.count <= 65536 else { throw CompanionFailure.invalid("Invalid voice result") }
     for action in actions {
@@ -342,8 +342,8 @@ final class CompanionVoiceJobs {
           let identity = spec["recording_id"] as? String,
           filename.range(of: "^[A-Za-z0-9_-]{1,31}$", options: .regularExpression) != nil else { throw CompanionFailure.invalid("Invalid voice delivery") }
     let first = (result["actions"] as? [[String: Any]])?.first
-    // Ask AI answers use the watch's larger answer buffer.
-    let answer = result["category"] as? String == "ask_ai"
+    // Chat answers use the watch's larger answer buffer.
+    let answer = result["category"] as? String == "chat"
     func bounded(_ text: String, _ size: Int) -> String {
       var value = ""
       for char in text { if (value + String(char)).utf8.count > size { break }; value.append(char) }
@@ -352,7 +352,7 @@ final class CompanionVoiceJobs {
     return ["t": "voice_memo", "action": "result", "version": 1,
       "result_id": Self.sha("result-v1:" + id), "recording_key": Self.sha(identity),
       "result_sha256": Self.sha(try Self.canonical(result)), "generation": generation, "filename": filename,
-      "text": bounded(summary, answer ? 1023 : 127), "action_type": answer ? "ask_ai" : first?["type"] as? String ?? "",
+      "text": bounded(summary, answer ? 1023 : 127), "action_type": answer ? "chat" : first?["type"] as? String ?? "",
       "datetime": bounded(first?["start_time"] as? String ?? first?["due_date"] as? String ?? "", 31)]
   }
   func acknowledge(_ id: String, ack: [String: Any], filename: String) throws -> Bool {

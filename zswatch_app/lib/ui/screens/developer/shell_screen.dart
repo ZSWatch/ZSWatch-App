@@ -440,18 +440,18 @@ class _QuickActionsTab extends ConsumerWidget {
             ref: ref,
             action: () => _voiceMemoTest(ref, phrase, language),
           ),
-        for (final (title, phrase, start) in _askTestPhrases)
+        for (final (title, phrase, start) in _chatTestPhrases)
           _QuickActionCard(
             icon: Icons.question_answer,
             title: title,
-            command: '$start, speech, ask send',
+            command: '$start, speech, chat send',
             ref: ref,
             action: () => _voiceMemoTest(
               ref,
               phrase,
               'en-US',
               start: start,
-              stop: 'ask send',
+              stop: 'chat send',
             ),
           ),
         _QuickActionCard(
@@ -541,14 +541,14 @@ const _voiceTestPhrases = [
   ),
 ];
 
-/// Drives the watch's Chat app through its `ask` shell command.
-const _askTestPhrases = [
+/// Drives the watch's Chat app through its `chat` shell command.
+const _chatTestPhrases = [
   (
     'Chat Test (phone speaks)',
     'What is the highest mountain in Sweden?',
-    'ask new',
+    'chat new',
   ),
-  ('Chat Reply Test (phone speaks)', 'And how high is it?', 'ask reply'),
+  ('Chat Reply Test (phone speaks)', 'And how high is it?', 'chat reply'),
 ];
 
 /// Records a voice memo on the watch while the phone speaks a known phrase,
