@@ -351,7 +351,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       "version": 1, "owner": "ios_companion_native", "platform": "ios",
       "runtime_active": journal.desired, "protocol_ready": journal.desired && phase == "ready",
       "phase": journal.loadError == nil ? phase : "error", "scan_active": scanning,
-      "scan_results": scans.values.sorted { ($0["rssi"] as? Int ?? -127) > ($1["rssi"] as? Int ?? -127) },
+      "scan_results": listedScans.sorted { ($0["rssi"] as? Int ?? -127) > ($1["rssi"] as? Int ?? -127) },
       "ancs_authorized": peripheral?.ancsAuthorized ?? false,
       "capabilities": ["ble_restoration": true, "system_unpair": false,
                        "notification_filters": false, "ancs": true, "ams": true,
@@ -481,8 +481,15 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     try journal.forget(id)
     if selected { firmware.abort("forgotten") }
     if selected { retryToken += 1; scanStop(); closeLink(); phase = "stopped" }
-    if let uuid = UUID(uuidString: id) { accessorySetup?.remove(uuid) }
+    if let uuid = UUID(uuidString: id) { accessorySetup?.remove(uuid); scans.removeValue(forKey: uuid) }
     try changed("watch_forgotten")
+  }
+
+  // With AccessorySetupKit the list holds watches set up through the picker, so
+  // drop any whose authorization was removed (forgotten here or in Settings).
+  private var listedScans: [[String: Any]] {
+    guard usesAccessorySetup, let authorized = accessorySetup?.identifiers else { return Array(scans.values) }
+    return scans.filter { authorized.contains($0.key) }.map(\.value)
   }
 
   func scanStart() throws {
