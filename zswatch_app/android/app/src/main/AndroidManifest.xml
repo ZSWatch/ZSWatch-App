@@ -40,6 +40,7 @@
 
     <!-- Network access for firmware downloads -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- Required to launch system timer/alarm intents -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
