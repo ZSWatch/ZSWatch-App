@@ -115,27 +115,8 @@ class MainActivity : FlutterActivity() {
                     LifecycleLogger.log("ForegroundChannel", "isBatteryOptimizationDisabled=$isIgnoring")
                     result.success(isIgnoring)
                 }
-                "requestDisableBatteryOptimization" -> {
-                    try {
-                        LifecycleLogger.log("ForegroundChannel", "requestDisableBatteryOptimization")
-                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                            data = Uri.parse("package:$packageName")
-                        }
-                        if (intent.resolveActivity(packageManager) != null) {
-                            startActivity(intent)
-                            result.success(true)
-                        } else {
-                            android.util.Log.e("MainActivity", "No activity to handle ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")
-                            // Fallback to general battery optimization settings
-                            val fallbackIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                            startActivity(fallbackIntent)
-                            result.success(true)
-                        }
-                    } catch (e: Exception) {
-                        android.util.Log.e("MainActivity", "Failed to request battery optimization exemption", e)
-                        result.error("BATTERY_OPT_ERROR", e.localizedMessage, null)
-                    }
-                }
+                // Play restricts REQUEST_IGNORE_BATTERY_OPTIMIZATIONS; open the list instead.
+                "requestDisableBatteryOptimization",
                 "openBatteryOptimizationSettings" -> {
                     try {
                         LifecycleLogger.log("ForegroundChannel", "openBatteryOptimizationSettings")
