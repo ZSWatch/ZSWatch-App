@@ -258,13 +258,14 @@ class OpenRouterClient {
       return await call().timeout(requestTimeout);
     } on TimeoutException {
       throw const OpenRouterFailure(OpenRouterFailureKind.retry, 'Timeout');
-    } on SocketException {
-      throw const OpenRouterFailure(OpenRouterFailureKind.retry, 'Offline');
     } on http.ClientException {
       throw OpenRouterFailure(
         OpenRouterFailureKind.retry,
         _closed ? 'Cancelled' : 'Connection failed',
       );
+    } on IOException {
+      // Sockets and also TLS handshake failures.
+      throw const OpenRouterFailure(OpenRouterFailureKind.retry, 'Offline');
     }
   }
 
