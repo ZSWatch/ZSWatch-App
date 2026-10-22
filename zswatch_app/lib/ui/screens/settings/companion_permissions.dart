@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/companion_runtime_providers.dart';
+import '../../../providers/foreground_service_providers.dart';
 
 final companionPermissionsStatusProvider = FutureProvider.autoDispose((ref) {
   return ref.watch(companionClientProvider).permissionStatus();
@@ -76,9 +77,8 @@ List<CompanionPermission> companionPermissions() => [
       'battery_exemption',
       'Battery optimization',
       'Allow background operation',
-      (ref) async {
-        await Permission.ignoreBatteryOptimizations.request();
-      },
+      (ref) =>
+          ref.read(foregroundServiceProvider).openBatteryOptimizationSettings(),
     ),
 ];
 
