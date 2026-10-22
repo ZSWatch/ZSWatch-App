@@ -20,15 +20,15 @@ object PrototypeVoiceResult {
         val result = envelope.getJSONObject("result")
         PrototypeJobs.validateResult(result)
         val first = result.getJSONArray("actions").optJSONObject(0)
-        // Ask AI answers use the watch's larger answer buffer.
-        val answer = result.getString("category") == "ask_ai"
+        // Chat answers use the watch's larger answer buffer.
+        val answer = result.getString("category") == "chat"
         return JSONObject().put("t", "voice_memo").put("action", "result").put("version", 1)
             .put("result_id", envelope.getString("result_id"))
             .put("recording_key", PrototypeJobs.sha(envelope.getString("recording_id")))
             .put("result_sha256", PrototypeJobs.sha(PrototypeJobs.canonical(result)))
             .put("generation", envelope.getLong("generation")).put("filename", filename)
             .put("text", bounded(result.getString("summary"), if (answer) 1023 else 127))
-            .put("action_type", if (answer) "ask_ai" else first?.optString("type") ?: "")
+            .put("action_type", if (answer) "chat" else first?.optString("type") ?: "")
             .put("datetime", bounded(first?.optString("start_time")?.takeIf { it.isNotEmpty() }
                 ?: first?.optString("due_date") ?: "", 31))
     }

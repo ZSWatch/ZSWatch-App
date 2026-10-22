@@ -78,7 +78,7 @@ abstract final class OpenRouterRequest {
   };
 
   /// System prompt for the watch's Chat app. [now] grounds "today".
-  static String askPrompt(DateTime now) =>
+  static String chatPrompt(DateTime now) =>
       'You are a voice chat on a smartwatch: answer questions and help the '
       'user think through ideas. The message was transcribed from speech and '
       'may contain recognition errors; respond to what was most likely meant. '
@@ -90,10 +90,10 @@ abstract final class OpenRouterRequest {
   /// Reply of [routePrompt] for speech that is not a question.
   static const String memoMarker = 'MEMO';
 
-  /// Like [askPrompt], but for any voice memo: answers questions and replies
+  /// Like [chatPrompt], but for any voice memo: answers questions and replies
   /// [memoMarker] for notes, tasks, reminders, events, timers and alarms.
   static String routePrompt(DateTime now) =>
-      '${askPrompt(now)} If the speech is not a question or a request for '
+      '${chatPrompt(now)} If the speech is not a question or a request for '
       'information, but something to save or schedule (a note, task, '
       'reminder, calendar event, timer or alarm), reply with exactly '
       '$memoMarker and nothing else.';

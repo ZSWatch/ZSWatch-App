@@ -683,12 +683,12 @@ final class CompanionPhoneUITests: XCTestCase {
 
     /// Asks the watch's Chat app a spoken question and waits for the answer.
     /// Needs an OpenRouter key in the app.
-    func testAskAI() throws {
+    func testChat() throws {
         try recordQuestion("Chat Test (phone speaks)")
     }
 
-    /// Follow-up to `testAskAI` within its conversation window.
-    func testAskAIReply() throws {
+    /// Follow-up to `testChat` within its conversation window.
+    func testChatReply() throws {
         try recordQuestion("Chat Reply Test (phone speaks)")
     }
 
@@ -702,9 +702,9 @@ final class CompanionPhoneUITests: XCTestCase {
         try openDeveloperRoute("Shell", heading: "Shell")
         try tap(containing("Quick Actions"), "Quick Actions")
         try tap(try reveal(containing(action), action), action)
-        try require(containing("Recorded: ").waitForExistence(timeout: 60), "Question was not recorded", capture: "ask")
+        try require(containing("Recorded: ").waitForExistence(timeout: 60), "Question was not recorded", capture: "chat")
         print("HIL_ASK_RECORDED")
-        // The answer is checked on the watch (`ask state`) or in the native journal.
+        // The answer is checked on the watch (`chat state`) or in the native journal.
         Thread.sleep(forTimeInterval: Config.backgroundSeconds)
     }
 

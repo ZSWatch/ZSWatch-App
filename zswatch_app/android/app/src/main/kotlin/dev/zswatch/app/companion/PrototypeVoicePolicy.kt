@@ -11,8 +11,8 @@ object PrototypeVoicePolicy {
             "analysis_enabled" to analyze)
     }
 
-    /** The watch's Ask AI questions are always answered, even with memo processing off. */
-    fun isQuestion(filename: String) = filename.startsWith("ask_") || filename.startsWith("askr_")
+    /** The watch's Chat questions are always answered, even with memo processing off. */
+    fun isQuestion(filename: String) = filename.startsWith("chat_") || filename.startsWith("chatr_")
 
     fun recordingRequest(policy: Any?, watchId: String, filename: String = ""): Map<String, Any>? {
         val value = policy as? Map<*, *> ?: return null

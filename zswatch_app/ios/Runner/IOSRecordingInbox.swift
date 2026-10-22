@@ -128,9 +128,9 @@ final class IOSRecordingInbox {
           }
         } else if next.count < 4096 {
           var metadata = original
-          // The watch's Ask AI questions are always answered, even with memo processing off.
+          // The watch's Chat questions are always answered, even with memo processing off.
           let name = original["filename"] as? String ?? ""
-          let question = name.hasPrefix("ask_") || name.hasPrefix("askr_")
+          let question = name.hasPrefix("chat_") || name.hasPrefix("chatr_")
           // Their models come from the last saved policy, also one saved for another watch.
           if var policy = owner.journal.fields["voice_processing_policy"] as? [String: Any],
              question || (policy["enabled"] as? Bool == true && policy["watch_id"] as? String == owner.journal.address) {
