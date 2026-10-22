@@ -235,6 +235,30 @@ class _KeyEntryState extends ConsumerState<_KeyEntry> {
   }
 
   Future<void> _save() async {
+    // App Store 5.1.2(i): ask before personal data goes to a third-party AI.
+    final allowed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Send voice data to OpenRouter?'),
+        content: const Text(
+          'With a key saved, your voice memo recordings, their transcripts '
+          'and your Chat questions are sent to OpenRouter and the AI model '
+          'provider you choose, to transcribe and answer them. Remove the '
+          'key at any time to stop.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Allow'),
+          ),
+        ],
+      ),
+    );
+    if (allowed != true || !mounted) return;
     setState(() {
       _saving = true;
       _error = null;

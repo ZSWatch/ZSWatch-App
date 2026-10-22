@@ -649,6 +649,7 @@ final class CompanionPhoneUITests: XCTestCase {
             try tap(field, "API key field")
             field.typeText(key)
             try tap(exact("Verify and save"), "Verify and save")
+            try tap(app.buttons["Allow"], "Allow OpenRouter")
             try require(prefix("OpenRouter key saved").waitForExistence(timeout: 30), "Key not accepted", capture: "openrouter-key")
         }
         let automatic = try switchOnRow("Automatically process new recordings")
