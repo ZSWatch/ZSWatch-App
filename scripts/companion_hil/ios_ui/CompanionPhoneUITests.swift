@@ -330,6 +330,21 @@ final class CompanionPhoneUITests: XCTestCase {
         throw fail("No \(Config.watchName) pairing prompt within 150 s", capture: "no-pair-prompt")
     }
 
+    /// Taps Disconnect so another central can use the watch's only connection.
+    func testStopConnection() throws {
+        try connectedHome()
+        app.buttons["Disconnect"].tap()
+        try require(app.buttons["Connect"].waitForExistence(timeout: 15), "Disconnect did not stop")
+    }
+
+    /// Taps Connect and waits for the connected Home.
+    func testStartConnection() throws {
+        app.activate()
+        let connect = app.buttons["Connect"]
+        if connect.waitForExistence(timeout: 10) { connect.tap() }
+        try require(app.buttons["Disconnect"].waitForExistence(timeout: 60), "Connect did not return", capture: "reconnect")
+    }
+
     /// Developer > Find watch makes the watch buzz.
     func testFindWatch() throws {
         try openRoute("Developer", heading: "Developer Tools")
