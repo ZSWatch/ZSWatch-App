@@ -184,10 +184,14 @@ final class IOSVoiceCoordinator {
     }
   }
   func sessionClosed() { deliveries.removeAll() }
-  func deliverResults() {
+  /// The watch is connected and acknowledges results, so it shows them itself.
+  private var watchTakesResults: Bool {
     guard let owner, owner.isReadySession(owner.journal.generation),
-          let list = owner.journal.fields["recording_list"] as? [String: Any],
-          list["generation"] as? Int == owner.journal.generation, list["result_ack_version"] as? Int == 1 else { return }
+          let list = owner.journal.fields["recording_list"] as? [String: Any] else { return false }
+    return list["generation"] as? Int == owner.journal.generation && list["result_ack_version"] as? Int == 1
+  }
+  func deliverResults() {
+    guard let owner, watchTakesResults else { return }
     let generation = owner.journal.generation
     for (id, item) in jobs.jobs where item["state"] as? String == "result_ready" {
       guard let spec = item["spec"] as? [String: Any], spec["watch_id"] as? String == owner.journal.address,
@@ -249,10 +253,9 @@ final class IOSVoiceCoordinator {
     guard let item = jobs.jobs[id], let result = item["result"] as? [String: Any], let until = item["undo_until"] as? Int,
           item["selected"] as? Bool == true, item["undone"] as? Bool != true, item["auto_created"] as? Bool != true else { scheduleUndo(); return }
     let actions = result["actions"] as? [[String: Any]] ?? []
-    let watchReachable = owner.map { $0.isReadySession($0.journal.generation) } ?? false
     if item["state"] as? String == "delivered" {
       VoiceUndoNotification.remove(id)
-    } else if !watchReachable, autoCreateEnabled, actions.contains(where: { IOSCompanionActions.autoDraft($0) != nil }) {
+    } else if !watchTakesResults, autoCreateEnabled, actions.contains(where: { IOSCompanionActions.autoDraft($0) != nil }) {
       VoiceUndoNotification.show(id, result: result, until: until)
     }
     scheduleUndo()

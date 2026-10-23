@@ -77,6 +77,13 @@ object CompanionVoiceActions {
 
     private val SCHEDULE = Any()
 
+    /** The watch is connected and acknowledges results, so it shows them itself. */
+    private fun watchTakesResults(control: Map<String, Any?>): Boolean {
+        val list = control["recording_list"] as? Map<*, *> ?: return false
+        return control["phase"] == "ready" && (list["generation"] as? Number)?.toLong() == (control["generation"] as? Number)?.toLong() &&
+            list["address"] == control["address"] && list["result_ack_version"] == 1
+    }
+
     /** A result is ready or the watch received it: (re)start the phone Undo and the creation timer.
      *  The phone Undo is only for a watch that cannot show its own popup. */
     fun resultReady(context: Context, id: String) {
@@ -88,7 +95,7 @@ object CompanionVoiceActions {
             (0 until actions.length()).any { draft(actions.getJSONObject(it), null) != null }
         if (item.optString("state") == "delivered") {
             VoiceUndoNotification.cancel(context, id)
-        } else if (creates && control["phase"] != "ready" && item.has("undo_until") && item.optBoolean("selected") &&
+        } else if (creates && !watchTakesResults(control) && item.has("undo_until") && item.optBoolean("selected") &&
             !item.optBoolean("undone") && !item.optBoolean("auto_created")) {
             VoiceUndoNotification.show(context, id, item.getJSONObject("result"), item.getLong("undo_until"))
         }
