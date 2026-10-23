@@ -114,15 +114,18 @@ Update before you submit:
 
 ## Screenshots
 
-These are in `.companion-hil-runs/release/` (gitignored).
+These are in `.companion-hil-runs/release/` (gitignored). `store_screenshots.zip` holds both sets.
 
-- **`store_ios/01..06`**, 1320×2868 (App Store 6.9", iPhone only, so no iPad set). Captured on the iPhone 11 with the real watch: Home, Voice memo detail, Voice AI, Firmware, Watchface, Developer. Ready to use as a draft.
-  - Live-data flaws worth a retake with a charged watch and staged content: 0 steps, low watch battery, a low-battery banner on Firmware, recordings titled with timestamps, and a "milk" memo that is not processed.
-  - The UI test also shows "Use pushed file: dfu_*.zip" rows. Delete those test files from the app container first.
-  - To retake: run `testStoreScreenshots`, export the attachments, then `python scripts/store/frame_screenshots.py ios_pick/spec.json --font fonts/Inter.ttf --out store_ios`.
-- **`store_play/01..06`**, 1080×1920, and `feature_graphic_1024x500.png`. These are **provisional**: iOS captures inside an Android frame. Retake them on the OnePlus. The iOS simulator cannot build (ggml simulator symbols), and the emulator has no watch.
+- **`store_ios/<W>x<H>/01..13`.** 13 screens in every App Store iPhone size: 1320×2868, 1290×2796, 1284×2778, 1242×2688 and 1242×2208.
+  - Captured on the iPhone 11 with the real watch on 2026-10-23, build 1.2.0+10.
+  - Remove the ones you don't want.
+  - Live-data flaws you may want to retake with a charged watch: 0 steps, 22% battery, a low-battery banner on Firmware, and recordings titled with timestamps.
+- **`store_play/01..13`** at 1080×1920, plus `feature_graphic_1024x500.png`. These are **provisional**: iPhone captures in an Android frame. Retake them on the OnePlus.
+- **To retake:**
+  1. Run `testStoreScreenshots`.
+  2. Export the attachments into `ios_raw2/`.
+  3. Run `python scripts/store/frame_screenshots.py ios_raw2/spec.json --font fonts/Inter.ttf --out store_ios`.
 - The font is Inter (OFL). Apple only licenses SF Pro for UI mockups, not marketing text.
-- The current App Store screenshots are Android captures on white, saved in `appstore_current/`.
 
 ## Still to verify on the OnePlus
 
