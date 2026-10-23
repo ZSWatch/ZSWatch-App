@@ -120,18 +120,19 @@ These are in `.companion-hil-runs/release/` (gitignored). `store_screenshots.zip
   - Captured on the iPhone 11 with the real watch on 2026-10-23, build 1.2.0+10.
   - Remove the ones you don't want.
   - Live-data flaws you may want to retake with a charged watch: 0 steps, 22% battery, a low-battery banner on Firmware, and recordings titled with timestamps.
-- **`store_play/01..13`** at 1080×1920, plus `feature_graphic_1024x500.png`. These are **provisional**: iPhone captures in an Android frame. Retake them on the OnePlus.
+- **`store_play/01..13`** at 1080×1920, plus `feature_graphic_1024x500.png`. Captured on the OnePlus (Android 16) with the real watch on 2026-10-23, build 1.2.0+10. The raw captures and `spec.json` are in `android_raw/`.
 - **To retake:**
   1. Run `testStoreScreenshots`.
   2. Export the attachments into `ios_raw2/`.
   3. Run `python scripts/store/frame_screenshots.py ios_raw2/spec.json --font fonts/Inter.ttf --out store_ios`.
 - The font is Inter (OFL). Apple only licenses SF Pro for UI mockups, not marketing text.
 
-## Still to verify on the OnePlus
+## Verified on the OnePlus (2026-10-23, release-signed 1.2.0+10, fresh install)
 
-- The permission setup screen after the first connection, including the battery row opening the system list.
-- The Android 16 target with the real watch: foreground service start from the background, notification listener, and edge-to-edge on screens with bottom actions.
-- An install of the release AAB through internal testing.
+- First run: Add watch → notification prompt → companion pairing → permission setup screen → OpenRouter consent dialog.
+- Settings permissions: all granted except battery optimization. Its Allow opens Android's battery optimization list.
+- The Licenses page lists the native libraries.
+- Fixed in `8fe5c8f`: the connection dropped when the watch toggled its SMP service (Service Changed) while Android was already rediscovering. The app now retries the rediscovery. Verified with two SMP on/off cycles, no disconnect.
 
 ## Sources
 
