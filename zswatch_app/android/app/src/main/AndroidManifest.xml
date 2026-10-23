@@ -30,8 +30,6 @@
     <!-- Notification access (requires user to enable in settings) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Microphone access for debug audio recording in benchmark mode -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Calendar access for AI-created calendar events and reminders -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
