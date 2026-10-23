@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Watch HTTP relay: watch requests support HTTP as well as HTTPS.
-     Certificate verification remains the platform default for HTTPS. -->
+<!-- Watch HTTP relay: HTTPS only, plus plain HTTP to the local HIL probe. -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true" />
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
 </network-security-config>

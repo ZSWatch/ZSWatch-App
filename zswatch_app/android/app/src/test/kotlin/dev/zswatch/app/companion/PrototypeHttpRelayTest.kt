@@ -146,7 +146,7 @@ class PrototypeHttpRelayTest {
             val done = CountDownLatch(1); var result: RelayResult? = null
             val executor = HttpUrlRelayExecutor { it() }
             try {
-                executor.execute(RelayRequest("1", "http://127.0.0.1:${server.localPort}/", xpath, false)) { result = it; done.countDown() }
+                executor.execute(RelayRequest("1", "http://127.0.0.1:${server.localPort}/", xpath)) { result = it; done.countDown() }
                 assertTrue(done.await(10, TimeUnit.SECONDS)); thread.join(1000)
                 return result!!
             } finally { executor.close() }
@@ -178,7 +178,7 @@ class PrototypeHttpRelayTest {
             val executor = HttpUrlRelayExecutor { it() }; val done = CountDownLatch(1)
             var result: RelayResult? = null
             try {
-                executor.execute(RelayRequest("1", "http://127.0.0.1:${server.localPort}/", null, false)) { result = it; done.countDown() }
+                executor.execute(RelayRequest("1", "http://127.0.0.1:${server.localPort}/", null)) { result = it; done.countDown() }
                 assertTrue(done.await(10, TimeUnit.SECONDS)); peer.join(1000)
                 assertEquals("ok", result!!.body)
                 assertEquals(listOf("GET / HTTP/1.1", "GET /next HTTP/1.1"), paths)
@@ -190,7 +190,7 @@ class PrototypeHttpRelayTest {
         try {
             for (url in listOf("file:///etc/passwd", "ftp://example.com/", "https://user:pass@example.com/")) {
                 val done = CountDownLatch(1); var result: RelayResult? = null
-                executor.execute(RelayRequest("1", url, null, false)) { result = it; done.countDown() }
+                executor.execute(RelayRequest("1", url, null)) { result = it; done.countDown() }
                 assertTrue(done.await(2, TimeUnit.SECONDS)); assertNotNull(result!!.error); assertNull(result!!.body)
             }
         } finally { executor.close() }

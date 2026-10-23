@@ -5,10 +5,6 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.SSLContext
-import javax.net.ssl.X509TrustManager
-import java.security.cert.X509Certificate
 import java.nio.charset.Charset
 import java.io.StringReader
 import javax.xml.parsers.DocumentBuilderFactory
@@ -17,8 +13,8 @@ import javax.xml.xpath.XPathFactory
 import org.xml.sax.InputSource
 import org.w3c.dom.NodeList
 
-/** GET only; IO never runs on the BLE handler. TLS bypass is explicit per request,
- * never a global trust-manager change. Redirects are bounded and cannot downgrade
+/** GET only; IO never runs on the BLE handler. TLS always uses the platform
+ * verification; the Gadgetbridge `insecure` flag is ignored. Redirects are bounded and cannot downgrade
  * HTTPS. Raw body/XML is bounded before parsing; no URL/body goes into diagnostics.
  */
 internal class HttpUrlRelayExecutor(private val deliver: (() -> Unit) -> Unit) {
@@ -71,16 +67,6 @@ internal class HttpUrlRelayExecutor(private val deliver: (() -> Unit) -> Unit) {
                 connection.requestMethod = "GET"
                 connection.setRequestProperty("User-Agent", "ZSWatch-Companion/1.0")
                 connection.setRequestProperty("Accept", "*/*")
-                if (request.insecure && connection is HttpsURLConnection) {
-                    val tls = SSLContext.getInstance("TLS")
-                    tls.init(null, arrayOf(object : X509TrustManager {
-                        override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-                        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-                        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-                    }), null)
-                    connection.sslSocketFactory = tls.socketFactory
-                    connection.hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
-                }
                 val status = connection.responseCode
                 if (status in listOf(301, 302, 303, 307, 308)) {
                     if (redirect == 4) throw RelayFailure("Too many redirects")
