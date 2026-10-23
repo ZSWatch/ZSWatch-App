@@ -5,7 +5,10 @@ Usage:
 
 spec.json:
   {"platform": "ios" | "android",
+   "sizes": [[1320, 2868], ...],  # optional, defaults below
    "screens": [{"file": "home.png", "title": "...", "subtitle": "..."}, ...]}
+
+With more than one size, each size goes to its own WxH folder.
 
 Needs Pillow. Use a font licensed for marketing use (e.g. Inter, OFL); SF Pro
 may only be used for Apple-platform UI mockups.
@@ -17,8 +20,11 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-# App Store 6.9" portrait, and a 9:16 Play Store phone image.
-SIZES = {"ios": (1320, 2868), "android": (1080, 1920)}
+# App Store iPhone sizes (6.9", 6.7", 6.5", 6.5", 5.5") and a 9:16 Play image.
+SIZES = {
+    "ios": [(1320, 2868), (1290, 2796), (1284, 2778), (1242, 2688), (1242, 2208)],
+    "android": [(1080, 1920)],
+}
 TOP = (11, 37, 48)
 BOTTOM = (5, 8, 12)
 GLOW = (0, 188, 212)
@@ -123,8 +129,8 @@ def phone(shot, platform, width):
     return img
 
 
-def compose(spec_screen, platform, font_path, src_dir):
-    w, h = SIZES[platform]
+def compose(spec_screen, platform, font_path, src_dir, size):
+    w, h = size
     img = background(w, h)
     d = ImageDraw.Draw(img)
     title_font = font(font_path, round(w * 0.072), "Bold")
@@ -161,13 +167,15 @@ def main():
     args = parser.parse_args()
     spec_path = Path(args.spec)
     spec = json.loads(spec_path.read_text())
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    for i, screen in enumerate(spec["screens"], 1):
-        img = compose(screen, spec["platform"], args.font, spec_path.parent)
-        name = out / f"{i:02d}_{Path(screen['file']).stem}.png"
-        img.save(name)
-        print(name)
+    sizes = [tuple(s) for s in spec.get("sizes", SIZES[spec["platform"]])]
+    for size in sizes:
+        out = Path(args.out) / f"{size[0]}x{size[1]}" if len(sizes) > 1 else Path(args.out)
+        out.mkdir(parents=True, exist_ok=True)
+        for i, screen in enumerate(spec["screens"], 1):
+            img = compose(screen, spec["platform"], args.font, spec_path.parent, size)
+            name = out / f"{i:02d}_{Path(screen['file']).stem}.png"
+            img.save(name)
+            print(name)
 
 
 if __name__ == "__main__":
