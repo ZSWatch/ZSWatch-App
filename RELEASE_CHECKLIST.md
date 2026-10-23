@@ -25,7 +25,7 @@ Checks: `flutter analyze` is clean and all 381 tests pass. The release APK and A
 
 ## Things to decide or do yourself
 
-1. **Android signing.** There is no upload keystore on the Mac, so `flutter build appbundle` falls back to debug signing, which Play rejects. Copy the keystore and `android/key.properties` (keys `storePassword`, `keyPassword`, `keyAlias`, `storeFile`, with `storeFile` relative to `android/app/`) from the Linux machine, then run `flutter build appbundle --release`. If the key is lost: with Play App Signing you can request an upload key reset in Play Console.
+1. **Android signing.** Done. `zswatch-release.keystore` and `key.properties` were copied from the Linux machine into `zswatch_app/android/`; both are gitignored. `flutter build appbundle --release` now signs with the release key (CN=Jakob Krantz, OU=ZSWatch).
 2. **AAB size.** It is 161 MB. Play caps the compressed download of the base module at 200 MB, so this fits. The APK is 232 MB, so ship only the AAB.
 3. **Play production access.** New personal developer accounts need closed testing with **12 testers for 14 continuous days** before they can apply for production (it used to be 20). Check that the counter in Play Console is running.
 4. **Privacy policy.** The App Store and Play listings link to https://zswatch.dev/privacy. It is out of date: it says location never leaves the phone (the watch's weather requests send coordinates to Open-Meteo) and does not mention OpenRouter, Hugging Face, calendar or notifications. The update is on firmware repo branch `jakkra_privacy_policy` (`website/src/pages/privacy.md`); deploy the site after it merges.
