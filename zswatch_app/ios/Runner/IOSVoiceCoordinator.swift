@@ -244,11 +244,15 @@ final class IOSVoiceCoordinator {
     return undone
   }
   /// A result is ready or the watch received it: (re)start the phone Undo and the creation timer.
+  /// The phone Undo is only for a watch that cannot show its own popup.
   func resultReady(_ id: String) {
     guard let item = jobs.jobs[id], let result = item["result"] as? [String: Any], let until = item["undo_until"] as? Int,
           item["selected"] as? Bool == true, item["undone"] as? Bool != true, item["auto_created"] as? Bool != true else { scheduleUndo(); return }
     let actions = result["actions"] as? [[String: Any]] ?? []
-    if autoCreateEnabled, actions.contains(where: { IOSCompanionActions.autoDraft($0) != nil }) {
+    let watchReachable = owner.map { $0.isReadySession($0.journal.generation) } ?? false
+    if item["state"] as? String == "delivered" {
+      VoiceUndoNotification.remove(id)
+    } else if !watchReachable, autoCreateEnabled, actions.contains(where: { IOSCompanionActions.autoDraft($0) != nil }) {
       VoiceUndoNotification.show(id, result: result, until: until)
     }
     scheduleUndo()

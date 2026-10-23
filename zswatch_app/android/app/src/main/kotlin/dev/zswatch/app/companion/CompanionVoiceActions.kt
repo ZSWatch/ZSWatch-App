@@ -77,15 +77,19 @@ object CompanionVoiceActions {
 
     private val SCHEDULE = Any()
 
-    /** A result is ready or the watch received it: (re)start the phone Undo and the creation timer. */
+    /** A result is ready or the watch received it: (re)start the phone Undo and the creation timer.
+     *  The phone Undo is only for a watch that cannot show its own popup. */
     fun resultReady(context: Context, id: String) {
         val item = PrototypeJobs(PrototypeHub.jobJournal(context)).state(id)
-        val settings = PrototypeHub.journal(context).control()["voice_actions"] as? Map<*, *>
+        val control = PrototypeHub.journal(context).control()
+        val settings = control["voice_actions"] as? Map<*, *>
         val actions = item.optJSONObject("result")?.optJSONArray("actions")
         val creates = settings?.get("auto_create") != false && actions != null &&
             (0 until actions.length()).any { draft(actions.getJSONObject(it), null) != null }
-        if (creates && item.has("undo_until") && item.optBoolean("selected") && !item.optBoolean("undone") &&
-            !item.optBoolean("auto_created")) {
+        if (item.optString("state") == "delivered") {
+            VoiceUndoNotification.cancel(context, id)
+        } else if (creates && control["phase"] != "ready" && item.has("undo_until") && item.optBoolean("selected") &&
+            !item.optBoolean("undone") && !item.optBoolean("auto_created")) {
             VoiceUndoNotification.show(context, id, item.getJSONObject("result"), item.getLong("undo_until"))
         }
         schedule(context)
