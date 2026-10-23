@@ -4,7 +4,7 @@ import libxml2
 
 /// Short, session-scoped watch requests. Requests/bodies are never journaled.
 final class CompanionHttpRelay {
-  struct Request { let id: String; let url: URL; let xpath: String?; let insecure: Bool }
+  struct Request { let id: String; let url: URL; let xpath: String? }
   typealias Fetch = (Request, @escaping (Result<String, Error>) -> Void) -> (() -> Void)
   private final class Pending {
     let generation: Int
@@ -50,7 +50,8 @@ final class CompanionHttpRelay {
           message["insecure"] == nil || (message["insecure"] as? NSNumber).map({ CFGetTypeID($0) == CFBooleanGetTypeID() }) == true else {
       complete(id, entry, .failure(CompanionFailure.invalid("Invalid request"))); return true
     }
-    let request = Request(id: id, url: url, xpath: message["xpath"] as? String, insecure: message["insecure"] as? Bool == true)
+    // The Gadgetbridge `insecure` flag is ignored: TLS always uses the system trust.
+    let request = Request(id: id, url: url, xpath: message["xpath"] as? String)
     let cancel = fetch(request) { self.complete(id, entry, $0) }
     if pending[id] === entry && !entry.replying { entry.cancel = cancel } else { cancel() }
     return true
@@ -196,13 +197,6 @@ final class CompanionHttpRequest: NSObject, URLSessionDataDelegate {
       rejection = "Invalid or insecure redirect"; completionHandler(nil); return
     }
     completionHandler(newRequest)
-  }
-  func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,
-                  completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
-    if request.insecure, challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-       let trust = challenge.protectionSpace.serverTrust {
-      completionHandler(.useCredential, URLCredential(trust: trust))
-    } else { completionHandler(.performDefaultHandling, nil) }
   }
   func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
     guard !finished else { return }
