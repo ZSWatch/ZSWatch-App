@@ -124,7 +124,7 @@ the pushed package when testing is complete.
 | Flow | Checks |
 | --- | --- |
 | `testMainRoutes` | Health (Today/Week/Month), Notifications, Analytics, Watchface, Developer, Voice open and Home stays connected |
-| `testSettingsReadOnly` | iOS permission rows, App Version, Licenses, Coredump Server dialog (cancelled) |
+| `testSettingsReadOnly` | iOS permission rows, App Version, Licenses |
 | `testShellAppState` | BLE shell `app state` returns `UI state:` |
 | `testDeveloperReadOnlyRoutes` | Crash Reports, File System, Comm Log load watch data |
 | `testFirmwareSelectPackage` | picks `ZSW_FW_PACKAGE`; no upload |

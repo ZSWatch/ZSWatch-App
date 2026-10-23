@@ -767,28 +767,6 @@ class AppDatabase extends _$AppDatabase {
         .watch();
   }
 
-  /// Update a crash report with analysis results
-  Future<void> updateCrashReportAnalysis({
-    required int reportId,
-    required bool success,
-    String? backtrace,
-    String? registers,
-    String? rawOutput,
-    String? error,
-    bool elfAvailable = false,
-  }) {
-    return (update(crashReports)..where((c) => c.id.equals(reportId))).write(
-      CrashReportsCompanion(
-        analyzed: const Value(true),
-        backtrace: Value(backtrace),
-        registers: Value(registers),
-        rawOutput: Value(rawOutput),
-        analysisError: Value(error),
-        elfAvailable: Value(elfAvailable),
-      ),
-    );
-  }
-
   /// Check if a crash report already exists (dedup by file+line+crashTime+watchId)
   Future<CrashReportEntity?> findExistingCrashReport({
     required String watchId,

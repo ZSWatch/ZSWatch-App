@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 
 import '../database/app_database.dart';
-import '../models/coredump_analysis.dart';
 import '../models/crash_summary.dart';
 
 /// Repository for persisting and querying crash reports.
@@ -47,22 +46,6 @@ class CrashReportRepository {
       '[CrashReportRepo] Saved crash report #$id: ${summary.file}:${summary.line}',
     );
     return id;
-  }
-
-  /// Update a crash report with analysis results.
-  Future<void> saveAnalysisResult({
-    required int reportId,
-    required CoredumpAnalysis analysis,
-  }) async {
-    await _db.updateCrashReportAnalysis(
-      reportId: reportId,
-      success: analysis.success,
-      backtrace: analysis.backtrace,
-      registers: analysis.registers,
-      rawOutput: analysis.rawOutput,
-      error: analysis.error,
-      elfAvailable: analysis.elfAvailable,
-    );
   }
 
   /// Get crash reports for a watch.

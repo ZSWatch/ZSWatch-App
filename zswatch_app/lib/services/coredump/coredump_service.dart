@@ -4,125 +4,85 @@ import 'package:flutter/foundation.dart';
 import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 import 'package:rxdart/rxdart.dart';
 
-import '../../data/models/coredump_analysis.dart';
-import '../../data/models/crash_summary.dart';
-import '../dfu/firmware_manager.dart';
 import '../watch_service.dart';
-import 'coredump_api_service.dart';
 
-/// Phase of the coredump analysis pipeline.
-enum CoredumpAnalysisPhase {
-  idle,
-  enablingSmp,
-  downloading,
-  uploading,
-  analyzing,
-  completed,
-  failed,
-}
+enum CoredumpDownloadPhase { idle, enablingSmp, downloading, completed, failed }
 
-/// Current state of a coredump analysis operation.
-class CoredumpAnalysisState {
-  final CoredumpAnalysisPhase phase;
+class CoredumpDownloadState {
+  final CoredumpDownloadPhase phase;
   final double downloadProgress;
-  final CoredumpAnalysis? result;
   final String? errorMessage;
 
-  const CoredumpAnalysisState({
-    this.phase = CoredumpAnalysisPhase.idle,
+  const CoredumpDownloadState({
+    this.phase = CoredumpDownloadPhase.idle,
     this.downloadProgress = 0.0,
-    this.result,
     this.errorMessage,
   });
 
-  CoredumpAnalysisState copyWith({
-    CoredumpAnalysisPhase? phase,
+  CoredumpDownloadState copyWith({
+    CoredumpDownloadPhase? phase,
     double? downloadProgress,
-    CoredumpAnalysis? result,
     String? errorMessage,
   }) {
-    return CoredumpAnalysisState(
+    return CoredumpDownloadState(
       phase: phase ?? this.phase,
       downloadProgress: downloadProgress ?? this.downloadProgress,
-      result: result ?? this.result,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 
   bool get isRunning =>
-      phase != CoredumpAnalysisPhase.idle &&
-      phase != CoredumpAnalysisPhase.completed &&
-      phase != CoredumpAnalysisPhase.failed;
+      phase == CoredumpDownloadPhase.enablingSmp ||
+      phase == CoredumpDownloadPhase.downloading;
 }
 
-/// Orchestrates the full coredump analysis pipeline:
-/// 1. Enable SMP on the watch
-/// 2. Download /lvgl_lfs/coredump.txt via MCUmgr FS
-/// 3. Upload to backend for analysis
-/// 4. Return backtrace/registers
+/// Downloads /lvgl_lfs/coredump.txt from the watch so it can be exported.
 class CoredumpService {
   static const String _coredumpPath = '/lvgl_lfs/coredump.txt';
 
   final WatchService? _watchService;
   final Future<Uint8List> Function()? _nativeDownload;
-  final CoredumpApiService _apiService;
-  final FirmwareManager _firmwareManager;
 
   FsManager? _fsManager;
   StreamSubscription<DownloadCallback>? _downloadSubscription;
   Completer<Uint8List?>? _downloadCompleter;
 
-  final _state = BehaviorSubject<CoredumpAnalysisState>.seeded(
-    const CoredumpAnalysisState(),
+  final _state = BehaviorSubject<CoredumpDownloadState>.seeded(
+    const CoredumpDownloadState(),
   );
 
-  /// The raw coredump text from the last analysis (for export).
+  /// The coredump text from the last download.
   String? lastCoredumpTxt;
 
-  CoredumpService(this._watchService, this._apiService, this._firmwareManager)
-    : _nativeDownload = null;
+  CoredumpService(this._watchService) : _nativeDownload = null;
 
-  CoredumpService.native(
-    this._nativeDownload,
-    this._apiService,
-    this._firmwareManager,
-  ) : _watchService = null;
+  CoredumpService.native(this._nativeDownload) : _watchService = null;
 
-  Stream<CoredumpAnalysisState> get stateStream => _state.stream;
-  CoredumpAnalysisState get currentState => _state.value;
+  Stream<CoredumpDownloadState> get stateStream => _state.stream;
+  CoredumpDownloadState get currentState => _state.value;
 
-  /// Run the full analysis pipeline: download from watch → send to backend.
-  /// Set [useLatestElf] to true for dev builds to skip hash/commit matching.
-  Future<CoredumpAnalysis?> analyze(
-    CrashSummary summary, {
-    bool useLatestElf = false,
-  }) async {
-    if (currentState.isRunning) {
-      debugPrint('[CoredumpService] Analysis already in progress');
-      return null;
-    }
+  Future<String?> download() async {
+    if (currentState.isRunning) return null;
 
     final smpGen = _watchService?.connectionGeneration;
     try {
-      // Step 1: Enable SMP
       _state.add(
-        const CoredumpAnalysisState(phase: CoredumpAnalysisPhase.enablingSmp),
+        const CoredumpDownloadState(phase: CoredumpDownloadPhase.enablingSmp),
       );
-      if (_watchService != null) await _watchService.enableSmp();
-      // Give the watch time to enable SMP service
       if (_watchService != null) {
+        await _watchService.enableSmp();
+        // Give the watch time to enable SMP service
         await Future<void>.delayed(const Duration(seconds: 2));
       }
 
-      // Step 2: Download coredump.txt
       _state.add(
-        const CoredumpAnalysisState(phase: CoredumpAnalysisPhase.downloading),
+        const CoredumpDownloadState(phase: CoredumpDownloadPhase.downloading),
       );
       final coredumpBytes = await _downloadCoredump();
       if (coredumpBytes == null) {
         _state.add(
-          const CoredumpAnalysisState(
-            phase: CoredumpAnalysisPhase.failed,
+          const CoredumpDownloadState(
+            phase: CoredumpDownloadPhase.failed,
             errorMessage: 'Failed to download coredump from watch',
           ),
         );
@@ -156,68 +116,33 @@ class CoredumpService {
         );
       } else {
         coredumpTxt = String.fromCharCodes(coredumpBytes);
-        debugPrint('[CoredumpService] No #CD:BEGIN# marker found, sending raw');
+        debugPrint('[CoredumpService] No #CD:BEGIN# marker found, keeping raw');
       }
       debugPrint(
         '[CoredumpService] Downloaded coredump: ${coredumpBytes.length} bytes, '
         'text portion: ${coredumpTxt.length} chars',
       );
 
-      // Store for export
       lastCoredumpTxt = coredumpTxt;
-
-      // Look up elf_hash from local cache (set when firmware was downloaded via app)
-      final elfHash = await _firmwareManager.getCachedElfHash(
-        summary.fwCommitSha,
-      );
-      if (elfHash != null) {
-        debugPrint('[CoredumpService] Found cached elf_hash: $elfHash');
-      }
-
-      // Step 3: Send to backend
       _state.add(
-        const CoredumpAnalysisState(phase: CoredumpAnalysisPhase.analyzing),
+        const CoredumpDownloadState(phase: CoredumpDownloadPhase.completed),
       );
-      final result = await _apiService.analyze(
-        coredumpTxt: coredumpTxt,
-        summary: summary,
-        elfHash: elfHash,
-        useLatestElf: useLatestElf,
-      );
-
-      // Note: ELF upload is handled by CI or the upload_elf.py script.
-      // The app only consumes the analysis endpoint.
-
-      _state.add(
-        CoredumpAnalysisState(
-          phase: CoredumpAnalysisPhase.completed,
-          result: result,
-        ),
-      );
-
-      // Disable SMP after we're done
-      try {
-        if (_watchService != null && smpGen != null) {
-          await _watchService.disableSmpIfConnectionUnchanged(smpGen);
-        }
-      } catch (_) {}
-
-      return result;
+      return coredumpTxt;
     } catch (e, st) {
-      debugPrint('[CoredumpService] Analysis failed: $e\n$st');
+      debugPrint('[CoredumpService] Download failed: $e\n$st');
       _state.add(
-        CoredumpAnalysisState(
-          phase: CoredumpAnalysisPhase.failed,
+        CoredumpDownloadState(
+          phase: CoredumpDownloadPhase.failed,
           errorMessage: e.toString(),
         ),
       );
-      // Try to disable SMP even on failure
+      return null;
+    } finally {
       try {
         if (_watchService != null && smpGen != null) {
           await _watchService.disableSmpIfConnectionUnchanged(smpGen);
         }
       } catch (_) {}
-      return null;
     }
   }
 
@@ -292,7 +217,8 @@ class CoredumpService {
   }
 
   void reset() {
-    _state.add(const CoredumpAnalysisState());
+    lastCoredumpTxt = null;
+    _state.add(const CoredumpDownloadState());
   }
 
   void dispose() {
