@@ -77,7 +77,6 @@ post_install do |installer|
     if target.name == 'permission_handler_apple'
       target.build_configurations.each do |config|
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_MICROPHONE=1'
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_LOCATION=1'
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_NOTIFICATIONS=1'
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'PERMISSION_EVENTS=1'
