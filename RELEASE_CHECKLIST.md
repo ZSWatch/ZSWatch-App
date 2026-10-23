@@ -8,7 +8,7 @@ There are 364 commits since 1.1.0.
 
 | Commit | What |
 | --- | --- |
-| `9b2ef8c`, `0abd2e5` | `version: 1.2.0+10`, Android `targetSdk 36` (Play requires API 36 for updates since 31 Aug 2026). Git history has build numbers 1 and 2 only, so 10 is safely above anything uploaded |
+| `9b2ef8c`, `0abd2e5` | `version: 1.2.0+11`, Android `targetSdk 36` (Play requires API 36 for updates since 31 Aug 2026). Git history has build numbers 1 and 2 only, so 10 is safely above anything uploaded |
 | `ccd193e` | `PrivacyInfo.xcprivacy` (SystemBootTime 35F9.1, FileTimestamp C617.1, no tracking) |
 | `1248191` | Ask for consent before voice audio and text go to OpenRouter (App Review guideline 5.1.2(i), Nov 2025) |
 | `642c0c2` | Background location text in Play's prominent-disclosure wording |
@@ -117,17 +117,17 @@ Update before you submit:
 These are in `.companion-hil-runs/release/` (gitignored). `store_screenshots.zip` holds both sets.
 
 - **`store_ios/<W>x<H>/01..13`.** 13 screens in every App Store iPhone size: 1320×2868, 1290×2796, 1284×2778, 1242×2688 and 1242×2208.
-  - Captured on the iPhone 11 with the real watch on 2026-10-23, build 1.2.0+10.
+  - Captured on the iPhone 11 with the real watch on 2026-10-23, build 1.2.0+11.
   - Remove the ones you don't want.
   - Live-data flaws you may want to retake with a charged watch: 0 steps, 22% battery, a low-battery banner on Firmware, and recordings titled with timestamps.
-- **`store_play/01..13`** at 1080×1920, plus `feature_graphic_1024x500.png`. Captured on the OnePlus (Android 16) with the real watch on 2026-10-23, build 1.2.0+10. The raw captures and `spec.json` are in `android_raw/`.
+- **`store_play/01..13`** at 1080×1920, plus `feature_graphic_1024x500.png`. Captured on the OnePlus (Android 16) with the real watch on 2026-10-23, build 1.2.0+11. The raw captures and `spec.json` are in `android_raw/`.
 - **To retake:**
   1. Run `testStoreScreenshots`.
   2. Export the attachments into `ios_raw2/`.
   3. Run `python scripts/store/frame_screenshots.py ios_raw2/spec.json --font fonts/Inter.ttf --out store_ios`.
 - The font is Inter (OFL). Apple only licenses SF Pro for UI mockups, not marketing text.
 
-## Verified on the OnePlus (2026-10-23, release-signed 1.2.0+10, fresh install)
+## Verified on the OnePlus (2026-10-23, release-signed 1.2.0+11, fresh install)
 
 - First run: Add watch → notification prompt → companion pairing → permission setup screen → OpenRouter consent dialog.
 - Settings permissions: all granted except battery optimization. Its Allow opens Android's battery optimization list.
