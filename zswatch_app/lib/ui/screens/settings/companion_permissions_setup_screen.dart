@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../providers/companion_runtime_providers.dart';
 import '../../navigation/app_router.dart';
 import 'companion_permissions.dart';
 
@@ -19,6 +20,8 @@ final _locationPermission = CompanionPermission(
       await openAppSettings();
     } else if (whenInUse.isGranted) {
       await Permission.locationAlways.request();
+      // The permission alone does not share anything; this row is the opt-in.
+      await ref.read(companionClientProvider).configureGps(true);
     }
   },
 );

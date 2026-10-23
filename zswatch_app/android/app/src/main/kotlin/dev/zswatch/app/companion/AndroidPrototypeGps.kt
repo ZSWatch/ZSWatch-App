@@ -8,6 +8,7 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
@@ -103,13 +104,23 @@ private class AndroidGpsSource(private val context: Context) : PrototypeGpsSourc
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
             manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) providers.add(LocationManager.GPS_PROVIDER)
         if (manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) providers.add(LocationManager.NETWORK_PROVIDER)
+        if (Build.VERSION.SDK_INT >= 31 && manager.hasProvider(LocationManager.FUSED_PROVIDER) &&
+            manager.isProviderEnabled(LocationManager.FUSED_PROVIDER)) providers.add(LocationManager.FUSED_PROVIDER)
         check(providers.isNotEmpty()) { "No location provider available" }
+        val signal = CancellationSignal()
+        val stop = { signal.cancel(); manager.removeUpdates(listener) }
         try {
             providers.forEach { manager.requestLocationUpdates(it, 5000L, 0f, listener, PrototypeHub.worker.looper) }
+            // With coarse access only, Android throttles updates to 10 minutes; ask for one fix now.
+            if (Build.VERSION.SDK_INT >= 30) providers.forEach { provider ->
+                manager.getCurrentLocation(provider, signal, { PrototypeHub.worker.post(it) }) { location ->
+                    if (location != null && !signal.isCanceled) fix(convert(location))
+                }
+            }
             // The controller rejects stale cached locations using monotonic time.
             providers.mapNotNull { manager.getLastKnownLocation(it) }.sortedByDescending { it.elapsedRealtimeNanos }
                 .firstOrNull()?.let { fix(convert(it)) }
-        } catch (error: Exception) { manager.removeUpdates(listener); throw error }
-        return { manager.removeUpdates(listener) }
+        } catch (error: Exception) { stop(); throw error }
+        return stop
     }
 }
