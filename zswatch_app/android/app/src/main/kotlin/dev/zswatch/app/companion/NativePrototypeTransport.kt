@@ -920,8 +920,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
             // Old characteristic objects stay valid until this returns.
             servicesStale = false
             rediscovering = true
-            check(client.discoverServices()) { "GATT rediscovery rejected" }
             deadline(token, 15000, "Service rediscovery timed out")
+            requestRediscovery(client, token, operation)
             return
         }
         if (pumpSensor(client)) return
@@ -943,6 +943,16 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 if (runtime.owns(session) && operation == expected && writing) safely { writeFinished() }
             }, 40)
         }
+    }
+
+    // After Service Changed the stack may already be rediscovering on its own
+    // and rejects our request; retry until it accepts, within the deadline.
+    private fun requestRediscovery(client: BluetoothGatt, session: Long, expected: Long) {
+        if (client.discoverServices()) return
+        handler.postDelayed({
+            if (runtime.owns(session) && gatt === client && rediscovering && operation == expected)
+                safely { requestRediscovery(client, session, expected) }
+        }, 300)
     }
 
     private fun incomingSensor(uuid: UUID, value: ByteArray) {
