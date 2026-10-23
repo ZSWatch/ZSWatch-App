@@ -2,7 +2,7 @@ package dev.zswatch.app.companion
 
 import org.json.JSONObject
 
-internal data class RelayRequest(val id: String, val url: String, val xpath: String?, val insecure: Boolean)
+internal data class RelayRequest(val id: String, val url: String, val xpath: String?)
 internal data class RelayResult(val body: String? = null, val error: String? = null)
 
 /** Worker-owned transient requests. No replay after reconnect/death: the watch
@@ -58,7 +58,7 @@ internal class PrototypeHttpRelay(
             complete(id, entry, RelayResult(error = "Invalid request")); return true
         }
         try {
-            val cancel = execute(RelayRequest(id, url, xpath, message.optBoolean("insecure", false))) {
+            val cancel = execute(RelayRequest(id, url, xpath)) {
                 result -> complete(id, entry, result)
             }
             if (pending[id] === entry && !entry.replying) entry.cancel = cancel else cancel()

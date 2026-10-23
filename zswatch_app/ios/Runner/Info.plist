@@ -40,9 +40,9 @@
 	<string>ZSWatch needs Bluetooth to communicate with your smartwatch for syncing data, notifications, and firmware updates.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>ZSWatch needs Bluetooth to communicate with your smartwatch.</string>
-	<!-- Watch requests may target user-provided HTTP endpoints. TLS bypass remains per request. -->
+	<!-- Watch HTTP relay: HTTPS only, plus plain HTTP to local addresses (HIL probe). -->
 	<key>NSAppTransportSecurity</key>
-	<dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+	<dict><key>NSAllowsLocalNetworking</key><true/></dict>
 	<!-- Location Permissions (for GPS relay to watch) -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ZSWatch needs location access to provide GPS data to your smartwatch for weather and fitness features.</string>
