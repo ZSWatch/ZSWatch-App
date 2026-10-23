@@ -70,7 +70,7 @@ def clean_status_bar(shot, platform, font_path):
     """Replaces the captured status bar with a neutral 9:41 one."""
     shot = shot.convert("RGB")
     w, h = shot.size
-    bar = round(h * 88 / 1792) if platform == "ios" else round(h * 0.035)
+    bar = round(h * 88 / 1792) if platform == "ios" else round(h * 0.04)
     fill = shot.getpixel((4, 4))
     d = ImageDraw.Draw(shot)
     d.rectangle([0, 0, w, bar], fill=fill)
