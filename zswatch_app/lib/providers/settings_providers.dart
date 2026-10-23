@@ -31,8 +31,6 @@ abstract final class SettingsKeys {
   static const String openRouterSttModel = 'openrouter_stt_model';
   static const String openRouterAnalysisModel = 'openrouter_analysis_model';
   static const String openRouterModelsCache = 'openrouter_models_cache';
-  static const String coredumpServerUrl = 'coredump_server_url';
-  static const String coredumpUseLatestElf = 'coredump_use_latest_elf';
 }
 
 /// Provider for SharedPreferences instance
@@ -473,54 +471,5 @@ class SelectedProductivityCalendarIdNotifier extends StateNotifier<int?> {
       return;
     }
     _prefs?.setInt(SettingsKeys.selectedProductivityCalendarId, calendarId);
-  }
-}
-
-/// Dev mode: use the latest ELF on the server regardless of hash/commit matching.
-final coredumpUseLatestElfProvider =
-    StateNotifierProvider<CoredumpUseLatestElfNotifier, bool>((ref) {
-      final prefs = ref.watch(sharedPreferencesProvider);
-      return CoredumpUseLatestElfNotifier(prefs.valueOrNull);
-    });
-
-class CoredumpUseLatestElfNotifier extends StateNotifier<bool> {
-  final SharedPreferences? _prefs;
-
-  CoredumpUseLatestElfNotifier(this._prefs)
-    : super(_prefs?.getBool(SettingsKeys.coredumpUseLatestElf) ?? false);
-
-  void toggle() {
-    state = !state;
-    _prefs?.setBool(SettingsKeys.coredumpUseLatestElf, state);
-  }
-
-  void setEnabled(bool enabled) {
-    state = enabled;
-    _prefs?.setBool(SettingsKeys.coredumpUseLatestElf, enabled);
-  }
-}
-
-/// Coredump analysis server URL.
-final coredumpServerUrlProvider =
-    StateNotifierProvider<CoredumpServerUrlNotifier, String>((ref) {
-      final prefs = ref.watch(sharedPreferencesProvider);
-      return CoredumpServerUrlNotifier(prefs.valueOrNull);
-    });
-
-class CoredumpServerUrlNotifier extends StateNotifier<String> {
-  static const String defaultUrl = 'https://zswatch-production.up.railway.app';
-  final SharedPreferences? _prefs;
-
-  CoredumpServerUrlNotifier(this._prefs)
-    : super(_prefs?.getString(SettingsKeys.coredumpServerUrl) ?? defaultUrl);
-
-  void setUrl(String url) {
-    state = url;
-    _prefs?.setString(SettingsKeys.coredumpServerUrl, url);
-  }
-
-  void reset() {
-    state = defaultUrl;
-    _prefs?.remove(SettingsKeys.coredumpServerUrl);
   }
 }

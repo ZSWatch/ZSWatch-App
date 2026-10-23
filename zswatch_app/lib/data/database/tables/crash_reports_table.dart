@@ -38,6 +38,8 @@ class CrashReports extends Table {
   /// When this crash was first received by the app
   DateTimeColumn get receivedAt => dateTime().named('received_at')();
 
+  // The analysis columns below are no longer written; kept to avoid a
+  // schema migration.
   /// Whether analysis has been performed
   BoolColumn get analyzed => boolean().withDefault(const Constant(false))();
 
