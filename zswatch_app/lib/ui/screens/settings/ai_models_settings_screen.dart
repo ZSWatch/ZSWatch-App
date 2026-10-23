@@ -4,9 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:record/record.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -1372,11 +1370,6 @@ class _BenchmarkSection extends ConsumerStatefulWidget {
 
 class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
   late final TextEditingController _aiInputController;
-  AudioRecorder? _audioRecorder;
-  bool _isRecording = false;
-  Duration _recordingDuration = Duration.zero;
-  Timer? _recordingTimer;
-  String? _lastRecordingPath;
 
   @override
   void initState() {
@@ -1389,13 +1382,6 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
   @override
   void dispose() {
     _aiInputController.dispose();
-    _recordingTimer?.cancel();
-    _audioRecorder?.dispose();
-    // Clean up temp recording file
-    if (_lastRecordingPath != null) {
-      final f = File(_lastRecordingPath!);
-      if (f.existsSync()) f.deleteSync();
-    }
     super.dispose();
   }
 
@@ -1404,7 +1390,6 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
     final benchState = ref.watch(_benchmarkStateProvider);
     final isRunning = benchState.whenOrNull(data: (s) => s.isRunning) ?? false;
     final runningType = benchState.whenOrNull(data: (s) => s.runningTestType);
-    final hasTranscript = _aiInputController.text.trim().isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -1423,44 +1408,17 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _BenchmarkPill(
-                  icon: _isRecording ? Icons.fiber_manual_record : Icons.mic,
-                  label: _isRecording ? 'Recording' : 'Phone input',
-                  color: _isRecording
-                      ? AppTheme.errorColor
-                      : AppTheme.primaryColor,
-                ),
-                _BenchmarkPill(
-                  icon: hasTranscript ? Icons.check_circle : Icons.edit_note,
-                  label: hasTranscript ? 'Transcript ready' : 'Type or record',
-                  color: hasTranscript
-                      ? AppTheme.successColor
-                      : AppTheme.textSecondary,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
             _AiBenchmarkInputEditor(
               controller: _aiInputController,
-              isRecording: _isRecording,
-              recordingDuration: _recordingDuration,
               onReset: () {
                 _aiInputController.text =
                     'Remind me to buy groceries tomorrow and call the dentist at 2 PM.';
               },
-              onRecordToggle: isRunning
-                  ? null
-                  : () => _toggleRecording(context),
             ),
             const SizedBox(height: 14),
-            _BenchmarkHintCard(
-              message: _isRecording
-                  ? 'Recording in progress. Tap the microphone again to stop and transcribe.'
-                  : 'Record on the phone or paste text, then run the AI benchmark using the same prompt flow as voice memos.',
+            const _BenchmarkHintCard(
+              message:
+                  'Type or paste text, then run the AI benchmark using the same prompt flow as voice memos.',
             ),
             const SizedBox(height: 10),
             SizedBox(
@@ -1477,9 +1435,7 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
                       )
                     : const Icon(Icons.psychology, size: 18),
                 label: Text(runningType == 'ai' ? 'Running…' : 'Test AI'),
-                onPressed: isRunning || _isRecording
-                    ? null
-                    : () => _runAiBenchmark(context),
+                onPressed: isRunning ? null : () => _runAiBenchmark(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -1499,122 +1455,6 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
         ),
       ),
     );
-  }
-
-  // ---- Recording ----
-
-  Future<void> _toggleRecording(BuildContext context) async {
-    if (_isRecording) {
-      await _stopRecording();
-    } else {
-      await _startRecording(context);
-    }
-  }
-
-  Future<void> _startRecording(BuildContext context) async {
-    // Request microphone permission
-    final status = await Permission.microphone.request();
-    if (!status.isGranted) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Microphone permission is required to record audio.'),
-          ),
-        );
-      }
-      return;
-    }
-
-    _audioRecorder = AudioRecorder();
-
-    // Record as WAV for best Whisper compatibility
-    final tempDir = await getTemporaryDirectory();
-    _lastRecordingPath =
-        '${tempDir.path}/benchmark_recording_${DateTime.now().millisecondsSinceEpoch}.wav';
-
-    await _audioRecorder!.start(
-      const RecordConfig(
-        encoder: AudioEncoder.wav,
-        sampleRate: 16000,
-        numChannels: 1,
-      ),
-      path: _lastRecordingPath!,
-    );
-
-    setState(() {
-      _isRecording = true;
-      _recordingDuration = Duration.zero;
-    });
-
-    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() {
-        _recordingDuration += const Duration(seconds: 1);
-      });
-    });
-  }
-
-  Future<void> _stopRecording() async {
-    _recordingTimer?.cancel();
-    _recordingTimer = null;
-
-    final path = await _audioRecorder?.stop();
-    await _audioRecorder?.dispose();
-    _audioRecorder = null;
-
-    setState(() {
-      _isRecording = false;
-    });
-
-    if (path == null || !File(path).existsSync()) {
-      debugPrint('[Benchmark] Recording failed – no file at $path');
-      return;
-    }
-
-    _lastRecordingPath = path;
-
-    // Transcribe the recording and fill the text field
-    final selectedType = ref.read(transcriptionEngineTypeProvider);
-    final engine = createTranscriptionEngine(selectedType);
-    try {
-      final available = await engine.isAvailable();
-      if (!available) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Transcription model not downloaded — download it in settings first.',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transcribing recording…')),
-        );
-      }
-
-      final transcript = await engine.transcribe(path);
-      if (transcript.isNotEmpty && mounted) {
-        _aiInputController.text = transcript;
-        ScaffoldMessenger.of(context).clearSnackBars();
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No speech detected in recording.')),
-        );
-      }
-    } catch (e) {
-      debugPrint('[Benchmark] Transcription error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Transcription failed: $e')));
-      }
-    } finally {
-      engine.dispose();
-    }
   }
 
   void _runAiBenchmark(BuildContext context) {
@@ -1661,28 +1501,16 @@ class _BenchmarkSectionState extends ConsumerState<_BenchmarkSection> {
 
 class _AiBenchmarkInputEditor extends StatelessWidget {
   final TextEditingController controller;
-  final bool isRecording;
-  final Duration recordingDuration;
   final VoidCallback onReset;
-  final VoidCallback? onRecordToggle;
 
   const _AiBenchmarkInputEditor({
     required this.controller,
-    required this.isRecording,
-    required this.recordingDuration,
     required this.onReset,
-    required this.onRecordToggle,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final minutes = recordingDuration.inMinutes.remainder(60);
-    final seconds = recordingDuration.inSeconds.remainder(60);
-    final durationText =
-        '${minutes.toString().padLeft(2, '0')}:'
-        '${seconds.toString().padLeft(2, '0')}';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1696,31 +1524,6 @@ class _AiBenchmarkInputEditor extends StatelessWidget {
                 ),
               ),
             ),
-            if (isRecording) ...[
-              Text(
-                durationText,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: AppTheme.errorColor,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              const SizedBox(width: 4),
-            ],
-            IconButton(
-              onPressed: onRecordToggle,
-              icon: Icon(
-                isRecording ? Icons.stop_circle : Icons.mic,
-                color: isRecording ? AppTheme.errorColor : null,
-                size: 22,
-              ),
-              tooltip: isRecording ? 'Stop recording' : 'Record audio',
-              style: IconButton.styleFrom(
-                backgroundColor: isRecording
-                    ? AppTheme.errorColor.withValues(alpha: 0.15)
-                    : Colors.white.withValues(alpha: 0.04),
-              ),
-            ),
-            const SizedBox(width: 4),
             TextButton.icon(
               onPressed: onReset,
               icon: const Icon(Icons.restart_alt, size: 16),
@@ -1896,44 +1699,6 @@ class _LastResultTile extends StatelessWidget {
                     ),
                   ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BenchmarkPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  const _BenchmarkPill({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
             ),
           ),
         ],
