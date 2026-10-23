@@ -476,6 +476,20 @@ final class CompanionPhoneUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 2)
         screenshot("store-VoiceAI")
         try home()
+        try openSettings()
+        Thread.sleep(forTimeInterval: 2)
+        screenshot("store-Settings")
+        try reveal(prefix("App Permissions"), "App Permissions").tap()
+        Thread.sleep(forTimeInterval: 1)
+        screenshot("store-Permissions")
+        try home()
+        try tap(exact("Developer"), "Developer entry")
+        if let shell = [prefix("Shell"), containing("Shell")].first(where: { $0.waitForExistence(timeout: 3) }) {
+            try reveal(shell, "Shell").tap()
+            Thread.sleep(forTimeInterval: 2)
+            screenshot("store-Shell")
+        }
+        try home()
     }
 
     // MARK: - Firmware and resources
