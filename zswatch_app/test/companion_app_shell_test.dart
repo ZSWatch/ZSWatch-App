@@ -1118,21 +1118,13 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Coredump Server'));
-      await tester.tap(find.text('Coredump Server'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'http://127.0.0.1:18879');
-      await tester.tap(find.text('Save'));
-      await tester.pumpAndSettle();
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getBool('keep_screen_on_during_dfu'), isFalse);
-      expect(prefs.getString('coredump_server_url'), 'http://127.0.0.1:18879');
       routes.pop();
       await tester.pumpAndSettle();
       unawaited(routes.push<void>(AppRoutes.settings));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Coredump Server'));
-      expect(find.text('http://127.0.0.1:18879'), findsOneWidget);
+      await tester.ensureVisible(find.text('Licenses'));
       expect(find.text('App Version'), findsOneWidget);
       expect(find.text('Licenses'), findsOneWidget);
       expect(calls.every((c) => c.method == 'permissionStatus'), isTrue);

@@ -8,11 +8,9 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/database/app_database.dart';
-import '../../../data/models/coredump_analysis.dart';
 import '../../../data/models/crash_summary.dart';
 import '../../../providers/coredump_providers.dart';
 import '../../../providers/companion_runtime_providers.dart';
-import '../../../providers/settings_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../../services/coredump/coredump_service.dart';
 
@@ -25,7 +23,7 @@ class CrashReportScreen extends ConsumerWidget {
     final inspection = native
         ? ref.watch(nativeCoredumpInspectionProvider)
         : null;
-    // History/analysis remain in the existing UI repository. This provider uses
+    // History remains in the existing UI repository. This provider uses
     // the native summary stream on Android and never constructs WatchService.
     if (native) ref.watch(crashReportPersistenceProvider);
     final current = inspection?.isLoading == true
@@ -78,9 +76,9 @@ class _CurrentCrashTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(crashSummaryProvider);
-    final analysisAsync = ref.watch(coredumpAnalysisStateProvider);
-    final analysisState =
-        analysisAsync.valueOrNull ?? const CoredumpAnalysisState();
+    final downloadState =
+        ref.watch(coredumpDownloadStateProvider).valueOrNull ??
+        const CoredumpDownloadState();
 
     if (summary == null) {
       return Center(
@@ -117,7 +115,7 @@ class _CurrentCrashTab extends ConsumerWidget {
         children: [
           _SummaryCard(summary: summary),
           const SizedBox(height: AppTheme.spacingLg),
-          _AnalyzeSection(summary: summary, state: analysisState),
+          _DownloadSection(state: downloadState),
           const SizedBox(height: AppTheme.spacingLg),
           _ActionButtons(summary: summary),
         ],
@@ -365,17 +363,9 @@ class _CrashHistoryTile extends StatelessWidget {
         vertical: 2,
       ),
       child: ExpansionTile(
-        leading: Icon(
-          report.analyzed
-              ? (report.backtrace != null
-                    ? Icons.check_circle
-                    : Icons.info_outline)
-              : Icons.warning_amber_rounded,
-          color: report.analyzed
-              ? (report.backtrace != null
-                    ? AppTheme.successColor
-                    : Colors.amber)
-              : AppTheme.errorColor,
+        leading: const Icon(
+          Icons.warning_amber_rounded,
+          color: AppTheme.errorColor,
           size: 20,
         ),
         title: Text(
@@ -397,28 +387,6 @@ class _CrashHistoryTile extends StatelessWidget {
           AppTheme.spacingMd,
         ),
         children: [
-          if (report.analyzed && report.backtrace != null) ...[
-            _CodeBlock(title: 'Backtrace', content: report.backtrace!),
-          ],
-          if (report.analyzed && report.registers != null) ...[
-            const SizedBox(height: 4),
-            _CodeBlock(title: 'Registers', content: report.registers!),
-          ],
-          if (report.analyzed && report.analysisError != null)
-            Text(
-              report.analysisError!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppTheme.errorColor),
-            ),
-          if (!report.analyzed)
-            Text(
-              'Not analyzed',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
-            ),
-          const SizedBox(height: 4),
           Row(
             children: [
               Text(
@@ -436,31 +404,26 @@ class _CrashHistoryTile extends StatelessWidget {
               ),
             ],
           ),
-          if (report.backtrace != null) ...[
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () {
-                  final text = [
-                    'Crash: ${report.file}:${report.line}',
-                    'Time: ${report.crashTime}',
-                    'FW: ${report.fwVersion}-${report.fwCommitSha}',
-                    if (report.backtrace != null)
-                      'Backtrace:\n${report.backtrace}',
-                    if (report.registers != null)
-                      'Registers:\n${report.registers}',
-                  ].join('\n');
-                  Clipboard.setData(ClipboardData(text: text));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Copied to clipboard')),
-                  );
-                },
-                icon: const Icon(Icons.copy, size: 16),
-                label: const Text('Copy'),
-              ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () {
+                final text = [
+                  'Crash: ${report.file}:${report.line}',
+                  'Time: ${report.crashTime}',
+                  'FW: ${report.fwVersion}-${report.fwCommitSha}',
+                  'Board: ${report.board} (${report.buildType})',
+                ].join('\n');
+                Clipboard.setData(ClipboardData(text: text));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Copied to clipboard')),
+                );
+              },
+              icon: const Icon(Icons.copy, size: 16),
+              label: const Text('Copy'),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -557,247 +520,64 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _AnalyzeSection extends ConsumerWidget {
-  final CrashSummary summary;
-  final CoredumpAnalysisState state;
-  const _AnalyzeSection({required this.summary, required this.state});
+class _DownloadSection extends ConsumerWidget {
+  final CoredumpDownloadState state;
+  const _DownloadSection({required this.state});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final useLatestElf = ref.watch(coredumpUseLatestElfProvider);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (state.isRunning) ...[
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppTheme.spacingMd),
-              child: Column(
-                children: [
-                  Text(
-                    _phaseLabel(state.phase),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: AppTheme.spacingSm),
-                  if (state.phase == CoredumpAnalysisPhase.downloading)
-                    LinearProgressIndicator(value: state.downloadProgress)
-                  else
-                    const LinearProgressIndicator(),
-                ],
-              ),
-            ),
-          ),
-        ] else if (state.phase == CoredumpAnalysisPhase.failed) ...[
-          Card(
-            color: AppTheme.errorColor.withValues(alpha: 0.1),
-            child: Padding(
-              padding: const EdgeInsets.all(AppTheme.spacingMd),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: AppTheme.errorColor,
-                      ),
-                      const SizedBox(width: AppTheme.spacingSm),
-                      Text(
-                        'Analysis Failed',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: AppTheme.errorColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (state.errorMessage != null) ...[
-                    const SizedBox(height: AppTheme.spacingSm),
-                    Text(
-                      state.errorMessage!,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                  const SizedBox(height: AppTheme.spacingSm),
-                  FilledButton.icon(
-                    onPressed: () => _startAnalysis(ref),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Retry'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ] else if (state.result != null) ...[
-          _AnalysisResultCard(result: state.result!),
-        ] else ...[
-          CheckboxListTile(
-            value: useLatestElf,
-            onChanged: (v) => ref
-                .read(coredumpUseLatestElfProvider.notifier)
-                .setEnabled(v ?? false),
-            title: const Text('Use latest server ELF (dev)'),
-            subtitle: const Text('Skip hash matching, use last uploaded ELF'),
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-          ),
-          const SizedBox(height: AppTheme.spacingSm),
-          FilledButton.icon(
-            onPressed: () => _startAnalysis(ref),
-            icon: const Icon(Icons.bug_report),
-            label: const Text('Analyze Coredump'),
-          ),
-        ],
-      ],
-    );
-  }
-
-  void _startAnalysis(WidgetRef ref) {
-    final service = ref.read(coredumpServiceProvider);
-    final useLatestElf = ref.read(coredumpUseLatestElfProvider);
-    service.analyze(summary, useLatestElf: useLatestElf);
-  }
-
-  String _phaseLabel(CoredumpAnalysisPhase phase) {
-    switch (phase) {
-      case CoredumpAnalysisPhase.enablingSmp:
-        return 'Enabling SMP on watch...';
-      case CoredumpAnalysisPhase.downloading:
-        return 'Downloading coredump from watch...';
-      case CoredumpAnalysisPhase.uploading:
-        return 'Uploading to server...';
-      case CoredumpAnalysisPhase.analyzing:
-        return 'Analyzing coredump on server...';
-      default:
-        return '';
-    }
-  }
-}
-
-class _AnalysisResultCard extends ConsumerWidget {
-  final CoredumpAnalysis result;
-  const _AnalysisResultCard({required this.result});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (!result.success) {
-      return Card(
-        color: AppTheme.errorColor.withValues(alpha: 0.1),
-        child: Padding(
-          padding: const EdgeInsets.all(AppTheme.spacingMd),
-          child: Text(
-            result.error ?? 'Analysis failed',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-      );
-    }
-
-    if (!result.elfAvailable) {
+    if (state.isRunning) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(AppTheme.spacingMd),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.amber),
-                  const SizedBox(width: AppTheme.spacingSm),
-                  Expanded(
-                    child: Text(
-                      'ELF Not Available',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                  ),
-                ],
+              Text(
+                state.phase == CoredumpDownloadPhase.downloading
+                    ? 'Downloading coredump from watch...'
+                    : 'Enabling SMP on watch...',
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: AppTheme.spacingSm),
-              Text(
-                result.error ??
-                    'The ELF file for this firmware is not cached on the server. '
-                        'It will be available once CI completes for this commit, '
-                        'or upload manually with the upload_elf.py script.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              if (state.phase == CoredumpDownloadPhase.downloading)
+                LinearProgressIndicator(value: state.downloadProgress)
+              else
+                const LinearProgressIndicator(),
             ],
           ),
         ),
       );
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (result.backtrace != null)
-          _CodeBlock(title: 'Backtrace', content: result.backtrace!),
-        if (result.registers != null) ...[
-          const SizedBox(height: AppTheme.spacingSm),
-          _CodeBlock(title: 'Registers', content: result.registers!),
-        ],
-        if (result.backtrace != null || result.registers != null) ...[
-          const SizedBox(height: AppTheme.spacingSm),
-          OutlinedButton.icon(
-            onPressed: () {
-              final text = [
-                if (result.backtrace != null) 'Backtrace:\n${result.backtrace}',
-                if (result.registers != null) 'Registers:\n${result.registers}',
-              ].join('\n\n');
-              Clipboard.setData(ClipboardData(text: text));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Analysis result copied to clipboard'),
-                ),
-              );
-            },
-            icon: const Icon(Icons.copy),
-            label: const Text('Copy Analysis'),
+        if (state.phase == CoredumpDownloadPhase.failed) ...[
+          Text(
+            state.errorMessage ?? 'Download failed',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.errorColor),
           ),
+          const SizedBox(height: AppTheme.spacingSm),
         ],
+        if (state.phase == CoredumpDownloadPhase.completed)
+          Text(
+            'Coredump downloaded. Export it and attach it to a GitHub issue.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+          )
+        else
+          FilledButton.icon(
+            onPressed: () => ref.read(coredumpServiceProvider).download(),
+            icon: const Icon(Icons.download),
+            label: Text(
+              state.phase == CoredumpDownloadPhase.failed
+                  ? 'Retry Download'
+                  : 'Download Coredump',
+            ),
+          ),
       ],
-    );
-  }
-}
-
-class _CodeBlock extends StatelessWidget {
-  final String title;
-  final String content;
-  const _CodeBlock({required this.title, required this.content});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ExpansionTile(
-        title: Text(title, style: Theme.of(context).textTheme.titleSmall),
-        initiallyExpanded: true,
-        childrenPadding: const EdgeInsets.fromLTRB(
-          AppTheme.spacingMd,
-          0,
-          AppTheme.spacingMd,
-          AppTheme.spacingMd,
-        ),
-        children: [
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.black87,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            padding: const EdgeInsets.all(AppTheme.spacingSm),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SelectableText(
-                content,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 11,
-                  color: Colors.greenAccent,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

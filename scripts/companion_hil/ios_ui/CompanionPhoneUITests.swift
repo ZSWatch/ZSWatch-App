@@ -416,7 +416,7 @@ final class CompanionPhoneUITests: XCTestCase {
         }
     }
 
-    /// Read-only walk through Settings: permissions, version, licenses, coredump server dialog.
+    /// Read-only walk through Settings: permissions, version, licenses.
     func testSettingsReadOnly() throws {
         try openSettings()
         try reveal(prefix("App Permissions"), "App Permissions").tap()
@@ -425,15 +425,10 @@ final class CompanionPhoneUITests: XCTestCase {
         }
         XCTAssertFalse(exact("Battery optimization").exists, "Android-only permission row on iOS")
         screenshot("settings-permissions")
-        try reveal(prefix("App Version"), "App Version").tap()
-        try require(exact("App Version").waitForExistence(timeout: 10), "Missing version dialog")
-        if app.buttons["OK"].exists { app.buttons["OK"].firstMatch.tap() } else if app.buttons["Close"].exists { app.buttons["Close"].tap() }
+        try reveal(prefix("App Version"), "App Version")
         try reveal(prefix("Licenses"), "Licenses").tap()
         try require(exact("Licenses").waitForExistence(timeout: 10), "Missing Licenses")
         app.buttons["Back"].tap()
-        try reveal(prefix("Coredump Server"), "Coredump Server").tap()
-        try require(app.buttons["Cancel"].waitForExistence(timeout: 10), "Missing coredump dialog")
-        app.buttons["Cancel"].tap()
         try home()
     }
 
