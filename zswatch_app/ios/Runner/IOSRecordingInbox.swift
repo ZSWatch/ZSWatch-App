@@ -95,6 +95,7 @@ final class IOSRecordingInbox {
     var restored = try files.restoreLocal(identity, metadata: record)
     restored.removeValue(forKey: "deleted_at")
     try put(identity, restored)
+    try owner?.voice?.restoreRecordings([identity])
   }
   @discardableResult func receive(_ message: [String: Any]) -> Bool {
     guard let owner, message["t"] as? String == "voice_memo" else { return false }

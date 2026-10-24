@@ -59,6 +59,20 @@ class PrototypeRecordingLibraryTest {
         assertTrue(audio.isFile)
     }
 
+    @Test fun restoreBringsBackAProcessedResult() {
+        val f = fixture()
+        val jobs = PrototypeJobs(f.jobStore)
+        val id = job(jobs)
+        f.jobStore.update("seed", mapOf("jobs" to JSONObject().put(id, jobs.state(id).put("state", "result_ready")),
+            "outbox" to JSONObject().put("r", JSONObject().put("job_id", id).put("watch_id", "watch-a").put("state", "pending"))))
+        f.library.remove(listOf(key))
+        assertEquals("cancelled", jobs.state(id).getString("state"))
+        f.library.restore(key)
+        assertEquals("result_ready", jobs.state(id).getString("state"))
+        assertFalse(jobs.state(id).has("removed_from"))
+        assertEquals(1, jobs.pending("watch-a").size)
+    }
+
     @Test fun purgeRemovesFilesAndJobsForGood() {
         val f = fixture()
         val jobs = PrototypeJobs(f.jobStore)

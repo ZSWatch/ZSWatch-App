@@ -89,6 +89,7 @@ class PrototypeRecordingLibrary(
         val record = records()[identity]
         require(record != null && record["state"] == "deleted" && record["purged"] != true) { "Deleted recording required" }
         store.putRecord(identity, files.restoreLocal(identity, record) - "deleted_at")
+        jobs().restoreRecordings(setOf(identity))
     }
 
     fun search(query: String): Set<String> {

@@ -311,10 +311,36 @@ class PrototypeJobs(private val store: PrototypeStore) {
         if (matched.isEmpty()) return
         for (id in matched) {
             val item = jobs.getJSONObject(id)
-            if (item.getString("state") in listOf("ready", "waiting_remote", "blocked", "result_ready")) cancelItem(id, item, outbox)
+            val state = item.getString("state")
+            if (state == "result_ready") {
+                // Restore brings back the result and its pending watch delivery.
+                item.put("removed_from", state)
+                for (resultId in outbox.keys()) {
+                    val delivery = outbox.getJSONObject(resultId)
+                    if (delivery.getString("job_id") == id && delivery.getString("state") == "pending") delivery.put("removed", true)
+                }
+            }
+            if (state in listOf("ready", "waiting_remote", "blocked", "result_ready")) cancelItem(id, item, outbox)
             else item.put("fence", item.getLong("fence") + 1).put("lease_until", JSONObject.NULL)
         }
         commit("voice_recordings_removed", jobs, outbox)
+    }
+
+    fun restoreRecordings(identities: Set<String>) {
+        val jobs = jobs(); val outbox = outbox()
+        val matched = recordingJobs(jobs, identities).filter { jobs.getJSONObject(it).has("removed_from") }
+        if (matched.isEmpty()) return
+        for (id in matched) {
+            val item = jobs.getJSONObject(id)
+            item.put("state", item.remove("removed_from"))
+            for (resultId in outbox.keys()) {
+                val delivery = outbox.getJSONObject(resultId)
+                if (delivery.getString("job_id") == id && delivery.optBoolean("removed")) {
+                    delivery.remove("removed"); delivery.put("state", "pending")
+                }
+            }
+        }
+        commit("voice_recordings_restored", jobs, outbox)
     }
 
     fun purgeRecordings(identities: Set<String>) {
