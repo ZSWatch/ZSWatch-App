@@ -221,7 +221,7 @@ void main() {
       expect(calls.last.arguments, {
         'version': 1,
         'enabled': true,
-        'packages': ['com.zswatch.app'],
+        'blockedPackages': ['com.zswatch.app'],
       });
     },
   );
@@ -234,7 +234,10 @@ void main() {
         throwsFormatException,
       );
       await expectLater(
-        client.configureNotifications(true, List.filled(65, 'com.zswatch.app')),
+        client.configureNotifications(
+          true,
+          List.filled(257, 'com.zswatch.app'),
+        ),
         throwsFormatException,
       );
       expect(calls, isEmpty);

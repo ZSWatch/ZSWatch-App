@@ -9,22 +9,23 @@ class PrototypeNotifications(private val store: PrototypeStore) {
     @Suppress("UNCHECKED_CAST")
     private fun entries() = JSONObject(store.control()["notifications"] as? Map<String, Any?> ?: emptyMap<String, Any?>())
 
-    fun configure(enabled: Boolean, packages: List<String>) {
-        require(packages.size <= 64 && packages.all { Regex("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+").matches(it) })
+    /** All apps forward by default; [blocked] opts packages out. */
+    fun configure(enabled: Boolean, blocked: List<String>) {
+        require(blocked.size <= MAX_BLOCKED && blocked.all { Regex("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+").matches(it) })
         val notices = entries()
         notices.keys().asSequence().toList().forEach { key ->
             val item = notices.getJSONObject(key)
-            if (!enabled || item.getString("package") !in packages) removeItem(item)
+            if (!enabled || item.getString("package") in blocked) removeItem(item)
         }
         store.update("notification_configuration", mapOf("notifications_enabled" to enabled,
-            "notification_packages" to packages.distinct(), "notifications" to notices))
+            BLOCKED to blocked.distinct(), "notifications" to notices))
     }
 
     fun post(data: Map<String, Any?>, now: Long): Boolean {
         val state = store.control()
         if (state["desired_running"] != true || state["notifications_enabled"] != true) return false
         val source = data["packageName"] as? String ?: return false
-        if (source !in (state["notification_packages"] as? List<*> ?: emptyList<Any>())) return false
+        if (source in (state[BLOCKED] as? List<*> ?: emptyList<Any>())) return false
         val key = data["key"] as? String ?: return false
         if (key.length > 512) return false
         // Listener reconnect replays active Android notifications. Their original
@@ -76,12 +77,12 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         if (action !in listOf("DISMISS", "DISMISS_ALL")) return emptyList()
         val id = message.opt("id")
         if (action == "DISMISS" && id !is Int && id !is Long) return emptyList()
-        val packages = state["notification_packages"] as? List<*> ?: emptyList<Any>()
+        val blocked = state[BLOCKED] as? List<*> ?: emptyList<Any>()
         val notices = entries()
         return notices.keys().asSequence().filter { key ->
             val item = notices.getJSONObject(key)
             !item.optBoolean("removed") && item.getLong("expires_ms") > now &&
-                item.getString("package") in packages && item.optLong("delivered_generation", -1) == generation &&
+                item.getString("package") !in blocked && item.optLong("delivered_generation", -1) == generation &&
                 (action == "DISMISS_ALL" || item.getLong("id") == (id as Number).toLong())
         }.toList()
     }
@@ -146,6 +147,8 @@ class PrototypeNotifications(private val store: PrototypeStore) {
 
     companion object {
         const val CAPACITY = 64
+        const val MAX_BLOCKED = 256
+        const val BLOCKED = "notification_blocked_packages"
         const val RETENTION_MS = 10 * 60 * 1000L
         /** Limit UTF-8 bytes without splitting a code point; JSON controls become spaces. */
         private fun bounded(value: String, budget: Int): String {

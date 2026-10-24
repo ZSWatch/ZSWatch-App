@@ -92,9 +92,10 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
     final watch = ref.watch(currentWatchProvider);
     final connection = ref.watch(watchConnectionProvider);
     final battery = ref.watch(batteryLevelProvider);
-    final packages = ((state?.fields['notification_packages'] as List?) ?? [])
-        .cast<String>();
-    final testAllowed = packages.contains('com.zswatch.app');
+    final blocked =
+        ((state?.fields['notification_blocked_packages'] as List?) ?? [])
+            .cast<String>();
+    final testAllowed = !blocked.contains('com.zswatch.app');
     return MaterialApp(
       theme: ThemeData.dark(),
       routes: {
@@ -194,17 +195,14 @@ class _CompanionPrototypeAppState extends ConsumerState<CompanionPrototypeApp> {
             ),
             SwitchListTile(
               title: const Text('Forward notifications'),
-              subtitle: Text('${packages.length} selected apps'),
+              subtitle: Text('${blocked.length} blocked apps'),
               value: state?.fields['notifications_enabled'] == true,
               onChanged: busy || state == null
                   ? null
                   : (enabled) => unawaited(
                       run(() async {
                         show(
-                          await client.configureNotifications(
-                            enabled,
-                            packages,
-                          ),
+                          await client.configureNotifications(enabled, blocked),
                         );
                       }),
                     ),

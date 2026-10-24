@@ -592,12 +592,13 @@ class CompanionPrototypeClient {
     return snapshot;
   }
 
+  /// All apps forward by default; [blockedPackages] opts apps out.
   Future<CompanionPrototypeSnapshot> configureNotifications(
     bool enabled,
-    List<String> packages,
+    List<String> blockedPackages,
   ) async {
-    if (packages.length > 64 ||
-        packages.any(
+    if (blockedPackages.length > 256 ||
+        blockedPackages.any(
           (p) => !RegExp(r'^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$').hasMatch(p),
         )) {
       throw const FormatException('Expected Android package names');
@@ -606,7 +607,7 @@ class CompanionPrototypeClient {
       await methods.invokeMethod<Object?>('configureNotifications', {
         'version': 1,
         'enabled': enabled,
-        'packages': packages,
+        'blockedPackages': blockedPackages,
       }),
     );
   }

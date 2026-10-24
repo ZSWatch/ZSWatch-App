@@ -33,7 +33,7 @@ Map<String, Object?> policy({bool enabled = true}) => {
   'events': <Object?>[],
   'recordings': <String, Object?>{},
   'notifications_enabled': enabled,
-  'notification_packages': ['com.zswatch.app'],
+  'notification_blocked_packages': ['com.zswatch.app'],
 };
 
 void main() {
@@ -162,7 +162,7 @@ void main() {
             ...saved,
             'event_cursor': (saved['event_cursor'] as int) + 1,
             'notifications_enabled': args['enabled'],
-            'notification_packages': args['packages'],
+            'notification_blocked_packages': args['blockedPackages'],
           };
           // Deliberately delay native stream delivery: the second edit must
           // retain the policy committed by the first command response.
@@ -176,14 +176,14 @@ void main() {
       expect(find.text('Watch disconnected'), findsOneWidget);
       expect(find.text('Notification access granted'), findsOneWidget);
       expect(find.text('Notification listener disconnected'), findsOneWidget);
-      expect(find.text('1/64 apps selected'), findsOneWidget);
+      expect(find.text('1 app blocked'), findsOneWidget);
       expect(
         tester
             .widget<CheckboxListTile>(
               find.widgetWithText(CheckboxListTile, 'Messages'),
             )
             .value,
-        false,
+        true,
       );
 
       await tester.tap(find.widgetWithText(CheckboxListTile, 'Messages'));
@@ -191,15 +191,15 @@ void main() {
       expect(calls.last.arguments, {
         'version': 1,
         'enabled': true,
-        'packages': ['com.example.messages', 'com.zswatch.app'],
+        'blockedPackages': ['com.example.messages', 'com.zswatch.app'],
       });
-      expect(find.text('2/64 apps selected'), findsOneWidget);
+      expect(find.text('2 apps blocked'), findsOneWidget);
       await tester.tap(find.byType(SwitchListTile));
       await tester.pumpAndSettle();
       expect(calls.last.arguments, {
         'version': 1,
         'enabled': false,
-        'packages': ['com.example.messages', 'com.zswatch.app'],
+        'blockedPackages': ['com.example.messages', 'com.zswatch.app'],
       });
       await tester.tap(find.byTooltip('Refresh notification apps'));
       await tester.pumpAndSettle();
@@ -295,12 +295,12 @@ void main() {
   );
 
   testWidgets(
-    'developer toggle preserves saved packages and synthetic actions require ZSWatch selection',
+    'developer toggle preserves blocked apps and synthetic actions require ZSWatch unblocked',
     (tester) async {
       final calls = <MethodCall>[];
       final saved = {
         ...policy(),
-        'notification_packages': ['com.example.messages'],
+        'notification_blocked_packages': ['com.zswatch.app'],
       };
       messenger.setMockMethodCallHandler(methods, (call) async {
         calls.add(call);
@@ -332,7 +332,7 @@ void main() {
       expect(calls.single.arguments, {
         'version': 1,
         'enabled': false,
-        'packages': ['com.example.messages'],
+        'blockedPackages': ['com.zswatch.app'],
       });
       expect(
         tester
