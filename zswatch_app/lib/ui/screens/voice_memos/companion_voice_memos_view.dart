@@ -20,6 +20,7 @@ import '../../../services/ai/openrouter_client.dart';
 import '../../../services/ai/voice_model_config.dart';
 import '../../../services/voice_memo/transcription_engine.dart';
 import '../../../services/voice_memo/voice_memo_file_store.dart';
+import '../../../services/voice_memo/voice_note_tidy.dart';
 import '../../../providers/companion_recording_import_providers.dart';
 import '../../widgets/voice_memos/audio_playback_bar.dart';
 import '../../widgets/voice_memos/companion_voice_action_card.dart';
@@ -58,6 +59,8 @@ class _CompanionVoiceMemosViewState
   bool selecting = false;
   bool modifying = false;
   final selected = <String>{};
+  Object? tidiedCursor;
+  bool tidying = false;
 
   @override
   void dispose() {
@@ -164,6 +167,48 @@ class _CompanionVoiceMemosViewState
     );
   }
 
+  Future<void> purgeAll(List<String> identities) async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Permanently delete ${identities.length} recording${identities.length == 1 ? '' : 's'}?',
+        ),
+        content: const Text(
+          'Permanently remove all Recently deleted audio, saved notes and action history from this phone. You cannot restore them. Watch originals, calendar entries and scheduled alerts remain.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete all permanently'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    await modify(
+      () => VoiceMemoFileStore.exclusive(() async {
+        for (final batch in _batches(identities)) {
+          await ref.read(companionClientProvider).purgeRecordings(batch);
+        }
+      }),
+    );
+  }
+
+  /// Native calls take at most 100 recordings each.
+  static Iterable<List<String>> _batches(List<String> identities) sync* {
+    for (var start = 0; start < identities.length; start += 100) {
+      yield identities.sublist(
+        start,
+        start + 100 > identities.length ? identities.length : start + 100,
+      );
+    }
+  }
+
   Future<void> remove(List<String> identities) async {
     final accepted = await showDialog<bool>(
       context: context,
@@ -172,7 +217,7 @@ class _CompanionVoiceMemosViewState
           'Delete ${identities.length} recording${identities.length == 1 ? '' : 's'} from phone?',
         ),
         content: const Text(
-          'Move local audio and saved notes to Recently deleted. You can restore them there. Watch originals, calendar entries and scheduled alerts remain.',
+          'Move local audio and saved notes to Deleted. You can restore them there for 30 days. Watch originals, calendar entries and scheduled alerts remain.',
         ),
         actions: [
           TextButton(
@@ -188,14 +233,43 @@ class _CompanionVoiceMemosViewState
     );
     if (accepted != true || !mounted) return;
     await modify(() async {
-      await VoiceMemoFileStore.exclusive(
-        () => ref.read(companionClientProvider).removeRecordings(identities),
-      );
+      await VoiceMemoFileStore.exclusive(() async {
+        for (final batch in _batches(identities)) {
+          await ref.read(companionClientProvider).removeRecordings(batch);
+        }
+      });
       if (mounted) {
         setState(() {
           selected.clear();
           selecting = false;
         });
+      }
+    });
+  }
+
+  /// Runs after each native change; failures leave the list as it is.
+  void tidy(
+    List<CompanionRecording> items,
+    Map<String, Map<Object?, Object?>> jobs,
+    Object? cursor,
+  ) {
+    if (tidying || cursor == tidiedCursor) return;
+    tidying = true;
+    tidiedCursor = cursor;
+    final client = ref.read(companionClientProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        if (!mounted) return;
+        await VoiceNoteTidy.apply(
+          recordings: items,
+          jobs: jobs,
+          prefs: await ref.read(sharedPreferencesProvider.future),
+          client: client,
+        );
+      } catch (error) {
+        debugPrint('[CompanionVoiceMemosView] tidy skipped: $error');
+      } finally {
+        tidying = false;
       }
     });
   }
@@ -340,8 +414,8 @@ class _CompanionVoiceMemosViewState
           builder: (context, setDialogState) => AlertDialog(
             title: Text(switch (operation) {
               'transcribe' => 'Transcribe recording',
-              'retranscribe' => 'Re-transcribe recording',
-              'reanalyze' => 'Re-analyze transcript',
+              'retranscribe' => 'Transcribe recording again',
+              'reanalyze' => 'Analyze transcript again',
               _ =>
                 config.cloud
                     ? 'Process recording'
@@ -473,45 +547,37 @@ class _CompanionVoiceMemosViewState
                         ),
                         const SizedBox(height: 12),
                         Text(jobLabel(job)),
-                        if (ref
-                                .read(companionSnapshotProvider)
-                                .asData
-                                ?.value
-                                .isIos ==
-                            true)
-                          PopupMenuButton<String>(
-                            tooltip: 'Saved revisions',
-                            onSelected: (other) {
-                              Navigator.pop(context);
-                              unawaited(showJob(other, recording));
-                            },
-                            itemBuilder: (_) => [
-                              for (final version
-                                  in (ref
-                                                  .read(
-                                                    companionSnapshotProvider,
-                                                  )
-                                                  .asData
-                                                  ?.value
-                                                  .fields['voice_jobs']
-                                              as List? ??
-                                          [])
-                                      .whereType<Map<Object?, Object?>>())
-                                if (version['recording_id'] ==
-                                        recording.identity &&
-                                    version['job_id'] != id)
-                                  PopupMenuItem(
-                                    value: version['job_id'] as String,
-                                    child: Text(
-                                      'Revision ${version['generation']} • ${jobLabel(version)}',
-                                    ),
+                        PopupMenuButton<String>(
+                          tooltip: 'Saved revisions',
+                          onSelected: (other) {
+                            Navigator.pop(context);
+                            unawaited(showJob(other, recording));
+                          },
+                          itemBuilder: (_) => [
+                            for (final version
+                                in (ref
+                                                .read(companionSnapshotProvider)
+                                                .asData
+                                                ?.value
+                                                .fields['voice_jobs']
+                                            as List? ??
+                                        [])
+                                    .whereType<Map<Object?, Object?>>())
+                              if (version['recording_id'] ==
+                                      recording.identity &&
+                                  version['job_id'] != id)
+                                PopupMenuItem(
+                                  value: version['job_id'] as String,
+                                  child: Text(
+                                    'Revision ${version['generation']} • ${jobLabel(version)}',
                                   ),
-                            ],
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text('Saved revisions'),
-                            ),
+                                ),
+                          ],
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: Text('Saved revisions'),
                           ),
+                        ),
                         if (job['last_error'] != null &&
                             [
                               'ready',
@@ -546,13 +612,7 @@ class _CompanionVoiceMemosViewState
                                   ClipboardData(text: text),
                                 ),
                               ),
-                              if (ref
-                                          .read(companionSnapshotProvider)
-                                          .asData
-                                          ?.value
-                                          .isIos ==
-                                      true &&
-                                  job['selected'] == true &&
+                              if (job['selected'] == true &&
                                   recording.state !=
                                       CompanionRecordingState.deleted)
                                 TextButton.icon(
@@ -729,11 +789,9 @@ class _CompanionVoiceMemosViewState
     final canProcess = ready || snapshot?.isIos == true;
     final paused = snapshot?.fields['recording_sync_enabled'] == false;
     final watchId = snapshot?.fields['address'];
-    final ios = snapshot?.isIos == true;
-    final matches = ios && query.isNotEmpty
+    final matches = query.isNotEmpty
         ? ref.watch(companionRecordingSearchProvider(query))
         : null;
-    final observed = snapshot?.fields['recording_list'];
     final jobs = <String, Map<Object?, Object?>>{};
     for (final job
         in (snapshot?.fields['voice_jobs'] as List? ?? [])
@@ -750,433 +808,520 @@ class _CompanionVoiceMemosViewState
         jobs[identity] = job;
       }
     }
-    final liveListCount =
-        ready &&
-            observed is Map &&
-            observed['address'] == watchId &&
-            observed['generation'] == snapshot?.generation &&
-            observed['count'] is int
-        ? observed['count'] as int
-        : null;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Voice Notes'),
-        actions: [
-          if (ios)
-            IconButton(
-              tooltip: 'Earlier recordings',
-              icon: const Icon(Icons.history),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const RetainedVoiceMemosView(),
-                ),
-              ),
+    final watchItems = (recordings.asData?.value ?? <CompanionRecording>[])
+        .where((item) => item.watchId == watchId)
+        .toList();
+    final items = watchItems
+        .where((item) {
+          if (item.purged && !item.purgePending) return false;
+          if (filter == _RecordingFilter.deleted) {
+            return item.state == CompanionRecordingState.deleted;
+          }
+          if (item.state == CompanionRecordingState.deleted) return false;
+          // Searching the inbox also finds finished notes.
+          if (filter == _RecordingFilter.archived
+              ? !item.archived
+              : item.archived &&
+                    (filter != _RecordingFilter.all || query.isEmpty)) {
+            return false;
+          }
+          final types = jobs[item.identity]?['action_types'] as List? ?? [];
+          return switch (filter) {
+            _RecordingFilter.tasks => types.contains('task'),
+            _RecordingFilter.reminders => types.contains('reminder'),
+            _RecordingFilter.alerts => types.any(
+              (type) => type == 'timer' || type == 'alarm',
             ),
-          if (ios)
-            IconButton(
-              tooltip: selecting ? 'Cancel selection' : 'Select recordings',
-              icon: Icon(selecting ? Icons.close : Icons.checklist),
-              onPressed: modifying
-                  ? null
-                  : () => setState(() {
-                      selecting = !selecting;
-                      selected.clear();
-                    }),
-            ),
-          IconButton(
-            tooltip: 'Alarms & Timers',
-            icon: const Icon(Icons.alarm_outlined),
-            onPressed: () => context.push(AppRoutes.alarmsTimers),
-          ),
-          IconButton(
-            tooltip: 'Refresh recording list',
-            onPressed: ready && !refreshing ? refreshList : null,
-            icon: refreshing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: recordings.when(
-        skipLoadingOnRefresh: false,
-        skipLoadingOnReload: false,
-        data: (all) {
-          final watchItems = all
-              .where((item) => item.watchId == watchId)
-              .toList();
-          final saved = watchItems
-              .where((item) => item.hasCommittedReceipt)
-              .length;
-          final items = watchItems
-              .where((item) {
-                if (item.purged && !item.purgePending) return false;
-                if (filter == _RecordingFilter.deleted) {
-                  return item.state == CompanionRecordingState.deleted;
-                }
-                if (item.state == CompanionRecordingState.deleted) return false;
-                if (filter == _RecordingFilter.archived
-                    ? !item.archived
-                    : item.archived) {
-                  return false;
-                }
-                final types =
-                    jobs[item.identity]?['action_types'] as List? ?? [];
-                if (filter == _RecordingFilter.tasks &&
-                    !types.contains('task')) {
-                  return false;
-                }
-                if (filter == _RecordingFilter.reminders &&
-                    !types.contains('reminder')) {
-                  return false;
-                }
-                if (filter == _RecordingFilter.alerts &&
-                    !types.any((type) => type == 'timer' || type == 'alarm')) {
-                  return false;
-                }
-                if (filter == _RecordingFilter.notes && types.isNotEmpty) {
-                  return false;
-                }
-                return true;
-              })
-              .where(
-                (item) =>
-                    query.isEmpty ||
-                    item.title.toLowerCase().contains(query) ||
-                    item.filename.toLowerCase().contains(query) ||
-                    matches?.asData?.value.contains(item.identity) == true,
-              )
-              .toList();
-          final selection = watchItems
-              .where(
-                (item) =>
-                    selected.contains(item.identity) &&
-                    item.hasCommittedReceipt,
-              )
-              .map((item) => item.identity)
-              .toSet();
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text('${items.length} recordings • $saved saved on phone'),
-              if (ios) ...[
-                TextField(
-                  controller: search,
-                  maxLength: 128,
-                  decoration: const InputDecoration(
-                    hintText: 'Search titles, transcripts or actions',
-                    prefixIcon: Icon(Icons.search),
-                    counterText: '',
-                  ),
-                  onChanged: (text) {
-                    searchTimer?.cancel();
-                    searchTimer = Timer(const Duration(milliseconds: 200), () {
-                      if (mounted) {
-                        setState(() => query = text.trim().toLowerCase());
-                      }
-                    });
-                  },
+            _RecordingFilter.notes => types.isEmpty,
+            _ => true,
+          };
+        })
+        .where(
+          (item) =>
+              query.isEmpty ||
+              item.title.toLowerCase().contains(query) ||
+              item.filename.toLowerCase().contains(query) ||
+              matches?.asData?.value.contains(item.identity) == true,
+        )
+        .toList();
+    final selectable = items
+        .where((item) => item.hasCommittedReceipt)
+        .map((item) => item.identity)
+        .toSet();
+    final selection = selected.intersection(selectable);
+    final failed = watchItems.any(
+      (item) => !item.purged && item.state == CompanionRecordingState.failed,
+    );
+    final canAnalyze = ref.watch(voiceModelConfigProvider).canAnalyze;
+    if (recordings.hasValue && snapshot != null) {
+      tidy(watchItems, jobs, snapshot.fields['event_cursor']);
+    }
+    void stopSelecting() => setState(() {
+      selecting = false;
+      selected.clear();
+    });
+    return PopScope(
+      canPop: !selecting,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) stopSelecting();
+      },
+      child: Scaffold(
+        appBar: selecting
+            ? AppBar(
+                leading: IconButton(
+                  tooltip: 'Cancel selection',
+                  icon: const Icon(Icons.close),
+                  onPressed: modifying ? null : stopSelecting,
                 ),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final option in _RecordingFilter.values)
-                      ChoiceChip(
-                        label: Text(switch (option) {
-                          _RecordingFilter.all => 'All',
-                          _RecordingFilter.notes => 'Notes',
-                          _RecordingFilter.tasks => 'Tasks',
-                          _RecordingFilter.reminders => 'Reminders',
-                          _RecordingFilter.alerts => 'Timers & Alarms',
-                          _RecordingFilter.archived => 'Archived',
-                          _RecordingFilter.deleted => 'Recently deleted',
-                        }),
-                        selected: filter == option,
-                        onSelected: (_) => setState(() {
-                          filter = option;
-                          selected.clear();
-                        }),
-                      ),
-                  ],
-                ),
-                if (matches?.isLoading == true) const LinearProgressIndicator(),
-                if (matches?.hasError == true)
-                  const Text(
-                    'Transcript search is unavailable. Showing title matches.',
+                title: Text('${selection.length} selected'),
+                actions: [
+                  IconButton(
+                    tooltip:
+                        selectable.isNotEmpty &&
+                            selection.length == selectable.length
+                        ? 'Deselect all'
+                        : 'Select all',
+                    icon: const Icon(Icons.select_all),
+                    onPressed: modifying || selectable.isEmpty
+                        ? null
+                        : () => setState(() {
+                            if (selection.length == selectable.length) {
+                              selected.clear();
+                            } else {
+                              selected.addAll(selectable);
+                            }
+                          }),
                   ),
-                if (filter == _RecordingFilter.deleted)
-                  const Text(
-                    'Restore recordings or delete them permanently to free phone storage. Watch originals remain.',
+                  IconButton(
+                    tooltip: 'Transcribe or process selected',
+                    icon: const Icon(Icons.auto_awesome),
+                    onPressed: modifying || selection.isEmpty
+                        ? null
+                        : () => showBatchSheet(selection),
                   ),
-                if (selecting && selection.isNotEmpty) ...[
-                  Text('${selection.length} selected'),
-                  Wrap(
-                    children: [
-                      TextButton(
-                        onPressed: modifying
-                            ? null
-                            : () => modify(() async {
-                                for (final identity in selection) {
-                                  await ref
-                                      .read(companionClientProvider)
-                                      .updateRecording(
-                                        identity,
-                                        archived:
-                                            filter != _RecordingFilter.archived,
-                                      );
-                                }
-                                if (mounted) {
-                                  setState(() {
-                                    selected.clear();
-                                    selecting = false;
-                                  });
-                                }
-                              }),
-                        child: Text(
-                          filter == _RecordingFilter.archived
-                              ? 'Unarchive selected'
-                              : 'Archive selected',
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: modifying
-                            ? null
-                            : () => remove(selection.toList()),
-                        child: const Text('Delete selected'),
-                      ),
-                    ],
-                  ),
-                  CompanionVoiceBatchButton(
-                    operation: 'transcribe',
-                    label: 'Transcribe selected',
-                    identities: selection,
-                  ),
-                  CompanionVoiceBatchButton(
-                    operation: 'process',
-                    label: 'Process selected',
-                    identities: selection,
-                  ),
-                ],
-              ],
-              if (liveListCount != null)
-                Text('Latest watch list: $liveListCount recordings'),
-              Text(
-                !ready
-                    ? 'Watch disconnected — showing saved status'
-                    : paused
-                    ? 'Downloads paused'
-                    : 'Downloads enabled',
-              ),
-              if (ios)
-                Wrap(
-                  children: [
-                    TextButton(
-                      onPressed: !modifying
-                          ? () => modify(() async {
+                  IconButton(
+                    tooltip: filter == _RecordingFilter.archived
+                        ? 'Mark selected not done'
+                        : 'Mark selected done',
+                    icon: Icon(
+                      filter == _RecordingFilter.archived
+                          ? Icons.remove_done
+                          : Icons.done_all,
+                    ),
+                    onPressed: modifying || selection.isEmpty
+                        ? null
+                        : () => modify(() async {
+                            for (final identity in selection) {
                               await ref
                                   .read(companionClientProvider)
-                                  .setRecordingSync(paused);
-                            })
-                          : null,
-                      child: Text(
-                        paused ? 'Resume downloads' : 'Pause downloads',
-                      ),
-                    ),
-                    if (watchItems.any(
-                      (item) =>
-                          !item.purged &&
-                          item.state == CompanionRecordingState.failed,
-                    ))
-                      TextButton(
-                        onPressed: ready && !modifying
-                            ? () => modify(() async {
-                                await ref
-                                    .read(companionClientProvider)
-                                    .command('retryRecordings');
-                              })
-                            : null,
-                        child: const Text('Retry failed downloads'),
-                      ),
-                  ],
-                ),
-              if (imports.hasError) ...[
-                const Text('Playback imports are unavailable'),
-                TextButton(
-                  onPressed: () =>
-                      ref.invalidate(companionRecordingImportsProvider),
-                  child: const Text('Retry playback imports'),
-                ),
-              ],
-              if (snapshot?.isIos == true)
-                const Text(
-                  'Processing runs while the app is open or when iOS schedules background time.',
-                ),
-              const SizedBox(height: 16),
-              const CompanionVoiceBatchButton(
-                operation: 'transcribe',
-                label: 'Transcribe all untranscribed',
-              ),
-              const CompanionVoiceBatchButton(
-                operation: 'process',
-                label: 'Process all unprocessed',
-              ),
-              if (items.isEmpty)
-                const Text('No recordings saved for this watch'),
-              for (final item in items)
-                ListTile(
-                  key: ValueKey(item.identity),
-                  leading: selecting && item.hasCommittedReceipt
-                      ? Checkbox(
-                          value: selected.contains(item.identity),
-                          onChanged: modifying
-                              ? null
-                              : (value) => setState(() {
-                                  if (value == true && selected.length < 100) {
-                                    selected.add(item.identity);
-                                  } else {
-                                    selected.remove(item.identity);
-                                  }
-                                }),
-                        )
-                      : Icon(
-                          item.hasCommittedReceipt
-                              ? Icons.file_download_done
-                              : Icons.mic,
-                        ),
-                  title: Text(item.title),
-                  onTap: selecting && item.hasCommittedReceipt
-                      ? () => setState(() {
-                          if (!selected.remove(item.identity) &&
-                              selected.length < 100) {
-                            selected.add(item.identity);
-                          }
-                        })
-                      : jobs[item.identity] == null
-                      ? null
-                      : () => showJob(
-                          jobs[item.identity]!['job_id'] as String,
-                          item,
-                        ),
-                  subtitle: Text(
-                    '${DateFormat.yMMMd().add_Hm().format(item.timestampUtc.toLocal())} • '
-                    '${(item.durationMs / 1000).toStringAsFixed(1)} s\n'
-                    '${status(item, ready, paused)}'
-                    '${jobs[item.identity] == null ? '' : ' • ${jobLabel(jobs[item.identity]!)}'}'
-                    '${imported[item.identity]?.sourceSha256 == item.sha256 && item.hasCommittedReceipt ? ' • Playback prepared' : ''}',
+                                  .updateRecording(
+                                    identity,
+                                    archived:
+                                        filter != _RecordingFilter.archived,
+                                  );
+                            }
+                            if (mounted) stopSelecting();
+                          }),
                   ),
-                  isThreeLine: true,
-                  trailing: ios && item.state == CompanionRecordingState.deleted
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (!item.purged)
-                              TextButton(
-                                onPressed: modifying
-                                    ? null
-                                    : () => recordingAction('restore', item),
-                                child: const Text('Restore'),
-                              ),
-                            IconButton(
-                              tooltip: item.purgePending
-                                  ? 'Retry permanent deletion'
-                                  : 'Delete permanently from phone',
-                              onPressed: modifying ? null : () => purge(item),
-                              icon: const Icon(Icons.delete_forever),
+                  IconButton(
+                    tooltip: 'Delete selected',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: modifying || selection.isEmpty
+                        ? null
+                        : () => remove(selection.toList()),
+                  ),
+                ],
+              )
+            : AppBar(
+                title: const Text('Voice Notes'),
+                actions: [
+                  IconButton(
+                    tooltip: 'Alarms & Timers',
+                    icon: const Icon(Icons.alarm_outlined),
+                    onPressed: () => context.push(AppRoutes.alarmsTimers),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'More options',
+                    onSelected: (choice) async {
+                      switch (choice) {
+                        case 'select':
+                          setState(() => selecting = true);
+                        case 'batch':
+                          await showBatchSheet(null);
+                        case 'refresh':
+                          await refreshList();
+                        case 'sync':
+                          await modify(
+                            () => ref
+                                .read(companionClientProvider)
+                                .setRecordingSync(paused),
+                          );
+                        case 'earlier':
+                          await Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const RetainedVoiceMemosView(),
                             ),
-                          ],
-                        )
-                      : item.hasCommittedReceipt
-                      ? Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (ref.watch(voiceModelConfigProvider).canAnalyze)
-                              IconButton(
-                                tooltip: 'Process recording locally',
-                                onPressed: canProcess
-                                    ? () => processRecording(item)
-                                    : null,
-                                icon: const Icon(Icons.auto_awesome),
-                              ),
-                            PopupMenuButton<String>(
-                              key: ValueKey('recording-menu:${item.identity}'),
-                              tooltip: 'Transcription actions',
-                              enabled: canProcess,
-                              onSelected: (operation) =>
-                                  recordingAction(operation, item),
-                              itemBuilder: (_) => [
-                                const PopupMenuItem(
-                                  value: 'transcribe',
-                                  child: Text('Transcribe only'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'retranscribe',
-                                  child: Text('Re-transcribe'),
-                                ),
-                                if (ref
-                                    .watch(voiceModelConfigProvider)
-                                    .canAnalyze)
-                                  const PopupMenuItem(
-                                    value: 'reanalyze',
-                                    child: Text('Re-analyze transcript'),
-                                  ),
-                                const PopupMenuItem(
-                                  value: 'export',
-                                  child: Text('Export audio'),
-                                ),
-                                if (ios) ...[
-                                  const PopupMenuItem(
-                                    value: 'rename',
-                                    child: Text('Rename'),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'archive',
-                                    child: Text(
-                                      item.archived ? 'Unarchive' : 'Archive',
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Delete from phone'),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            IconButton(
-                              tooltip:
-                                  imported[item.identity]?.sourceSha256 ==
-                                      item.sha256
-                                  ? 'Play recording'
-                                  : 'Prepare playback',
-                              onPressed: preparing == null
-                                  ? () => preparePlayback(item)
-                                  : null,
-                              icon: preparing == item.identity
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(),
-                                    )
-                                  : Icon(
-                                      imported[item.identity]?.sourceSha256 ==
-                                              item.sha256
-                                          ? Icons.play_arrow
-                                          : Icons.audio_file_outlined,
-                                    ),
-                            ),
-                          ],
+                          );
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      _menuItem('select', Icons.checklist, 'Select recordings'),
+                      _menuItem(
+                        'batch',
+                        Icons.auto_awesome,
+                        'Transcribe or process all',
+                      ),
+                      _menuItem(
+                        'refresh',
+                        Icons.refresh,
+                        'Refresh recording list',
+                        enabled: ready && !refreshing,
+                      ),
+                      _menuItem(
+                        'sync',
+                        paused ? Icons.play_arrow : Icons.pause,
+                        paused ? 'Resume downloads' : 'Pause downloads',
+                        enabled: !modifying,
+                      ),
+                      _menuItem('earlier', Icons.history, 'Earlier recordings'),
+                    ],
+                  ),
+                ],
+              ),
+        body: recordings.when(
+          skipLoadingOnRefresh: false,
+          skipLoadingOnReload: false,
+          data: (_) => ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            children: [
+              TextField(
+                controller: search,
+                maxLength: 128,
+                decoration: const InputDecoration(
+                  hintText: 'Search titles, transcripts or actions',
+                  prefixIcon: Icon(Icons.search),
+                  counterText: '',
+                ),
+                onChanged: (text) {
+                  searchTimer?.cancel();
+                  searchTimer = Timer(const Duration(milliseconds: 200), () {
+                    if (mounted) {
+                      setState(() => query = text.trim().toLowerCase());
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final option in _RecordingFilter.values)
+                    ChoiceChip(
+                      visualDensity: VisualDensity.compact,
+                      label: Text(switch (option) {
+                        _RecordingFilter.all => 'Inbox',
+                        _RecordingFilter.notes => 'Notes',
+                        _RecordingFilter.tasks => 'Tasks',
+                        _RecordingFilter.reminders => 'Reminders',
+                        _RecordingFilter.alerts => 'Alarms',
+                        _RecordingFilter.archived => 'Done',
+                        _RecordingFilter.deleted => 'Deleted',
+                      }),
+                      selected: filter == option,
+                      onSelected: (_) => setState(() {
+                        filter = option;
+                        selected.clear();
+                      }),
+                    ),
+                ],
+              ),
+              if (matches?.isLoading == true) const LinearProgressIndicator(),
+              if (matches?.hasError == true)
+                _notice(
+                  Icons.search_off,
+                  'Transcript search is unavailable. Showing title matches.',
+                ),
+              if (!ready)
+                _notice(
+                  Icons.watch_off_outlined,
+                  'Watch disconnected — showing saved recordings',
+                )
+              else if (paused)
+                _notice(
+                  Icons.pause_circle_outline,
+                  'Downloads paused',
+                  action: 'Resume',
+                  onPressed: modifying
+                      ? null
+                      : () => modify(
+                          () => ref
+                              .read(companionClientProvider)
+                              .setRecordingSync(true),
+                        ),
+                ),
+              if (failed)
+                _notice(
+                  Icons.error_outline,
+                  'Some downloads failed',
+                  action: 'Retry',
+                  onPressed: ready && !modifying
+                      ? () => modify(
+                          () => ref
+                              .read(companionClientProvider)
+                              .command('retryRecordings'),
                         )
                       : null,
                 ),
+              if (imports.hasError)
+                _notice(
+                  Icons.error_outline,
+                  'Playback is unavailable',
+                  action: 'Retry',
+                  onPressed: () =>
+                      ref.invalidate(companionRecordingImportsProvider),
+                ),
+              if (filter == _RecordingFilter.deleted)
+                _notice(
+                  Icons.info_outline,
+                  'Deleted recordings are removed from this phone after 30 days. Watch originals remain.',
+                  action: items.isEmpty ? null : 'Delete all permanently',
+                  onPressed: modifying
+                      ? null
+                      : () => purgeAll(
+                          items.map((item) => item.identity).toList(),
+                        ),
+                ),
+              if (items.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Text(
+                      filter == _RecordingFilter.all && query.isEmpty
+                          ? 'All caught up. Finished notes move to Done.'
+                          : 'No recordings here',
+                    ),
+                  ),
+                ),
+              for (final item in items)
+                recordingTile(
+                  item,
+                  jobs[item.identity],
+                  imported[item.identity],
+                  ready: ready,
+                  paused: paused,
+                  canProcess: canProcess,
+                  canAnalyze: canAnalyze,
+                ),
             ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) =>
-            const Center(child: Text('Recording status is unavailable')),
+          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stack) =>
+              const Center(child: Text('Recording status is unavailable')),
+        ),
       ),
+    );
+  }
+
+  static PopupMenuItem<String> _menuItem(
+    String value,
+    IconData icon,
+    String label, {
+    bool enabled = true,
+  }) => PopupMenuItem(
+    value: value,
+    enabled: enabled,
+    child: ListTile(
+      leading: Icon(icon),
+      title: Text(label),
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+    ),
+  );
+
+  Widget _notice(
+    IconData icon,
+    String text, {
+    String? action,
+    VoidCallback? onPressed,
+  }) => Card(
+    margin: const EdgeInsets.only(top: 8),
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(width: 12),
+          Expanded(child: Text(text)),
+          if (action != null)
+            TextButton(onPressed: onPressed, child: Text(action)),
+        ],
+      ),
+    ),
+  );
+
+  Future<void> showBatchSheet(Set<String>? identities) =>
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CompanionVoiceBatchButton(
+                operation: 'transcribe',
+                label: identities == null
+                    ? 'Transcribe all untranscribed'
+                    : 'Transcribe selected',
+                identities: identities,
+                onQueued: () => Navigator.pop(context),
+              ),
+              CompanionVoiceBatchButton(
+                operation: 'process',
+                label: identities == null
+                    ? 'Process all unprocessed'
+                    : 'Process selected',
+                identities: identities,
+                onQueued: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget recordingTile(
+    CompanionRecording item,
+    Map<Object?, Object?>? job,
+    ImportedRecording? playback, {
+    required bool ready,
+    required bool paused,
+    required bool canProcess,
+    required bool canAnalyze,
+  }) {
+    final saved = item.hasCommittedReceipt;
+    final hasTranscript =
+        job != null &&
+        (job['transcript_saved'] == true ||
+            [
+              'transcribed',
+              'result_ready',
+              'delivered',
+            ].contains(job['state']));
+    final details = [
+      if (item.state != CompanionRecordingState.downloaded)
+        status(item, ready, paused),
+      if (job != null) jobLabel(job),
+    ].join(' • ');
+    final prepared = playback?.sourceSha256 == item.sha256;
+    void toggle() => setState(() {
+      if (!selected.remove(item.identity)) selected.add(item.identity);
+    });
+    return ListTile(
+      key: ValueKey(item.identity),
+      contentPadding: EdgeInsets.zero,
+      leading: selecting && saved
+          ? Checkbox(
+              value: selected.contains(item.identity),
+              onChanged: modifying ? null : (_) => toggle(),
+            )
+          : saved && item.state != CompanionRecordingState.deleted
+          ? IconButton(
+              tooltip: prepared ? 'Play recording' : 'Prepare playback',
+              onPressed: preparing == null ? () => preparePlayback(item) : null,
+              icon: preparing == item.identity
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(),
+                    )
+                  : const Icon(Icons.play_circle_outline),
+            )
+          : SizedBox.square(
+              dimension: 48,
+              child: Icon(switch (item.state) {
+                CompanionRecordingState.failed => Icons.error_outline,
+                CompanionRecordingState.deleted => Icons.delete_outline,
+                _ => Icons.downloading,
+              }),
+            ),
+      title: Text(item.title),
+      subtitle: Text(
+        '${DateFormat.yMMMd().add_Hm().format(item.timestampUtc.toLocal())} • '
+        '${(item.durationMs / 1000).toStringAsFixed(1)} s'
+        '${details.isEmpty ? '' : '\n$details'}',
+      ),
+      isThreeLine: details.isNotEmpty,
+      onTap: selecting
+          ? (saved && !modifying ? toggle : null)
+          : job != null
+          ? () => showJob(job['job_id'] as String, item)
+          : saved && item.state != CompanionRecordingState.deleted
+          ? () => preparePlayback(item)
+          : null,
+      onLongPress: !selecting && saved && !modifying
+          ? () => setState(() {
+              selecting = true;
+              selected.add(item.identity);
+            })
+          : null,
+      trailing: item.state == CompanionRecordingState.deleted
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!item.purged)
+                  TextButton(
+                    onPressed: modifying
+                        ? null
+                        : () => recordingAction('restore', item),
+                    child: const Text('Restore'),
+                  ),
+                IconButton(
+                  tooltip: item.purgePending
+                      ? 'Retry permanent deletion'
+                      : 'Delete permanently from phone',
+                  onPressed: modifying ? null : () => purge(item),
+                  icon: const Icon(Icons.delete_forever),
+                ),
+              ],
+            )
+          : saved && !selecting
+          ? PopupMenuButton<String>(
+              key: ValueKey('recording-menu:${item.identity}'),
+              tooltip: 'Recording actions',
+              onSelected: (operation) => recordingAction(operation, item),
+              itemBuilder: (_) => [
+                if (canAnalyze)
+                  _menuItem(
+                    'process',
+                    Icons.auto_awesome,
+                    'Process with AI',
+                    enabled: canProcess,
+                  ),
+                _menuItem(
+                  hasTranscript ? 'retranscribe' : 'transcribe',
+                  Icons.subtitles_outlined,
+                  'Transcribe',
+                  enabled: canProcess,
+                ),
+                if (canAnalyze && hasTranscript)
+                  _menuItem(
+                    'reanalyze',
+                    Icons.psychology_outlined,
+                    'Analyze again',
+                    enabled: canProcess,
+                  ),
+                const PopupMenuDivider(),
+                _menuItem(
+                  'archive',
+                  item.archived
+                      ? Icons.remove_done
+                      : Icons.check_circle_outline,
+                  item.archived ? 'Mark not done' : 'Mark done',
+                ),
+                _menuItem('export', Icons.ios_share, 'Export audio'),
+                _menuItem('rename', Icons.edit_outlined, 'Rename'),
+                _menuItem('delete', Icons.delete_outline, 'Delete'),
+              ],
+            )
+          : null,
     );
   }
 

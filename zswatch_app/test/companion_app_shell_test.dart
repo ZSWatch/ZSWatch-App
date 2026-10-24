@@ -426,23 +426,27 @@ void main() {
       await mount(tester, state);
       router(tester).go(AppRoutes.voiceMemos);
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Transcription actions'));
+      await tester.tap(find.byTooltip('Recording actions'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Transcribe only'));
+      await tester.tap(find.text('Transcribe'));
       await tester.pumpAndSettle();
       expect(find.text('Transcribe recording'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(calls.where((c) => c.method == 'processRecording'), isEmpty);
-      await tester.tap(find.byTooltip('Transcription actions'));
+      await tester.tap(find.byTooltip('Recording actions'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Transcribe only'));
+      await tester.tap(find.text('Transcribe'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Transcribe'));
       await tester.pumpAndSettle();
       final queued = calls.where((c) => c.method == 'processRecording').single;
       expect((queued.arguments as Map)['operation'], 'transcribe');
       expect((queued.arguments as Map)['identity'], identity);
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Transcribe or process all'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Transcribe all untranscribed'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Queue'));
@@ -995,8 +999,16 @@ void main() {
       routes.go(AppRoutes.voiceMemos);
       await tester.pumpAndSettle();
       expect(find.text('Voice Notes'), findsOneWidget);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
       await tester.pumpAndSettle();
       expect(calls.map((c) => c.method), [
         'permissionStatus',

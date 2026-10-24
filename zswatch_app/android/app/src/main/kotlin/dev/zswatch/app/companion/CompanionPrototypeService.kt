@@ -118,6 +118,7 @@ class CompanionPrototypeService : Service() {
                 PrototypeWatchface.markInterrupted(store)
                 PrototypeFirmware.markInterrupted(store)
                 val files = ReceiptFiles(File(filesDir, "companion-prototype/recordings"))
+                PrototypeHub.library(applicationContext).recover()
                 val link = NativePrototypeTransport(applicationContext, PrototypeHub.worker, store, files)
                 transport = link
                 telemetrySink = AndroidTelemetrySink(applicationContext)

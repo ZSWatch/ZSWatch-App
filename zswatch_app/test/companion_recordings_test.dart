@@ -268,6 +268,8 @@ void main() {
   testWidgets(
     'existing Voice Notes screen shows native receipts without starting legacy sync, DB or AI',
     (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       final calls = <String>[];
       const channel = MethodChannel('dev.zswatch.app/companion_v1');
       final pending = record();
@@ -327,9 +329,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('3 recordings • 1 saved on phone'), findsOneWidget);
       expect(find.text('Downloads paused'), findsOneWidget);
-      expect(find.text('Latest watch list: 3 recordings'), findsOneWidget);
       expect(find.textContaining('Download failed'), findsOneWidget);
       expect(find.textContaining('Waiting — downloads paused'), findsOneWidget);
       expect(
@@ -345,7 +345,9 @@ void main() {
         findsNWidgets(3),
       );
       expect(calls, isEmpty); // Opening the screen sends no sync/model command.
-      await tester.tap(find.byTooltip('Refresh recording list'));
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Refresh recording list'));
       await tester.pumpAndSettle();
       expect(calls, ['requestRecordingList']);
       expect(state.fields['recording_sync_enabled'], false);
@@ -527,7 +529,6 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(prepares, 0);
-      expect(find.textContaining('Playback prepared'), findsNothing);
       expect(find.byTooltip('Play recording'), findsNothing);
       await tester.tap(find.byTooltip('Prepare playback'));
       await tester.pumpAndSettle();

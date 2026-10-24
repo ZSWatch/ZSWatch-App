@@ -179,6 +179,53 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         PrototypeHub.main.post { result.success(mapOf("version" to 1, "job_id" to id)) }
                     } catch (error: Exception) { PrototypeHub.main.post { result.error("PROCESSING_FAILED", error.message, null) } }
                 }
+                "updateRecording", "restoreRecording", "removeRecordings", "purgeRecordings" -> PrototypeHub.worker.post {
+                    try {
+                        val library = PrototypeHub.library(context)
+                        when (call.method) {
+                            "updateRecording" -> {
+                                val title = call.argument<Any?>("title")
+                                val archived = call.argument<Any?>("archived")
+                                require((title == null || title is String) && (archived == null || archived is Boolean)) { "Invalid recording changes" }
+                                library.update(call.argument<String>("identity") ?: error("Recording identity required"),
+                                    title as String?, archived as Boolean?)
+                            }
+                            "restoreRecording" -> library.restore(call.argument<String>("identity") ?: error("Recording identity required"))
+                            else -> {
+                                val identities = (call.argument<List<*>>("identities") ?: error("Selected recordings required"))
+                                    .map { it as? String ?: error("Selected recordings required") }
+                                if (call.method == "purgeRecordings") library.purge(identities)
+                                else {
+                                    library.remove(identities)
+                                    CompanionPrototypeService.instance?.localFixture?.cancelRecordings(identities.toSet())
+                                }
+                            }
+                        }
+                        snapshot(result::success) { result.error("RECORDING_FAILED", it, null) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("RECORDING_FAILED", error.message, null) } }
+                }
+                "searchRecordings" -> PrototypeHub.worker.post {
+                    try {
+                        val query = call.argument<String>("query") ?: error("Search query required")
+                        require(query.toByteArray(Charsets.UTF_8).size <= 512) { "Search query too long" }
+                        val matches = PrototypeHub.library(context).search(query).sorted()
+                        PrototypeHub.main.post { result.success(mapOf("version" to 1, "identities" to matches)) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("SEARCH_FAILED", error.message, null) } }
+                }
+                "editVoiceTranscript" -> PrototypeHub.worker.post {
+                    try {
+                        val id = call.argument<String>("job_id") ?: error("Job ID required")
+                        val transcript = call.argument<String>("transcript") ?: error("Current transcript required")
+                        require(Regex("[a-f0-9]{64}").matches(id))
+                        val jobs = PrototypeJobs(PrototypeHub.jobJournal(context))
+                        val identity = jobs.state(id).getJSONObject("spec").getString("recording_id")
+                        require(PrototypeHub.journal(context).record(identity)?.get("state") == "downloaded") {
+                            "Restore this recording before editing"
+                        }
+                        val edited = jobs.editTranscript(id, transcript)
+                        PrototypeHub.main.post { result.success(mapOf("version" to 1, "job_id" to edited)) }
+                    } catch (error: Exception) { PrototypeHub.main.post { result.error("JOB_FAILED", error.message, null) } }
+                }
                 "snapshot" -> snapshot(result::success) { message -> result.error("SNAPSHOT_FAILED", message, null) }
                 "discoverWatch" -> PrototypeHub.worker.post {
                     try {

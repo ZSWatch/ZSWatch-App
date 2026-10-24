@@ -22,6 +22,7 @@ class CompanionRecording {
   final bool archived;
   final bool purged;
   final bool purgePending;
+  final DateTime? deletedAt;
 
   const CompanionRecording._({
     required this.identity,
@@ -38,6 +39,7 @@ class CompanionRecording {
     required this.archived,
     required this.purged,
     required this.purgePending,
+    this.deletedAt,
   });
 
   /// This reflects the committed journal. It does not read/validate the file,
@@ -82,6 +84,7 @@ class CompanionRecording {
     final archived = value['archived'] ?? false;
     final purged = value['purged'] ?? false;
     final purgePending = value['purge_pending'] ?? false;
+    final deletedAt = value['deleted_at'];
     if ((path != null && (path is! String || !path.startsWith('/'))) ||
         (hash != null &&
             (hash is! String || !RegExp(r'^[a-f0-9]{64}$').hasMatch(hash))) ||
@@ -91,6 +94,7 @@ class CompanionRecording {
         archived is! bool ||
         purged is! bool ||
         purgePending is! bool ||
+        (deletedAt != null && deletedAt is! int) ||
         (purged && state != CompanionRecordingState.deleted) ||
         (purgePending && !purged) ||
         (state == CompanionRecordingState.downloaded &&
@@ -115,6 +119,9 @@ class CompanionRecording {
       archived: archived,
       purged: purged,
       purgePending: purgePending,
+      deletedAt: deletedAt is int
+          ? DateTime.fromMillisecondsSinceEpoch(deletedAt, isUtc: true)
+          : null,
     );
   }
 }

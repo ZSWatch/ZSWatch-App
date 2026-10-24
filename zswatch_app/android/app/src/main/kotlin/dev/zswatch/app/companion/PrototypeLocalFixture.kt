@@ -54,6 +54,7 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         require(operation in listOf("process", "transcribe", "retranscribe", "reanalyze")) { "Unknown voice operation" }
         PrototypeVoicePolicy.configuration(stt, llm, correct)
         val metadata = service.runtime!!.store.record(identity) ?: error("Unknown recording")
+        require(metadata["state"] == "downloaded") { "Restore this recording before processing" }
         val receipt = ReceiptFiles(File(context.filesDir, "companion-prototype/recordings")).recover(identity, metadata)
             ?: error("Verified recording receipt required")
         require(receipt["sha256"] == metadata["sha256"] && receipt["address"] == service.runtime!!.store.control()["address"])
@@ -272,5 +273,10 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
 
     fun cancel(id: String) {
         if (busy && activeClaim?.id == id) engine?.cancel(id)
+    }
+
+    fun cancelRecordings(identities: Set<String>) {
+        val claim = activeClaim ?: return
+        if (busy && claim.spec.getString("recording_id") in identities) engine?.cancel(claim.id)
     }
 }
