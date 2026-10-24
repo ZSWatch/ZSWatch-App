@@ -12,7 +12,7 @@ import hashlib
 class NativeRuntimeProbeTests(unittest.TestCase):
     def state(self):
         return {'version': 1, 'generation': 1, 'desired_running': True, 'phase': 'ready',
-                'notification_packages': ['com.zswatch.app'], 'notifications': {}}
+                'notification_blocked_packages': [], 'notifications': {}}
 
     def test_ready_requires_live_service_and_running_intent(self):
         services = 'ServiceRecord{abc u0 com.zswatch.app/' + COMPONENT + '}'
@@ -24,8 +24,8 @@ class NativeRuntimeProbeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             summarize(state, services, '123', 'ready')
 
-    def test_android_stringified_allowlist_is_rejected(self):
-        state = self.state(); state['notification_packages'] = '[com.zswatch.app]'
+    def test_android_stringified_blocklist_is_rejected(self):
+        state = self.state(); state['notification_blocked_packages'] = '[com.zswatch.app]'
         with self.assertRaises(ValueError):
             summarize(state, '', '')
 

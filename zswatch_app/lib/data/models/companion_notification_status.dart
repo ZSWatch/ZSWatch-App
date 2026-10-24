@@ -19,7 +19,7 @@ class CompanionNotificationStatus {
         value['access_granted'] is! bool ||
         value['listener_connected'] is! bool ||
         value['apps'] is! List ||
-        (value['apps'] as List).length > 256) {
+        (value['apps'] as List).length > 512) {
       throw const FormatException('Unsupported notification status');
     }
     final seen = <String>{};

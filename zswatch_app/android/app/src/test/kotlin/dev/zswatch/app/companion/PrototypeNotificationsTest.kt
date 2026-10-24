@@ -15,17 +15,17 @@ class PrototypeNotificationsTest {
     private fun notification(key: String = "first", body: String = "Fixture text") = mapOf<String, Any?>(
         "key" to key, "packageName" to packageName, "appName" to "ZSWatch", "title" to "Fixture", "body" to body)
 
-    @Test fun disabledAndUnlistedPackagesAreNotCollected() {
+    @Test fun disabledAndBlockedPackagesAreNotCollected() {
         val inbox = PrototypeNotifications(store())
         assertFalse(inbox.post(notification(), 0))
-        inbox.configure(true, listOf("com.example.other"))
+        inbox.configure(true, listOf(packageName))
         assertFalse(inbox.post(notification(), 0))
         assertNull(inbox.next(1, 0))
     }
 
     @Test fun writtenNotificationKeepsIdentityAcrossReopenAndReconnect() {
         val journal = store(); val inbox = PrototypeNotifications(journal)
-        inbox.configure(true, listOf(packageName)); assertTrue(inbox.post(notification(), 0))
+        inbox.configure(true, emptyList()); assertTrue(inbox.post(notification(), 0))
         val first = inbox.next(1, 0)!!; inbox.written(first, 1)
         assertFalse(first.replace)
         assertNull(inbox.next(1, 0))
@@ -38,7 +38,7 @@ class PrototypeNotificationsTest {
     }
 
     @Test fun staleWriteCannotClearUpdatedOrRemovedNotification() {
-        val inbox = PrototypeNotifications(store()); inbox.configure(true, listOf(packageName))
+        val inbox = PrototypeNotifications(store()); inbox.configure(true, emptyList())
         inbox.post(notification(), 0); val old = inbox.next(1, 0)!!
         inbox.post(notification(body = "Updated"), 1); inbox.written(old, 1)
         val update = inbox.next(1, 1)!!
@@ -52,7 +52,7 @@ class PrototypeNotificationsTest {
     }
 
     @Test fun activeSetReconciliationSurvivesListenerProcessDeath() {
-        val inbox = PrototypeNotifications(store()); inbox.configure(true, listOf(packageName))
+        val inbox = PrototypeNotifications(store()); inbox.configure(true, emptyList())
         inbox.post(notification(), 0); inbox.written(inbox.next(1, 0)!!, 1)
         val reopened = PrototypeNotifications(PrototypeStore(temporary.root))
         reopened.reconcile(emptySet())
@@ -60,7 +60,7 @@ class PrototypeNotificationsTest {
     }
 
     @Test fun expiryAndDisablingRemoveOldWatchStateWithoutReplayingText() {
-        val inbox = PrototypeNotifications(store()); inbox.configure(true, listOf(packageName))
+        val inbox = PrototypeNotifications(store()); inbox.configure(true, emptyList())
         inbox.post(notification(), 0)
         val expired = inbox.next(1, PrototypeNotifications.RETENTION_MS)!!
         assertTrue(expired.packet.contains("notify-")); assertFalse(expired.packet.contains("Fixture text"))
@@ -70,7 +70,7 @@ class PrototypeNotificationsTest {
     }
 
     @Test fun unicodeAndJsonEscapesFitFirmwareReceiveBuffer() {
-        val inbox = PrototypeNotifications(store()); inbox.configure(true, listOf(packageName))
+        val inbox = PrototypeNotifications(store()); inbox.configure(true, emptyList())
         inbox.post(notification(body = "🎙️\"\\\n".repeat(1000)), 0)
         val wire = inbox.next(1, 0)!!.packet
         assertTrue(wire.toByteArray(Charsets.UTF_8).size < 2000)
@@ -81,7 +81,7 @@ class PrototypeNotificationsTest {
 
     @Test fun offlineMaintenancePurgesTextWithoutATransport() {
         val journal = store(); val inbox = PrototypeNotifications(journal)
-        inbox.configure(true, listOf(packageName)); inbox.post(notification(), 0)
+        inbox.configure(true, emptyList()); inbox.post(notification(), 0)
         inbox.expire(PrototypeNotifications.RETENTION_MS)
         val saved = journal.control()["notifications"] as Map<*, *>
         val item = saved.values.single() as Map<*, *>
@@ -92,7 +92,7 @@ class PrototypeNotificationsTest {
 
     @Test fun listenerRestartCannotResurrectExpiredAndroidNotificationText() {
         val journal = store(); val inbox = PrototypeNotifications(journal)
-        inbox.configure(true, listOf(packageName))
+        inbox.configure(true, emptyList())
         val notice = notification() + mapOf("postedAt" to 0L)
         assertTrue(inbox.post(notice, 0))
         val expired = inbox.next(1, PrototypeNotifications.RETENTION_MS)!!
@@ -105,7 +105,7 @@ class PrototypeNotificationsTest {
     }
 
     @Test fun capacityIsBoundedAndUnknownRemovalsDoNotCreateEntries() {
-        val inbox = PrototypeNotifications(store()); inbox.configure(true, listOf(packageName))
+        val inbox = PrototypeNotifications(store()); inbox.configure(true, emptyList())
         repeat(PrototypeNotifications.CAPACITY) { assertTrue(inbox.post(notification("key$it"), 0)) }
         assertFalse(inbox.post(notification("overflow"), 0))
         assertFalse(inbox.remove("unknown"))
@@ -113,7 +113,7 @@ class PrototypeNotificationsTest {
 
     @Test fun stopClearsPendingContentAndLaterEventsCannotUndoStop() {
         val journal = store(); val inbox = PrototypeNotifications(journal)
-        inbox.configure(true, listOf(packageName)); inbox.post(notification(), 0)
+        inbox.configure(true, emptyList()); inbox.post(notification(), 0)
         val runtime = PrototypeRuntime(journal, object : PrototypeTransport {
             override fun connect(address: String, generation: Long) {}
             override fun close() {}
@@ -124,7 +124,7 @@ class PrototypeNotificationsTest {
 
     @Test fun watchDismissalUsesPersistedIdentityOnlyForItsActiveDeliverySession() {
         val journal = store(); journal.update("session", mapOf("generation" to 1L))
-        val inbox = PrototypeNotifications(journal); inbox.configure(true, listOf(packageName))
+        val inbox = PrototypeNotifications(journal); inbox.configure(true, emptyList())
         inbox.post(notification(), 0); val delivery = inbox.next(1, 0)!!
         val action = JSONObject().put("t", "notify").put("n", "DISMISS").put("id", delivery.id)
         assertTrue(inbox.dismissalKeys(action, 1, 0).isEmpty())
@@ -140,7 +140,7 @@ class PrototypeNotificationsTest {
 
     @Test fun dismissAllIsScopedToAllowedUnexpiredForwardedNoticesAndStopDisablesActions() {
         val journal = store(); journal.update("session", mapOf("generation" to 1L))
-        val inbox = PrototypeNotifications(journal); inbox.configure(true, listOf(packageName))
+        val inbox = PrototypeNotifications(journal); inbox.configure(true, emptyList())
         inbox.post(notification("first"), 0); inbox.written(inbox.next(1, 0)!!, 1)
         inbox.post(notification("second"), 0)
         val all = JSONObject("""{"t":"notify","n":"DISMISS_ALL"}""")
@@ -154,7 +154,7 @@ class PrototypeNotificationsTest {
 
     @Test fun unknownActionAndInvalidIdCannotDismissOtherAndroidNotifications() {
         val journal = store(); journal.update("session", mapOf("generation" to 1L))
-        val inbox = PrototypeNotifications(journal); inbox.configure(true, listOf(packageName))
+        val inbox = PrototypeNotifications(journal); inbox.configure(true, emptyList())
         inbox.post(notification(), 0); inbox.written(inbox.next(1, 0)!!, 1)
         for (wire in listOf(
             """{"t":"notify","n":"OPEN","id":1000000}""",

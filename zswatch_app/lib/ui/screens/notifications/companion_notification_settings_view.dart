@@ -40,7 +40,7 @@ class _CompanionNotificationSettingsViewState
     super.dispose();
   }
 
-  Future<void> update(bool enabled, Set<String> packages) async {
+  Future<void> update(bool enabled, Set<String> blocked) async {
     if (busy) return;
     setState(() {
       busy = true;
@@ -49,7 +49,7 @@ class _CompanionNotificationSettingsViewState
     try {
       final result = await ref
           .read(companionClientProvider)
-          .configureNotifications(enabled, packages.toList()..sort());
+          .configureNotifications(enabled, blocked.toList()..sort());
       if (mounted) setState(() => acceptedPolicy = result);
     } catch (failure) {
       if (mounted) {
@@ -85,7 +85,7 @@ class _CompanionNotificationSettingsViewState
     final observed = ref.watch(companionSnapshotProvider).asData?.value;
     // A command response can arrive before the shared event stream catches up.
     // Use its committed policy until that cursor is observed, so rapid edits
-    // cannot accidentally restore the previous package selection.
+    // cannot accidentally restore the previous blocked apps.
     final snapshot =
         observed != null &&
             acceptedPolicy != null &&
@@ -93,8 +93,8 @@ class _CompanionNotificationSettingsViewState
         ? acceptedPolicy
         : observed;
     final enabled = snapshot?.fields['notifications_enabled'] == true;
-    final packages =
-        ((snapshot?.fields['notification_packages'] as List?) ?? [])
+    final blocked =
+        ((snapshot?.fields['notification_blocked_packages'] as List?) ?? [])
             .cast<String>()
             .toSet();
     return Scaffold(
@@ -117,7 +117,7 @@ class _CompanionNotificationSettingsViewState
           snapshot != null,
           snapshot?.protocolReady == true,
           enabled,
-          packages,
+          blocked,
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (failure, stack) =>
@@ -131,7 +131,7 @@ class _CompanionNotificationSettingsViewState
     bool knownPolicy,
     bool ready,
     bool enabled,
-    Set<String> packages,
+    Set<String> blocked,
   ) {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -155,37 +155,38 @@ class _CompanionNotificationSettingsViewState
         SwitchListTile(
           title: const Text('Forward notifications'),
           subtitle: const Text(
-            'Forward eligible notifications from selected apps',
+            'Forward notifications from all apps except unchecked ones',
           ),
           value: enabled,
           onChanged: busy || !knownPolicy || (!access.accessGranted && !enabled)
               ? null
-              : (value) => update(value, packages),
+              : (value) => update(value, blocked),
         ),
         const SizedBox(height: 16),
-        Text('${packages.length}/64 apps selected'),
-        const Text(
-          'Apps with active notifications and saved selections appear here.',
-        ),
+        Text(switch (blocked.length) {
+          0 => 'All apps forwarded',
+          1 => '1 app blocked',
+          final count => '$count apps blocked',
+        }),
         if (error != null)
           Text(error!, style: const TextStyle(color: Colors.redAccent)),
         for (final app in access.apps)
           CheckboxListTile(
             title: Text(app.appName),
             subtitle: Text(app.packageName),
-            value: packages.contains(app.packageName),
+            value: !blocked.contains(app.packageName),
             onChanged:
                 busy ||
                     !knownPolicy ||
-                    (!packages.contains(app.packageName) &&
-                        packages.length >= 64)
+                    (!blocked.contains(app.packageName) &&
+                        blocked.length >= 256)
                 ? null
                 : (value) {
-                    final next = {...packages};
+                    final next = {...blocked};
                     if (value == true) {
-                      next.add(app.packageName);
-                    } else {
                       next.remove(app.packageName);
+                    } else {
+                      next.add(app.packageName);
                     }
                     update(enabled, next);
                   },

@@ -60,9 +60,9 @@ def summarize(state, services, pid, expected=None):
         raise ValueError('Unsupported native state')
     if type(state.get('generation')) is not int or state['generation'] < 0:
         raise ValueError('Invalid generation')
-    packages = state.get('notification_packages', [])
+    blocked = state.get('notification_blocked_packages', [])
     notices = state.get('notifications', {})
-    if not isinstance(packages, list) or not all(isinstance(x, str) for x in packages):
+    if not isinstance(blocked, list) or not all(isinstance(x, str) for x in blocked):
         raise ValueError('Notification packages must be a JSON array, not a string')
     if not isinstance(notices, dict) or len(notices) > 64:
         raise ValueError('Invalid bounded notification journal')
@@ -109,7 +109,7 @@ def summarize(state, services, pid, expected=None):
         'pid': pid.strip(), 'service_present': active, 'protocol_ready': ready,
         'generation': state['generation'], 'phase': state.get('phase'),
         'desired_running': state['desired_running'], 'notification_count': len(notices),
-        'notification_packages': packages, 'recording_sync_enabled': state.get('recording_sync_enabled'),
+        'notification_blocked_packages': blocked, 'recording_sync_enabled': state.get('recording_sync_enabled'),
         'last_time_write_utc_ms': state.get('last_time_write_utc_ms'),
         'last_notification_write_utc_ms': state.get('last_notification_write_utc_ms'),
         'watch_status_observed_utc_ms': observed_status,

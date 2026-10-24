@@ -119,14 +119,16 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
             get() = instance?.prototypeConnected == true
 
         /** App metadata only: no notice keys/text/icons cross the core bridge. */
-        fun getPrototypeNotificationApps(context: android.content.Context, selected: List<String>): List<Map<String, String>> {
+        fun getPrototypeNotificationApps(context: android.content.Context, blocked: List<String>): List<Map<String, String>> {
             val active = instance?.takeIf { it.prototypeConnected }?.activeNotifications?.map { it.packageName } ?: emptyList()
-            return (selected + context.packageName + active).distinct()
-                .filter { Regex("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+").matches(it) }.take(256).map { name ->
+            val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            val installed = context.packageManager.queryIntentActivities(launcher, 0).map { it.activityInfo.packageName }
+            return (blocked + active + installed).distinct()
+                .filter { it != context.packageName && Regex("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+").matches(it) }.take(512).map { name ->
                 val label = try { context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(name, 0)).toString() }
                     catch (_: PackageManager.NameNotFoundException) { name }
                 mapOf("packageName" to name, "appName" to label.take(160))
-            }.sortedBy { it["appName"] }
+            }.sortedBy { it["appName"]!!.lowercase() }
         }
         
         // Check if notification access is enabled

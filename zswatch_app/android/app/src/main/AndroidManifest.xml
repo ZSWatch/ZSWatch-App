@@ -138,6 +138,11 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Lists installed apps in the notification settings -->
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent>
         <!-- Required for url_launcher to open URLs in browser -->
         <intent>
             <action android:name="android.intent.action.VIEW"/>

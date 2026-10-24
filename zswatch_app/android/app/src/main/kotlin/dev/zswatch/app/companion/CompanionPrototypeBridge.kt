@@ -243,12 +243,12 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                 }
                 "notificationStatus" -> PrototypeHub.worker.post {
                     try {
-                        val selected = (PrototypeHub.journal(context).control()["notification_packages"] as? List<*>)
+                        val blocked = (PrototypeHub.journal(context).control()[PrototypeNotifications.BLOCKED] as? List<*>)
                             ?.filterIsInstance<String>() ?: emptyList()
                         val state = mapOf("version" to 1,
                             "access_granted" to dev.zswatch.app.NotificationListenerServiceImpl.isNotificationAccessEnabled(context),
                             "listener_connected" to dev.zswatch.app.NotificationListenerServiceImpl.isPrototypeConnected,
-                            "apps" to dev.zswatch.app.NotificationListenerServiceImpl.getPrototypeNotificationApps(context, selected))
+                            "apps" to dev.zswatch.app.NotificationListenerServiceImpl.getPrototypeNotificationApps(context, blocked))
                         PrototypeHub.main.post { result.success(state) }
                     } catch (error: Exception) {
                         PrototypeHub.main.post { result.error("NOTIFICATION_STATUS_FAILED", error.message, null) }
@@ -514,11 +514,11 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                                 }
                                 "configureNotifications" -> {
                                     val enabled = call.argument<Boolean>("enabled") ?: error("Enabled required")
-                                    val packages = call.argument<List<String>>("packages") ?: error("Packages required")
+                                    val blocked = call.argument<List<String>>("blockedPackages") ?: error("Blocked packages required")
                                     if (enabled) check(dev.zswatch.app.NotificationListenerServiceImpl.isNotificationAccessEnabled(context)) {
                                         "Grant notification access before enabling forwarding"
                                     }
-                                    PrototypeNotifications(store).configure(enabled, packages)
+                                    PrototypeNotifications(store).configure(enabled, blocked)
                                     service?.transport?.flushNotifications()
                                     if (enabled) PrototypeHub.main.post { dev.zswatch.app.NotificationListenerServiceImpl.replayPrototypeNotifications() }
                                 }

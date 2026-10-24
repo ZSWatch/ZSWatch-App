@@ -57,7 +57,7 @@ Map<String, Object?> snapshot({bool active = false, bool ready = false}) => {
   'recordings': <String, Object?>{},
   'recording_sync_enabled': false,
   'notifications_enabled': true,
-  'notification_packages': ['com.zswatch.app'],
+  'notification_blocked_packages': <String>[],
   // The default models are already saved, so the app has nothing to apply.
   'voice_processing_policy': {
     'enabled': false,
