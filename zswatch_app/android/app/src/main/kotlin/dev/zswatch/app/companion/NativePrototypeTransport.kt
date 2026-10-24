@@ -1079,6 +1079,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     private fun recoverReceipts() {
         for ((key, metadata) in records()) {
+            // Never turn a phone-side deletion back into a sync candidate.
+            if (metadata["state"] == "deleted") continue
             val recovered = files.recover(key, metadata)
             if (recovered != null) {
                 if (metadata["state"] != "downloaded" || metadata["sha256"] != recovered["sha256"]) store.putRecord(key, recovered)

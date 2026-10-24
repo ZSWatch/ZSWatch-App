@@ -301,6 +301,84 @@ class PrototypeJobs(private val store: PrototypeStore) {
         }
     }
 
+    private fun recordingJobs(jobs: JSONObject, identities: Set<String>) = jobs.keys().asSequence().toList()
+        .filter { jobs.getJSONObject(it).getJSONObject("spec").getString("recording_id") in identities }
+
+    /** Fence work for removed recordings; results and action receipts stay for restore/undo. */
+    fun cancelRecordings(identities: Set<String>) {
+        val jobs = jobs(); val outbox = outbox()
+        val matched = recordingJobs(jobs, identities)
+        if (matched.isEmpty()) return
+        for (id in matched) {
+            val item = jobs.getJSONObject(id)
+            if (item.getString("state") in listOf("ready", "waiting_remote", "blocked", "result_ready")) cancelItem(id, item, outbox)
+            else item.put("fence", item.getLong("fence") + 1).put("lease_until", JSONObject.NULL)
+        }
+        commit("voice_recordings_removed", jobs, outbox)
+    }
+
+    fun purgeRecordings(identities: Set<String>) {
+        val jobs = jobs(); val outbox = outbox()
+        val matched = recordingJobs(jobs, identities).toSet()
+        if (matched.isEmpty()) return
+        matched.forEach(jobs::remove)
+        for (resultId in outbox.keys().asSequence().toList()) {
+            if (outbox.getJSONObject(resultId).getString("job_id") in matched) outbox.remove(resultId)
+        }
+        commit("voice_recordings_purged", jobs, outbox)
+    }
+
+    /** A saved edit becomes the selected revision; earlier revisions stay listed. */
+    fun editTranscript(id: String, transcript: String): String {
+        val jobs = jobs(); val outbox = outbox()
+        val original = jobs.getJSONObject(id)
+        val text = original.optJSONObject("result")?.opt("transcript") as? String ?: original.opt("transcript") as? String
+        require(original.optBoolean("selected") && text != null && transcript.isNotBlank() &&
+            transcript.toByteArray(Charsets.UTF_8).size <= 64000) { "Current saved transcript required (maximum 64 KB)" }
+        val spec = original.getJSONObject("spec")
+        val identity = spec.getString("recording_id")
+        val prior = recordingJobs(jobs, setOf(identity))
+        val edited = JSONObject(spec.toString()).put("pipeline_revision", "transcript-edit-v1")
+            .put("generation", prior.maxOf { jobs.getJSONObject(it).getJSONObject("spec").getLong("generation") } + 1)
+        val editedId = key(edited)
+        pruneSuperseded(jobs, outbox, edited)
+        require(jobs.length() < TOTAL_LIMIT) { "Job capacity reached" }
+        for (priorId in prior) {
+            val item = jobs.optJSONObject(priorId) ?: continue
+            item.put("selected", false)
+            if (item.getString("state") in listOf("ready", "waiting_remote", "blocked", "result_ready")) cancelItem(priorId, item, outbox)
+            else item.put("fence", item.getLong("fence") + 1).put("lease_until", JSONObject.NULL)
+        }
+        jobs.put(editedId, JSONObject().put("spec", edited).put("state", "transcribed").put("selected", true)
+            .put("remote_id", JSONObject.NULL).put("fence", 0L).put("lease_until", JSONObject.NULL)
+            .put("attempts", 0).put("next_attempt", 0L).put("last_error", JSONObject.NULL)
+            .put("transcript", transcript).put("result", JSONObject().put("version", 1).put("transcript", transcript)
+                .put("summary", "").put("category", "").put("actions", JSONArray())))
+        commit("voice_transcript_edited", jobs, outbox)
+        return editedId
+    }
+
+    fun search(query: String): Set<String> {
+        val jobs = jobs()
+        val matches = mutableSetOf<String>()
+        for (id in jobs.keys()) {
+            val item = jobs.getJSONObject(id)
+            if (!item.optBoolean("selected")) continue
+            val result = item.optJSONObject("result")
+            val texts = mutableListOf(item.optString("transcript"), result?.optString("transcript").orEmpty(),
+                result?.optString("summary").orEmpty())
+            val actions = result?.optJSONArray("actions")
+            for (index in 0 until (actions?.length() ?: 0)) {
+                val action = actions!!.optJSONObject(index) ?: continue
+                for (key in action.keys()) (action.get(key) as? String)?.let(texts::add)
+            }
+            if (texts.any { it.contains(query, ignoreCase = true) }) {
+                matches += item.getJSONObject("spec").getString("recording_id")
+            }
+        }
+        return matches
+    }
+
     /** A new key or top-up: queue every job that waited for it. */
     fun unblockCloud(): Boolean {
         val ids = identities().filter { id -> state(id).let {
@@ -368,7 +446,13 @@ class PrototypeJobs(private val store: PrototypeStore) {
     fun summary(): List<Map<String, Any?>> = identities().map { id ->
         val item = state(id)
         val spec = item.getJSONObject("spec")
-        mapOf("job_id" to id, "state" to item.getString("state"), "remote_id" to item.optString("remote_id", ""),
+        val result = item.optJSONObject("result")
+        val actions = result?.optJSONArray("actions")
+        val types = (0 until (actions?.length() ?: 0)).mapNotNull { actions!!.optJSONObject(it)?.opt("type") as? String }
+        val states = item.optJSONObject("action_states")
+        val resolved = states?.keys()?.asSequence()?.count { states.optJSONObject(it)?.optString("state") in RESOLVED_ACTION_STATES } ?: 0
+        (if (result == null) emptyMap<String, Any?>() else mapOf("category" to result.optString("category"), "action_types" to types)) +
+        mapOf("job_id" to id, "state" to item.getString("state"), "actions_resolved" to resolved, "remote_id" to item.optString("remote_id", ""),
             "selected" to item.optBoolean("selected"),
             "watch_id" to spec.getString("watch_id"), "recording_id" to spec.getString("recording_id"),
             "provider" to spec.getString("provider"), "model" to spec.getString("model"),
@@ -384,6 +468,8 @@ class PrototypeJobs(private val store: PrototypeStore) {
 
     companion object {
         private val ACTIVE = listOf("ready", "waiting_remote", "blocked")
+        /** The user acted on these; "creating" and "undoing" are still in progress. */
+        private val RESOLVED_ACTION_STATES = listOf("created", "dispatched", "dismissed", "undone")
         /** Backends the shared Dart worker executes; openrouter jobs upload with consent. */
         val DART_BACKENDS = listOf("local", "openrouter")
         private const val ACTIVE_LIMIT = 100

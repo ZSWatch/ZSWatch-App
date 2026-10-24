@@ -34,6 +34,8 @@ final class CompanionVoiceJobs {
     try journal.update(event, ["jobs": next, "voice_jobs": Self.summary(next)])
     jobs = next
   }
+  /// The user acted on these; "creating" and "undoing" are still in progress.
+  static let resolvedActionStates: Set<String> = ["created", "dispatched", "dismissed", "undone"]
   static func summary(_ jobs: [String: [String: Any]]) -> [[String: Any]] {
     jobs.sorted(by: { $0.key < $1.key }).compactMap { id, item in
       guard let spec = item["spec"] as? [String: Any] else { return nil }
@@ -44,6 +46,8 @@ final class CompanionVoiceJobs {
         result["category"] = body["category"] ?? ""
         result["action_types"] = (body["actions"] as? [[String: Any]] ?? []).compactMap { $0["type"] as? String }
       }
+      result["actions_resolved"] = (item["action_states"] as? [String: [String: Any]] ?? [:]).values
+        .filter { Self.resolvedActionStates.contains($0["state"] as? String ?? "") }.count
       for key in ["attempts", "deferred_attempts", "next_attempt", "last_error", "action_revision", "undo_until"] { result[key] = item[key] ?? NSNull() }
       result["undone"] = item["undone"] as? Bool ?? false; result["auto_created"] = item["auto_created"] as? Bool ?? false
       return result

@@ -11,11 +11,13 @@ class CompanionVoiceBatchButton extends ConsumerStatefulWidget {
   final String operation;
   final String label;
   final Set<String>? identities;
+  final VoidCallback? onQueued;
   const CompanionVoiceBatchButton({
     super.key,
     required this.operation,
     required this.label,
     this.identities,
+    this.onQueued,
   });
 
   @override
@@ -114,6 +116,7 @@ class _BatchState extends ConsumerState<CompanionVoiceBatchButton> {
     } finally {
       if (mounted) setState(() => busy = false);
     }
+    if (mounted) widget.onQueued?.call();
   }
 
   @override

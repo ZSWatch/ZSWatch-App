@@ -206,13 +206,13 @@ final class CompanionPhoneUITests: XCTestCase {
     /// Exactly one recording must match so destructive actions hit only it.
     private func singleRecording() throws -> XCUIElement {
         let row = try searchRecordings(try Config.required("ZSW_RECORDING"))
-        try require(app.buttons.matching(identifier: "Transcription actions").count == 1,
+        try require(app.buttons.matching(identifier: "Recording actions").count == 1,
                     "ZSW_RECORDING must match exactly one recording", capture: "recording-not-unique")
         return row
     }
 
     private func recordingAction(_ action: String) throws {
-        try tap(app.buttons["Transcription actions"], "Transcription actions")
+        try tap(app.buttons["Recording actions"], "Recording actions")
         try tap(exact(action), action)
     }
 
@@ -541,25 +541,25 @@ final class CompanionPhoneUITests: XCTestCase {
         try home()
     }
 
-    /// Archive, unarchive, delete from phone, restore from Recently deleted.
+    /// Mark done, mark not done, delete from phone, restore from Recently deleted.
     /// State: ends where it started; touches only the `ZSW_RECORDING` match.
     func testRecordingArchiveDeleteRestore() throws {
         let row = try singleRecording()
-        try recordingAction("Archive")
-        try require(row.waitForNonExistence(timeout: 10), "Archived recording still in All")
-        try tap(exact("Archived"), "Archived filter")
-        try require(row.waitForExistence(timeout: 10), "Recording not in Archived")
-        try recordingAction("Unarchive")
-        try tap(exact("All"), "All filter")
-        try require(row.waitForExistence(timeout: 10), "Recording not back in All")
-        try recordingAction("Delete from phone")
+        try recordingAction("Mark done")
+        try require(row.waitForNonExistence(timeout: 10), "Done recording still in Inbox")
+        try tap(exact("Done"), "Done filter")
+        try require(row.waitForExistence(timeout: 10), "Recording not in Done")
+        try recordingAction("Mark not done")
+        try tap(exact("Inbox"), "Inbox filter")
+        try require(row.waitForExistence(timeout: 10), "Recording not back in Inbox")
+        try recordingAction("Delete")
         try tap(app.buttons["Delete from phone"], "delete confirmation")
         try require(row.waitForNonExistence(timeout: 10), "Deleted recording still listed")
-        try tap(exact("Recently deleted"), "Recently deleted filter")
+        try tap(exact("Deleted"), "Deleted filter")
         try require(row.waitForExistence(timeout: 10) && app.buttons.matching(identifier: "Restore").count == 1,
                     "Expected only this recording in Recently deleted", capture: "recently-deleted")
         app.buttons["Restore"].tap()
-        try tap(exact("All"), "All filter")
+        try tap(exact("Inbox"), "Inbox filter")
         try require(row.waitForExistence(timeout: 10), "Restored recording missing")
         try home()
     }
@@ -596,10 +596,10 @@ final class CompanionPhoneUITests: XCTestCase {
 
     // MARK: - Transcription, analysis, models
 
-    /// Transcribe only on `ZSW_RECORDING`. State: saves a new transcript revision.
+    /// Transcribe on `ZSW_RECORDING`. State: saves a new transcript revision.
     func testTranscribeRecording() throws {
         _ = try singleRecording()
-        try recordingAction("Transcribe only")
+        try recordingAction("Transcribe")
         try tap(app.buttons["Transcribe"], "Transcribe confirmation")
         try require(containing("Transcribed").waitForExistence(timeout: 300), "Transcription not saved", capture: "transcribe")
         screenshot("transcribed")
@@ -609,7 +609,7 @@ final class CompanionPhoneUITests: XCTestCase {
     /// or a reviewable action. State: sends the analysis result to the watch.
     func testAnalyzeTranscript() throws {
         _ = try singleRecording()
-        try recordingAction("Re-analyze transcript")
+        try recordingAction("Analyze again")
         try tap(app.buttons["Process"], "Process confirmation")
         let result = any("label CONTAINS %@ OR label BEGINSWITH %@", "Accepted by watch", "Review & create")
         try require(result.waitForExistence(timeout: 300), "No analysis result", capture: "analysis")

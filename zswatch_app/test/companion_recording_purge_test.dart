@@ -73,7 +73,7 @@ void main() {
             return state.fields;
           });
       await mount(tester, state);
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Recently deleted'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Deleted'));
       await tester.pumpAndSettle();
       expect(find.text('gone'), findsNothing);
       expect(find.text('Restore'), findsOneWidget);

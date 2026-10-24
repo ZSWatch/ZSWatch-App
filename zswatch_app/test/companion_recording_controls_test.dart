@@ -24,8 +24,9 @@ Map<String, Object?> receipt(
   String name, {
   bool archived = false,
   String state = 'downloaded',
+  String address = watch,
 }) => {
-  'address': watch,
+  'address': address,
   'filename': name,
   'timestamp': 1000,
   'size_bytes': 100,
@@ -35,20 +36,24 @@ Map<String, Object?> receipt(
   'local_path': '/private/$name.zsw_opus',
   'archived': archived,
 };
-String identity(String name) => '$watch:$name:1000:100:1000';
-CompanionPrototypeSnapshot snapshot(Map<String, Object?> records) =>
-    CompanionPrototypeSnapshot.decode({
-      'version': 1,
-      'owner': 'ios_companion_native',
-      'address': watch,
-      'runtime_active': false,
-      'protocol_ready': false,
-      'generation': 1,
-      'event_cursor': 1,
-      'phase': 'stopped',
-      'events': <Object?>[],
-      'recordings': records,
-    });
+String identity(String name, [String address = watch]) =>
+    '$address:$name:1000:100:1000';
+CompanionPrototypeSnapshot snapshot(
+  Map<String, Object?> records, {
+  String owner = 'ios_companion_native',
+  String address = watch,
+}) => CompanionPrototypeSnapshot.decode({
+  'version': 1,
+  'owner': owner,
+  'address': address,
+  'runtime_active': false,
+  'protocol_ready': false,
+  'generation': 1,
+  'event_cursor': 1,
+  'phase': 'stopped',
+  'events': <Object?>[],
+  'recordings': records,
+});
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -119,11 +124,11 @@ void main() {
       await tester.enterText(find.byType(TextField), '');
       await tester.pump(const Duration(milliseconds: 210));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Archived'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Done'));
       await tester.pumpAndSettle();
       expect(find.text('old'), findsOneWidget);
       expect(find.text('speech'), findsNothing);
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Recently deleted'));
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Deleted'));
       await tester.pumpAndSettle();
       expect(find.text('deleted'), findsOneWidget);
       expect(find.text('Restore'), findsOneWidget);
@@ -145,14 +150,16 @@ void main() {
             return state.fields;
           });
       await mount(tester, state);
-      await tester.tap(find.byTooltip('Select recordings'));
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Select recordings'));
       await tester.pumpAndSettle();
       final row = find.byKey(ValueKey(identity('one')));
       await tester.tap(
         find.descendant(of: row, matching: find.byType(Checkbox)),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Delete selected'));
+      await tester.tap(find.byTooltip('Delete selected'));
       await tester.pumpAndSettle();
       expect(calls, isEmpty);
       await tester.tap(find.text('Delete from phone'));
@@ -160,6 +167,69 @@ void main() {
       expect(calls.map((call) => call.method), ['removeRecordings']);
       expect((calls.single.arguments as Map)['identities'], [identity('one')]);
       expect(find.text('1 selected'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Android selects all and empties Recently deleted in one confirmed purge',
+    (tester) async {
+      const android = 'AA:BB:CC:DD:EE:FF';
+      final state = snapshot(
+        {
+          identity('one', android): receipt('one', address: android),
+          identity('two', android): receipt('two', address: android),
+          identity('gone', android): receipt(
+            'gone',
+            state: 'deleted',
+            address: android,
+          ),
+          identity('also', android): receipt(
+            'also',
+            state: 'deleted',
+            address: android,
+          ),
+        },
+        owner: 'android_service_native',
+        address: android,
+      );
+      final calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            calls.add(call);
+            return state.fields;
+          });
+      await mount(tester, state);
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Select recordings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Select all'));
+      await tester.pumpAndSettle();
+      expect(find.text('2 selected'), findsOneWidget);
+      await tester.tap(find.byTooltip('Delete selected'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete from phone'));
+      await tester.pumpAndSettle();
+      expect(calls.map((call) => call.method), ['removeRecordings']);
+      expect(((calls.single.arguments as Map)['identities'] as List).toSet(), {
+        identity('one', android),
+        identity('two', android),
+      });
+      calls.clear();
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Deleted'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete all permanently'));
+      await tester.pumpAndSettle();
+      expect(calls, isEmpty);
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Delete all permanently'),
+      );
+      await tester.pumpAndSettle();
+      expect(calls.map((call) => call.method), ['purgeRecordings']);
+      expect(((calls.single.arguments as Map)['identities'] as List).toSet(), {
+        identity('gone', android),
+        identity('also', android),
+      });
     },
   );
 
@@ -289,7 +359,9 @@ void main() {
           return state.fields;
         });
     await mount(tester, state);
-    await tester.tap(find.text('Retry failed downloads'));
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('More options'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Pause downloads'));
     await tester.pumpAndSettle();
@@ -312,6 +384,8 @@ void main() {
             return state.fields;
           });
       await mount(tester, state);
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Pause downloads'));
       await tester.pumpAndSettle();
       expect(calls.map((call) => call.method), ['setRecordingSync']);

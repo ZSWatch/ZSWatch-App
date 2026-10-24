@@ -39,7 +39,7 @@ class PreparedVoiceMemoFile {
 /// Complete stages carry a receipt manifest for conservative startup recovery.
 class VoiceMemoFileStore {
   static final Set<String> _activeStages = {};
-  static Future<void> _tail = Future.value();
+  static Future<void>? _tail;
 
   static bool isActiveStage(String path) => _activeStages.contains(path);
 
@@ -48,13 +48,16 @@ class VoiceMemoFileStore {
   static Future<T> exclusive<T>(Future<T> Function() operation) {
     final previous = _tail;
     final released = Completer<void>();
-    _tail = released.future;
+    final mine = released.future;
+    _tail = mine;
     return () async {
-      await previous;
+      if (previous != null) await previous;
       try {
         return await operation();
       } finally {
         released.complete();
+        // An idle queue keeps no future from an earlier zone.
+        if (identical(_tail, mine)) _tail = null;
       }
     }();
   }

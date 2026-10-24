@@ -53,6 +53,9 @@ object PrototypeHub {
         catch (error: Exception) { state + mapOf("remote_jobs_error" to error.javaClass.simpleName) }
     }
 
+    fun library(context: Context) = PrototypeRecordingLibrary(journal(context),
+        ReceiptFiles(File(context.filesDir, "companion-prototype/recordings"))) { PrototypeJobs(jobJournal(context)) }
+
     fun journal(context: Context): PrototypeStore {
         check(Looper.myLooper() == worker.looper)
         return store ?: PrototypeStore(File(context.filesDir, "companion-prototype")).also { created ->
