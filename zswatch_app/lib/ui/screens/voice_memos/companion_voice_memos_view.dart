@@ -1084,7 +1084,9 @@ class _CompanionVoiceMemosViewState
                 _notice(
                   Icons.info_outline,
                   'Deleted recordings are removed from this phone after 30 days. Watch originals remain.',
-                  action: items.isEmpty ? null : 'Delete all permanently',
+                  action: items.isEmpty || query.isNotEmpty
+                      ? null
+                      : 'Delete all permanently',
                   onPressed: modifying
                       ? null
                       : () => purgeAll(

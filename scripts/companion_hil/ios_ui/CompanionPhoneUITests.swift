@@ -545,8 +545,8 @@ final class CompanionPhoneUITests: XCTestCase {
     /// State: ends where it started; touches only the `ZSW_RECORDING` match.
     func testRecordingArchiveDeleteRestore() throws {
         let row = try singleRecording()
+        // Search keeps finished notes visible in Inbox, so check the Done filter.
         try recordingAction("Mark done")
-        try require(row.waitForNonExistence(timeout: 10), "Done recording still in Inbox")
         try tap(exact("Done"), "Done filter")
         try require(row.waitForExistence(timeout: 10), "Recording not in Done")
         try recordingAction("Mark not done")

@@ -199,10 +199,21 @@ final class CompanionVoiceJobs {
       next[id]?["lease_until"] = NSNull()
       // Retain completed results and action receipts for Recently deleted/undo.
       if ["ready", "blocked", "result_ready"].contains(item["state"] as? String ?? "") {
+        // Restore brings back a result still waiting for the watch.
+        if item["state"] as? String == "result_ready" { next[id]?["removed_from"] = "result_ready" }
         next[id]?["state"] = "cancelled"
       }
     }
     try commit("voice_recordings_removed", next)
+  }
+  func restoreRecordings(_ identities: Set<String>) throws {
+    var next = jobs
+    var changed = false
+    for (id, item) in jobs where identities.contains((item["spec"] as? [String: Any])?["recording_id"] as? String ?? "") {
+      guard let state = item["removed_from"] as? String else { continue }
+      next[id]?["state"] = state; next[id]?.removeValue(forKey: "removed_from"); changed = true
+    }
+    if changed { try commit("voice_recordings_restored", next) }
   }
   func purgeRecordings(_ identities: Set<String>) throws {
     let next = jobs.filter { !identities.contains(($0.value["spec"] as? [String: Any])?["recording_id"] as? String ?? "") }

@@ -82,6 +82,9 @@ final class IOSVoiceCoordinator {
   func removeRecordings(_ identities: Set<String>) throws {
     try jobs.cancelRecordings(identities); fenceObsoleteWorker(); owner?.journalChanged()
   }
+  func restoreRecordings(_ identities: Set<String>) throws {
+    try jobs.restoreRecordings(identities); owner?.journalChanged(); advance()
+  }
   func purgeRecordings(_ identities: Set<String>) throws {
     try jobs.purgeRecordings(identities); fenceObsoleteWorker(); owner?.journalChanged()
   }
