@@ -13,19 +13,16 @@ import CoreLocation
     let fields = try JSONSerialization.jsonObject(with: Data(packet.dropFirst(3).dropLast().utf8)) as! [String: Any]
     precondition(fields["speed"] as? Double == 7.2, "Preserve existing watch km/h mapping")
     precondition(fields["hdop"] as? Double == 10 && fields["gpsSource"] as? String == "phone")
-    precondition(CompanionLocationPacket.encode(fix(age: 31), now: now) == nil, "Cached fixes expire")
+    precondition(CompanionLocationPacket.encode(fix(age: 1801), now: now) == nil, "Cached fixes expire")
     precondition(CompanionLocationPacket.encode(fix(age: -10), now: now) == nil, "Future clock skew is rejected")
     precondition(CompanionLocationPacket.encode(fix(accuracy: -1), now: now) == nil, "Invalid precision is rejected")
-    precondition(CompanionLocationPacket.encode(fix(accuracy: 1001), now: now) == nil, "Coarse fixes cannot masquerade as precise GPS")
+    precondition(CompanionLocationPacket.encode(fix(accuracy: 50001), now: now) == nil, "Unusable accuracy is rejected")
     precondition(CompanionLocationPacket.encode(fix(latitude: 91), now: now) == nil, "Invalid coordinates are rejected")
-    precondition(CompanionLocationPacket.encode(fix(age: 600, accuracy: 5000), now: now, weather: true) != nil,
-      "Weather accepts a recent approximate cached fix")
-    precondition(CompanionLocationPacket.encode(fix(accuracy: 50001), now: now, weather: true) == nil,
-      "Weather still requires bounded approximate accuracy")
-    precondition(CompanionLocationPacket.encode(fix(age: 1801), now: now, weather: true) == nil,
-      "Weather still rejects locations older than 30 minutes")
-    precondition(CompanionLocationPacket.encode(fix(age: 600, accuracy: 5000), now: now) == nil,
-      "Weather policy must not relax live GPS")
+    let cached = fix(age: 600, accuracy: 5000)
+    let cachedPacket = CompanionLocationPacket.encode(cached, now: now)!
+    let cachedFields = try JSONSerialization.jsonObject(with: Data(cachedPacket.dropFirst(3).dropLast().utf8)) as! [String: Any]
+    precondition(cachedFields["time"] as? Int == Int(cached.timestamp.timeIntervalSince1970 * 1000),
+      "Cached approximate fixes retain their original timestamp")
     print("PASS: GPS age/precision/coordinate bounds and existing units")
   }
 }

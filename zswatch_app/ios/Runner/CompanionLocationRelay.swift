@@ -5,10 +5,10 @@ import UIKit
 #endif
 
 struct CompanionLocationPacket {
-  static func encode(_ fix: CLLocation, now: Date = Date(), weather: Bool = false) -> String? {
+  static func encode(_ fix: CLLocation, now: Date = Date()) -> String? {
     let age = now.timeIntervalSince(fix.timestamp)
-    guard age >= -1, age <= (weather ? 1800 : 30), fix.horizontalAccuracy >= 0,
-          fix.horizontalAccuracy <= (weather ? 50000 : 1000),
+    guard age >= -1, age <= 1800, fix.horizontalAccuracy >= 0,
+          fix.horizontalAccuracy <= 50000,
           CLLocationCoordinate2DIsValid(fix.coordinate), fix.coordinate.latitude.isFinite,
           fix.coordinate.longitude.isFinite else { return nil }
     var fields: [String: Any] = ["t": "gps", "lat": fix.coordinate.latitude,
@@ -32,7 +32,6 @@ final class CompanionLocationRelay: NSObject, CLLocationManagerDelegate {
   private var watchToken = UUID()
   private var requested = false
   private var lastWrite: Date?
-  private var weather = false
   private let send: (Int, UUID, CLLocation, @escaping () -> Void) -> Void
   private let observe: (Int, UUID, String, Bool) -> Void
   init(send: @escaping (Int, UUID, CLLocation, @escaping () -> Void) -> Void,
@@ -42,9 +41,9 @@ final class CompanionLocationRelay: NSObject, CLLocationManagerDelegate {
     return ["foreground": auth == .authorizedAlways || auth == .authorizedWhenInUse,
             "background": auth == .authorizedAlways, "services": CLLocationManager.locationServicesEnabled()]
   }
-  func request(_ generation: Int, token: UUID, wanted: Bool, enabled: Bool, weather: Bool = false) {
+  func request(_ generation: Int, token: UUID, wanted: Bool, enabled: Bool) {
     DispatchQueue.main.async {
-      self.stopOnMain(); self.generation = generation; self.watchToken = token; self.weather = weather
+      self.stopOnMain(); self.generation = generation; self.watchToken = token
       guard wanted, enabled else { self.observe(generation, self.watchToken, enabled ? "idle" : "disabled", false); return }
       let permissions = Self.permissions
       guard permissions["foreground"] == true,
@@ -63,7 +62,7 @@ final class CompanionLocationRelay: NSObject, CLLocationManagerDelegate {
       self.requested = true; let token = self.token
       self.observe(generation, self.watchToken, "acquiring", true)
       manager.startUpdatingLocation()
-      if weather, let cached = manager.location {
+      if let cached = manager.location {
         self.locationManager(manager, didUpdateLocations: [cached])
       }
       DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
@@ -86,7 +85,7 @@ final class CompanionLocationRelay: NSObject, CLLocationManagerDelegate {
     manager?.stopUpdatingLocation(); manager?.allowsBackgroundLocationUpdates = false
   }
   func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-    guard requested, let fix = locations.last, CompanionLocationPacket.encode(fix, weather: weather) != nil,
+    guard requested, let fix = locations.last, CompanionLocationPacket.encode(fix) != nil,
           lastWrite == nil || Date().timeIntervalSince(lastWrite!) >= 5 else { return }
     lastWrite = Date(); let token = self.token; let generation = self.generation
     send(generation, watchToken, fix) {

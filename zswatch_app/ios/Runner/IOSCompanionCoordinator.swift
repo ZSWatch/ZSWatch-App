@@ -19,15 +19,14 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   private var smpOwner: IOSCompanionSmp?
   lazy var firmware = IOSCompanionFirmware(owner: self)
   private var gpsRequested = false
-  private var gpsWeatherRequest = false
   private var gpsToken = UUID()
   private lazy var gps = CompanionLocationRelay(
     send: { [weak self] generation, token, fix, done in
       self?.queue.async {
         guard let self, self.gpsToken == token, self.gpsRequested, self.isReadySession(generation), self.journal.fields["gps_enabled"] as? Bool == true,
-              let packet = CompanionLocationPacket.encode(fix, weather: self.gpsWeatherRequest) else { return }
+              let packet = CompanionLocationPacket.encode(fix) else { return }
         try? self.send(packet, admission: { self.gpsToken == token && self.gpsRequested && self.isReadySession(generation) &&
-          self.journal.fields["gps_enabled"] as? Bool == true && CompanionLocationPacket.encode(fix, weather: self.gpsWeatherRequest) != nil }, done: done)
+          self.journal.fields["gps_enabled"] as? Bool == true && CompanionLocationPacket.encode(fix) != nil }, done: done)
       }
     },
     observe: { [weak self] generation, token, state, requested in
@@ -792,8 +791,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     guard phase == "ready", journal.desired, let type = value["t"] as? String else { return }
     if type == "gps_power", let wanted = value["status"] as? Bool {
       gpsRequested = wanted; gpsToken = UUID()
-      gpsWeatherRequest = value["purpose"] as? String == "weather"
-      gps.request(journal.generation, token: gpsToken, wanted: wanted, enabled: journal.fields["gps_enabled"] as? Bool == true, weather: gpsWeatherRequest)
+      gps.request(journal.generation, token: gpsToken, wanted: wanted, enabled: journal.fields["gps_enabled"] as? Bool == true)
       return
     }
     if http.receive(value, generation: journal.generation) { return }
