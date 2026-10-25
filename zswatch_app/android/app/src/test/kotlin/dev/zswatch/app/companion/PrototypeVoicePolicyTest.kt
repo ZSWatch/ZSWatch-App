@@ -68,6 +68,14 @@ class PrototypeVoicePolicyTest {
         assertNull(PrototypeVoicePolicy.recordingRequest(policy, "watch-b", "20261022_103603"))
         assertNotNull(PrototypeVoicePolicy.recordingRequest(policy, "watch-b", "chat_20261022_103603"))
     }
+    @Test fun dictatedRepliesAreAlwaysProcessedAndReachTheWatch() {
+        val policy = PrototypeVoicePolicy.configuration("kbWhisperBase", "openrouter:m", false, analyze = false) +
+            mapOf("watch_id" to "watch-a", "enabled" to false)
+        val request = PrototypeVoicePolicy.recordingRequest(policy, "watch-b", "reply_20261025_001710")!!
+        // Not transcription only, that result would stay on the phone.
+        assertEquals(true, request["analysis_enabled"])
+        assertFalse(PrototypeVoicePolicy.isReply("20261025_001710"))
+    }
 
     @Test(expected = IllegalArgumentException::class)
     fun rejectsAmbiguousModelEncoding() {

@@ -1,6 +1,8 @@
 package dev.zswatch.app
 
 import android.app.Notification
+import android.app.PendingIntent
+import android.app.RemoteInput
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -9,6 +11,7 @@ import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.os.Build
+import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Base64
@@ -190,6 +193,42 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         }
 
         /** Native companion action; never cancel an ongoing/foreground notice. */
+        /** The action that takes a typed reply, preferring one marked as Reply. Wear actions are
+         *  included, some messaging apps only offer replies there. */
+        @Suppress("DEPRECATION")
+        fun replyAction(notification: Notification): Notification.Action? {
+            val actions = (notification.actions?.toList() ?: emptyList()) +
+                Notification.WearableExtender(notification).actions
+            val replies = actions.filter { action -> action.remoteInputs?.any { it.allowFreeFormInput } == true }
+            return replies.firstOrNull {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && it.semanticAction == Notification.Action.SEMANTIC_ACTION_REPLY
+            } ?: replies.firstOrNull()
+        }
+
+        /** Replies to an active notification through its reply action.
+         *  Returns null when sent, otherwise a short reason for the watch. Never logs the text. */
+        fun replyToPrototypeNotification(key: String, text: String): String? {
+            val listener = instance ?: return "Notification access is off on the phone"
+            val notice = listener.activeNotifications?.firstOrNull { it.key == key }
+                ?: return "The message is gone from the phone"
+            val action = replyAction(notice.notification) ?: return "The app does not take replies"
+            val inputs = action.remoteInputs
+            val results = Bundle()
+            for (input in inputs) if (input.allowFreeFormInput) results.putCharSequence(input.resultKey, text)
+            val intent = Intent().addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            RemoteInput.addResultsToIntent(inputs, intent, results)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                RemoteInput.setResultsSource(intent, RemoteInput.SOURCE_FREE_FORM_INPUT)
+            }
+            return try {
+                action.actionIntent.send(listener, 0, intent)
+                LifecycleLogger.log(TAG, "prototype_reply_sent")
+                null
+            } catch (error: PendingIntent.CanceledException) {
+                "The app no longer takes this reply"
+            }
+        }
+
         fun dismissPrototypeNotifications(keys: List<String>): Int {
             val listener = instance ?: return 0
             val requested = keys.toSet()
@@ -497,9 +536,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         val category = notification.category
         
         // Check for reply action
-        val hasReplyAction = notification.actions?.any { action ->
-            action.remoteInputs?.isNotEmpty() == true
-        } ?: false
+        val hasReplyAction = replyAction(notification) != null
         
         // Check if it's a group summary
         val isGroupSummary = (notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0

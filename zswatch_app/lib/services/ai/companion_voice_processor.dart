@@ -9,6 +9,7 @@ import '../voice_memo/transcription_engine.dart';
 import '../voice_memo/verified_companion_recording.dart';
 import '../voice_memo/ogg_opus_writer.dart';
 import 'companion_chat_processor.dart';
+import 'companion_reply_processor.dart';
 import 'llm_service.dart';
 import 'openrouter_client.dart';
 import 'voice_note_ai_pipeline.dart';
@@ -96,6 +97,26 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
       );
     } finally {
       chatClient?.close();
+    }
+  }
+  if (isReplyRecording(recording.filename)) {
+    // Without a key the draft explains what to set up.
+    final replyClient = cloudStt && key is String && key.isNotEmpty
+        ? (cloudFactory ?? OpenRouterClient.new)(key)
+        : null;
+    try {
+      return await transcribeCompanionReply(
+        recording: recording,
+        sttModel: models[0],
+        client: replyClient,
+        support: Directory(
+          await (await getApplicationSupportDirectory()).resolveSymbolicLinks(),
+        ),
+        saveTranscript: saveTranscript,
+        control: control,
+      );
+    } finally {
+      replyClient?.close();
     }
   }
   OpenRouterClient? client;

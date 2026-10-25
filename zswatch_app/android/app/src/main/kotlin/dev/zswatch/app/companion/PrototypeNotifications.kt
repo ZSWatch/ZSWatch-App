@@ -5,6 +5,8 @@ import org.json.JSONObject
 /** Bounded desired notification state. Write completion is not a watch ACK. */
 class PrototypeNotifications(private val store: PrototypeStore) {
     data class Delivery(val key: String, val id: Long, val revision: Long, val packet: String, val replace: Boolean = false)
+    /** A reply the watch asked to send. [key] is null when the notification is no longer on the watch. */
+    data class Reply(val id: Long, val key: String?, val text: String)
 
     @Suppress("UNCHECKED_CAST")
     private fun entries() = JSONObject(store.control()["notifications"] as? Map<String, Any?> ?: emptyMap<String, Any?>())
@@ -45,6 +47,8 @@ class PrototypeNotifications(private val store: PrototypeStore) {
             .put("title", bounded(data["title"] as? String ?: "", 160))
             .put("body", bounded(data["body"] as? String ?: "", 450))
         (data["sender"] as? String)?.let { packet.put("sender", bounded(it, 160)) }
+        // The watch offers a dictated reply. Gadgetbridge firmware ignores the field.
+        if (data["canReply"] == true) packet.put("reply", true)
         val wire = "GB($packet)"
         require(wire.toByteArray(Charsets.UTF_8).size <= 2000)
         if (old != null && !old.optBoolean("removed") && old.getString("packet") == wire) return false
@@ -85,6 +89,24 @@ class PrototypeNotifications(private val store: PrototypeStore) {
                 item.getString("package") !in blocked && item.optLong("delivered_generation", -1) == generation &&
                 (action == "DISMISS_ALL" || item.getLong("id") == (id as Number).toLong())
         }.toList()
+    }
+
+    /** A watch REPLY for a notification sent on this active session, like [dismissalKeys]. */
+    fun reply(message: JSONObject, generation: Long, now: Long): Reply? {
+        val state = store.control()
+        if (message.optString("t") != "notify" || message.optString("n") != "REPLY" || state["desired_running"] != true ||
+            state["notifications_enabled"] != true || (state["generation"] as Number).toLong() != generation) return null
+        val id = message.opt("id")
+        val text = message.opt("msg")
+        if ((id !is Int && id !is Long) || text !is String || text.isBlank() || text.length > MAX_REPLY_LENGTH) return null
+        val packages = state["notification_packages"] as? List<*> ?: emptyList<Any>()
+        val notices = entries()
+        val key = notices.keys().asSequence().firstOrNull { key ->
+            val item = notices.getJSONObject(key)
+            !item.optBoolean("removed") && item.getLong("expires_ms") > now && item.getString("package") in packages &&
+                item.optLong("delivered_generation", -1) == generation && item.getLong("id") == (id as Number).toLong()
+        }
+        return Reply((id as Number).toLong(), key, text.trim())
     }
 
     /** The listener's active set is authoritative after its process is recreated. */
@@ -150,6 +172,8 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         const val MAX_BLOCKED = 256
         const val BLOCKED = "notification_blocked_packages"
         const val RETENTION_MS = 10 * 60 * 1000L
+        /** The watch keeps at most 511 bytes of a reply. */
+        const val MAX_REPLY_LENGTH = 512
         /** Limit UTF-8 bytes without splitting a code point; JSON controls become spaces. */
         private fun bounded(value: String, budget: Int): String {
             val text = StringBuilder()

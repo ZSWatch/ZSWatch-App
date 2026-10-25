@@ -152,6 +152,37 @@ class PrototypeNotificationsTest {
         assertTrue(inbox.dismissalKeys(all, 1, 0).isEmpty())
     }
 
+    @Test fun replyableNotificationsAreMarkedForTheWatch() {
+        val inbox = PrototypeNotifications(store()); inbox.configure(true, listOf(packageName))
+        inbox.post(notification("first") + mapOf("canReply" to true), 0)
+        inbox.post(notification("second"), 0)
+        val first = JSONObject(inbox.next(1, 0)!!.also { inbox.written(it, 1) }.packet.removePrefix("GB(").removeSuffix(")"))
+        val second = JSONObject(inbox.next(1, 0)!!.packet.removePrefix("GB(").removeSuffix(")"))
+        assertTrue(first.getBoolean("reply"))
+        assertFalse(second.has("reply"))
+    }
+
+    @Test fun watchReplyFindsOnlyANotificationSentOnThisSession() {
+        val journal = store(); journal.update("session", mapOf("generation" to 1L))
+        val inbox = PrototypeNotifications(journal); inbox.configure(true, listOf(packageName))
+        inbox.post(notification() + mapOf("canReply" to true), 0)
+        val delivery = inbox.next(1, 0)!!
+        fun reply(id: Any, msg: Any = " Ja gärna! ") =
+            JSONObject().put("t", "notify").put("n", "REPLY").put("id", id).put("msg", msg)
+        // Not yet on the watch, so there is nothing to reply to.
+        assertNull(inbox.reply(reply(delivery.id), 1, 0)!!.key)
+        inbox.written(delivery, 1)
+        val found = inbox.reply(reply(delivery.id), 1, 0)!!
+        assertEquals("first", found.key); assertEquals(delivery.id, found.id); assertEquals("Ja gärna!", found.text)
+        assertNull(inbox.reply(reply(delivery.id), 1, PrototypeNotifications.RETENTION_MS)!!.key)
+        assertNull(inbox.reply(reply(999), 1, 0)!!.key)
+        assertNull(inbox.reply(reply(delivery.id), 2, 0))
+        assertNull(inbox.reply(reply(delivery.id, "  "), 1, 0))
+        assertNull(inbox.reply(reply(delivery.id, "x".repeat(PrototypeNotifications.MAX_REPLY_LENGTH + 1)), 1, 0))
+        assertNull(inbox.reply(reply("1000000"), 1, 0))
+        assertNull(inbox.reply(JSONObject().put("t", "notify").put("n", "DISMISS").put("id", delivery.id), 1, 0))
+    }
+
     @Test fun unknownActionAndInvalidIdCannotDismissOtherAndroidNotifications() {
         val journal = store(); journal.update("session", mapOf("generation" to 1L))
         val inbox = PrototypeNotifications(journal); inbox.configure(true, emptyList())

@@ -1056,6 +1056,21 @@ class NativePrototypeTransport(private val context: Context, private val handler
                     LifecycleLogger.log("CompanionNotifications", "dismiss_failed ${error.javaClass.simpleName}")
                 }
             }
+            PrototypeNotifications(store).reply(message, token, System.currentTimeMillis())?.let { reply ->
+                val error = reply.key?.let { key ->
+                    try {
+                        dev.zswatch.app.NotificationListenerServiceImpl.replyToPrototypeNotification(key, reply.text)
+                    } catch (error: Exception) {
+                        LifecycleLogger.log("CompanionNotifications", "reply_failed ${error.javaClass.simpleName}")
+                        "Could not send the reply"
+                    }
+                } ?: "The message is gone from the phone"
+                store.update("watch_notification_reply_requested", detail = mapOf("sent" to (error == null)))
+                // The watch shows whether the app took the reply.
+                val status = JSONObject().put("t", "notify_reply").put("id", reply.id).put("ok", error == null)
+                error?.let { status.put("err", it) }
+                if (store.control()["phase"] == "ready") command("GB($status)")
+            }
             if (store.control()["phase"] == "ready") httpRelay.receive(message, token)
             if (store.control()["phase"] == "ready") mediaControl(message, token)
             if (store.control()["phase"] == "ready") gpsRequest(message, token)

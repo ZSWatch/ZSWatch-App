@@ -14,9 +14,12 @@ object PrototypeVoicePolicy {
     /** The watch's Chat questions are always answered, even with memo processing off. */
     fun isQuestion(filename: String) = filename.startsWith("chat_") || filename.startsWith("chatr_")
 
+    /** A dictated notification reply is always transcribed, the user waits for it on the watch. */
+    fun isReply(filename: String) = filename.startsWith("reply_")
+
     fun recordingRequest(policy: Any?, watchId: String, filename: String = ""): Map<String, Any>? {
         val value = policy as? Map<*, *> ?: return null
-        val question = isQuestion(filename)
+        val question = isQuestion(filename) || isReply(filename)
         // Questions use the last saved models, also ones saved for another watch.
         if (!question && (value["enabled"] != true || value["watch_id"] != watchId)) return null
         return configuration(value["transcription_model"] as String, value["analysis_model"] as String,
