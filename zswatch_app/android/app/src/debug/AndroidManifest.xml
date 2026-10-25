@@ -3,6 +3,8 @@
     <application>
         <service android:name=".companion.CompanionMediaFixtureService"
             android:exported="false" android:foregroundServiceType="mediaPlayback" />
+        <!-- Exported so adb can post the fixture; debug builds only. -->
+        <receiver android:name=".companion.CompanionReplyFixtureReceiver" android:exported="true" />
     </application>
     <instrumentation android:name="dev.zswatch.app.companion.CompanionTransferProbe"
         android:targetPackage="com.zswatch.app" android:label="ZSWatch transfer probe" />
