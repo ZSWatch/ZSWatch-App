@@ -98,6 +98,8 @@ void main() {
   final nativeJobDetails = <String, Map<String, Object?>>{};
   final forbidden = <String>[];
   late Map<String, Object?> saved;
+  Iterable<MethodCall> commands() =>
+      calls.where((call) => call.method != 'permissionStatus');
   var permissionRequests = 0;
   var denyPermission = false;
   var hasCloudKey = false;
@@ -420,7 +422,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: route);
       }
-      expect(calls, isEmpty);
+      expect(commands(), isEmpty);
       expect(metadataWrites, isEmpty);
       expect(forbidden, isEmpty);
       await scope.read(demoModeControllerProvider).set(false);
@@ -709,7 +711,7 @@ void main() {
         isTrue,
       );
       expect(forbidden, isEmpty);
-      expect(calls, isEmpty);
+      expect(commands(), isEmpty);
       expect(subscriptions.where((kind) => kind == 'listen'), hasLength(1));
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
@@ -978,7 +980,7 @@ void main() {
       await tester.tap(find.text('Log Viewer'));
       await tester.pumpAndSettle();
       expect(logSubscriptions, ['listen']);
-      expect(calls, isEmpty);
+      expect(commands(), isEmpty);
 
       Future<void> logEvent(Map<String, Object?> event) async {
         await messenger.handlePlatformMessage(
@@ -1000,8 +1002,8 @@ void main() {
       });
       await tester.tap(find.byType(Switch));
       await tester.pumpAndSettle();
-      expect(calls.single.method, 'setLogStreaming');
-      expect(calls.single.arguments, {'version': 1, 'enabled': true});
+      expect(commands().single.method, 'setLogStreaming');
+      expect(commands().single.arguments, {'version': 1, 'enabled': true});
       await logEvent({
         'kind': 'state',
         'requested': true,
@@ -1032,7 +1034,7 @@ void main() {
       router(tester).pop();
       await tester.pumpAndSettle();
       expect(logSubscriptions, ['listen', 'cancel']);
-      expect(calls.map((call) => call.method), ['setLogStreaming']);
+      expect(commands().map((call) => call.method), ['setLogStreaming']);
       expect(find.text('Developer Tools'), findsOneWidget);
     },
   );
@@ -1053,11 +1055,11 @@ void main() {
         metadataWrites.single.readyAt.millisecondsSinceEpoch,
         1700000000000,
       );
-      expect(calls, isEmpty);
+      expect(commands(), isEmpty);
       expect(permissionRequests, 0);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
-      expect(calls, isEmpty);
+      expect(commands(), isEmpty);
     },
   );
 
@@ -1066,7 +1068,7 @@ void main() {
     (tester) async {
       await mount(tester, snapshot());
       expect(find.text('Watch disconnected'), findsOneWidget);
-      expect(calls, isEmpty);
+      expect(commands(), isEmpty);
       expect(permissionRequests, 0);
       final routes = router(tester);
       routes.go(AppRoutes.settings);
@@ -1089,10 +1091,11 @@ void main() {
         tester.binding.handleAppLifecycleStateChanged(state);
       }
       await tester.pumpAndSettle();
-      expect(calls.map((c) => c.method), [
-        'permissionStatus',
-        'notificationStatus',
-      ]);
+      expect(commands().map((c) => c.method), ['notificationStatus']);
+      expect(
+        calls.where((call) => call.method == 'permissionStatus'),
+        hasLength(2),
+      );
       expect(subscriptions, ['listen']);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
@@ -1245,8 +1248,8 @@ void main() {
       await tester.tap(find.text('Connect'));
       await tester.pumpAndSettle();
       expect(permissionRequests, 1);
-      expect(calls.single.method, 'start');
-      expect(calls.single.arguments, {
+      expect(commands().single.method, 'start');
+      expect(commands().single.arguments, {
         'version': 1,
         'address': 'AA:BB:CC:DD:EE:FF',
       });
@@ -1280,7 +1283,7 @@ void main() {
       await mount(tester, snapshot());
       await tester.tap(find.text('Connect'));
       await tester.pumpAndSettle();
-      expect(calls, isEmpty);
+      expect(commands(), isEmpty);
       expect(permissionRequests, 1);
       expect(
         find.text('Could not change the watch connection'),
@@ -1300,7 +1303,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Add Watch'), findsOneWidget);
       expect(find.text('Find watch'), findsOneWidget);
-      expect(calls, isEmpty);
+      expect(commands(), isEmpty);
       expect(permissionRequests, 0);
       expect(forbidden, isEmpty);
       await tester.pumpWidget(const SizedBox());
@@ -1331,7 +1334,7 @@ void main() {
       expect(find.text('Available Releases'), findsOneWidget);
       expect(find.text('Select .zip or .bin file'), findsOneWidget);
       expect(forbidden, isEmpty);
-      expect(calls, isEmpty);
+      expect(commands(), isEmpty);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
     },
@@ -1350,7 +1353,7 @@ void main() {
         findsOneWidget,
       );
     }
-    expect(calls, isEmpty);
+    expect(commands(), isEmpty);
     routes.go(AppRoutes.home);
     await tester.pumpAndSettle();
     expect(find.byType(DashboardScreen), findsOneWidget);
@@ -1367,7 +1370,7 @@ void main() {
       expect(find.byType(DashboardScreen), findsNothing);
       await tester.tap(find.text('Cancel connection'));
       await tester.pump();
-      expect(calls.single.method, 'stop');
+      expect(commands().single.method, 'stop');
       await messenger.handlePlatformMessage(
         events.name,
         const StandardMethodCodec().encodeErrorEnvelope(

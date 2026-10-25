@@ -5,6 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../data/models/companion_gps_status.dart';
 import '../../../providers/companion_runtime_providers.dart';
+import '../../../providers/companion_permission_setup_providers.dart';
 import '../../../services/background/companion_prototype_client.dart';
 import 'location_permission_guidance.dart';
 
@@ -54,8 +55,8 @@ class _CompanionGpsSettingsTileState
         await ref.read(companionGpsPermissionsProvider)();
       }
       final snapshot = await ref
-          .read(companionClientProvider)
-          .configureGps(enabled);
+          .read(companionGpsSetupProvider)
+          .configure(enabled);
       if (mounted) setState(() => accepted = snapshot);
     } catch (_) {
       if (mounted) {

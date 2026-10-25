@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zswatch_app/providers/companion_permission_setup_providers.dart';
+import 'package:zswatch_app/providers/settings_providers.dart';
 import 'package:zswatch_app/data/models/companion_gps_status.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/gps_providers.dart';
@@ -30,7 +33,101 @@ void main() {
   const channel = MethodChannel('dev.zswatch.app/companion_v1');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+  test(
+    'location consent enables sharing once and preserves a later off choice',
+    () async {
+      final prefs = await SharedPreferences.getInstance();
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return fields(enabled: (call.arguments as Map?)?['enabled'] == true);
+      });
+      CompanionGpsSetup setup() => CompanionGpsSetup(
+        const CompanionPrototypeClient(),
+        () async => prefs,
+      );
+      final owner = setup();
+      await owner.enableDefaultIfGranted({
+        'location': true,
+        'background_location': false,
+      });
+      expect(calls, isEmpty);
+      const granted = {'location': true, 'background_location': true};
+      await Future.wait([
+        owner.enableDefaultIfGranted(granted),
+        owner.enableDefaultIfGranted(granted),
+      ]);
+      expect(calls.map((call) => call.method), ['snapshot', 'configureGps']);
+      expect((calls.last.arguments as Map)['enabled'], true);
+      await owner.configure(false);
+      expect((calls.last.arguments as Map)['enabled'], false);
+      // A new owner represents restarting the app with permission still granted.
+      await setup().enableDefaultIfGranted(granted);
+      expect(
+        calls.where((call) => call.method == 'configureGps'),
+        hasLength(2),
+      );
+      expect(prefs.getBool(SettingsKeys.watchLocationDefaultApplied), true);
+    },
+  );
+
+  test(
+    'explicit off during a permission refresh wins over the default',
+    () async {
+      final prefs = await SharedPreferences.getInstance();
+      final snapshot = Completer<Map<String, Object?>>();
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        if (call.method == 'snapshot') return snapshot.future;
+        return fields();
+      });
+      final owner = CompanionGpsSetup(
+        const CompanionPrototypeClient(),
+        () async => prefs,
+      );
+      final pending = owner.enableDefaultIfGranted({
+        'location': true,
+        'background_location': true,
+      });
+      await Future<void>.delayed(Duration.zero);
+      await owner.configure(false);
+      snapshot.complete(fields());
+      await pending;
+      expect(
+        calls.where((call) => call.method == 'configureGps'),
+        hasLength(1),
+      );
+      expect((calls.last.arguments as Map)['enabled'], false);
+    },
+  );
+
+  test('failed permission default remains retryable', () async {
+    final prefs = await SharedPreferences.getInstance();
+    var attempts = 0;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'configureGps' && ++attempts == 1) {
+        throw PlatformException(code: 'LOCATION_SERVICES_OFF');
+      }
+      return fields(enabled: call.method == 'configureGps');
+    });
+    final owner = CompanionGpsSetup(
+      const CompanionPrototypeClient(),
+      () async => prefs,
+    );
+    const granted = {'location': true, 'background_location': true};
+    await expectLater(
+      owner.enableDefaultIfGranted(granted),
+      throwsA(isA<PlatformException>()),
+    );
+    expect(prefs.getBool(SettingsKeys.watchLocationDefaultApplied), isNull);
+    await owner.enableDefaultIfGranted(granted);
+    expect(attempts, 2);
+    expect(prefs.getBool(SettingsKeys.watchLocationDefaultApplied), true);
+  });
 
   test(
     'old journals default to sharing off; stale active state is not live',

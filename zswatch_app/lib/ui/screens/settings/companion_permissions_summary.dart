@@ -5,13 +5,11 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/companion_runtime_providers.dart';
+import '../../../providers/companion_permission_setup_providers.dart';
 import 'location_permission_guidance.dart';
 
-final companionPermissionsStatusProvider = FutureProvider.autoDispose((ref) {
-  return ref.watch(companionClientProvider).permissionStatus();
-});
-
-/// Read-only on entry; permission prompts happen only after an explicit tap.
+/// Permission prompts happen only after an explicit tap. Granted location
+/// consent activates sharing once, while preserving later switch choices.
 class CompanionPermissionsSummary extends ConsumerStatefulWidget {
   const CompanionPermissionsSummary({
     super.key,
