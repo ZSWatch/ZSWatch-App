@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../data/models/companion_gps_status.dart';
 import '../../../providers/companion_runtime_providers.dart';
 import '../../../services/background/companion_prototype_client.dart';
+import 'location_permission_guidance.dart';
 
 class CompanionGpsSettingsTile extends ConsumerStatefulWidget {
   const CompanionGpsSettingsTile({super.key});
@@ -48,29 +49,7 @@ class _CompanionGpsSettingsTileState
     });
     try {
       if (enabled) {
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Share location with your watch?'),
-            content: Text(
-              defaultTargetPlatform == TargetPlatform.iOS
-                  ? 'Share phone location for watch weather and GPS. Allow Always for requests while the app is in the background, and enable Precise Location. You can turn sharing off here.'
-                  : 'Allow your watch to request phone location for weather and other location features, '
-                        'including when this app is closed. In Android permissions, allow location all the time. '
-                        'You can turn sharing off here whenever you want.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Continue'),
-              ),
-            ],
-          ),
-        );
+        final confirmed = await showLocationPermissionGuidance(context);
         if (confirmed != true) return;
         await ref.read(companionGpsPermissionsProvider)();
       }
