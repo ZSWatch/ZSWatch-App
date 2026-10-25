@@ -469,10 +469,12 @@ void main() {
     await tester.ensureVisible(find.text('App Permissions'));
     await tester.tap(find.text('App Permissions'));
     await tester.pumpAndSettle();
-    expect(find.text('3 of 6 granted'), findsOneWidget);
+    expect(find.text('2 of 5 granted'), findsOneWidget);
     expect(find.text('Bluetooth connection'), findsOneWidget);
     expect(find.text('Notification access'), findsOneWidget);
-    expect(find.text('Background location'), findsOneWidget);
+    expect(find.text('Background location'), findsNothing);
+    expect(find.text('Location'), findsOneWidget);
+    expect(find.textContaining('While using app only'), findsOneWidget);
     expect(find.text('Battery optimization'), findsOneWidget);
     expect(permissionRequests, 0);
     expect(calls.where((c) => c.method == 'permissionStatus'), isNotEmpty);

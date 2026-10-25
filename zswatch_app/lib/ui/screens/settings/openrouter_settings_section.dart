@@ -241,8 +241,9 @@ class _KeyEntryState extends ConsumerState<_KeyEntry> {
     });
     try {
       await ref.read(openRouterKeyProvider.notifier).save(_controller.text);
-      _controller.clear();
+      if (mounted) _controller.clear();
     } on OpenRouterFailure catch (e) {
+      if (!mounted) return;
       setState(
         () => _error = switch (e.kind) {
           OpenRouterFailureKind.auth => 'OpenRouter rejected this key.',
@@ -252,7 +253,7 @@ class _KeyEntryState extends ConsumerState<_KeyEntry> {
         },
       );
     } on Object catch (e) {
-      setState(() => _error = 'Could not save the key: $e');
+      if (mounted) setState(() => _error = 'Could not save the key: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -270,7 +271,9 @@ class _KeyEntryState extends ConsumerState<_KeyEntry> {
         children: [
           const Text(
             'Create a key on openrouter.ai and paste it here. Give it a '
-            'credit limit, e.g. \$5, so a bug can never spend more.',
+            'credit limit, e.g. \$5, so a bug can never spend more. '
+            'Saving enables automatic transcription and analysis for new recordings. '
+            'You can turn either option off below.',
           ),
           TextButton.icon(
             onPressed: () =>

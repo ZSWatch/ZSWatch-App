@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../providers/companion_runtime_providers.dart';
+import 'location_permission_guidance.dart';
 
 final companionPermissionsStatusProvider = FutureProvider.autoDispose((ref) {
   return ref.watch(companionClientProvider).permissionStatus();
@@ -53,7 +55,13 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open permission settings: $error')),
+          SnackBar(
+            content: Text('Permission setup incomplete. $error'),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () => openAppSettings(),
+            ),
+          ),
         );
       }
     } finally {
@@ -77,7 +85,8 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
         '${status[key] == true ? 'Granted' : 'Not granted'} · $description',
       ),
       trailing: Icon(
-        status[key] == true ? Icons.check_circle_outline : Icons.open_in_new,
+        status[key] == true ? Icons.check_circle : Icons.open_in_new,
+        color: status[key] == true ? AppTheme.successColor : null,
       ),
       onTap: busy ? null : () => request(action),
     );
@@ -96,7 +105,7 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
             subtitle: Text(
               isIos
                   ? 'Bluetooth, notifications and location'
-                  : '${status.values.where((v) => v).length} of ${status.length} granted',
+                  : '${['bluetooth', 'notifications', 'notification_access', 'background_location', 'battery_exemption'].where((key) => status[key] == true).length} of 5 granted',
             ),
             children: [
               permission(
@@ -132,20 +141,17 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
                 ),
               permission(
                 status,
-                'location',
-                'Location',
-                'Location for watch weather and GPS',
-                () async {
-                  final result = await Permission.locationWhenInUse.request();
-                  if (!result.isGranted) await openAppSettings();
-                },
-              ),
-              permission(
-                status,
                 'background_location',
-                'Background location',
-                'Location while the app is in the background',
+                'Location',
+                status['background_location'] == true
+                    ? 'Weather and GPS, including while the app is closed'
+                    : status['location'] == true
+                    ? 'While using app only · Choose ${isIos ? 'Always' : 'Allow all the time'} for background weather and GPS'
+                    : 'Weather and GPS · Requires ${isIos ? 'Always' : 'Allow all the time'} access',
                 () async {
+                  if (await showLocationPermissionGuidance(context) != true) {
+                    return;
+                  }
                   await ref.read(companionGpsPermissionsProvider)();
                 },
               ),

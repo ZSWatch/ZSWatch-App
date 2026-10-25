@@ -82,6 +82,13 @@ final voiceModelConfigProvider = Provider<VoiceModelConfig>((ref) {
   );
 });
 
+/// HTTP client factory, also used when verifying a newly entered key.
+final openRouterClientFactoryProvider =
+    Provider<OpenRouterClient Function(String)>(
+      (ref) =>
+          (key) => OpenRouterClient(key),
+    );
+
 /// The key stored by the native owner; null when none is set.
 final openRouterKeyProvider =
     StateNotifierProvider<OpenRouterKeyNotifier, AsyncValue<String?>>(
@@ -101,15 +108,39 @@ class OpenRouterKeyNotifier extends StateNotifier<AsyncValue<String?>> {
   }
 
   /// Validates [key] with OpenRouter before storing it. Throws
-  /// [OpenRouterFailure] when OpenRouter rejects it.
+  /// [OpenRouterFailure] when OpenRouter rejects it. Explicitly saving a key
+  /// opts into cloud transcription and analysis; loading a stored key does not
+  /// change the user's switches.
   Future<OpenRouterKeyInfo> save(String key) async {
     final trimmed = key.trim();
-    final client = OpenRouterClient(trimmed);
+    final client = _ref.read(openRouterClientFactoryProvider)(trimmed);
     try {
       final info = await client.keyInfo();
-      await _ref.read(companionClientProvider).setCloudCredential(trimmed);
+      final owner = _ref.read(companionClientProvider);
+      await owner.setCloudCredential(trimmed);
+      // Read the native owner directly: onboarding can run before any watch or
+      // snapshot stream has been selected.
+      try {
+        final snapshot = await owner.snapshot();
+        await _ref.read(sharedPreferencesProvider.future);
+        await owner.configureVoiceProcessing(
+          watchId: snapshot.watch?.id ?? '',
+          enabled: true,
+          transcriptionModel:
+              openRouterModelPrefix + _ref.read(openRouterSttModelProvider),
+          analysisModel:
+              openRouterModelPrefix +
+              _ref.read(openRouterAnalysisModelProvider),
+          correctTranscription: false,
+          analyze: true,
+        );
+      } on Object {
+        throw StateError(
+          'The key was stored, but automatic voice processing could not be enabled. '
+          'Save the key again to retry.',
+        );
+      }
       state = AsyncValue.data(trimmed);
-      _ref.invalidate(openRouterKeyInfoProvider);
       return info;
     } finally {
       client.close();
