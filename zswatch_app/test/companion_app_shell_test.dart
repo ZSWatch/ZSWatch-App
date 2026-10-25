@@ -1177,7 +1177,7 @@ void main() {
       final routes = router(tester);
       unawaited(routes.push(AppRoutes.settings));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Watch connection'));
+      await tester.tap(find.text('Manage watches'));
       await tester.pumpAndSettle();
       expect(find.text('Saved watches'), findsOneWidget);
       expect(find.text('Disconnect'), findsOneWidget);
@@ -1192,7 +1192,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Settings'), findsOneWidget);
       expect(calls.every((c) => c.method == 'permissionStatus'), isTrue);
-      await tester.tap(find.text('Watch connection'));
+      await tester.tap(find.text('Manage watches'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Disconnect'));
       await tester.pumpAndSettle();
