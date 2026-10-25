@@ -56,10 +56,13 @@ final class IOSVoiceCoordinator {
     }
   }
   func configure(_ args: [String: Any]) throws {
-    guard let watch = args["watch_id"] as? String, UUID(uuidString: watch)?.uuidString == watch,
+    guard let watch = args["watch_id"] as? String,
           let enabled = args["enabled"] as? Bool, let stt = args["transcription_model"] as? String,
           let llm = args["analysis_model"] as? String, let correct = args["correct_transcription"] as? Bool,
-          let owner else { throw CompanionFailure.invalid("Voice policy required") }
+          let owner,
+          (watch.isEmpty ? owner.journal.address.isEmpty :
+            (UUID(uuidString: watch)?.uuidString == watch && watch == owner.journal.address))
+    else { throw CompanionFailure.invalid("Voice policy required") }
     let analyze = args["analysis_enabled"] as? Bool != false && CompanionVoiceJobs.isCloud(llm)
     var config = try CompanionVoiceJobs.configuration(stt, llm, correct, analyze: analyze)
     config["watch_id"] = watch; config["enabled"] = enabled

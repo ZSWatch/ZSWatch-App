@@ -15,6 +15,31 @@ class PrototypeNotificationsTest {
     private fun notification(key: String = "first", body: String = "Fixture text") = mapOf<String, Any?>(
         "key" to key, "packageName" to packageName, "appName" to "ZSWatch", "title" to "Fixture", "body" to body)
 
+    @Test fun accessGrantEnablesForwardingOnceAndPreservesAnExplicitOffChoice() {
+        val journal = store()
+        val inbox = PrototypeNotifications(journal)
+        assertFalse(journal.control().containsKey("notifications_enabled"))
+        inbox.accessGranted()
+        assertEquals(true, journal.control()["notifications_enabled"])
+        assertTrue(inbox.post(notification(), 0))
+        inbox.configure(false, listOf(packageName))
+        val reopened = PrototypeStore(temporary.root)
+        PrototypeNotifications(reopened).accessGranted()
+        assertEquals(false, reopened.control()["notifications_enabled"])
+        assertEquals(listOf(packageName), reopened.control()[PrototypeNotifications.BLOCKED])
+    }
+
+    @Test fun accessGrantPreservesBlockedAppsAndDoesNotCollectBeforeWatchConnection() {
+        val journal = store()
+        journal.update("setup", mapOf("desired_running" to false,
+            PrototypeNotifications.BLOCKED to listOf(packageName)))
+        val inbox = PrototypeNotifications(journal)
+        inbox.accessGranted()
+        assertEquals(true, journal.control()["notifications_enabled"])
+        assertEquals(listOf(packageName), journal.control()[PrototypeNotifications.BLOCKED])
+        assertFalse(inbox.post(notification(), 0))
+    }
+
     @Test fun disabledAndBlockedPackagesAreNotCollected() {
         val inbox = PrototypeNotifications(store())
         assertFalse(inbox.post(notification(), 0))

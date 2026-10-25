@@ -30,11 +30,14 @@ final companionVoicePolicySyncProvider = Provider<void>((ref) {
   if (watch == null ||
       snapshot?.fields['desired_running'] != true ||
       // Leave automatic processing of another watch alone.
-      (enabled && policy?['watch_id'] != watch.id)) {
+      (enabled &&
+          policy?['watch_id'] != '' &&
+          policy?['watch_id'] != watch.id)) {
     return;
   }
   final config = ref.watch(voiceModelConfigProvider);
   if (policy != null &&
+      policy['watch_id'] == watch.id &&
       policy['transcription_model'] == config.transcriptionModel &&
       policy['analysis_model'] == config.analysisModel &&
       policy['correct_transcription'] == config.correctTranscription) {

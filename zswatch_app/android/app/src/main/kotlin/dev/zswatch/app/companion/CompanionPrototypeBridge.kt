@@ -101,9 +101,8 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         val args = call.arguments as Map<*, *>
                         val store = PrototypeHub.journal(context)
                         val watch = args["watch_id"] as String
-                        require(watch == store.control()["address"] && Regex("[0-9A-F]{2}(:[0-9A-F]{2}){5}").matches(watch))
+                        require(PrototypeVoicePolicy.validTarget(watch, store.control()["address"] as? String))
                         val enabled = args["enabled"] as Boolean
-                        if (enabled) check(store.control()["desired_running"] == true) { "Connect the watch first" }
                         val config = PrototypeVoicePolicy.configuration(args["transcription_model"] as String,
                             args["analysis_model"] as String, args["correct_transcription"] as Boolean,
                             args["analysis_enabled"] != false)

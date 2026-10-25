@@ -342,6 +342,7 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
         prototypeConnected = true
         Log.d(TAG, "NotificationListenerService connected")
         LifecycleLogger.log(TAG, "onListenerConnected activeNotifications=${activeNotifications?.size ?: 0}")
+        dev.zswatch.app.companion.PrototypeNotificationRouter.connected(applicationContext)
         replayPrototypeNotifications()
     }
     
