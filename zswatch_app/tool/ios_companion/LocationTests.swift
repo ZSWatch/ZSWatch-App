@@ -18,6 +18,14 @@ import CoreLocation
     precondition(CompanionLocationPacket.encode(fix(accuracy: -1), now: now) == nil, "Invalid precision is rejected")
     precondition(CompanionLocationPacket.encode(fix(accuracy: 1001), now: now) == nil, "Coarse fixes cannot masquerade as precise GPS")
     precondition(CompanionLocationPacket.encode(fix(latitude: 91), now: now) == nil, "Invalid coordinates are rejected")
+    precondition(CompanionLocationPacket.encode(fix(age: 600, accuracy: 5000), now: now, weather: true) != nil,
+      "Weather accepts a recent approximate cached fix")
+    precondition(CompanionLocationPacket.encode(fix(accuracy: 50001), now: now, weather: true) == nil,
+      "Weather still requires bounded approximate accuracy")
+    precondition(CompanionLocationPacket.encode(fix(age: 1801), now: now, weather: true) == nil,
+      "Weather still rejects locations older than 30 minutes")
+    precondition(CompanionLocationPacket.encode(fix(age: 600, accuracy: 5000), now: now) == nil,
+      "Weather policy must not relax live GPS")
     print("PASS: GPS age/precision/coordinate bounds and existing units")
   }
 }

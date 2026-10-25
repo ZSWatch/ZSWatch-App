@@ -187,4 +187,28 @@ class PrototypeGpsTest {
         assertTrue(rig.packets.isEmpty())
         assertEquals(1, rig.source.releases)
     }
+    @Test fun weatherCanUseRecentCachedFixWithoutRelaxingLiveGps() {
+        val rig = Rig(); rig.time = 1000000L; rig.controller.ready(1)
+        val cached = rig.fix().copy(elapsedMs = rig.time - 600000, accuracy = 5000.0)
+        rig.controller.receive(rig.message(true), 1)
+        rig.source.fixes.last()(cached)
+        assertTrue(rig.packets.isEmpty())
+        rig.controller.receive(rig.message(false), 1)
+        rig.controller.receive(rig.message(true).put("purpose", "weather"), 1)
+        rig.source.fixes.last()(cached)
+        assertEquals(1, rig.packets.size)
+        assertTrue(rig.guards.last()())
+        assertNull(cached.copy(accuracy = 50001.0).packet(rig.time, weather = true))
+        rig.advance(1200001)
+        assertFalse(rig.guards.last()())
+        assertNull(cached.packet(rig.time, weather = true))
+    }
+
+    @Test fun unrecognizedPurposeStillRequiresFreshLocation() {
+        val rig = Rig(); rig.time = 1000000L; rig.controller.ready(1)
+        rig.controller.receive(rig.message(true).put("purpose", "navigation"), 1)
+        rig.source.fixes.last()(rig.fix().copy(elapsedMs = rig.time - 600000))
+        assertTrue(rig.packets.isEmpty())
+    }
+
 }
