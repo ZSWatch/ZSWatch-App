@@ -20,15 +20,18 @@ object PrototypeVoiceResult {
         val result = envelope.getJSONObject("result")
         PrototypeJobs.validateResult(result)
         val first = result.getJSONArray("actions").optJSONObject(0)
+        val category = result.getString("category")
         // Chat answers use the watch's larger answer buffer.
-        val answer = result.getString("category") == "chat"
+        val answer = category == "chat"
+        // Reply drafts, or why there is none, go to the watch's reply view.
+        val reply = category == "reply" || category == "reply_error"
         return JSONObject().put("t", "voice_memo").put("action", "result").put("version", 1)
             .put("result_id", envelope.getString("result_id"))
             .put("recording_key", PrototypeJobs.sha(envelope.getString("recording_id")))
             .put("result_sha256", PrototypeJobs.sha(PrototypeJobs.canonical(result)))
             .put("generation", envelope.getLong("generation")).put("filename", filename)
-            .put("text", bounded(result.getString("summary"), if (answer) 1023 else 127))
-            .put("action_type", if (answer) "chat" else first?.optString("type") ?: "")
+            .put("text", bounded(result.getString("summary"), if (answer) 1023 else if (reply) 511 else 127))
+            .put("action_type", if (answer || reply) category else first?.optString("type") ?: "")
             .put("datetime", bounded(first?.optString("start_time")?.takeIf { it.isNotEmpty() }
                 ?: first?.optString("due_date") ?: "", 31))
     }

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:zswatch_app/data/models/companion_recording.dart';
 import 'package:zswatch_app/services/ai/companion_chat_processor.dart';
+import 'package:zswatch_app/services/ai/companion_reply_processor.dart';
 import 'package:zswatch_app/services/ai/companion_voice_processor.dart';
 import 'package:zswatch_app/services/ai/openrouter_client.dart';
 
@@ -202,6 +203,50 @@ void main() {
         ),
       );
       expect(result['summary'], 'OpenRouter is out of credits.');
+    });
+
+    test('a dictated reply is only transcribed', () async {
+      final recording = await seedCompanionRecording(
+        root,
+        filename: 'reply_20261025_001710',
+      );
+      String? saved;
+      final result = await processCompanionVoiceRecording(
+        request(recording),
+        saveTranscript: (transcript) async => saved = transcript,
+        cloudFactory: fake(
+          'Ja gärna, ses vid tre.',
+          (_) => fail('A reply is not sent to a language model'),
+        ),
+      );
+      expect(result['category'], replyCategory);
+      expect(result['summary'], 'Ja gärna, ses vid tre.');
+      expect(result['transcript'], 'Ja gärna, ses vid tre.');
+      expect(result['actions'], isEmpty);
+      expect(saved, 'Ja gärna, ses vid tre.');
+      expect(isReplyRecording('20261025_001710'), isFalse);
+    });
+
+    test('a reply that cannot be transcribed tells the watch why', () async {
+      final recording = await seedCompanionRecording(
+        root,
+        filename: 'reply_20261025_001710',
+      );
+      final silent = await processCompanionVoiceRecording(
+        request(recording),
+        saveTranscript: (_) async => fail('Nothing to save'),
+        cloudFactory: fake('', (_) => fail('No language model')),
+      );
+      expect(silent['category'], replyErrorCategory);
+      expect(silent['summary'], "I didn't catch that. Try again.");
+
+      final noKey = await processCompanionVoiceRecording(
+        request(recording, key: null),
+        saveTranscript: (_) async => fail('Nothing to save'),
+        cloudFactory: (_) => fail('No client without a key'),
+      );
+      expect(noKey['category'], replyErrorCategory);
+      expect(noKey['summary'], contains('OpenRouter'));
     });
 
     test('a memo that is a question is answered instead of saved', () async {

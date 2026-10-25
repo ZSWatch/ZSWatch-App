@@ -143,7 +143,7 @@ Future<Map<String, Object?>> _answer(
 ) async {
   String question;
   try {
-    question = await _transcribe(
+    question = await transcribeCompanionRecording(
       recording,
       models[0],
       client,
@@ -162,7 +162,7 @@ Future<Map<String, Object?>> _answer(
     });
   } on OpenRouterFailure catch (e) {
     control.check();
-    return result('', _failureText(e));
+    return result('', openRouterFailureText(e));
   }
   control.check();
   final store = ChatConversationStore(
@@ -186,7 +186,7 @@ Future<Map<String, Object?>> _answer(
     );
   } on OpenRouterFailure catch (e) {
     control.check();
-    return result(question, _failureText(e));
+    return result(question, openRouterFailureText(e));
   }
   control.check();
   if (answer.isEmpty) return result(question, 'No answer. Try again.');
@@ -243,18 +243,22 @@ Future<String?> answerIfQuestion({
 
 const chatConversationFile = 'chat_conversation.json';
 
-String _failureText(OpenRouterFailure failure) => switch (failure.kind) {
-  OpenRouterFailureKind.auth =>
-    'OpenRouter rejected the API key. Check it in the ZSWatch app.',
-  OpenRouterFailureKind.credits => 'OpenRouter is out of credits.',
-  OpenRouterFailureKind.retry => "Couldn't reach OpenRouter. Try again.",
-  OpenRouterFailureKind.rejected => "OpenRouter couldn't answer that.",
-};
+/// A short explanation for the watch.
+String openRouterFailureText(OpenRouterFailure failure) =>
+    switch (failure.kind) {
+      OpenRouterFailureKind.auth =>
+        'OpenRouter rejected the API key. Check it in the ZSWatch app.',
+      OpenRouterFailureKind.credits => 'OpenRouter is out of credits.',
+      OpenRouterFailureKind.retry => "Couldn't reach OpenRouter. Try again.",
+      OpenRouterFailureKind.rejected => "OpenRouter couldn't answer that.",
+    };
 
-Future<String> _transcribe(
+/// Transcribes a recording with the selected engine. [client] is only needed
+/// for an OpenRouter model.
+Future<String> transcribeCompanionRecording(
   CompanionRecording recording,
   String sttModel,
-  OpenRouterClient client,
+  OpenRouterClient? client,
   Directory support,
   CompanionVoiceCancellation control,
   void Function(TranscriptionEngine) onEngine,
@@ -263,7 +267,10 @@ Future<String> _transcribe(
   control.check();
   final audio = OggOpusWriter.convert(verified.parsed);
   if (isOpenRouterModel(sttModel)) {
-    return (await client.transcribe(openRouterModelId(sttModel), audio)).trim();
+    return (await client!.transcribe(
+      openRouterModelId(sttModel),
+      audio,
+    )).trim();
   }
   final engine = createTranscriptionEngine(
     TranscriptionEngineType.values.byName(sttModel),

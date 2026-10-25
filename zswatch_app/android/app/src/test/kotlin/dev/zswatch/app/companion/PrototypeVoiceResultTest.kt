@@ -22,6 +22,19 @@ class PrototypeVoiceResultTest {
         assertEquals(PrototypeJobs.sha(PrototypeJobs.canonical(result())), packet.getString("result_sha256"))
     }
 
+    @Test fun replyDraftsUseTheReplyTypeAndALargerBound() {
+        for (category in listOf("reply", "reply_error")) {
+            val draft = JSONObject().put("version", 1).put("transcript", "").put("summary", "Ja gärna! ".repeat(80))
+                .put("category", category).put("actions", JSONArray())
+            val packet = PrototypeVoiceResult.packet(JSONObject(envelope().toString()).put("result", draft),
+                "reply_20261025_001710")
+            assertEquals(category, packet.getString("action_type"))
+            val size = packet.getString("text").toByteArray(Charsets.UTF_8).size
+            assertTrue(size in 400..511)
+            assertFalse(packet.getString("text").contains('\uFFFD'))
+        }
+    }
+
     @Test fun ackRequiresExactResultDigestRecordingAndIntegerGenerationAcrossJsonRoundtrip() {
         val packet = PrototypeVoiceResult.packet(envelope(), "owned_sample")
         val ack = JSONObject(packet.toString()).put("action", "result_ack").put("status", "accepted")
