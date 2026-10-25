@@ -58,7 +58,7 @@ class PrototypeGpsTest {
         assertEquals(7.2, json.getDouble("speed"), 0.000001)
         assertEquals(9.0, json.getDouble("hdop"), 0.0)
         assertNull(fix.packet(4000))
-        assertNull(fix.packet(35001))
+        assertNull(fix.packet(1805001))
         assertNull(fix.copy(latitude = Double.NaN).packet(6000))
         assertNull(fix.copy(longitude = 181.0).packet(6000))
         assertNull(fix.copy(utcMs = 0).packet(6000))
@@ -137,7 +137,7 @@ class PrototypeGpsTest {
         assertTrue(rig.packets.isEmpty())
         rig.admitted = true; rig.advance(500)
         assertEquals(1, rig.packets.size)
-        rig.advance(30001)
+        rig.advance(1800001)
         assertFalse(rig.guards.single()())
         assertEquals("location_unavailable", rig.observed.last().second)
         assertEquals(1, rig.source.releases)
@@ -187,28 +187,26 @@ class PrototypeGpsTest {
         assertTrue(rig.packets.isEmpty())
         assertEquals(1, rig.source.releases)
     }
-    @Test fun weatherCanUseRecentCachedFixWithoutRelaxingLiveGps() {
+    @Test fun standardGpsRequestAcceptsCachedApproximateLocationAndPreservesItsTimestamp() {
         val rig = Rig(); rig.time = 1000000L; rig.controller.ready(1)
         val cached = rig.fix().copy(elapsedMs = rig.time - 600000, accuracy = 5000.0)
         rig.controller.receive(rig.message(true), 1)
         rig.source.fixes.last()(cached)
-        assertTrue(rig.packets.isEmpty())
-        rig.controller.receive(rig.message(false), 1)
-        rig.controller.receive(rig.message(true).put("purpose", "weather"), 1)
-        rig.source.fixes.last()(cached)
         assertEquals(1, rig.packets.size)
         assertTrue(rig.guards.last()())
-        assertNull(cached.copy(accuracy = 50001.0).packet(rig.time, weather = true))
+        val packet = JSONObject(rig.packets.single().removePrefix("GB(").removeSuffix(")"))
+        assertEquals(cached.utcMs, packet.getLong("time"))
+        assertEquals(5000.0, packet.getDouble("hdop"), 0.0)
+    }
+
+    @Test fun cachedLocationExpiresBeforeQueuedSend() {
+        val rig = Rig(); rig.time = 1000000L; rig.controller.ready(1)
+        val cached = rig.fix().copy(elapsedMs = rig.time - 600000)
+        rig.controller.receive(rig.message(true), 1)
+        rig.source.fixes.last()(cached)
+        assertTrue(rig.guards.last()())
         rig.advance(1200001)
         assertFalse(rig.guards.last()())
-        assertNull(cached.packet(rig.time, weather = true))
+        assertNull(cached.packet(rig.time))
     }
-
-    @Test fun unrecognizedPurposeStillRequiresFreshLocation() {
-        val rig = Rig(); rig.time = 1000000L; rig.controller.ready(1)
-        rig.controller.receive(rig.message(true).put("purpose", "navigation"), 1)
-        rig.source.fixes.last()(rig.fix().copy(elapsedMs = rig.time - 600000))
-        assertTrue(rig.packets.isEmpty())
-    }
-
 }
