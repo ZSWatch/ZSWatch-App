@@ -167,3 +167,26 @@ with the app in the background. These fixtures do not send to real contacts.
 The iOS UI is covered by shared widget tests; no iOS device build or fresh iPhone
 acceptance is claimed. The OnePlus app is then reset for the user's clean
 permission-onboarding test.
+
+### Setup preferences follow-up
+
+Voice automatic-processing and analysis controls are now editable before pairing
+and while disconnected on Android and iOS. Before pairing, an explicit choice is
+saved natively as an unbound default; the shared model-policy synchronizer binds
+it to the first selected watch without changing the analysis choice. Existing
+watch policies retain their scope. Choosing these preferences does not process
+old recordings or start a connection.
+
+On Android, the notification listener's first successful access grant enables
+forwarding by default. An explicit saved off switch and blocked apps survive
+listener reconnects and app restarts. iOS continues to use system ANCS sharing.
+
+Setup follow-up validation: 392 shared Flutter tests and 24 Android policy tests
+pass, analysis is clean, and Android build 13 compiles and was installed in place
+on the OnePlus. Its native journal changed from no forwarding setting to
+`notifications_enabled: true` with notification access already granted and no
+watch selected. The UI tests cover both voice switches before pairing and while
+disconnected on Android/iOS, and applying the saved choices to the first watch.
+Wireless ADB went offline during the final live voice-screen navigation, so that
+last visual check is not claimed. No new iOS native build/device test was run.
+The app data and entered OpenRouter key were retained; no further wipe occurred.

@@ -25,6 +25,102 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
+  for (final selected in [false, true]) {
+    testWidgets(
+      'voice options save ${selected ? 'while disconnected' : 'before pairing'}',
+      (tester) async {
+        final ios = defaultTargetPlatform == TargetPlatform.iOS;
+        final address = selected
+            ? (ios
+                  ? 'FE88C737-593F-DB9B-732D-E11FF4C463F5'
+                  : 'AA:BB:CC:DD:EE:FF')
+            : '';
+        final fields = <String, Object?>{
+          'version': 1,
+          'owner': ios ? 'ios_companion_native' : 'android_service_native',
+          'runtime_active': false,
+          'protocol_ready': false,
+          'phase': 'stopped',
+          'generation': 1,
+          'event_cursor': 0,
+          'events': <Object?>[],
+          'recordings': <String, Object?>{},
+          'address': address,
+          'desired_running': false,
+        };
+        final values = StreamController<CompanionPrototypeSnapshot>.broadcast();
+        final calls = <MethodCall>[];
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          calls.add(call);
+          if (call.method == 'cloudCredential') {
+            return {'version': 1, 'key': 'fixture-key'};
+          }
+          fields['voice_processing_policy'] = Map<Object?, Object?>.from(
+            call.arguments as Map,
+          );
+          values.add(CompanionPrototypeSnapshot.decode(fields));
+          return fields;
+        });
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              companionSnapshotProvider.overrideWith((ref) => values.stream),
+              onDeviceProcessingProvider.overrideWith(
+                (ref) => PrefBoolNotifier(null, 'mode', false),
+              ),
+              openRouterSttModelProvider.overrideWith(
+                (ref) => PrefStringNotifier(null, 'stt', 'google/stt'),
+              ),
+              openRouterAnalysisModelProvider.overrideWith(
+                (ref) => PrefStringNotifier(null, 'llm', 'google/llm'),
+              ),
+            ],
+            child: const MaterialApp(
+              home: Scaffold(body: CompanionVoicePolicyTile()),
+            ),
+          ),
+        );
+        values.add(CompanionPrototypeSnapshot.decode(fields));
+        await tester.pumpAndSettle();
+        final automatic = find.widgetWithText(
+          SwitchListTile,
+          'Automatically process new recordings',
+        );
+        final analysis = find.widgetWithText(
+          SwitchListTile,
+          'Analyze after transcription',
+        );
+        expect(tester.widget<SwitchListTile>(automatic).onChanged, isNotNull);
+        expect(tester.widget<SwitchListTile>(analysis).onChanged, isNotNull);
+        expect(calls, isEmpty);
+        await tester.tap(automatic);
+        await tester.pumpAndSettle();
+        expect((calls.last.arguments as Map)['watch_id'], address);
+        expect((calls.last.arguments as Map)['enabled'], true);
+        expect(tester.widget<SwitchListTile>(automatic).value, true);
+        await tester.tap(analysis);
+        await tester.pumpAndSettle();
+        expect((calls.last.arguments as Map)['analysis_enabled'], false);
+        expect((calls.last.arguments as Map)['enabled'], true);
+        expect(
+          calls.every(
+            (call) => [
+              'cloudCredential',
+              'configureVoiceProcessing',
+            ].contains(call.method),
+          ),
+          isTrue,
+        );
+        await tester.pumpWidget(const SizedBox());
+        await values.close();
+      },
+      variant: const TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+      }),
+    );
+  }
+
   testWidgets(
     'opening settings never processes audio; opt-in captures chosen models',
     (tester) async {

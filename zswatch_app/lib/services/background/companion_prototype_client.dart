@@ -475,6 +475,7 @@ class CompanionPrototypeClient {
     return (result['identities'] as List).cast<String>().toSet();
   }
 
+  /// An empty watchId saves onboarding defaults, bound when the first watch is selected.
   Future<CompanionPrototypeSnapshot> configureVoiceProcessing({
     required String watchId,
     required bool enabled,

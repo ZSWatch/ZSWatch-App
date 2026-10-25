@@ -5,6 +5,10 @@ import dev.zswatch.app.LifecycleLogger
 
 /** All Android notifications reach the service without a Flutter callback. */
 object PrototypeNotificationRouter {
+    fun connected(context: Context) {
+        enqueue(context) { PrototypeNotifications(it).accessGranted() }
+    }
+
     fun posted(context: Context, data: Map<String, Any?>): Boolean {
         enqueue(context) { PrototypeNotifications(it).post(data, System.currentTimeMillis()) }
         return true

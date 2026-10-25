@@ -49,6 +49,17 @@ class PrototypeVoicePolicyTest {
             .last { it["kind"] == "recording_list_entries_skipped" }["detail"] as Map<*, *>
         assertEquals(1, skipped["capacity"])
     }
+    @Test fun onboardingDefaultsAndStoppedWatchSettingsCannotTargetAnotherWatch() {
+        val watch = "AA:BB:CC:DD:EE:FF"
+        assertTrue(PrototypeVoicePolicy.validTarget("", null))
+        assertTrue(PrototypeVoicePolicy.validTarget("", ""))
+        assertTrue(PrototypeVoicePolicy.validTarget(watch, watch))
+        assertFalse(PrototypeVoicePolicy.validTarget("", watch))
+        assertFalse(PrototypeVoicePolicy.validTarget(watch, null))
+        assertFalse(PrototypeVoicePolicy.validTarget("11:22:33:44:55:66", watch))
+        assertFalse(PrototypeVoicePolicy.validTarget("invalid", "invalid"))
+    }
+
     @Test fun requestsAreWatchScopedAndCaptureConfiguration() {
         val config = PrototypeVoicePolicy.configuration("kbWhisperBase", "qwen", false)
         val policy = config + mapOf("watch_id" to "watch-a", "enabled" to true)

@@ -76,7 +76,7 @@ class _CompanionOnboardingScreenState
             subtitle: Text(
               isIos
                   ? 'Check notification sharing for your watch.'
-                  : 'Enable forwarding to your watch. All apps are included '
+                  : 'Grant notification access to start forwarding. All apps are included '
                         'unless you turn an app off.',
             ),
             trailing: const Icon(Icons.chevron_right),
@@ -89,8 +89,8 @@ class _CompanionOnboardingScreenState
               'Add an OpenRouter key for cloud transcription, or choose '
               'on-device processing and download a speech model. '
               '${isIos ? '' : 'Dictated replies work without automatic voice-note processing. '}'
-              'After connecting your watch, you can also enable automatic '
-              'processing and analysis of ordinary voice notes.',
+              'Automatic processing and analysis of ordinary voice notes are '
+              'optional. You can configure them now, before connecting your watch.',
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoutes.aiModels),

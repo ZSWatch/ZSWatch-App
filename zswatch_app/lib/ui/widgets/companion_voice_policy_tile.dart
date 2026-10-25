@@ -22,14 +22,14 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
 
   Future<void> _save(bool enabled, {bool? analyze}) async {
     final snapshot = ref.read(companionSnapshotProvider).asData?.value;
-    final watch = snapshot?.watch;
-    if (watch == null) return;
+    if (snapshot == null) return;
+    final watch = snapshot.watch;
     final config = ref.read(voiceModelConfigProvider);
     final analyzeEnabled =
         config.canAnalyze &&
         (analyze ??
-            (snapshot?.fields['voice_processing_policy'] is Map
-                ? (snapshot!.fields['voice_processing_policy']
+            (snapshot.fields['voice_processing_policy'] is Map
+                ? (snapshot.fields['voice_processing_policy']
                           as Map)['analysis_enabled'] !=
                       false
                 : true));
@@ -85,7 +85,7 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
       await ref
           .read(companionClientProvider)
           .configureVoiceProcessing(
-            watchId: watch.id,
+            watchId: watch?.id ?? '',
             enabled: enabled,
             transcriptionModel: config.transcriptionModel,
             analysisModel: config.analysisModel,
@@ -111,22 +111,21 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
     final raw = snapshot?.fields['voice_processing_policy'];
     final policy = raw is Map ? raw : const <Object?, Object?>{};
     final enabled =
-        policy['enabled'] == true && policy['watch_id'] == snapshot?.watch?.id;
+        policy['enabled'] == true &&
+        policy['watch_id'] == (snapshot?.watch?.id ?? '');
     final config = ref.watch(voiceModelConfigProvider);
     final changed =
         policy['transcription_model'] != config.transcriptionModel ||
         policy['analysis_model'] != config.analysisModel ||
         policy['correct_transcription'] != config.correctTranscription;
-    final canSave =
-        !_saving &&
-        snapshot?.watch != null &&
-        snapshot?.fields['desired_running'] == true;
+    final canSave = !_saving && snapshot != null;
     return Column(
       children: [
         SwitchListTile(
           title: const Text('Automatically process new recordings'),
           subtitle: Text(
             '${config.cloud ? 'Sends each new recording to OpenRouter with zero data retention, right after it arrives.' : '${config.canAnalyze ? 'Uses the selected local models' : 'Transcribes with the selected speech model'}. Audio stays on this phone.'} '
+            '${snapshot?.watch == null ? 'Your choice is saved for when you connect your watch. ' : ''}'
             'Existing recordings are processed manually. Turning this off '
             'leaves already queued jobs running.',
           ),

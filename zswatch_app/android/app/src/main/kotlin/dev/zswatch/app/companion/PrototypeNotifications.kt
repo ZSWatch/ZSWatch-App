@@ -11,6 +11,14 @@ class PrototypeNotifications(private val store: PrototypeStore) {
     @Suppress("UNCHECKED_CAST")
     private fun entries() = JSONObject(store.control()["notifications"] as? Map<String, Any?> ?: emptyMap<String, Any?>())
 
+    /** Granting Android notification access opts in once; a saved off switch stays off. */
+    fun accessGranted() {
+        val state = store.control()
+        if (state.containsKey("notifications_enabled")) return
+        val blocked = (state[BLOCKED] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+        configure(true, blocked)
+    }
+
     /** All apps forward by default; [blocked] opts packages out. */
     fun configure(enabled: Boolean, blocked: List<String>) {
         require(blocked.size <= MAX_BLOCKED && blocked.all { Regex("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+").matches(it) })

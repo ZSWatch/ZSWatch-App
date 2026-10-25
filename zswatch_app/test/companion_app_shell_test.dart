@@ -100,6 +100,7 @@ void main() {
   late Map<String, Object?> saved;
   var permissionRequests = 0;
   var denyPermission = false;
+  var hasCloudKey = false;
 
   Never legacy(String name) {
     forbidden.add(name);
@@ -218,6 +219,7 @@ void main() {
     forbidden.clear();
     permissionRequests = 0;
     denyPermission = false;
+    hasCloudKey = false;
     saved = snapshot();
     messenger.setMockMethodCallHandler(events, (call) async {
       subscriptions.add(call.method);
@@ -237,6 +239,9 @@ void main() {
     });
     messenger.setMockMethodCallHandler(methods, (call) async {
       calls.add(call);
+      if (call.method == 'cloudCredential') {
+        return {'version': 1, 'key': hasCloudKey ? 'fixture-key' : null};
+      }
       if (call.method == 'voiceJob') {
         final id = (call.arguments as Map)['job_id'] as String;
         return {'version': 1, 'job_id': id, 'job': nativeJobDetails[id]!};
@@ -321,6 +326,34 @@ void main() {
       TargetPlatform.android,
       TargetPlatform.iOS,
     }),
+  );
+
+  testWidgets(
+    'voice choices saved before pairing bind to the first watch without changing analysis',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      hasCloudKey = true;
+      final state = snapshot(active: true, ready: true);
+      state['voice_processing_policy'] = {
+        ...(state['voice_processing_policy'] as Map<String, Object?>),
+        'watch_id': '',
+        'enabled': true,
+        'analysis_enabled': false,
+      };
+      await mount(tester, state);
+      await tester.pumpAndSettle();
+      final savedPolicy =
+          calls
+                  .where((call) => call.method == 'configureVoiceProcessing')
+                  .single
+                  .arguments
+              as Map;
+      expect(savedPolicy['watch_id'], 'AA:BB:CC:DD:EE:FF');
+      expect(savedPolicy['enabled'], true);
+      expect(savedPolicy['analysis_enabled'], false);
+      expect(calls.where((call) => call.method == 'processRecording'), isEmpty);
+      expect(forbidden, isEmpty);
+    },
   );
 
   testWidgets(
