@@ -48,6 +48,66 @@ class PrototypeNotificationsTest {
         assertNull(inbox.next(1, 0))
     }
 
+    @Test fun emptyAndWhitespaceNotificationsNeverCreateAWatchPopup() {
+        val journal = store(); val inbox = PrototypeNotifications(journal)
+        inbox.configure(true, emptyList())
+        for (empty in listOf(null, "", " \t\r\n")) {
+            val notice = notification() + mapOf("title" to empty, "body" to empty,
+                "sender" to empty, "appName" to "LinkedIn", "canReply" to true)
+            assertFalse(inbox.post(notice, 0))
+            assertNull(inbox.next(1, 0))
+        }
+        assertFalse(journal.control().containsKey("notification_next_id"))
+        // Validate the actual bounded fields, not text beyond the watch's limit.
+        assertFalse(inbox.post(notification() + mapOf("title" to "", "body" to " ".repeat(450) + "hidden"), 0))
+    }
+
+    @Test fun titleBodyAndSenderOnlyNotificationsRemainForwardable() {
+        val inbox = PrototypeNotifications(store()); inbox.configure(true, emptyList())
+        for (field in listOf("title", "body", "sender")) {
+            val notice = notification(field) + mapOf("title" to "", "body" to "", "sender" to "") +
+                mapOf(field to "Useful text")
+            assertTrue(inbox.post(notice, 0))
+            val delivery = inbox.next(1, 0)!!
+            assertTrue(delivery.packet.contains("Useful text"))
+            inbox.written(delivery, 1)
+        }
+    }
+
+    @Test fun anEmptyUpdateRemovesThePreviouslyForwardedNotification() {
+        val inbox = PrototypeNotifications(store()); inbox.configure(true, emptyList())
+        assertTrue(inbox.post(notification(), 0))
+        val first = inbox.next(1, 0)!!; inbox.written(first, 1)
+        val empty = notification() + mapOf("title" to "", "body" to "", "sender" to "")
+        assertTrue(inbox.post(empty, 1))
+        assertFalse(inbox.post(empty, 2))
+        val removal = inbox.next(1, 2)!!
+        assertEquals(first.id, removal.id)
+        assertTrue(removal.packet.contains("notify-"))
+        assertFalse(removal.packet.contains("Fixture"))
+        inbox.written(removal, 1)
+        assertNull(inbox.next(2, 2))
+    }
+
+    @Test fun legacyEmptyNotificationsAreRemovedBeforeReconnectReplay() {
+        val journal = store()
+        PrototypeNotifications(journal).configure(true, emptyList())
+        // Reproduce an older app's saved LinkedIn packet, still within retention.
+        journal.update("legacy_fixture", mapOf("notifications" to mapOf("legacy" to mapOf(
+            "id" to 123L, "package" to "com.linkedin.android", "revision" to 1L,
+            "removed" to false, "expires_ms" to PrototypeNotifications.RETENTION_MS,
+            "delivered_generation" to 1L, "delivered_revision" to 1L,
+            "packet" to "GB({\"t\":\"notify\",\"id\":123,\"src\":\"LinkedIn\",\"title\":\"\",\"body\":\"\"})"))))
+        val reopened = PrototypeNotifications(PrototypeStore(temporary.root))
+        val removal = reopened.next(2, 0)!!
+        assertTrue(removal.packet.contains("notify-"))
+        assertFalse(removal.packet.contains("LinkedIn"))
+        val pruned = (PrototypeStore(temporary.root).control()["notifications"] as Map<*, *>).values.single() as Map<*, *>
+        assertFalse(pruned.containsKey("packet"))
+        reopened.written(removal, 2)
+        assertNull(reopened.next(3, 0))
+    }
+
     @Test fun writtenNotificationKeepsIdentityAcrossReopenAndReconnect() {
         val journal = store(); val inbox = PrototypeNotifications(journal)
         inbox.configure(true, emptyList()); assertTrue(inbox.post(notification(), 0))
