@@ -1057,14 +1057,14 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 }
             }
             PrototypeNotifications(store).reply(message, token, System.currentTimeMillis())?.let { reply ->
-                val error = reply.key?.let { key ->
-                    try {
-                        dev.zswatch.app.NotificationListenerServiceImpl.replyToPrototypeNotification(key, reply.text)
-                    } catch (error: Exception) {
-                        LifecycleLogger.log("CompanionNotifications", "reply_failed ${error.javaClass.simpleName}")
-                        "Could not send the reply"
-                    }
-                } ?: "The message is gone from the phone"
+                // Null means sent, so this must not be written as `key?.let { } ?: error`.
+                val key = reply.key
+                val error = if (key == null) "The message is gone from the phone" else try {
+                    dev.zswatch.app.NotificationListenerServiceImpl.replyToPrototypeNotification(key, reply.text)
+                } catch (error: Exception) {
+                    LifecycleLogger.log("CompanionNotifications", "reply_failed ${error.javaClass.simpleName}")
+                    "Could not send the reply"
+                }
                 store.update("watch_notification_reply_requested", detail = mapOf("sent" to (error == null)))
                 // The watch shows whether the app took the reply.
                 val status = JSONObject().put("t", "notify_reply").put("id", reply.id).put("ok", error == null)
