@@ -9,10 +9,11 @@ internal data class PrototypeGpsFix(
     val altitude: Double? = null, val speedMps: Double? = null,
     val bearing: Double? = null, val accuracy: Double? = null,
 ) {
-    fun packet(nowMs: Long): String? {
+    fun packet(nowMs: Long, weather: Boolean = false): String? {
         if (!latitude.isFinite() || latitude !in -90.0..90.0 ||
             !longitude.isFinite() || longitude !in -180.0..180.0 ||
-            elapsedMs < 0 || nowMs < elapsedMs || nowMs - elapsedMs > 30000 || utcMs <= 0) return null
+            elapsedMs < 0 || nowMs < elapsedMs || nowMs - elapsedMs > (if (weather) 1800000 else 30000) || utcMs <= 0) return null
+        if (weather && (accuracy == null || !accuracy.isFinite() || accuracy !in 0.0..50000.0)) return null
         val json = JSONObject().put("t", "gps").put("lat", latitude).put("lon", longitude)
             .put("time", utcMs).put("externalSource", true).put("gpsSource", "phone")
         altitude?.takeIf { it.isFinite() }?.let { json.put("alt", it) }
@@ -40,7 +41,7 @@ internal class PrototypeGps(
     private val send: (Long, String, () -> Boolean, () -> Unit) -> Boolean,
     private val observe: (Long, String, Boolean) -> Unit,
 ) {
-    private class Request(val generation: Long) {
+    private class Request(val generation: Long, val weather: Boolean) {
         var cancel: (() -> Unit)? = null
         var lastAdmittedMs: Long? = null
         var writing = false
@@ -59,7 +60,7 @@ internal class PrototypeGps(
         if (!enabled()) { release("disabled"); return }
         blocked()?.let { release(it); return }
         if (request != null) return
-        val next = Request(token)
+        val next = Request(token, message.optString("purpose") == "weather")
         request = next
         try {
             foreground(true)
@@ -96,13 +97,13 @@ internal class PrototypeGps(
         val remaining = expected.lastAdmittedMs?.let { 5000 - (time - it) } ?: 0
         if (remaining > 0) { retry(expected, remaining); return }
         val fix = expected.pending ?: return
-        val packet = fix.packet(time) ?: run { expected.pending = null; return }
+        val packet = fix.packet(time, expected.weather) ?: run { expected.pending = null; return }
         val previousAdmission = expected.lastAdmittedMs
         expected.pending = null
         expected.lastAdmittedMs = time
         expected.writing = true
         val accepted = send(expected.generation, packet, {
-            val allowed = request === expected && enabled() && blocked() == null && fix.packet(now()) != null
+            val allowed = request === expected && enabled() && blocked() == null && fix.packet(now(), expected.weather) != null
             if (!allowed && request === expected) release(blocked() ?: "location_unavailable")
             allowed
         }, {
