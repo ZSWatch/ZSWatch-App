@@ -22,8 +22,9 @@ class CompanionConnectionSettings extends ConsumerWidget {
       children: [
         ListTile(
           leading: const Icon(Icons.bluetooth),
-          title: const Text('Watch connection'),
+          title: const Text('Manage watches'),
           subtitle: Text(connection.state.statusText),
+          trailing: const Icon(Icons.chevron_right),
           onTap: () => context.push(AppRoutes.savedWatches),
         ),
         if (snapshot?.runtimeActive == true)

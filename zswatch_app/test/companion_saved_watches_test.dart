@@ -381,6 +381,38 @@ void main() {
         await tester.pump();
         expect(calls, hasLength(1));
         expect(find.text('Cancel connection'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNWidgets(2));
+
+        snapshots.add(
+          CompanionPrototypeSnapshot.decode(state(active: true, ready: true)),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Connected'), findsOneWidget);
+        expect(find.text('Disconnect'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.byType(LinearProgressIndicator), findsNothing);
+        expect(
+          find.descendant(of: tile, matching: find.byTooltip('Watch Settings')),
+          findsOneWidget,
+        );
+        // The active watch remains selected; tapping its tile must not reconnect.
+        await tester.tap(
+          find.descendant(of: tile, matching: find.text('UI renamed')),
+        );
+        await tester.pump();
+        expect(calls, hasLength(1));
+        expect(permissions, 1);
+
+        snapshots.add(
+          CompanionPrototypeSnapshot.decode({
+            ...state(active: true),
+            'phase': 'error',
+            'last_error': 'Connection failed',
+          }),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Connection error'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
       } finally {
         await tester.pumpWidget(const SizedBox());
         await tester.pumpAndSettle();

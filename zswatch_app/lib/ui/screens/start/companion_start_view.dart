@@ -102,6 +102,8 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
     final persistence = ref.watch(companionWatchPersistenceStateProvider);
     final active = snapshot?.runtimeActive == true;
     final ready = snapshot?.protocolReady == true;
+    final connecting =
+        snapshot?.connection.state.isConnectingOrReconnecting == true;
     final linkError = snapshot?.fields['last_error'];
     final busy =
         changingConnection || ref.watch(watchNotifierProvider).isLoading;
@@ -186,7 +188,7 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
                     key: ValueKey(item.id),
                     watch: item,
                     isConnecting:
-                        active &&
+                        connecting &&
                         snapshot?.fields['address'] == item.id.toUpperCase(),
                     enabled:
                         !busy &&
