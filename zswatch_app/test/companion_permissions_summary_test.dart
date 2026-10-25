@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:zswatch_app/core/theme/app_theme.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
+import 'package:zswatch_app/providers/companion_permission_setup_providers.dart';
 import 'package:zswatch_app/providers/demo_mode_provider.dart';
 import 'package:zswatch_app/ui/screens/settings/companion_permissions_summary.dart';
 

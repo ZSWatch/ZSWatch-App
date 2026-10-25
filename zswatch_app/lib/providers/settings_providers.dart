@@ -14,6 +14,8 @@ abstract final class SettingsKeys {
   static const String notificationFilterPackages =
       'notification_filter_packages';
   static const String onboardingCompleted = 'onboarding_completed';
+  static const String watchLocationDefaultApplied =
+      'watch_location_permission_default_applied';
   static const String keepScreenOnDuringDfu = 'keep_screen_on_during_dfu';
   static const String backgroundConnectionEnabled =
       'background_connection_enabled';

@@ -14,12 +14,12 @@ Future<bool?> showLocationPermissionGuidance(
                 'First choose Allow While Using App, then choose Change to Always '
                 'when iOS asks. If the second prompt does not appear, open '
                 'Settings → ZSWatch → Location and choose Always. '
-                'Enable Precise Location for GPS. You can turn sharing off in the app.'
+                'Enable Precise Location for GPS. Granting access turns sharing on. You can turn it off in the app.'
           : 'Watch weather and GPS need location access while the app is closed. '
                 'First choose While using the app. We will then open the next '
                 'Android permission step: choose Allow all the time. '
                 'If Android opens app settings, go to Permissions → Location '
-                'and choose Allow all the time. You can turn sharing off in the app.',
+                'and choose Allow all the time. Granting access turns sharing on. You can turn it off in the app.',
     ),
     actions: [
       TextButton(
