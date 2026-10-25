@@ -55,6 +55,10 @@ class PrototypeNotifications(private val store: PrototypeStore) {
             .put("title", bounded(data["title"] as? String ?: "", 160))
             .put("body", bounded(data["body"] as? String ?: "", 450))
         (data["sender"] as? String)?.let { packet.put("sender", bounded(it, 160)) }
+        // Some Android apps leave a textless notification active. The app name
+        // alone would create an empty watch popup, including during replay.
+        // An existing notification that becomes empty must be removed instead.
+        if (!hasDisplayText(packet)) return remove(key)
         // The watch offers a dictated reply. Gadgetbridge firmware ignores the field.
         if (data["canReply"] == true) packet.put("reply", true)
         val wire = "GB($packet)"
@@ -128,17 +132,26 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         if (changed) store.update("notifications_reconciled", mapOf("notifications" to notices))
     }
 
-    /** Purge private text even while BLE is disconnected. Keep only removal IDs. */
+    /** Purge obsolete/empty text even while disconnected. Keep only removal IDs. */
     fun expire(now: Long) {
         val notices = entries()
-        var expired = false
+        var changed = false
         notices.keys().asSequence().toList().forEach { key ->
             val item = notices.getJSONObject(key)
-            if (!item.optBoolean("removed") && item.getLong("expires_ms") <= now) {
-                removeItem(item); expired = true
+            if (!item.optBoolean("removed") &&
+                (item.getLong("expires_ms") <= now || !hasStoredDisplayText(item))) {
+                removeItem(item); changed = true
             }
         }
-        if (expired) store.update("notifications_expired", mapOf("notifications" to notices))
+        if (changed) store.update("notifications_pruned", mapOf("notifications" to notices))
+    }
+
+    /** Older app versions may already have persisted empty notification packets. */
+    private fun hasStoredDisplayText(item: JSONObject): Boolean {
+        val wire = item.optString("packet")
+        if (!wire.startsWith("GB(") || !wire.endsWith(")")) return false
+        return runCatching { hasDisplayText(JSONObject(wire.substring(3, wire.length - 1))) }
+            .getOrDefault(false)
     }
 
     fun next(generation: Long, now: Long): Delivery? {
@@ -180,6 +193,9 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         const val MAX_BLOCKED = 256
         const val BLOCKED = "notification_blocked_packages"
         const val RETENTION_MS = 10 * 60 * 1000L
+        private fun hasDisplayText(packet: JSONObject): Boolean =
+            listOf("title", "body", "sender").any { (packet.opt(it) as? String)?.isNotBlank() == true }
+
         /** The watch keeps at most 511 bytes of a reply. */
         const val MAX_REPLY_LENGTH = 512
         /** Limit UTF-8 bytes without splitting a code point; JSON controls become spaces. */
