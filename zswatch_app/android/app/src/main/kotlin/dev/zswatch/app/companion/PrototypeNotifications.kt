@@ -99,11 +99,11 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         val id = message.opt("id")
         val text = message.opt("msg")
         if ((id !is Int && id !is Long) || text !is String || text.isBlank() || text.length > MAX_REPLY_LENGTH) return null
-        val packages = state["notification_packages"] as? List<*> ?: emptyList<Any>()
+        val blocked = state[BLOCKED] as? List<*> ?: emptyList<Any>()
         val notices = entries()
         val key = notices.keys().asSequence().firstOrNull { key ->
             val item = notices.getJSONObject(key)
-            !item.optBoolean("removed") && item.getLong("expires_ms") > now && item.getString("package") in packages &&
+            !item.optBoolean("removed") && item.getLong("expires_ms") > now && item.getString("package") !in blocked &&
                 item.optLong("delivered_generation", -1) == generation && item.getLong("id") == (id as Number).toLong()
         }
         return Reply((id as Number).toLong(), key, text.trim())

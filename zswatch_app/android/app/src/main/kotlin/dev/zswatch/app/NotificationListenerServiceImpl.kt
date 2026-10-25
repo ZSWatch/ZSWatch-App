@@ -1,5 +1,6 @@
 package dev.zswatch.app
 
+import android.app.ActivityOptions
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.RemoteInput
@@ -221,8 +222,19 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
                 RemoteInput.setResultsSource(intent, RemoteInput.SOURCE_FREE_FORM_INPUT)
             }
             return try {
-                action.actionIntent.send(listener, 0, intent)
-                LifecycleLogger.log(TAG, "prototype_reply_sent")
+                // A watch reply is an explicit user action. Gmail uses an Activity
+                // PendingIntent; Android 14+ requires the sender to opt in, and
+                // Android 16's companion privileges need ALLOW_ALWAYS in background.
+                val options = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    ActivityOptions.makeBasic().apply {
+                        setPendingIntentBackgroundActivityStartMode(
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA)
+                                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                            else ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                    }.toBundle()
+                } else null
+                action.actionIntent.send(listener, 0, intent, null, null, null, options)
+                LifecycleLogger.log(TAG, "prototype_reply_dispatched activity=${action.actionIntent.isActivity}")
                 null
             } catch (error: PendingIntent.CanceledException) {
                 "The app no longer takes this reply"

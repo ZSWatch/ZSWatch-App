@@ -3,6 +3,8 @@
     <application>
         <service android:name=".companion.CompanionMediaFixtureService"
             android:exported="false" android:foregroundServiceType="mediaPlayback" />
+        <activity android:name=".companion.CompanionReplyFixtureActivity" android:exported="false"
+            android:theme="@android:style/Theme.NoDisplay" />
         <!-- Exported so adb can post the fixture; debug builds only. -->
         <receiver android:name=".companion.CompanionReplyFixtureReceiver" android:exported="true" />
     </application>

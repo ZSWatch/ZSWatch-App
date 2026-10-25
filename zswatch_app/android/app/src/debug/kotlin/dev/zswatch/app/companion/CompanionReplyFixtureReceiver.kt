@@ -12,6 +12,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import dev.zswatch.app.BuildConfig
+import dev.zswatch.app.NotificationListenerServiceImpl
 import dev.zswatch.app.NotificationDebugHelper
 import org.json.JSONObject
 import java.io.File
@@ -27,7 +28,16 @@ class CompanionReplyFixtureReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (!BuildConfig.DEBUG) return
         when (intent.action) {
-            POST -> post(context, intent.getStringExtra("sender") ?: "Fixture", intent.getStringExtra("text") ?: "Fixture message", null)
+            POST -> post(context, intent.getStringExtra("sender") ?: "Fixture", intent.getStringExtra("text") ?: "Fixture message", null,
+                intent.getBooleanExtra("activity_reply", false))
+            SEND -> {
+                // Only our own fixture is addressable; this cannot reply to real contacts.
+                val notice = context.getSystemService(NotificationManager::class.java).activeNotifications
+                    .firstOrNull { it.tag == TAG && it.id == ID } ?: return
+                val error = NotificationListenerServiceImpl.replyToPrototypeNotification(notice.key, "Fixture reply")
+                val root = File(context.filesDir, "companion-reply-fixture").apply { mkdirs() }
+                File(root, "dispatch.json").writeText(JSONObject(mapOf("error" to error)).toString())
+            }
             REPLY -> {
                 val text = RemoteInput.getResultsFromIntent(intent)?.getCharSequence(KEY)?.toString() ?: return
                 val root = File(context.filesDir, "companion-reply-fixture").apply { mkdirs() }
@@ -39,13 +49,14 @@ class CompanionReplyFixtureReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun post(context: Context, sender: String, text: String, reply: String?) {
+    private fun post(context: Context, sender: String, text: String, reply: String?, activity: Boolean = false) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel(CHANNEL, "Companion reply fixture", NotificationManager.IMPORTANCE_DEFAULT))
-        val replyIntent = Intent(context, CompanionReplyFixtureReceiver::class.java).setAction(REPLY)
-            .putExtra("sender", sender).putExtra("text", text)
-        val pending = PendingIntent.getBroadcast(context, 0, replyIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE)
+        val replyIntent = Intent(context, if (activity) CompanionReplyFixtureActivity::class.java else CompanionReplyFixtureReceiver::class.java)
+            .setAction(REPLY).putExtra("sender", sender).putExtra("text", text)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        val pending = if (activity) PendingIntent.getActivity(context, 0, replyIntent, flags)
+            else PendingIntent.getBroadcast(context, 0, replyIntent, flags)
         val action = NotificationCompat.Action.Builder(android.R.drawable.ic_menu_send, "Reply", pending)
             .addRemoteInput(RemoteInput.Builder(KEY).setLabel("Reply").build())
             .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
@@ -65,6 +76,7 @@ class CompanionReplyFixtureReceiver : BroadcastReceiver() {
     private companion object {
         const val POST = "dev.zswatch.app.REPLY_FIXTURE_POST"
         const val REPLY = "dev.zswatch.app.REPLY_FIXTURE_REPLY"
+        const val SEND = "dev.zswatch.app.REPLY_FIXTURE_SEND"
         const val KEY = "reply_text"
         const val CHANNEL = "companion_reply_fixture"
         const val TAG = "companion_reply_fixture"
