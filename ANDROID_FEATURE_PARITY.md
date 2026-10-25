@@ -141,3 +141,29 @@ release APK built and installed successfully. Tested release SHA-256:
 Evidence and the proposed microphone patch are under the gitignored
 `.companion-hil-runs/2026-10-20-codex-android/` directory. These results are scoped
 to this integration session and do not close the remaining parity inventory.
+
+## First-run setup and dictated reply follow-up — 2026-10-25
+
+Dictated replies is rebased on app main `8395a331`, including Voice Notes
+management and default-all-app notification forwarding. First-run Android and
+iOS now share a native-companion permission/setup page; it opens before watch
+selection, makes permission requests only on explicit taps, and links directly
+to notification forwarding and voice setup. General automatic memo processing
+and LLM analysis remain optional; dictated replies use speech-to-text only.
+iOS continues to use ANCS notification sharing, which has no reply action.
+
+The user successfully replied to a real Messenger conversation on the OnePlus.
+Its observed Reply action targets an Android service. The Gmail attempt failed:
+Android logged `BAL_BLOCK` for Gmail's `AutoSendActivity`. Reply dispatch now
+opts into the PendingIntent activity launch on API 34+, including companion
+background privileges on API 36+. A real Gmail retest is still required; dispatch
+acceptance must not be interpreted as recipient delivery confirmation.
+
+Validation of this follow-up: all 387 Flutter tests pass (including Android/iOS
+first-run setup), 24 targeted Kotlin notification/voice-policy/result tests pass,
+Flutter analysis is clean, and Android debug build 12 compiles. On the OnePlus,
+local broadcast and Gmail-like Activity reply fixtures both received their text
+with the app in the background. These fixtures do not send to real contacts.
+The iOS UI is covered by shared widget tests; no iOS device build or fresh iPhone
+acceptance is claimed. The OnePlus app is then reset for the user's clean
+permission-onboarding test.

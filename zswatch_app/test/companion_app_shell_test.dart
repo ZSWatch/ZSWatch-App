@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
@@ -119,6 +120,7 @@ void main() {
     WidgetTester tester,
     Map<String, Object?> state, {
     AppDatabase? crashDb,
+    bool showOnboarding = false,
   }) async {
     final db =
         crashDb ??
@@ -132,6 +134,10 @@ void main() {
       ProviderScope(
         overrides: [
           nativeCompanionRuntimeProvider.overrideWithValue(true),
+          if (!showOnboarding)
+            permissionOnboardingCompletedProvider.overrideWith(
+              (ref) async => true,
+            ),
           companionRecordingImportsProvider.overrideWith(
             (ref) => Stream.value([]),
           ),
@@ -279,6 +285,44 @@ void main() {
       return saved;
     });
   });
+  testWidgets(
+    'first launch shows shared setup, then stays completed',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final platform = defaultTargetPlatform;
+      await tester.binding.setSurfaceSize(const Size(800, 1800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await mount(tester, snapshot(), showOnboarding: true);
+      await tester.pumpAndSettle();
+      expect(find.text('Welcome to ZSWatch'), findsOneWidget);
+      expect(find.text('Bluetooth connection'), findsOneWidget);
+      expect(find.text('Set up voice notes'), findsOneWidget);
+      expect(
+        find.text('Notification access'),
+        platform == TargetPlatform.android ? findsOneWidget : findsNothing,
+      );
+      expect(permissionRequests, 0);
+      expect(calls.every((call) => call.method == 'permissionStatus'), isTrue);
+      await tester.tap(find.text('Continue to watch setup'));
+      await tester.pumpAndSettle();
+      expect(find.text('Welcome to ZSWatch'), findsNothing);
+      expect(find.text('Add watch'), findsOneWidget);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(permissionOnboardingCompletedKey), isTrue);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      await mount(tester, snapshot(), showOnboarding: true);
+      await tester.pumpAndSettle();
+      expect(find.text('Welcome to ZSWatch'), findsNothing);
+      expect(find.text('Add watch'), findsOneWidget);
+      expect(forbidden, isEmpty);
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    }),
+  );
+
   testWidgets(
     'native connection error ends spinner and exposes cancellation failure',
     (tester) async {

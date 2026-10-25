@@ -14,7 +14,7 @@ import 'notification_providers.dart';
 part 'permission_providers.freezed.dart';
 
 /// Key for storing whether onboarding has been completed
-const _onboardingCompletedKey = 'permission_onboarding_completed';
+const permissionOnboardingCompletedKey = 'permission_onboarding_completed';
 
 /// Provider for the permission service
 final permissionServiceProvider = Provider<PermissionService>((ref) {
@@ -40,7 +40,7 @@ final permissionsStatusProvider = FutureProvider<AppPermissionsStatus>((
 /// Provider for whether permission onboarding has been completed
 final permissionOnboardingCompletedProvider = FutureProvider<bool>((ref) async {
   final prefs = await SharedPreferences.getInstance();
-  return prefs.getBool(_onboardingCompletedKey) ?? false;
+  return prefs.getBool(permissionOnboardingCompletedKey) ?? false;
 });
 
 /// State for the permission notifier
@@ -93,7 +93,7 @@ class PermissionNotifier extends StateNotifier<PermissionState>
 
   Future<void> _loadOnboardingState() async {
     final prefs = await SharedPreferences.getInstance();
-    final completed = prefs.getBool(_onboardingCompletedKey) ?? false;
+    final completed = prefs.getBool(permissionOnboardingCompletedKey) ?? false;
     state = state.copyWith(onboardingCompleted: completed);
   }
 
@@ -179,14 +179,14 @@ class PermissionNotifier extends StateNotifier<PermissionState>
   /// Mark permission onboarding as completed
   Future<void> completeOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_onboardingCompletedKey, true);
+    await prefs.setBool(permissionOnboardingCompletedKey, true);
     state = state.copyWith(onboardingCompleted: true);
   }
 
   /// Reset onboarding state (for testing or re-requesting permissions)
   Future<void> resetOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_onboardingCompletedKey, false);
+    await prefs.setBool(permissionOnboardingCompletedKey, false);
     state = state.copyWith(onboardingCompleted: false);
   }
 

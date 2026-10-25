@@ -27,6 +27,7 @@ import '../screens/health/health_screen.dart';
 import '../screens/health/heart_rate_screen.dart';
 import '../screens/notifications/notification_settings_screen.dart';
 import '../screens/onboarding/permission_onboarding_screen.dart';
+import '../screens/onboarding/companion_onboarding_screen.dart';
 import '../screens/settings/ai_models_settings_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/start/start_page_screen.dart';
@@ -364,6 +365,24 @@ class _HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (ref.watch(demoModeProvider)) return const DashboardScreen();
     if (ref.watch(nativeCompanionRuntimeProvider)) {
+      final onboarding = ref.watch(permissionOnboardingCompletedProvider);
+      if (onboarding.isLoading) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      if (onboarding.hasError) {
+        return Scaffold(
+          body: Center(
+            child: OutlinedButton(
+              onPressed: () =>
+                  ref.invalidate(permissionOnboardingCompletedProvider),
+              child: const Text('Retry loading setup'),
+            ),
+          ),
+        );
+      }
+      if (onboarding.asData?.value != true) {
+        return const CompanionOnboardingScreen();
+      }
       final snapshot = ref.watch(companionSnapshotProvider);
       return snapshot.when(
         skipLoadingOnRefresh: false,

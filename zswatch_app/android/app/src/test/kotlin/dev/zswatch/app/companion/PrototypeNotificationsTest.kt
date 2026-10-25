@@ -153,7 +153,7 @@ class PrototypeNotificationsTest {
     }
 
     @Test fun replyableNotificationsAreMarkedForTheWatch() {
-        val inbox = PrototypeNotifications(store()); inbox.configure(true, listOf(packageName))
+        val inbox = PrototypeNotifications(store()); inbox.configure(true, emptyList())
         inbox.post(notification("first") + mapOf("canReply" to true), 0)
         inbox.post(notification("second"), 0)
         val first = JSONObject(inbox.next(1, 0)!!.also { inbox.written(it, 1) }.packet.removePrefix("GB(").removeSuffix(")"))
@@ -164,7 +164,7 @@ class PrototypeNotificationsTest {
 
     @Test fun watchReplyFindsOnlyANotificationSentOnThisSession() {
         val journal = store(); journal.update("session", mapOf("generation" to 1L))
-        val inbox = PrototypeNotifications(journal); inbox.configure(true, listOf(packageName))
+        val inbox = PrototypeNotifications(journal); inbox.configure(true, emptyList())
         inbox.post(notification() + mapOf("canReply" to true), 0)
         val delivery = inbox.next(1, 0)!!
         fun reply(id: Any, msg: Any = " Ja gärna! ") =
@@ -181,6 +181,9 @@ class PrototypeNotificationsTest {
         assertNull(inbox.reply(reply(delivery.id, "x".repeat(PrototypeNotifications.MAX_REPLY_LENGTH + 1)), 1, 0))
         assertNull(inbox.reply(reply("1000000"), 1, 0))
         assertNull(inbox.reply(JSONObject().put("t", "notify").put("n", "DISMISS").put("id", delivery.id), 1, 0))
+        // Default-all-app forwarding and replies share the same opt-out policy.
+        inbox.configure(true, listOf(packageName))
+        assertNull(inbox.reply(reply(delivery.id), 1, 0)!!.key)
     }
 
     @Test fun unknownActionAndInvalidIdCannotDismissOtherAndroidNotifications() {

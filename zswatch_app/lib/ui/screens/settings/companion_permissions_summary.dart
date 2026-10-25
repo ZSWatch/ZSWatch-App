@@ -11,7 +11,12 @@ final companionPermissionsStatusProvider = FutureProvider.autoDispose((ref) {
 
 /// Read-only on entry; permission prompts happen only after an explicit tap.
 class CompanionPermissionsSummary extends ConsumerStatefulWidget {
-  const CompanionPermissionsSummary({super.key});
+  const CompanionPermissionsSummary({
+    super.key,
+    this.initiallyExpanded = false,
+  });
+
+  final bool initiallyExpanded;
 
   @override
   ConsumerState<CompanionPermissionsSummary> createState() =>
@@ -85,6 +90,7 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
         .watch(companionPermissionsStatusProvider)
         .when(
           data: (status) => ExpansionTile(
+            initiallyExpanded: widget.initiallyExpanded,
             leading: const Icon(Icons.security),
             title: const Text('App Permissions'),
             subtitle: Text(
