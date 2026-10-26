@@ -539,7 +539,9 @@ class _DownloadSection extends ConsumerWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: AppTheme.spacingSm),
-              if (state.phase == CoredumpDownloadPhase.downloading)
+              // Native transfers report no progress; keep those indeterminate.
+              if (state.phase == CoredumpDownloadPhase.downloading &&
+                  state.downloadProgress > 0)
                 LinearProgressIndicator(value: state.downloadProgress)
               else
                 const LinearProgressIndicator(),

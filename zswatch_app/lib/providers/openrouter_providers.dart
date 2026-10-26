@@ -104,9 +104,11 @@ class OpenRouterKeyNotifier extends StateNotifier<AsyncValue<String?>> {
   final Ref _ref;
 
   Future<void> _load() async {
-    state = await AsyncValue.guard(
+    final key = await AsyncValue.guard(
       () => _ref.read(companionClientProvider).cloudCredential(),
     );
+    // Demo Mode can replace this notifier while the key loads.
+    if (mounted) state = key;
   }
 
   /// Validates [key] with OpenRouter before storing it. Throws

@@ -84,8 +84,12 @@ final class CompanionHttpRelay {
     for entry in old.values { entry.cancel(); observe(entry.generation, "connection_closed", 0) }
   }
   func disable() { for (id, entry) in pending { complete(id, entry, .failure(CompanionFailure.unavailable("HTTP relay disabled"))) } }
+  /// HTTPS anywhere; plain HTTP only to this phone (the HIL probe), like Android.
   static func validURL(_ url: URL) -> Bool {
-    ["http", "https"].contains(url.scheme?.lowercased() ?? "") && !(url.host ?? "").isEmpty && url.user == nil && url.password == nil
+    let host = url.host?.lowercased() ?? ""
+    let scheme = url.scheme?.lowercased() ?? ""
+    let allowed = scheme == "https" || (scheme == "http" && ["localhost", "127.0.0.1", "::1"].contains(host))
+    return allowed && !host.isEmpty && url.user == nil && url.password == nil
   }
   private static func packet(_ fields: [String: Any]) -> String {
     let bytes = try! JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys, .withoutEscapingSlashes])

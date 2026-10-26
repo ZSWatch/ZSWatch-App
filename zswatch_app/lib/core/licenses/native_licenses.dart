@@ -9,7 +9,7 @@ void registerNativeLicenses() {
       'assets/licenses/shared.md',
       if (defaultTargetPlatform == TargetPlatform.iOS)
         'assets/licenses/ios.md'
-      else
+      else if (defaultTargetPlatform == TargetPlatform.android)
         'assets/licenses/android.md',
     ];
     for (final file in files) {
