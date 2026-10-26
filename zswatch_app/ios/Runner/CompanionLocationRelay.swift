@@ -65,7 +65,6 @@ final class CompanionLocationRelay: NSObject, CLLocationManagerDelegate {
       manager.startUpdatingLocation()
       if let cached = manager.location {
         self.locationManager(manager, didUpdateLocations: [cached])
-        if self.lastWrite != nil { self.cachedTimestamp = cached.timestamp }
       }
       DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
         if self.token == token, self.requested, self.lastWrite == nil {
@@ -94,7 +93,7 @@ final class CompanionLocationRelay: NSObject, CLLocationManagerDelegate {
     } else {
       guard lastWrite == nil || Date().timeIntervalSince(lastWrite!) >= 5 else { return }
     }
-    cachedTimestamp = nil
+    cachedTimestamp = lastWrite == nil ? fix.timestamp : nil
     lastWrite = Date(); let token = self.token; let generation = self.generation
     send(generation, watchToken, fix) {
       DispatchQueue.main.async {

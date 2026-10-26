@@ -7,67 +7,78 @@ import 'package:zswatch_app/services/ai/llm_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test(
-    'transcription checkpoint completes without any STT or LLM model access',
-    () async {
-      final root = await Directory.systemTemp.createTemp(
-        'voice-transcribe-only-',
-      );
-      final recording = await seedCompanionRecording(root);
-      const paths = MethodChannel('plugins.flutter.io/path_provider');
-      final pathCalls = <String>[];
-      final messenger =
-          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-      messenger.setMockMethodCallHandler(paths, (call) async {
-        pathCalls.add(call.method);
-        if (call.method != 'getApplicationSupportDirectory') {
-          throw StateError('Unexpected model/scratch access');
-        }
-        return root.path;
-      });
-      addTearDown(() async {
-        messenger.setMockMethodCallHandler(paths, null);
-        await root.delete(recursive: true);
-      });
-      final result = await processCompanionVoiceRecording(
-        {
-          'version': 1,
-          'spec': {
-            'provider': 'dart-voice-v1',
-            'backend': 'local',
-            'upload_authorized': false,
-            'pipeline_revision': 'transcribe-v1',
-            'recording_id': recording.identity,
-            'input_sha256': recording.sha256,
-            'watch_id': recording.watchId,
-            'model': 'whisperTinyEn|model-that-is-not-installed|false',
-          },
-          'recording': {
-            'address': recording.watchId,
-            'filename': recording.filename,
-            'timestamp': recording.timestampUtc.millisecondsSinceEpoch ~/ 1000,
-            'duration_ms': recording.durationMs,
-            'size_bytes': recording.sizeBytes,
-            'state': 'downloaded',
-            'local_path': recording.localPath,
-            'sha256': recording.sha256,
-          },
-          'transcript': 'Saved speech from before process death',
+  for (final filename in ['memo_001', 'chat_20261022_001349', 'reply_001']) {
+    for (final cloudAnalysis in [false, true]) {
+      final analysisModel = cloudAnalysis
+          ? 'openrouter:unused-analysis-model'
+          : 'model-that-is-not-installed';
+      test(
+        'transcription checkpoint for $filename completes without model access $analysisModel',
+        () async {
+          final root = await Directory.systemTemp.createTemp(
+            'voice-transcribe-only-',
+          );
+          final recording = await seedCompanionRecording(
+            root,
+            filename: filename,
+          );
+          const paths = MethodChannel('plugins.flutter.io/path_provider');
+          final pathCalls = <String>[];
+          final messenger =
+              TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+          messenger.setMockMethodCallHandler(paths, (call) async {
+            pathCalls.add(call.method);
+            if (call.method != 'getApplicationSupportDirectory') {
+              throw StateError('Unexpected model/scratch access');
+            }
+            return root.path;
+          });
+          addTearDown(() async {
+            messenger.setMockMethodCallHandler(paths, null);
+            await root.delete(recursive: true);
+          });
+          final result = await processCompanionVoiceRecording(
+            {
+              'version': 1,
+              'spec': {
+                'provider': 'dart-voice-v1',
+                'backend': cloudAnalysis ? 'openrouter' : 'local',
+                'upload_authorized': cloudAnalysis,
+                'pipeline_revision': 'transcribe-v1',
+                'recording_id': recording.identity,
+                'input_sha256': recording.sha256,
+                'watch_id': recording.watchId,
+                'model': 'whisperTinyEn|$analysisModel|false',
+              },
+              'recording': {
+                'address': recording.watchId,
+                'filename': recording.filename,
+                'timestamp':
+                    recording.timestampUtc.millisecondsSinceEpoch ~/ 1000,
+                'duration_ms': recording.durationMs,
+                'size_bytes': recording.sizeBytes,
+                'state': 'downloaded',
+                'local_path': recording.localPath,
+                'sha256': recording.sha256,
+              },
+              'transcript': 'Saved speech from before process death',
+            },
+            saveTranscript: (_) async =>
+                fail('Committed speech must not be retranscribed'),
+          );
+          expect(result, {
+            'version': 1,
+            'transcript': 'Saved speech from before process death',
+            'summary': '',
+            'category': '',
+            'actions': <Object?>[],
+          });
+          expect(pathCalls, ['getApplicationSupportDirectory']);
+          expect(File(recording.localPath!).existsSync(), isTrue);
         },
-        saveTranscript: (_) async =>
-            fail('Committed speech must not be retranscribed'),
       );
-      expect(result, {
-        'version': 1,
-        'transcript': 'Saved speech from before process death',
-        'summary': '',
-        'category': '',
-        'actions': <Object?>[],
-      });
-      expect(pathCalls, ['getApplicationSupportDirectory']);
-      expect(File(recording.localPath!).existsSync(), isTrue);
-    },
-  );
+    }
+  }
   test(
     'unconfigured remote/hybrid jobs never fall back to local voice processing',
     () async {
