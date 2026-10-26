@@ -132,12 +132,12 @@ final class IOSRecordingInbox {
           // The watch's Chat questions are always answered, even with memo processing off.
           let name = original["filename"] as? String ?? ""
           let question = name.hasPrefix("chat_") || name.hasPrefix("chatr_")
-          // Their models come from the last saved policy, also one saved for another watch.
+          // Processing preferences apply to every watch; the request keeps its source identity.
           if var policy = owner.journal.fields["voice_processing_policy"] as? [String: Any],
-             question || (policy["enabled"] as? Bool == true && policy["watch_id"] as? String == owner.journal.address) {
+             question || policy["enabled"] as? Bool == true {
+            policy["watch_id"] = owner.journal.address
             if question {
               policy["analysis_enabled"] = true
-              policy["watch_id"] = owner.journal.address
             }
             metadata["processing_request"] = policy
           }

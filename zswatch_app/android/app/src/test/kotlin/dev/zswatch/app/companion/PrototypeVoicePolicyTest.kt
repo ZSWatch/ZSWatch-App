@@ -60,10 +60,10 @@ class PrototypeVoicePolicyTest {
         assertFalse(PrototypeVoicePolicy.validTarget("invalid", "invalid"))
     }
 
-    @Test fun requestsAreWatchScopedAndCaptureConfiguration() {
+    @Test fun requestsUseAppPreferenceAndCaptureSourceWatch() {
         val config = PrototypeVoicePolicy.configuration("kbWhisperBase", "qwen", false)
         val policy = config + mapOf("watch_id" to "watch-a", "enabled" to true)
-        assertNull(PrototypeVoicePolicy.recordingRequest(policy, "watch-b"))
+        assertEquals("watch-b", PrototypeVoicePolicy.recordingRequest(policy, "watch-b")!!["watch_id"])
         assertNull(PrototypeVoicePolicy.recordingRequest(policy + ("enabled" to false), "watch-a"))
         val request = PrototypeVoicePolicy.recordingRequest(policy, "watch-a")!!
         assertEquals("kbWhisperBase|qwen|false", PrototypeVoicePolicy.model(request))

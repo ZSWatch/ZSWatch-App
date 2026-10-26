@@ -27,17 +27,11 @@ final companionVoicePolicySyncProvider = Provider<void>((ref) {
   final raw = snapshot?.fields['voice_processing_policy'];
   final policy = raw is Map ? raw : null;
   final enabled = policy?['enabled'] == true;
-  if (watch == null ||
-      snapshot?.fields['desired_running'] != true ||
-      // Leave automatic processing of another watch alone.
-      (enabled &&
-          policy?['watch_id'] != '' &&
-          policy?['watch_id'] != watch.id)) {
+  if (watch == null || snapshot?.fields['desired_running'] != true) {
     return;
   }
   final config = ref.watch(voiceModelConfigProvider);
   if (policy != null &&
-      policy['watch_id'] == watch.id &&
       policy['transcription_model'] == config.transcriptionModel &&
       policy['analysis_model'] == config.analysisModel &&
       policy['correct_transcription'] == config.correctTranscription) {

@@ -110,9 +110,7 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
     final snapshot = ref.watch(companionSnapshotProvider).asData?.value;
     final raw = snapshot?.fields['voice_processing_policy'];
     final policy = raw is Map ? raw : const <Object?, Object?>{};
-    final enabled =
-        policy['enabled'] == true &&
-        policy['watch_id'] == (snapshot?.watch?.id ?? '');
+    final enabled = policy['enabled'] == true;
     final config = ref.watch(voiceModelConfigProvider);
     final changed =
         policy['transcription_model'] != config.transcriptionModel ||
@@ -126,7 +124,7 @@ class _VoicePolicyState extends ConsumerState<CompanionVoicePolicyTile> {
           subtitle: Text(
             '${config.cloud ? 'Sends each new recording to OpenRouter with zero data retention, right after it arrives.' : '${config.canAnalyze ? 'Uses the selected local models' : 'Transcribes with the selected speech model'}. Audio stays on this phone.'} '
             '${snapshot?.watch == null ? 'Your choice is saved for when you connect your watch. ' : ''}'
-            'Existing recordings are processed manually. Turning this off '
+            'Applies to all your watches. Existing recordings are processed manually. Turning this off '
             'leaves already queued jobs running.',
           ),
           value: enabled,
