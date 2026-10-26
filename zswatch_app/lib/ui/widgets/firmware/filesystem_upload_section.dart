@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -49,7 +50,7 @@ class FilesystemUploadSection extends StatelessWidget {
             ),
           ),
         ),
-        _PushedFiles(onFileSelected: onFileSelected),
+        if (kDebugMode) _PushedFiles(onFileSelected: onFileSelected),
         const SizedBox(height: AppTheme.spacingSm),
         Text(
           'Select a firmware package .zip or lvgl_resources_raw.bin.',
@@ -101,15 +102,14 @@ class FilesystemUploadSection extends StatelessWidget {
 /// `xcrun devicectl device copy to --domain-type appDataContainer ...`, or on
 /// Android `adb push` to `Android/data/<package>/files/dev_drop`.
 /// Lets hardware tests run a firmware update without the document picker.
-/// Shows nothing unless such files exist.
+/// Only included in debug builds; shows nothing unless such files exist.
 class _PushedFiles extends StatelessWidget {
   final void Function(String) onFileSelected;
 
   const _PushedFiles({required this.onFileSelected});
 
   static Future<List<File>> _list() async {
-    // Android: adb cannot write a release app's internal storage, but it can
-    // write its external files directory.
+    // Android: adb push can write the app's external files directory.
     final roots = [
       await getApplicationSupportDirectory(),
       if (Platform.isAndroid) await getExternalStorageDirectory(),
