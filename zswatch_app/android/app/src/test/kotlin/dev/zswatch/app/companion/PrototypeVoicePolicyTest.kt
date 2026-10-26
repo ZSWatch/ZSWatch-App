@@ -18,16 +18,17 @@ class PrototypeVoicePolicyTest {
                     .put("size_bytes", 100).put("duration_ms", 1000))))
         discover("old")
         val config = PrototypeVoicePolicy.configuration("kbWhisperBase", "qwen", false)
+        val request = config + mapOf("watch_id" to "watch-a")
         store.update("enabled", mapOf("voice_processing_policy" to
             (config + mapOf("watch_id" to "watch-a", "enabled" to true))))
         discover("old"); discover("new")
         store = PrototypeStore(java.io.File(temporary.root, "inbox"))
         assertFalse(store.record("watch-a:old:123:100:1000")!!.containsKey("processing_request"))
-        assertEquals(config, store.record("watch-a:new:123:100:1000")!!["processing_request"])
+        assertEquals(request, store.record("watch-a:new:123:100:1000")!!["processing_request"])
         store.update("disabled", mapOf("voice_processing_policy" to
             (config + mapOf("watch_id" to "watch-a", "enabled" to false))))
         discover("new"); discover("off")
-        assertEquals(config, store.record("watch-a:new:123:100:1000")!!["processing_request"])
+        assertEquals(request, store.record("watch-a:new:123:100:1000")!!["processing_request"])
         assertFalse(store.record("watch-a:off:123:100:1000")!!.containsKey("processing_request"))
     }
     @Test fun invalidAndOverCapacityListEntriesAreSkippedWithoutFailingTheList() {
