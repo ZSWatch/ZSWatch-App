@@ -55,7 +55,10 @@ class CompanionGpsSetup {
     if (preferences.getBool(SettingsKeys.watchLocationDefaultApplied) == true) {
       return;
     }
-    if (snapshot.fields['gps_enabled'] != true) {
+    // Only fresh native journals opt into the permission-driven default.
+    // Older journals cannot distinguish an unapplied default from an explicit off.
+    if (snapshot.fields['gps_default_eligible'] == true &&
+        snapshot.fields['gps_enabled'] != true) {
       await _client.configureGps(true);
     }
     await preferences.setBool(SettingsKeys.watchLocationDefaultApplied, true);

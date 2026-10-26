@@ -14,7 +14,11 @@ import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/settings/companion_gps_settings_tile.dart';
 
-Map<String, Object?> fields({bool enabled = false, int cursor = 1}) => {
+Map<String, Object?> fields({
+  bool enabled = false,
+  int cursor = 1,
+  bool? defaultEligible = true,
+}) => {
   'version': 1,
   'owner': 'android_service_native',
   'runtime_active': false,
@@ -25,6 +29,7 @@ Map<String, Object?> fields({bool enabled = false, int cursor = 1}) => {
   'events': <Object?>[],
   'recordings': <String, Object?>{},
   'gps_enabled': enabled,
+  if (defaultEligible != null) 'gps_default_eligible': defaultEligible,
   'gps_permissions': {'foreground': true, 'background': true, 'services': true},
 };
 
@@ -104,6 +109,30 @@ void main() {
       expect((calls.last.arguments as Map)['enabled'], false);
     },
   );
+
+  for (final eligibility in <bool?>[null, false]) {
+    test(
+      'permission refresh preserves an existing GPS opt-out ($eligibility)',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        final calls = <MethodCall>[];
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          calls.add(call);
+          return fields(defaultEligible: eligibility);
+        });
+        final owner = CompanionGpsSetup(
+          const CompanionPrototypeClient(),
+          () async => prefs,
+        );
+        await owner.enableDefaultIfGranted({
+          'location': true,
+          'background_location': true,
+        });
+        expect(calls.map((call) => call.method), ['snapshot']);
+        expect(prefs.getBool(SettingsKeys.watchLocationDefaultApplied), true);
+      },
+    );
+  }
 
   test('failed permission default remains retryable', () async {
     final prefs = await SharedPreferences.getInstance();
