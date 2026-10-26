@@ -4,7 +4,7 @@ package dev.zswatch.app.companion
 object PrototypeVoicePolicy {
     private val CLOUD_MODEL = Regex("openrouter:[A-Za-z0-9._:/-]{1,200}")
     fun isCloud(model: String) = model.startsWith("openrouter:")
-    /** Empty target is an onboarding default, bound to the first selected watch by the UI. */
+    /** Reject stale settings writes from a previously selected watch. */
     fun validTarget(watch: String, selected: String?): Boolean =
         if (watch.isEmpty()) selected.isNullOrEmpty()
         else watch == selected && Regex("[0-9A-F]{2}(:[0-9A-F]{2}){5}").matches(watch)
@@ -25,10 +25,11 @@ object PrototypeVoicePolicy {
     fun recordingRequest(policy: Any?, watchId: String, filename: String = ""): Map<String, Any>? {
         val value = policy as? Map<*, *> ?: return null
         val question = isQuestion(filename) || isReply(filename)
-        // Questions use the last saved models, also ones saved for another watch.
-        if (!question && (value["enabled"] != true || value["watch_id"] != watchId)) return null
+        // Automatic processing is an app preference; each request still records its source watch.
+        if (!question && value["enabled"] != true) return null
         return configuration(value["transcription_model"] as String, value["analysis_model"] as String,
-            value["correct_transcription"] as Boolean, question || value["analysis_enabled"] != false)
+            value["correct_transcription"] as Boolean, question || value["analysis_enabled"] != false) +
+            mapOf("watch_id" to watchId)
     }
 
     fun model(request: Map<*, *>): String {
