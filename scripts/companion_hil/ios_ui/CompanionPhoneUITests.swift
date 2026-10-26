@@ -352,9 +352,11 @@ final class CompanionPhoneUITests: XCTestCase {
         try require(exact("Welcome to ZSWatch").waitForExistence(timeout: 30), "No first-run setup", capture: "no-setup")
         screenshot("setup")
         let title = try reveal(exact("Location"), "Location")
-        let allow = app.buttons.matching(NSPredicate(format: "label == %@", "Allow")).allElementsBoundByIndex
-            .first { $0.isHittable && abs($0.frame.midY - title.frame.midY) < 40 }
-        if let allow {
+        func locationAllow() -> XCUIElement? {
+            app.buttons.matching(NSPredicate(format: "label == %@", "Allow")).allElementsBoundByIndex
+                .first { $0.isHittable && abs($0.frame.midY - title.frame.midY) < 40 }
+        }
+        if let allow = locationAllow() {
             allow.tap()
             try tap(app.buttons["Continue"], "location guidance Continue")
             for label in ["Allow While Using App", "Change to Always Allow", "Allow"] {
@@ -367,6 +369,9 @@ final class CompanionPhoneUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 2)
             screenshot("after-allow")
         }
+        // Granted only with Always: While Using keeps the row's Allow button.
+        try require(locationAllow() == nil && !containing("While using app only").exists,
+                    "Background location not granted", capture: "location-not-always")
         try tap(app.buttons["Continue to watch setup"], "Continue to watch setup")
         try require(exact("Add watch").waitForExistence(timeout: 10), "Not on Add watch", capture: "after-setup")
     }
@@ -478,13 +483,13 @@ final class CompanionPhoneUITests: XCTestCase {
                 field.tap(); field.typeText("milk\n")
                 Thread.sleep(forTimeInterval: 2)
                 screenshot("store-VoiceSearch")
-                let row = any("label BEGINSWITH '2026'")
-                if row.exists {
-                    try reveal(row, "milk memo").tap()
-                    Thread.sleep(forTimeInterval: 2)
-                    screenshot("store-VoiceDetail")
-                    if app.buttons["Close"].exists { app.buttons["Close"].tap() }
-                }
+                // Memo rows start with their date.
+                let row = any("label MATCHES %@", "(?s)20[0-9]{2}.*")
+                try require(row.waitForExistence(timeout: 5), "No memo matches milk", capture: "no-milk-memo")
+                try reveal(row, "milk memo").tap()
+                Thread.sleep(forTimeInterval: 2)
+                screenshot("store-VoiceDetail")
+                if app.buttons["Close"].exists { app.buttons["Close"].tap() }
             }
             app.buttons["Back"].tap()
         }

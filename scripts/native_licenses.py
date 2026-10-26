@@ -1,11 +1,13 @@
 """Writes zswatch_app/assets/licenses/*.md: licenses of native libraries that
 Flutter's license page does not collect (CocoaPods, Gradle, vendored C++).
 
-Run after `pod install` when native dependencies change:
+Run after `pod install` and an Android build (for the Gradle cache) when
+native dependencies change:
   python3 scripts/native_licenses.py
 """
 
 import re
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -14,6 +16,16 @@ OUT = APP / "assets" / "licenses"
 PODS_ACK = APP / "ios/Pods/Target Support Files/Pods-Runner/Pods-Runner-acknowledgements.markdown"
 APACHE = (APP / "ios/Pods/iOSMcuManagerLibrary/LICENSE").read_text()
 GGML_MIT = (ROOT / "third_party/fllama/src/llama.cpp/LICENSE").read_text()
+
+
+def litert_lm_license():
+    """LiteRT-LM's LICENSE from the AAR that build.gradle.kts pins."""
+    gradle = (APP / "android/app/build.gradle.kts").read_text()
+    version = re.search(r"litertlm-android:([^\"]+)", gradle).group(1)
+    cache = Path.home() / ".gradle/caches/modules-2/files-2.1/com.google.ai.edge.litertlm/litertlm-android" / version
+    aar = next(cache.glob(f"*/litertlm-android-{version}.aar"))
+    return zipfile.ZipFile(aar).read("LICENSE").decode()
+
 
 # Pods that come from Flutter plugins are already listed by Flutter.
 NATIVE_PODS = {
@@ -103,7 +115,7 @@ write("ios.md", pods())
 write("android.md", [
     ("nRF Connect Device Manager (mcumgr-android)", BSD3_NORDIC),
     ("Nordic Android BLE Library", BSD3_NORDIC),
-    ("LiteRT-LM", APACHE),
+    ("LiteRT-LM", litert_lm_license()),
 ])
 write("shared.md", [
     ("llama.cpp, ggml", GGML_MIT),

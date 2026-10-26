@@ -107,12 +107,13 @@ private class AndroidGpsSource(private val context: Context) : PrototypeGpsSourc
         if (Build.VERSION.SDK_INT >= 31 && manager.hasProvider(LocationManager.FUSED_PROVIDER) &&
             manager.isProviderEnabled(LocationManager.FUSED_PROVIDER)) providers.add(LocationManager.FUSED_PROVIDER)
         check(providers.isNotEmpty()) { "No location provider available" }
-        val signal = CancellationSignal()
-        val stop = { signal.cancel(); manager.removeUpdates(listener) }
+        // One signal per request: a signal holds a single cancel listener.
+        val signals = providers.map { CancellationSignal() }
+        val stop = { signals.forEach { it.cancel() }; manager.removeUpdates(listener) }
         try {
             providers.forEach { manager.requestLocationUpdates(it, 5000L, 0f, listener, PrototypeHub.worker.looper) }
             // With coarse access only, Android throttles updates to 10 minutes; ask for one fix now.
-            if (Build.VERSION.SDK_INT >= 30) providers.forEach { provider ->
+            if (Build.VERSION.SDK_INT >= 30) providers.zip(signals).forEach { (provider, signal) ->
                 manager.getCurrentLocation(provider, signal, { PrototypeHub.worker.post(it) }) { location ->
                     if (location != null && !signal.isCanceled) fix(convert(location))
                 }
