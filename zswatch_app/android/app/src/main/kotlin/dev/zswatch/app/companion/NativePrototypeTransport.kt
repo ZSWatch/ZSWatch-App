@@ -2,10 +2,13 @@
 package dev.zswatch.app.companion
 
 import android.bluetooth.*
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import androidx.core.content.ContextCompat
 import dev.zswatch.app.LifecycleLogger
@@ -520,6 +523,15 @@ class NativePrototypeTransport(private val context: Context, private val handler
                     "utc_ms" to System.currentTimeMillis())))
         },
     )
+
+    override fun connectionUnavailableReason(): String? {
+        if (Build.VERSION.SDK_INT >= 31 && ContextCompat.checkSelfPermission(context,
+                Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED)
+            return "Allow Bluetooth access in Settings to connect your watch."
+        val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
+            ?: return "Bluetooth is unavailable on this phone."
+        return if (adapter.isEnabled) null else "Turn on Bluetooth to connect your watch."
+    }
 
     override fun connect(address: String, generation: Long) {
         close()

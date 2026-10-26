@@ -18,7 +18,9 @@ class PrototypeContractsTest {
     private class Link : PrototypeTransport {
         val sessions = mutableListOf<Pair<String, Long>>()
         var closes = 0
+        var unavailableReason: String? = null
         var onConnect: ((Long) -> Unit)? = null
+        override fun connectionUnavailableReason() = unavailableReason
         override fun connect(address: String, generation: Long) { sessions.add(address to generation); onConnect?.invoke(generation) }
         override fun close() { closes++ }
     }
@@ -206,6 +208,53 @@ class PrototypeContractsTest {
         assertEquals("error", runtime.store.control()["phase"])
         assertEquals(true, runtime.store.control()["desired_running"])
         assertEquals(false, runtime.store.snapshot(runtime.active)["protocol_ready"])
+        assertEquals(1, link.closes)
+        assertEquals("Could not connect to your watch. Try again.", runtime.store.control()["last_error"])
+    }
+
+    @Test fun bluetoothOffWaitsWithoutGattAndResumesWhenEnabled() {
+        val link = Link(); link.unavailableReason = "Turn on Bluetooth to connect your watch."
+        val runtime = PrototypeRuntime(store(), link); runtime.start(address)
+        assertTrue(link.sessions.isEmpty())
+        assertEquals("disconnected", runtime.store.control()["phase"])
+        assertEquals(link.unavailableReason, runtime.store.control()["last_error"])
+        assertEquals(true, runtime.store.control()["desired_running"])
+        runtime.recoverForSystem()
+        assertTrue(link.sessions.isEmpty())
+        link.unavailableReason = null
+        assertTrue(runtime.recoverForSystem())
+        assertEquals(1, link.sessions.size)
+        assertEquals("connecting", runtime.store.control()["phase"])
+        assertNull(runtime.store.control()["last_error"])
+    }
+
+    @Test fun stopWhileBluetoothOffPreventsRadioOnFromConnecting() {
+        val link = Link(); link.unavailableReason = "Turn on Bluetooth to connect your watch."
+        val runtime = PrototypeRuntime(store(), link); runtime.start(address); runtime.stop()
+        link.unavailableReason = null
+        assertFalse(runtime.recoverForSystem())
+        assertTrue(link.sessions.isEmpty())
+        assertEquals(false, runtime.store.control()["desired_running"])
+    }
+
+    @Test fun radioDisabledBetweenPreflightAndGattReportsActionableState() {
+        val link = Link()
+        link.onConnect = {
+            link.unavailableReason = "Turn on Bluetooth to connect your watch."
+            throw IllegalStateException("Bluetooth is disabled")
+        }
+        val runtime = PrototypeRuntime(store(), link); runtime.start(address)
+        assertEquals("disconnected", runtime.store.control()["phase"])
+        assertEquals(link.unavailableReason, runtime.store.control()["last_error"])
+        assertEquals(true, runtime.store.control()["desired_running"])
+        assertEquals(1, link.closes)
+    }
+
+    @Test fun permissionRevokedDuringConnectDoesNotShowAnExceptionClass() {
+        val link = Link(); link.onConnect = { throw SecurityException("BLUETOOTH_CONNECT") }
+        val runtime = PrototypeRuntime(store(), link); runtime.start(address)
+        assertEquals("disconnected", runtime.store.control()["phase"])
+        assertEquals("Allow Bluetooth access in Settings to connect your watch.", runtime.store.control()["last_error"])
         assertEquals(1, link.closes)
     }
 
