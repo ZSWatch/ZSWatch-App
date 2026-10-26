@@ -331,7 +331,7 @@ void main() {
   );
 
   testWidgets(
-    'voice choices saved before pairing bind to the first watch without changing analysis',
+    'voice choices saved before pairing apply to the first watch unchanged',
     (tester) async {
       SharedPreferences.setMockInitialValues({});
       hasCloudKey = true;
@@ -344,15 +344,11 @@ void main() {
       };
       await mount(tester, state);
       await tester.pumpAndSettle();
-      final savedPolicy =
-          calls
-                  .where((call) => call.method == 'configureVoiceProcessing')
-                  .single
-                  .arguments
-              as Map;
-      expect(savedPolicy['watch_id'], 'AA:BB:CC:DD:EE:FF');
-      expect(savedPolicy['enabled'], true);
-      expect(savedPolicy['analysis_enabled'], false);
+      // Automatic processing is an app preference, so nothing is rewritten.
+      expect(
+        calls.where((call) => call.method == 'configureVoiceProcessing'),
+        isEmpty,
+      );
       expect(calls.where((call) => call.method == 'processRecording'), isEmpty);
       expect(forbidden, isEmpty);
     },
