@@ -191,22 +191,24 @@ class FirmwareManager {
 
   /// Fetch workflow runs with artifacts from GitHub Actions
   ///
-  /// Similar to the website implementation, this fetches recent successful builds
-  /// and prioritizes the main branch.
+  /// Matches the firmware website: successful firmware workflows only, latest
+  /// available build per branch, with main prioritized.
   Future<List<WorkflowRun>> fetchWorkflowRuns({int numRuns = 10}) async {
     _log('Fetching workflow runs from GitHub Actions...');
 
     try {
-      // Fetch a large window so that non-firmware runs (security scans, etc.)
-      // don't crowd out actual firmware builds from different branches.
+      // Query the same workflows as the website so unrelated repository jobs
+      // cannot crowd feature-branch firmware builds out of the result window.
       final responses = await Future.wait([
         http.get(
-          Uri.parse('$_apiBase/repos/$_owner/$_repo/actions/runs?per_page=50'),
+          Uri.parse(
+            '$_apiBase/repos/$_owner/$_repo/actions/workflows/ci.yml/runs?per_page=50&status=success',
+          ),
           headers: {'Accept': 'application/vnd.github.v3+json'},
         ),
         http.get(
           Uri.parse(
-            '$_apiBase/repos/$_owner/$_repo/actions/runs?branch=main&status=success&per_page=1',
+            '$_apiBase/repos/$_owner/$_repo/actions/workflows/build-main.yml/runs?branch=main&status=success&per_page=10',
           ),
           headers: {'Accept': 'application/vnd.github.v3+json'},
         ),
@@ -218,6 +220,12 @@ class FirmwareManager {
       if (runsResponse.statusCode != 200) {
         throw FirmwareDownloadException(
           'Failed to fetch workflow runs: ${runsResponse.statusCode}',
+        );
+      }
+
+      if (mainRunResponse.statusCode != 200) {
+        throw FirmwareDownloadException(
+          'Failed to fetch main firmware builds: ${mainRunResponse.statusCode}',
         );
       }
 
@@ -236,8 +244,9 @@ class FirmwareManager {
 
       _log('Found ${workflowRuns.length} workflow runs');
 
-      // Filter for successful runs, excluding gh-pages
-      final successfulRuns = workflowRuns
+      // Main comes first; older main builds remain candidates if newer ones
+      // have no unexpired firmware artifacts.
+      final candidateRuns = [...mainBranchRuns, ...workflowRuns]
           .map((r) => r as Map<String, dynamic>)
           .where(
             (run) =>
@@ -246,45 +255,25 @@ class FirmwareManager {
           )
           .toList();
 
-      // Find latest main run
-      final latestMainRun = mainBranchRuns
-          .map((r) => r as Map<String, dynamic>)
-          .where((run) => run['conclusion'] == 'success')
-          .firstOrNull;
-
-      // Ensure main is present by prepending it before trimming
-      final List<Map<String, dynamic>> runsWithMain = [
-        if (latestMainRun != null) latestMainRun,
-        ...successfulRuns,
-      ];
-
-      // Keep only the latest run per branch (runs are already sorted newest-first).
-      // Deduplicating by branch ensures feature branches aren't crowded out by
-      // multiple main-branch runs filling up the numRuns limit.
+      // Only reserve a branch and count toward the limit after finding firmware.
+      // Newer documentation/security runs must not hide an older firmware run.
       final seenBranches = <String>{};
-      final uniqueRuns = runsWithMain
-          .where((run) {
-            final branch = run['head_branch'] as String? ?? '';
-            if (seenBranches.contains(branch)) return false;
-            seenBranches.add(branch);
-            return true;
-          })
-          .take(numRuns)
-          .toList();
-
-      _log('Fetching artifacts from ${uniqueRuns.length} workflow runs...');
+      final seenRunIds = <int>{};
 
       // Fetch artifacts for each run
       final runs = <WorkflowRun>[];
-      for (final run in uniqueRuns) {
+      for (final run in candidateRuns) {
+        if (runs.length >= numRuns) break;
         final runId = run['id'] as int;
+        final branch = run['head_branch'] as String? ?? 'unknown';
+        if (seenBranches.contains(branch) || !seenRunIds.add(runId)) continue;
         final artifacts = await _fetchArtifactsForRun(runId);
 
         // Filter artifacts to match ZSWatch firmware
         final filteredArtifacts = artifacts.where((artifact) {
-          return _artifactFilters.any(
-            (filter) => artifact.name.contains(filter),
-          );
+          final name = artifact.name.toLowerCase();
+          return !name.endsWith('.sha256') &&
+              _artifactFilters.any(name.contains);
         }).toList();
 
         if (filteredArtifacts.isEmpty) {
@@ -292,11 +281,12 @@ class FirmwareManager {
           continue;
         }
 
+        seenBranches.add(branch);
         final headCommit = run['head_commit'] as Map<String, dynamic>?;
         runs.add(
           WorkflowRun(
             id: runId,
-            branch: run['head_branch'] as String? ?? 'unknown',
+            branch: branch,
             user:
                 (run['actor'] as Map<String, dynamic>?)?['login'] as String? ??
                 'unknown',
@@ -327,16 +317,15 @@ class FirmwareManager {
     try {
       final response = await http.get(
         Uri.parse(
-          '$_apiBase/repos/$_owner/$_repo/actions/runs/$runId/artifacts',
+          '$_apiBase/repos/$_owner/$_repo/actions/runs/$runId/artifacts?per_page=100',
         ),
         headers: {'Accept': 'application/vnd.github.v3+json'},
       );
 
       if (response.statusCode != 200) {
-        _log(
+        throw FirmwareDownloadException(
           'Failed to fetch artifacts for run $runId: ${response.statusCode}',
         );
-        return [];
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -372,7 +361,7 @@ class FirmwareManager {
           .toList();
     } catch (e) {
       _log('Error fetching artifacts for run $runId: $e');
-      return [];
+      rethrow;
     }
   }
 
