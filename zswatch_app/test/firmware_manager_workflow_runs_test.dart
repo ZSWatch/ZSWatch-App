@@ -52,6 +52,9 @@ void main() {
     int mainStatus = 200,
     int runsStatus = 200,
     int limit = 10,
+    Map<int, int> artifactStatuses = const {},
+    Map<String, String> workflowHeaders = const {},
+    Map<int, Map<String, String>> artifactHeaders = const {},
   }) => http.runWithClient(
     () => manager.fetchWorkflowRuns(numRuns: limit),
     () => MockClient((request) async {
@@ -77,9 +80,14 @@ void main() {
                 ? jsonEncode({'workflow_runs': mainRuns})
                 : 'Service unavailable',
             mainStatus,
+            headers: workflowHeaders,
           );
         }
-        return http.Response(jsonEncode({'workflow_runs': runs}), runsStatus);
+        return http.Response(
+          jsonEncode({'workflow_runs': runs}),
+          runsStatus,
+          headers: workflowHeaders,
+        );
       }
       final match = RegExp(
         r'/actions/runs/(\d+)/artifacts$',
@@ -88,7 +96,11 @@ void main() {
       final id = int.parse(match.group(1)!);
       artifactRequests.add(id);
       expect(uri.queryParameters['per_page'], '100');
-      return http.Response(jsonEncode({'artifacts': artifacts[id] ?? []}), 200);
+      return http.Response(
+        jsonEncode({'artifacts': artifacts[id] ?? []}),
+        artifactStatuses[id] ?? 200,
+        headers: artifactHeaders[id] ?? const {},
+      );
     }),
   );
 
@@ -245,5 +257,88 @@ void main() {
       fetch(runs: [], artifacts: {}, runsStatus: 403),
       throwsA(isA<FirmwareDownloadException>()),
     );
+  });
+
+  test('keeps earlier firmware when a later artifact request fails', () async {
+    final runs = await fetch(
+      runs: [workflow(3, 'main'), workflow(2, 'feature/one')],
+      artifacts: {
+        3: [artifact(30)],
+      },
+      artifactStatuses: {2: 503},
+    );
+    expect(runs.map((run) => run.id), [3]);
+    expect(artifactRequests, [3, 2]);
+  });
+
+  test('reports artifact failures when no firmware was collected', () async {
+    await expectLater(
+      fetch(
+        runs: [workflow(1, 'main')],
+        artifacts: {},
+        artifactStatuses: {1: 403},
+      ),
+      throwsA(isA<FirmwareDownloadException>()),
+    );
+  });
+
+  test('stops at the reported quota and keeps collected firmware', () async {
+    final runs = await fetch(
+      runs: [workflow(2, 'main'), workflow(1, 'feature/one')],
+      artifacts: {
+        2: [artifact(20)],
+        1: [artifact(10)],
+      },
+      workflowHeaders: {'x-ratelimit-remaining': '1'},
+      artifactHeaders: {
+        2: {'x-ratelimit-remaining': '0'},
+      },
+    );
+    expect(runs.map((run) => run.id), [2]);
+    expect(artifactRequests, [2]);
+  });
+
+  test('reports exhausted quota without issuing artifact requests', () async {
+    await expectLater(
+      fetch(
+        runs: [workflow(1, 'main')],
+        artifacts: {},
+        workflowHeaders: {'x-ratelimit-remaining': '0'},
+      ),
+      throwsA(isA<FirmwareDownloadException>()),
+    );
+    expect(artifactRequests, isEmpty);
+  });
+
+  test(
+    'does not cap candidates before reaching firmware-bearing runs',
+    () async {
+      final runs = await fetch(
+        runs: [for (var id = 20; id >= 1; id--) workflow(id, 'branch/$id')],
+        artifacts: {
+          1: [artifact(10)],
+        },
+        limit: 1,
+      );
+      expect(runs.single.id, 1);
+      expect(artifactRequests.length, 20);
+    },
+  );
+
+  test('refresh reuses artifact lookups even with exhausted quota', () async {
+    final source = [workflow(2, 'main'), workflow(1, 'feature/one')];
+    final artifacts = {
+      2: [artifact(20)],
+      1: [artifact(10)],
+    };
+    await fetch(runs: source, artifacts: artifacts);
+    artifactRequests.clear();
+    final refreshed = await fetch(
+      runs: source,
+      artifacts: artifacts,
+      workflowHeaders: {'x-ratelimit-remaining': '0'},
+    );
+    expect(refreshed.map((run) => run.id), [2, 1]);
+    expect(artifactRequests, isEmpty);
   });
 }
