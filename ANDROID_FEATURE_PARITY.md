@@ -171,12 +171,11 @@ permission-onboarding test.
 
 ### Setup preferences follow-up
 
-Voice automatic-processing and analysis controls are now editable before pairing
-and while disconnected on Android and iOS. Before pairing, an explicit choice is
-saved natively as an unbound default; the shared model-policy synchronizer binds
-it to the first selected watch without changing the analysis choice. Existing
-watch policies retain their scope. Choosing these preferences does not process
-old recordings or start a connection.
+Voice automatic-processing and analysis controls are editable before pairing
+and while disconnected on Android and iOS. The saved choices apply across watches;
+switching watches preserves the enabled state and analysis choice. Each recording,
+processing job and result delivery remains bound to its source watch. Choosing
+these preferences does not process old recordings or start a connection.
 
 On Android, the notification listener's first successful access grant enables
 forwarding by default. An explicit saved off switch and blocked apps survive
@@ -191,3 +190,15 @@ disconnected on Android/iOS, and applying the saved choices to the first watch.
 Wireless ADB went offline during the final live voice-screen navigation, so that
 last visual check is not claimed. No new iOS native build/device test was run.
 The app data and entered OpenRouter key were retained; no further wipe occurred.
+
+### Review follow-up — 2026-10-26
+
+Permission-driven GPS defaults now require a fresh-journal eligibility marker on
+both native platforms. Explicit GPS choices consume it, and older journals without
+that marker keep their existing state. iOS can relay the first newer fix immediately
+after a cached seed. Manual transcription/retranscription bypasses reply/chat
+result routing, saving an OpenRouter key updates UI state before applying voice
+preferences, and reply logging guards API-31-only PendingIntent inspection.
+The changes are committed for PR CI; no new local test suite or device acceptance
+is claimed for this follow-up. OnePlus build 20 contains the shared voice preference
+fix; these additional review fixes have not been installed on the phone yet.
