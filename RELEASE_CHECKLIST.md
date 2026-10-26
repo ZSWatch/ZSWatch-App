@@ -1,6 +1,7 @@
 # Release 1.2.0 checklist
 
 Prepared overnight on 2026-10-23, on branch `jakkra_permissions_setup` (not pushed).
+Commit hashes below are from that branch. The work was later cherry-picked onto `feature/dictated-replies`, whose first-run setup replaced that branch's post-connection permission screen.
 The live versions are App Store 1.1.0 (released 2026-02-18) and Play 1.1.0, which is still in closed testing.
 There are 364 commits since 1.1.0.
 
@@ -47,7 +48,7 @@ ZSWatch 1.2 is a big update for the open-source smartwatch.
 • A rewritten connection that stays up in the background and comes back after the app has been closed.
 • Faster and more reliable firmware updates, including resources and watchface backgrounds.
 • Weather and GPS for the watch.
-• A new permission setup after your first connection, with a clear explanation of each permission.
+• A new first-run setup, with a clear explanation of each permission.
 • Many fixes and stability improvements.
 ```
 
@@ -85,7 +86,7 @@ Add to both listings:
 | Key / mode | Use | Status |
 | --- | --- | --- |
 | `bluetooth-central` | Watch connection in the background | Needed |
-| `location` + Always string | GPS relay and weather for the watch | Needed; App Review will ask for the user-facing reason. The setup screen explains it |
+| `location` + Always string | GPS relay and weather for the watch | Needed; App Review will ask for the user-facing reason. The first-run setup and Settings explain it before the request |
 | `fetch`, `processing` | Voice jobs and sync (BGTaskScheduler) | Needed |
 | Calendars / Reminders (full access) | Create actions from voice memos | OK |
 | Photo library read | `image_picker` (watchface backgrounds) | Updated |
@@ -130,6 +131,7 @@ These are in `.companion-hil-runs/release/` (gitignored). `store_screenshots.zip
 ## Verified on the OnePlus (2026-10-23, release-signed 1.2.0+11, fresh install)
 
 - First run: Add watch → notification prompt → companion pairing → permission setup screen → OpenRouter consent dialog.
+  This was the post-connection setup screen from `jakkra_permissions_setup`. `feature/dictated-replies` replaced it with first-run setup before pairing, so this path needs a new check.
 - Settings permissions: all granted except battery optimization. Its Allow opens Android's battery optimization list.
 - The Licenses page lists the native libraries.
 - Fixed in `8fe5c8f`: the connection dropped when the watch toggled its SMP service (Service Changed) while Android was already rediscovering. The app now retries the rediscovery. Verified with two SMP on/off cycles, no disconnect.

@@ -345,6 +345,32 @@ final class CompanionPhoneUITests: XCTestCase {
         try require(app.buttons["Disconnect"].waitForExistence(timeout: 60), "Connect did not return", capture: "reconnect")
     }
 
+    /// First-run setup on a fresh install (setup pref unset): allows location
+    /// from its Allow button and continues to Add watch.
+    func testPermissionsOnboarding() throws {
+        app.activate()
+        try require(exact("Welcome to ZSWatch").waitForExistence(timeout: 30), "No first-run setup", capture: "no-setup")
+        screenshot("setup")
+        let title = try reveal(exact("Location"), "Location")
+        let allow = app.buttons.matching(NSPredicate(format: "label == %@", "Allow")).allElementsBoundByIndex
+            .first { $0.isHittable && abs($0.frame.midY - title.frame.midY) < 40 }
+        if let allow {
+            allow.tap()
+            try tap(app.buttons["Continue"], "location guidance Continue")
+            for label in ["Allow While Using App", "Change to Always Allow", "Allow"] {
+                let button = springboard.buttons[label]
+                if button.waitForExistence(timeout: 5) {
+                    screenshot("prompt-\(label)", springboard)
+                    button.tap()
+                }
+            }
+            Thread.sleep(forTimeInterval: 2)
+            screenshot("after-allow")
+        }
+        try tap(app.buttons["Continue to watch setup"], "Continue to watch setup")
+        try require(exact("Add watch").waitForExistence(timeout: 10), "Not on Add watch", capture: "after-setup")
+    }
+
     /// Developer > Find watch makes the watch buzz.
     func testFindWatch() throws {
         try openRoute("Developer", heading: "Developer Tools")
