@@ -241,8 +241,8 @@ class _KeyEntryState extends ConsumerState<_KeyEntry> {
       builder: (context) => AlertDialog(
         title: const Text('Send voice data to OpenRouter?'),
         content: const Text(
-          'With a key saved, your voice memo recordings, their transcripts '
-          'and your Chat questions are sent to OpenRouter and the AI model '
+          'With a key saved, your voice memo recordings, dictated replies, '
+          'their transcripts and your Chat questions are sent to OpenRouter and the AI model '
           'provider you choose, to transcribe and answer them. Remove the '
           'key at any time to stop.',
         ),
