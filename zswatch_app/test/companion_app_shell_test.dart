@@ -302,8 +302,12 @@ void main() {
       await mount(tester, snapshot(), showOnboarding: true);
       await tester.pumpAndSettle();
       expect(find.text('Welcome to ZSWatch'), findsOneWidget);
-      expect(find.text('Bluetooth connection'), findsOneWidget);
-      expect(find.text('Set up voice notes'), findsOneWidget);
+      // Only missing permissions; Bluetooth is asked for when adding a watch.
+      expect(find.text('Bluetooth connection'), findsNothing);
+      expect(find.text('App notifications'), findsNothing);
+      expect(find.text('Battery optimization'), findsNothing);
+      expect(find.text('Location'), findsOneWidget);
+      expect(find.text('Voice notes and Chat'), findsOneWidget);
       expect(
         find.text('Notification access'),
         platform == TargetPlatform.android ? findsOneWidget : findsNothing,
