@@ -80,14 +80,13 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
   ) {
     return ListTile(
       title: Text(title),
-      subtitle: Text(
-        '${status[key] == true ? 'Granted' : 'Not granted'} · $description',
-      ),
-      trailing: Icon(
-        status[key] == true ? Icons.check_circle : Icons.open_in_new,
-        color: status[key] == true ? AppTheme.successColor : null,
-      ),
-      onTap: busy ? null : () => request(action),
+      subtitle: Text(description),
+      trailing: status[key] == true
+          ? const Icon(Icons.check_circle, color: AppTheme.successColor)
+          : FilledButton.tonal(
+              onPressed: busy ? null : () => request(action),
+              child: const Text('Allow'),
+            ),
     );
   }
 
@@ -142,11 +141,10 @@ class _PermissionsState extends ConsumerState<CompanionPermissionsSummary>
                 status,
                 'background_location',
                 'Location',
-                status['background_location'] == true
-                    ? 'Weather and GPS, including while the app is closed'
-                    : status['location'] == true
+                status['background_location'] != true &&
+                        status['location'] == true
                     ? 'While using app only · Choose ${isIos ? 'Always' : 'Allow all the time'} for background weather and GPS'
-                    : 'Weather and GPS · Requires ${isIos ? 'Always' : 'Allow all the time'} access',
+                    : locationDisclosure,
                 () async {
                   if (await showLocationPermissionGuidance(context) != true) {
                     return;

@@ -94,29 +94,43 @@ void main() {
       );
       await tester.pumpAndSettle();
       final location = find.widgetWithText(ListTile, 'Location');
+      final allow = find.descendant(
+        of: location,
+        matching: find.widgetWithText(FilledButton, 'Allow'),
+      );
       expect(location, findsOneWidget);
       expect(find.text('Background location'), findsNothing);
       expect(find.textContaining('While using app only'), findsOneWidget);
-      expect(
-        (tester.widget<ListTile>(location).trailing! as Icon).icon,
-        Icons.open_in_new,
-      );
+      expect(allow, findsOneWidget);
       await tester.tap(location);
       await tester.pump(const Duration(milliseconds: 300));
+      expect(find.textContaining('First choose'), findsNothing);
+      await tester.tap(allow);
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.textContaining('First choose'), findsOneWidget);
+      expect(
+        find.textContaining('even when the app is closed'),
+        findsOneWidget,
+      );
       expect(requests, 0);
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(requests, 0);
-      await tester.tap(location);
+      await tester.tap(allow);
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('Continue'));
       await tester.pumpAndSettle();
       expect(requests, 1);
-      final icon = tester.widget<ListTile>(location).trailing! as Icon;
+      expect(allow, findsNothing);
+      final icon = tester.widget<Icon>(
+        find.descendant(of: location, matching: find.byType(Icon)),
+      );
       expect(icon.icon, Icons.check_circle);
       expect(icon.color, AppTheme.successColor);
-      expect(find.textContaining('Granted · Weather and GPS'), findsOneWidget);
+      expect(
+        find.textContaining('ZSWatch collects location data'),
+        findsOneWidget,
+      );
       if (defaultTargetPlatform == TargetPlatform.android) {
         expect(find.text('5 of 5 granted'), findsOneWidget);
       }
