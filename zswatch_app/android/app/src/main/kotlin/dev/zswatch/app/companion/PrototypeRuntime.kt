@@ -1,6 +1,7 @@
 package dev.zswatch.app.companion
 
 interface PrototypeTransport {
+    fun connectionUnavailableReason(): String? = null
     fun connect(address: String, generation: Long)
     fun close()
 }
@@ -23,8 +24,24 @@ class PrototypeRuntime(val store: PrototypeStore, private val transport: Prototy
             "generation" to next, "desired_running" to true, "address" to address,
             "phase" to "connecting", "last_error" to null))
         active = true
-        try { transport.connect(address, next) }
-        catch (error: Exception) { phase(next, "error", error.javaClass.simpleName); transport.close() }
+        try {
+            val unavailable = transport.connectionUnavailableReason()
+            if (unavailable != null) {
+                phase(next, "disconnected", unavailable)
+                transport.close()
+                return
+            }
+            transport.connect(address, next)
+        } catch (error: Exception) {
+            // Bluetooth or permission can change between the preflight and GATT
+            // acquisition. Keep the running intent so radio-on can recover it.
+            val unavailable = runCatching { transport.connectionUnavailableReason() }.getOrNull()
+            val permissionDenied = error is SecurityException
+            phase(next, if (unavailable != null || permissionDenied) "disconnected" else "error",
+                unavailable ?: if (permissionDenied) "Allow Bluetooth access in Settings to connect your watch."
+                    else "Could not connect to your watch. Try again.")
+            transport.close()
+        }
     }
 
     fun restore(): Boolean {
