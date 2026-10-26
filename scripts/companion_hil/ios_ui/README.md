@@ -156,6 +156,7 @@ Upload resources before firmware: the firmware reboot cuts a resource upload.
 | Flow | Effect |
 | --- | --- |
 | `testPairWatch` | taps Connect and accepts the iOS pairing prompt (creates a bond). Ask before running. |
+| `testPermissionsOnboarding` | first-run setup after a fresh install: allows location from its row and continues to Add watch. Answers the iOS location prompts. |
 | `testExplicitStopSurvivesRelaunch` | Disconnect, terminate and relaunch app, verify still stopped, Connect |
 | `testDemoModeRoundTrip` | Demo Mode on (real watch disconnects), walks routes, Demo Mode off, real watch back |
 | `testBluetoothOffOnRecovery` | turns phone Bluetooth off then on in Settings; restored on exit |
