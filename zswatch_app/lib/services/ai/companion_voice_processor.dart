@@ -121,7 +121,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
     }
   }
   OpenRouterClient? client;
-  if (cloud) {
+  if (cloudStt || (cloud && spec['pipeline_revision'] != 'transcribe-v1')) {
     if (key is! String || key.isEmpty) {
       throw PlatformException(code: 'CLOUD_AUTH');
     }
