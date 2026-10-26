@@ -114,6 +114,8 @@ class FirmwareManager {
 
   http.Client? _httpClient;
   bool _cancelDownload = false;
+  final _artifactCache =
+      <int, ({DateTime fetchedAt, List<WorkflowArtifact> artifacts})>{};
 
   /// Stream of download progress
   Stream<DownloadProgress> get downloadProgressStream =>
@@ -195,6 +197,11 @@ class FirmwareManager {
   /// available build per branch, with main prioritized.
   Future<List<WorkflowRun>> fetchWorkflowRuns({int numRuns = 10}) async {
     _log('Fetching workflow runs from GitHub Actions...');
+    final now = DateTime.now();
+    _artifactCache.removeWhere(
+      (_, cached) =>
+          now.difference(cached.fetchedAt) >= const Duration(minutes: 5),
+    );
 
     try {
       // Query the same workflows as the website so unrelated repository jobs
@@ -216,6 +223,9 @@ class FirmwareManager {
 
       final runsResponse = responses[0];
       final mainRunResponse = responses[1];
+      final budget = _GitHubRequestBudget()
+        ..observe(runsResponse)
+        ..observe(mainRunResponse);
 
       if (runsResponse.statusCode != 200) {
         throw FirmwareDownloadException(
@@ -267,7 +277,16 @@ class FirmwareManager {
         final runId = run['id'] as int;
         final branch = run['head_branch'] as String? ?? 'unknown';
         if (seenBranches.contains(branch) || !seenRunIds.add(runId)) continue;
-        final artifacts = await _fetchArtifactsForRun(runId);
+        final List<WorkflowArtifact> artifacts;
+        try {
+          artifacts = await _fetchArtifactsForRun(runId, budget);
+        } catch (e) {
+          if (runs.isEmpty) rethrow;
+          _log(
+            'Keeping ${runs.length} firmware builds after lookup failed: $e',
+          );
+          break;
+        }
 
         // Filter artifacts to match ZSWatch firmware
         final filteredArtifacts = artifacts.where((artifact) {
@@ -313,14 +332,27 @@ class FirmwareManager {
   }
 
   /// Fetch artifacts for a specific workflow run
-  Future<List<WorkflowArtifact>> _fetchArtifactsForRun(int runId) async {
+  Future<List<WorkflowArtifact>> _fetchArtifactsForRun(
+    int runId,
+    _GitHubRequestBudget budget,
+  ) async {
     try {
+      // Completed runs do not need another artifact request on every refresh.
+      // Keep the cache short so deletions and expiration are picked up promptly.
+      final now = DateTime.now();
+      final cached = _artifactCache[runId];
+      if (cached != null &&
+          now.difference(cached.fetchedAt) < const Duration(minutes: 5)) {
+        return cached.artifacts;
+      }
+      budget.requireAvailable();
       final response = await http.get(
         Uri.parse(
           '$_apiBase/repos/$_owner/$_repo/actions/runs/$runId/artifacts?per_page=100',
         ),
         headers: {'Accept': 'application/vnd.github.v3+json'},
       );
+      budget.observe(response);
 
       if (response.statusCode != 200) {
         throw FirmwareDownloadException(
@@ -335,7 +367,7 @@ class FirmwareManager {
         '[FirmwareManager] Found ${artifacts.length} artifacts for run $runId',
       );
 
-      return artifacts
+      final parsed = artifacts
           .map((a) {
             final artifact = a as Map<String, dynamic>;
             debugPrint('[FirmwareManager] Artifact: ${artifact['name']}');
@@ -359,6 +391,8 @@ class FirmwareManager {
           })
           .where((a) => !a.expired)
           .toList();
+      _artifactCache[runId] = (fetchedAt: now, artifacts: parsed);
+      return parsed;
     } catch (e) {
       _log('Error fetching artifacts for run $runId: $e');
       rethrow;
@@ -1238,6 +1272,28 @@ class FirmwareManager {
     cancelDownload();
     await _downloadProgressController.close();
     await _logController.close();
+  }
+}
+
+/// Use GitHub's remaining quota rather than a cap that can hide valid builds.
+class _GitHubRequestBudget {
+  int? _remaining;
+
+  void observe(http.Response response) {
+    final remaining = int.tryParse(
+      response.headers['x-ratelimit-remaining'] ?? '',
+    );
+    if (remaining != null && (_remaining == null || remaining < _remaining!)) {
+      _remaining = remaining;
+    }
+  }
+
+  void requireAvailable() {
+    if (_remaining == 0) {
+      throw FirmwareDownloadException(
+        'GitHub rate limit reached. Try refreshing later.',
+      );
+    }
   }
 }
 
