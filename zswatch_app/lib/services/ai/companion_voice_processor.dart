@@ -78,7 +78,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
       : TranscriptionEngineType.values.byName(models[0]);
   final key = (request['credentials'] as Map?)?['openrouter_key'];
   final chatKind = chatKindOf(recording.filename);
-  if (chatKind != null) {
+  if (chatKind != null && spec['pipeline_revision'] != 'transcribe-v1') {
     // Without a key the answer explains what to set up.
     final chatClient = cloud && key is String && key.isNotEmpty
         ? (cloudFactory ?? OpenRouterClient.new)(key)
@@ -99,7 +99,8 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
       chatClient?.close();
     }
   }
-  if (isReplyRecording(recording.filename)) {
+  if (isReplyRecording(recording.filename) &&
+      spec['pipeline_revision'] != 'transcribe-v1') {
     // Without a key the draft explains what to set up.
     final replyClient = cloudStt && key is String && key.isNotEmpty
         ? (cloudFactory ?? OpenRouterClient.new)(key)

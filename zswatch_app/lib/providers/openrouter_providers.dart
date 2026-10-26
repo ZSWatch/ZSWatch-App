@@ -118,6 +118,7 @@ class OpenRouterKeyNotifier extends StateNotifier<AsyncValue<String?>> {
       final info = await client.keyInfo();
       final owner = _ref.read(companionClientProvider);
       await owner.setCloudCredential(trimmed);
+      state = AsyncValue.data(trimmed);
       // Read the native owner directly: onboarding can run before any watch or
       // snapshot stream has been selected.
       try {
@@ -140,7 +141,6 @@ class OpenRouterKeyNotifier extends StateNotifier<AsyncValue<String?>> {
           'Save the key again to retry.',
         );
       }
-      state = AsyncValue.data(trimmed);
       return info;
     } finally {
       client.close();

@@ -32,6 +32,7 @@ final class CompanionLocationRelay: NSObject, CLLocationManagerDelegate {
   private var watchToken = UUID()
   private var requested = false
   private var lastWrite: Date?
+  private var cachedTimestamp: Date?
   private let send: (Int, UUID, CLLocation, @escaping () -> Void) -> Void
   private let observe: (Int, UUID, String, Bool) -> Void
   init(send: @escaping (Int, UUID, CLLocation, @escaping () -> Void) -> Void,
@@ -64,6 +65,7 @@ final class CompanionLocationRelay: NSObject, CLLocationManagerDelegate {
       manager.startUpdatingLocation()
       if let cached = manager.location {
         self.locationManager(manager, didUpdateLocations: [cached])
+        if self.lastWrite != nil { self.cachedTimestamp = cached.timestamp }
       }
       DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
         if self.token == token, self.requested, self.lastWrite == nil {
@@ -81,12 +83,18 @@ final class CompanionLocationRelay: NSObject, CLLocationManagerDelegate {
     }
   }
   private func stopOnMain() {
-    token = UUID(); requested = false; lastWrite = nil
+    token = UUID(); requested = false; lastWrite = nil; cachedTimestamp = nil
     manager?.stopUpdatingLocation(); manager?.allowsBackgroundLocationUpdates = false
   }
   func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-    guard requested, let fix = locations.last, CompanionLocationPacket.encode(fix) != nil,
-          lastWrite == nil || Date().timeIntervalSince(lastWrite!) >= 5 else { return }
+    guard requested, let fix = locations.last, CompanionLocationPacket.encode(fix) != nil else { return }
+    if let cachedTimestamp {
+      // The first newer fix replaces the seed immediately, even inside the rate limit.
+      guard fix.timestamp > cachedTimestamp else { return }
+    } else {
+      guard lastWrite == nil || Date().timeIntervalSince(lastWrite!) >= 5 else { return }
+    }
+    cachedTimestamp = nil
     lastWrite = Date(); let token = self.token; let generation = self.generation
     send(generation, watchToken, fix) {
       DispatchQueue.main.async {
