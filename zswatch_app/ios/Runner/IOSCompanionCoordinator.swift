@@ -40,9 +40,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       }
     })
   func configureGps(_ enabled: Bool) throws {
-    guard journal.fields["gps_enabled"] as? Bool != enabled else { return }
+    guard journal.fields["gps_enabled"] as? Bool != enabled ||
+          journal.fields["gps_default_eligible"] as? Bool == true else { return }
     gpsRequested = false; gpsToken = UUID(); gps.close()
-    try publish("gps_configuration", ["gps_enabled": enabled,
+    try publish("gps_configuration", ["gps_enabled": enabled, "gps_default_eligible": false,
       "gps_runtime": ["generation": journal.generation, "state": enabled ? "idle" : "disabled", "requested": false]])
   }
   func uiForegrounded() { firmware.foregrounded(); inbox?.foregrounded(); voice?.foregrounded() }

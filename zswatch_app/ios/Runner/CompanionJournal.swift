@@ -24,7 +24,7 @@ final class CompanionJournal {
               "recordings": [:], "voice_jobs": [], "forgotten_watches": [:],
               "journal_id": UUID().uuidString, "telemetry": [], "telemetry_sequence": 0,
               "telemetry_acked": 0, "telemetry_dropped": 0,
-              "http_enabled": true, "gps_enabled": false, "recording_sync_enabled": true]
+              "http_enabled": true, "gps_enabled": false, "gps_default_eligible": true, "recording_sync_enabled": true]
     if FileManager.default.fileExists(atPath: url.path) {
       do {
         let value = try JSONSerialization.jsonObject(with: Data(contentsOf: url))
@@ -38,6 +38,7 @@ final class CompanionJournal {
               (!intent.boolValue || UUID(uuidString: address)?.uuidString == address) else {
           throw CompanionFailure.storage("Invalid companion journal")
         }
+        fields["gps_default_eligible"] = saved["gps_default_eligible"] as? Bool ?? false
         fields.merge(saved) { _, saved in saved }
       } catch {
         // Do not overwrite an unreadable/protected/corrupt journal or restore intent by guess.

@@ -23,6 +23,7 @@ class PrototypeStore(private val directory: File, private val eventLimit: Int = 
             .put("generation", 0L).put("phase", "stopped").put("last_error", JSONObject.NULL)
             .put("last_time_write_utc_ms", JSONObject.NULL).put("event_cursor", 0L)
             .put("acked_cursor", 0L).put("events", JSONArray()).put("recordings", JSONObject())
+            .put("gps_default_eligible", true)
         require(data.getInt("version") == 1) { "Unsupported prototype journal version" }
     }
 

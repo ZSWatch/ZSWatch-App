@@ -45,7 +45,7 @@ internal class AndroidPrototypeGps(
     fun close() = controller.close()
     fun configure(enabled: Boolean) {
         if (enabled) check(blocked(application) == null) { "Grant background location and enable phone location first" }
-        store.update("gps_configuration", mapOf("gps_enabled" to enabled))
+        store.update("gps_configuration", mapOf("gps_enabled" to enabled, "gps_default_eligible" to false))
         controller.configurationChanged()
     }
 
@@ -74,7 +74,7 @@ internal class AndroidPrototypeGps(
 
         fun configureStopped(context: Context, store: PrototypeStore, enabled: Boolean) {
             if (enabled) check(blocked(context) == null) { "Grant background location and enable phone location first" }
-            store.update("gps_configuration", mapOf("gps_enabled" to enabled))
+            store.update("gps_configuration", mapOf("gps_enabled" to enabled, "gps_default_eligible" to false))
         }
     }
 }
