@@ -82,8 +82,8 @@ Put firmware/resource packages into Files yourself first (Safari download,
 AirDrop, Finder file sharing). The flows only pick them.
 
 Without touching the phone, push a package into the app's own container
-instead; the firmware screen then offers **Use pushed file: NAME** (shown only
-while such files exist):
+instead; debug builds offer **Use pushed file: NAME** on the firmware screen
+while such files exist. Release and profile builds use the normal file picker:
 
 ```sh
 xcrun devicectl device copy to --device "$ZSW_PHONE_UDID" --domain-type appDataContainer \
@@ -105,7 +105,7 @@ watch like a spoken memo. Keep the phone next to the watch with media volume up.
 Playback has a bounded wait so a stalled speech engine still reaches the stop
 attempt. A failed stop is reported; check the watch before retrying.
 
-On Android, packages can be pushed into the release app's external files
+On Android debug builds, packages can be pushed into the app's external files
 directory without `run-as`:
 
 ```sh
