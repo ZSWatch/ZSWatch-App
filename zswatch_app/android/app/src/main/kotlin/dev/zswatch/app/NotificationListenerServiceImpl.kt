@@ -234,7 +234,8 @@ class NotificationListenerServiceImpl : NotificationListenerService() {
                     }.toBundle()
                 } else null
                 action.actionIntent.send(listener, 0, intent, null, null, null, options)
-                LifecycleLogger.log(TAG, "prototype_reply_dispatched activity=${action.actionIntent.isActivity}")
+                val isActivity = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) action.actionIntent.isActivity else null
+                LifecycleLogger.log(TAG, "prototype_reply_dispatched activity=$isActivity")
                 null
             } catch (error: PendingIntent.CanceledException) {
                 "The app no longer takes this reply"
