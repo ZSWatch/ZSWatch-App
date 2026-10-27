@@ -60,7 +60,10 @@ void main() {
     () => MockClient((request) async {
       final uri = request.url;
       if (uri.path.contains('/actions/workflows/')) {
-        expect(uri.queryParameters['status'], 'success');
+        expect(
+          uri.queryParameters['status'],
+          uri.queryParameters['branch'] == 'main' ? 'success' : 'completed',
+        );
         expect(uri.path, endsWith('/runs'));
         expect(
           uri.path,
@@ -105,7 +108,7 @@ void main() {
   );
 
   test(
-    'matches the website by excluding failed and unfinished workflows',
+    'excludes unfinished workflows, keeps failed and cancelled ones',
     () async {
       final runs = await fetch(
         runs: [
@@ -122,10 +125,10 @@ void main() {
         },
       );
 
-      expect(runs.map((run) => run.id), [4]);
-      expect(artifactRequests, [4]);
-      expect(runs.first.commitMessage, 'Firmware change 4');
-      expect(runs.first.commitSha, 'commit-4');
+      expect(runs.map((run) => run.id), [3, 1, 4]);
+      expect(artifactRequests, [3, 1, 4]);
+      expect(runs.last.commitMessage, 'Firmware change 4');
+      expect(runs.last.commitSha, 'commit-4');
     },
   );
 
