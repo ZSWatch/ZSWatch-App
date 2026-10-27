@@ -464,6 +464,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var token = 0L
     private var operation = 0L
     private var retryDelay = 5000L
+    // A direct connect scans at a duty cycle Android throttles with the screen
+    // off, so it times out until the phone wakes. After one timeout, wait in a
+    // background connect instead: the controller keeps that one going in Doze.
+    private var backgroundConnect = false
     val liveLogs = CompanionLiveLogs(PrototypeHub::publishLiveLog)
     internal val sensors = PrototypeSensors(PrototypeHub::publishSensor)
     private var sensorDescriptor: BluetoothGattDescriptor? = null
@@ -550,6 +554,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                     // Some Android stacks repeat CONNECTED during bonding.
                     if (linkConnected) return@accept
                     linkConnected = true
+                    backgroundConnect = false
                     beginBonding(client, session)
                 } else if (state == BluetoothProfile.STATE_DISCONNECTED || status != BluetoothGatt.GATT_SUCCESS) {
                     lost(session, "GATT disconnect status=$status")
@@ -662,9 +667,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 if (characteristic.uuid == BATTERY_LEVEL) accept(client) { finishBatteryRead(copy, status) }
             }
         }
-        gatt = adapter.getRemoteDevice(address).connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
+        gatt = adapter.getRemoteDevice(address).connectGatt(context, backgroundConnect, callback, BluetoothDevice.TRANSPORT_LE)
             ?: error("GATT connection rejected")
-        deadline(session, 30000, "Connection timed out")
+        if (!backgroundConnect) deadline(session, 30000, CONNECT_TIMEOUT)
     }
 
     private fun discover(client: BluetoothGatt, session: Long) {
@@ -767,6 +772,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     private fun lost(session: Long, reason: String) {
         if (!runtime.owns(session)) return
+        if (reason == CONNECT_TIMEOUT) backgroundConnect = true
         runtime.phase(session, "disconnected", reason)
         close()
         handler.postDelayed({
@@ -1358,6 +1364,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     companion object {
         @Volatile var traceMcuPackets = false
+        private const val CONNECT_TIMEOUT = "Connection timed out"
         private val NUS = UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
         private val TX = UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
         private val RX = UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
