@@ -193,8 +193,9 @@ class FirmwareManager {
 
   /// Fetch workflow runs with artifacts from GitHub Actions
   ///
-  /// Matches the firmware website: successful firmware workflows only, latest
-  /// available build per branch, with main prioritized.
+  /// Latest available firmware build per branch, with main prioritized.
+  /// Failed or cancelled CI runs count: a failed test job keeps its build
+  /// artifacts.
   Future<List<WorkflowRun>> fetchWorkflowRuns({int numRuns = 10}) async {
     _log('Fetching workflow runs from GitHub Actions...');
     final now = DateTime.now();
@@ -209,7 +210,7 @@ class FirmwareManager {
       final responses = await Future.wait([
         http.get(
           Uri.parse(
-            '$_apiBase/repos/$_owner/$_repo/actions/workflows/ci.yml/runs?per_page=50&status=success',
+            '$_apiBase/repos/$_owner/$_repo/actions/workflows/ci.yml/runs?per_page=50&status=completed',
           ),
           headers: {'Accept': 'application/vnd.github.v3+json'},
         ),
@@ -260,7 +261,7 @@ class FirmwareManager {
           .map((r) => r as Map<String, dynamic>)
           .where(
             (run) =>
-                run['conclusion'] == 'success' &&
+                run['status'] == 'completed' &&
                 run['head_branch'] != 'gh-pages',
           )
           .toList();
