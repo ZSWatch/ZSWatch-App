@@ -111,12 +111,12 @@ Python HIL tools: `scripts/companion_hil/requirements-watch.txt` in a venv
 Rules: the watch releases USB 20 s after boot unless the host holds the CDC
 port, so keep it open 25 s after a reboot. Do not flash, reset or recover the
 watch during phone background/reconnection tests. Keep raw evidence in the
-gitignored `.companion-hil-runs/`, not in commits or `/tmp`. Ask before
-actions that touch the user's phone pairing or watch data.
+gitignored `.companion-hil-runs/`, not in commits or `/tmp`.
 
 ## Git
 
 - Work on feature branches; the app PR targets `main`.
+- Create pull requests for the user to review and merge; do not merge them.
 - Submodule changes: commit and push in the submodule first, then commit the
   new pointer in the app.
 - The firmware repo (`ZSWatch/`) has its own review process; leave it alone
