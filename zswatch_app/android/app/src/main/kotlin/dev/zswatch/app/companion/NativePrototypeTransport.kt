@@ -425,6 +425,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     internal fun finishFirmwareCheck() {
         firmwareCheckPreparing = false
+        smpPreparation.close()
         if (runtime.owns(token) && store.control()["phase"] == "ready") {
             if (smpIdleLease.held(token)) smpIdleLease.idle(token)
             handler.postDelayed({ safely { downloadNext() } }, 100)

@@ -49,6 +49,7 @@ internal class PrototypeFirmware(
     private var request: PrototypeFirmwareState? = null
     private var lastProgressAt = Long.MIN_VALUE
     private var lastPublished = 0
+    private var verificationAttempt = 0L
     val state get() = request
     val busy get() = request != null
 
@@ -130,9 +131,11 @@ internal class PrototypeFirmware(
         val old = request ?: return
         if (old.phase != "reconnecting" || old.address != address || !owns(old)) return
         try {
+            val attempt = ++verificationAttempt
             publish(old.copy(phase = "verifying"))
-            verify(request!!, { current(old.id)?.phase == "verifying" }) { result ->
-                if (current(old.id)?.phase == "verifying") result.fold({ finish(old.id, "completed", null) }, { fail(old.id, if (it is FirmwareVerificationUnavailable) "boot_check_unavailable" else "boot_check_failed") })
+            fun checking() = verificationAttempt == attempt && current(old.id)?.phase == "verifying"
+            verify(request!!, ::checking) { result ->
+                if (checking()) result.fold({ finish(old.id, "completed", null) }, { fail(old.id, if (it is FirmwareVerificationUnavailable) "boot_check_unavailable" else "boot_check_failed") })
             }
         } catch (error: Exception) { fail(old.id, "boot_check_failed") }
     }
@@ -153,8 +156,18 @@ internal class PrototypeFirmware(
         val next = old.copy(phase = phase, error = error, resultUnknown = phase != "completed")
         try { observe(next) } finally { release(next) }
     }
-    // Boot/slot swapping may outlast the first NUS connection attempt. Keep
-    // its existing boot-check deadline and verification; never replay upload.
-    fun connectionRetry() { if (request?.phase != "reconnecting") close() }
+    // Boot/SMP service changes can replace a connection during either stage.
+    // Keep the original deadline, fence its old check and never replay upload.
+    fun connectionRetry() {
+        val old = request ?: return
+        when (old.phase) {
+            "reconnecting" -> Unit
+            "verifying" -> {
+                verificationAttempt++
+                publish(old.copy(phase = "reconnecting"))
+            }
+            else -> close()
+        }
+    }
     fun close() { request?.let { fail(it.id, "interrupted") } }
 }
