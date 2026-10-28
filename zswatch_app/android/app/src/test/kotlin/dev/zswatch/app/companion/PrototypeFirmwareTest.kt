@@ -53,6 +53,45 @@ class PrototypeFirmwareTest {
         r.checks.single().second(Result.success(Unit))
         assertEquals("completed",r.states.last().phase)
     }
+    @Test fun verificationReconnectStartsAFreshCheckAndRejectsItsOldCallback() {
+        val r=Rig();val id=r.start();r.owner.sdkCompleted(id)
+        r.owner.ready("AA:BB:CC:DD:EE:FF")
+        val stale=r.checks.single()
+        r.active=false // Runtime fences verification before acquiring the new connection.
+        r.owner.connectionRetry()
+        assertTrue(r.owner.busy)
+        assertEquals("reconnecting",r.owner.state?.phase)
+        assertFalse(stale.first())
+        r.active=true
+        r.owner.ready("AA:BB:CC:DD:EE:FF")
+        assertEquals(2,r.checks.size)
+        assertFalse(stale.first())
+        stale.second(Result.success(Unit))
+        assertEquals("verifying",r.owner.state?.phase)
+        stale.second(Result.failure(IllegalStateException("Old SMP preparation cancelled")))
+        assertEquals("verifying",r.owner.state?.phase)
+        assertTrue(r.checks.last().first())
+        r.checks.last().second(Result.success(Unit))
+        assertEquals("completed",r.states.last().phase)
+        assertFalse(r.states.last().resultUnknown)
+        assertEquals(1,r.launches.size)
+        assertEquals(1,r.reconnects.size)
+    }
+    @Test fun verificationReconnectsKeepTheOriginalDeadlineAndStopWins() {
+        val r=Rig();val id=r.start();r.owner.sdkCompleted(id)
+        r.owner.ready("AA:BB:CC:DD:EE:FF")
+        r.advance(89000);r.owner.connectionRetry()
+        r.owner.ready("AA:BB:CC:DD:EE:FF")
+        r.advance(1000)
+        assertEquals("boot_check_timeout",r.states.last().error)
+        assertEquals(1,r.releases.size)
+        val stopped=Rig();val stoppedId=stopped.start();stopped.owner.sdkCompleted(stoppedId)
+        stopped.owner.ready("AA:BB:CC:DD:EE:FF");stopped.owner.connectionRetry();stopped.owner.close()
+        stopped.owner.ready("AA:BB:CC:DD:EE:FF")
+        assertEquals("interrupted",stopped.states.last().error)
+        assertEquals(1,stopped.checks.size)
+        assertEquals(1,stopped.releases.size)
+    }
     @Test fun bootConnectionRetriesKeepOriginalDeadlineAndStopStillWins() {
         val r=Rig();val id=r.start();r.owner.sdkCompleted(id)
         r.advance(89000);r.owner.connectionRetry();r.advance(1001)

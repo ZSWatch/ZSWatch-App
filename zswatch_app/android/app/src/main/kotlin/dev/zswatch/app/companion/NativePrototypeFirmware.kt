@@ -211,11 +211,16 @@ internal class NativePrototypeFirmware(private val handler: Handler, private val
         finally { try { releaseSdk() } finally { runtime.resumeAfterFirmware(old.second) } }
     }
 
-    /** Only the known single SMP-preparation recovery may retain the postflight operation. */
+    /** Preparation can span one generation; later reconnects restart only the check. */
     fun fenced(reason: String) {
         if (probe != null) { finishProbe("interrupted"); return }
         if (reason == "reconnect" && operation.state?.phase == "verifying" && link.firmwareCheckPreparing && preparationRecoveries++ == 0) return
-        if (reason == "reconnect") { operation.connectionRetry(); return }
+        if (reason == "reconnect") {
+            val wasVerifying = operation.state?.phase == "verifying"
+            operation.connectionRetry()
+            if (wasVerifying) link.finishFirmwareCheck()
+            return
+        }
         operation.close()
     }
     private fun safely(action: () -> Unit) {
