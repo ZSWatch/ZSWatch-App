@@ -326,6 +326,80 @@ void main() {
     },
   );
   test(
+    'saved firmware and resource results stay idle after UI restart',
+    () async {
+      for (final phase in ['completed', 'failed', 'cancelled']) {
+        for (final resources in [false, true]) {
+          final operation = firmware(phase, unknown: phase == 'failed');
+          if (resources) {
+            operation['resource'] = {'bytes': 64, 'hash': 'b' * 64};
+            operation['resource_verified'] = true;
+          }
+          final c = container(Stream.value(snapshot(operation: operation)));
+          addTearDown(c.dispose);
+          await c.read(companionSnapshotProvider.future);
+          expect(c.read(dfuStateProvider).status, DfuStatus.idle);
+          expect(
+            c.read(firmwareFilesystemStateProvider).status,
+            FilesystemUploadStatus.idle,
+          );
+          expect(
+            c.read(companionFirmwareStatusProvider).valueOrNull!.phase,
+            phase,
+          );
+        }
+      }
+      expect(calls, isEmpty);
+    },
+  );
+  test(
+    'delayed saved results stay idle but current update outcomes remain visible',
+    () async {
+      final states = StreamController<CompanionPrototypeSnapshot>();
+      final c = container(states.stream);
+      addTearDown(() async {
+        c.dispose();
+        await states.close();
+      });
+      await emit(c, states, snapshot());
+      expect(c.read(dfuStateProvider).status, DfuStatus.idle);
+      for (final phase in ['completed', 'failed', 'cancelled']) {
+        await emit(
+          c,
+          states,
+          snapshot(operation: firmware(phase, unknown: phase == 'failed')),
+        );
+        expect(c.read(dfuStateProvider).status, DfuStatus.idle);
+      }
+      for (final outcome in {
+        'completed': DfuStatus.completed,
+        'failed': DfuStatus.failed,
+        'cancelled': DfuStatus.cancelled,
+      }.entries) {
+        final id = 'new-update-${outcome.key}';
+        await emit(
+          c,
+          states,
+          snapshot(operation: firmware('uploading', id: id)),
+        );
+        expect(c.read(dfuStateProvider).status, DfuStatus.uploading);
+        await emit(
+          c,
+          states,
+          snapshot(
+            operation: firmware(
+              outcome.key,
+              id: id,
+              unknown: outcome.key == 'failed',
+            ),
+          ),
+        );
+        expect(c.read(dfuStateProvider).status, outcome.value);
+      }
+      expect(calls, isEmpty);
+    },
+  );
+  test(
     'existing firmware preparation preserves single external image and acceptance stays busy',
     () async {
       final states = StreamController<CompanionPrototypeSnapshot>();
@@ -594,6 +668,12 @@ void main() {
         await emit(
           c,
           states,
+          snapshot(operation: firmware('uploading', id: 'resource-$phase')),
+        );
+        expect(c.read(dfuStateProvider).status, DfuStatus.uploading);
+        await emit(
+          c,
+          states,
           snapshot(
             operation: {
               ...firmware(
@@ -796,6 +876,56 @@ void main() {
     expect(calls.map((call) => call.method), ['prepareShell', 'startFirmware']);
   });
   test(
+    'terminal results stay visible when the start receipt was lost',
+    () async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        if (call.method == 'prepareShell') {
+          return {'version': 1, 'generation': 8, 'prepared_from_generation': 7};
+        }
+        throw const FormatException('Lost receipt');
+      });
+      for (final outcome in {
+        'completed': DfuStatus.completed,
+        'failed': DfuStatus.failed,
+        'cancelled': DfuStatus.cancelled,
+      }.entries) {
+        final states = StreamController<CompanionPrototypeSnapshot>();
+        final c = container(states.stream);
+        try {
+          await emit(c, states, snapshot());
+          final notifier = c.read(dfuNotifierProvider.notifier);
+          await notifier.loadLocalFile(manager.images.first.filePath);
+          await notifier.startUpdate();
+          expect(c.read(dfuStateProvider).status, DfuStatus.failed);
+          final callsBeforeResult = calls.length;
+          await emit(
+            c,
+            states,
+            snapshot(
+              operation: firmware(
+                outcome.key,
+                unknown: outcome.key == 'failed',
+              ),
+              generation: 11,
+            ),
+          );
+          expect(c.read(dfuStateProvider).status, outcome.value);
+          await notifier.startUpdate();
+          expect(calls.length, callsBeforeResult);
+          notifier.reset();
+          expect(c.read(dfuStateProvider).status, DfuStatus.idle);
+          await notifier.loadLocalFile(manager.images.first.filePath);
+          expect(c.read(dfuNotifierProvider).downloadedImage, isNotNull);
+          expect(calls.length, callsBeforeResult);
+        } finally {
+          c.dispose();
+          await states.close();
+        }
+      }
+    },
+  );
+  test(
     'status errors and foreign watch receipts do not show verified success',
     () async {
       final states = StreamController<CompanionPrototypeSnapshot>();
@@ -851,13 +981,17 @@ void main() {
   testWidgets(
     'native upload cancellation remains visible until explicit UI dismissal',
     (tester) async {
-      final c = container(
-        Stream.value(
-          snapshot(operation: firmware('cancelled', cancelled: true)),
-        ),
-      );
-      addTearDown(c.dispose);
+      final states = StreamController<CompanionPrototypeSnapshot>();
+      final c = container(states.stream);
+      addTearDown(() async {
+        c.dispose();
+        await states.close();
+      });
+      states.add(snapshot(operation: firmware('uploading')));
       await c.read(companionSnapshotProvider.future);
+      expect(c.read(dfuStateProvider).status, DfuStatus.uploading);
+      states.add(snapshot(operation: firmware('cancelled', cancelled: true)));
+      await tester.pump();
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: c,
@@ -877,6 +1011,48 @@ void main() {
     },
   );
 
+  testWidgets('opening the update page never shows a saved update result', (
+    tester,
+  ) async {
+    final resources = {
+      ...firmware('completed'),
+      'targets': <Object?>[],
+      'resource': {'bytes': 64, 'hash': 'b' * 64},
+      'resource_verified': true,
+    };
+    for (final operation in [
+      null,
+      for (final phase in ['completed', 'failed', 'cancelled']) ...[
+        firmware(phase, unknown: phase == 'failed'),
+        {
+          ...resources,
+          ...firmware(phase, unknown: phase == 'failed'),
+          'targets': <Object?>[],
+        },
+      ],
+    ]) {
+      final c = container(Stream.value(snapshot(operation: operation)));
+      await c.read(companionSnapshotProvider.future);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: c,
+          child: const MaterialApp(home: FirmwareUpdateScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Update Complete!'), findsNothing);
+      expect(find.text('Filesystem Upload Complete!'), findsNothing);
+      expect(find.text('Done'), findsNothing);
+      expect(find.textContaining('unverified'), findsNothing);
+      expect(find.text('Update Cancelled'), findsNothing);
+      expect(c.read(dfuStateProvider).status, DfuStatus.idle);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+      c.dispose();
+    }
+    expect(calls, isEmpty);
+  });
+
   testWidgets('resource-only completion names the filesystem outcome', (
     tester,
   ) async {
@@ -884,9 +1060,25 @@ void main() {
       ..['targets'] = <Object?>[]
       ..['resource'] = {'bytes': 64, 'hash': 'b' * 64}
       ..['resource_verified'] = true;
-    final c = container(Stream.value(snapshot(operation: operation)));
-    addTearDown(c.dispose);
+    final states = StreamController<CompanionPrototypeSnapshot>();
+    final c = container(states.stream);
+    addTearDown(() async {
+      c.dispose();
+      await states.close();
+    });
+    states.add(
+      snapshot(
+        operation: {
+          ...operation,
+          'phase': 'resource_uploading',
+          'resource_verified': false,
+        },
+      ),
+    );
     await c.read(companionSnapshotProvider.future);
+    expect(c.read(dfuStateProvider).status, DfuStatus.uploading);
+    states.add(snapshot(operation: operation));
+    await tester.pump();
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: c,

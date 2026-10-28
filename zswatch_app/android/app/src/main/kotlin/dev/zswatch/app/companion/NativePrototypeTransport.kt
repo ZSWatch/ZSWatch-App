@@ -486,6 +486,15 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var servicesHandled = false
     private var servicesStale = false
     private var rediscovering = false
+    private var discoveryAddress: String? = null
+    private val discoveryRecovery = PrototypeDiscoveryRecovery<BluetoothGatt>(
+        current = { session, client -> runtime.owns(session) && gatt === client &&
+            !servicesHandled && bonding == null && store.control()["phase"] == "discovering" },
+        refresh = { client -> client.javaClass.getMethod("refresh").invoke(client) as Boolean },
+        later = { delay, action -> handler.postDelayed({ safely(action) }, delay) },
+        retry = { session, client -> discover(client, session) },
+        failed = { session, reason -> lost(session, reason) },
+    )
     private var bonding: PrototypeBonding? = null
     private var bondReceiver: BroadcastReceiver? = null
     private val recordingInbox = PrototypeRecordingInbox(store, { deleteRecordingOnWatch(it) }) {
@@ -539,6 +548,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     override fun connect(address: String, generation: Long) {
         close()
+        if (discoveryAddress != address) {
+            discoveryRecovery.reset()
+            discoveryAddress = address
+        }
         token = generation
         runtime.phase(token, "connecting")
         val adapter = context.getSystemService(BluetoothManager::class.java).adapter
@@ -624,6 +637,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 check(status == BluetoothGatt.GATT_SUCCESS) { "CCCD write failed: $status" }
                 operation++
                 runtime.phase(session, "ready")
+                discoveryRecovery.reset()
                 sensors.reset(session, PrototypeSensors.specs.filter { spec ->
                     client.getService(spec.service)?.getCharacteristic(spec.characteristic)?.let {
                         it.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 && it.getDescriptor(CCCD) != null
@@ -678,8 +692,12 @@ class NativePrototypeTransport(private val context: Context, private val handler
         // watch asks for its short one; a full discovery then misses the
         // deadline. The watch returns to its idle interval afterwards itself.
         client.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
-        check(client.discoverServices()) { "GATT discovery rejected" }
-        deadline(session, 15000, "Service discovery timed out")
+        client.discoverServices()
+        // Refresh/Service Changed may already have started discovery internally.
+        // Its callback can still finish this request even when another is rejected.
+        deadline(session, 15000, "Service discovery timed out") {
+            discoveryRecovery.timedOut(session, client)
+        }
     }
 
     private fun beginBonding(client: BluetoothGatt, session: Long) {
@@ -744,10 +762,12 @@ class NativePrototypeTransport(private val context: Context, private val handler
         deadline(session, 15000, "CCCD subscription timed out")
     }
 
-    private fun deadline(session: Long, delay: Long, reason: String) {
+    private fun deadline(session: Long, delay: Long, reason: String, timeout: (() -> Unit)? = null) {
         val expected = ++operation
         handler.postDelayed({
-            if (runtime.owns(session) && operation == expected) safely { lost(session, reason) }
+            if (runtime.owns(session) && operation == expected) safely {
+                if (timeout != null) timeout() else lost(session, reason)
+            }
         }, delay)
     }
 
@@ -1329,6 +1349,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
 
     override fun close() {
         closing = true
+        if (store.control()["desired_running"] != true) discoveryRecovery.reset()
         restart.disconnected(store.control()["desired_running"] != true)
         clearBonding()
         // Preparation can wait for one service-change reconnect, but it never

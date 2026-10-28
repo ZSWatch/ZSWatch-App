@@ -1,6 +1,7 @@
 package dev.zswatch.app.companion
 
 import android.app.NotificationChannel
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -52,6 +53,9 @@ class CompanionPrototypeService : Service() {
     internal var gps: AndroidPrototypeGps? = null
         private set
     @Volatile private var gpsForeground = false
+    @Volatile private var notificationPhase = "connecting"
+    @Volatile private var foregroundPublished = false
+    private val notificationLock = Any()
     private val systemEvents = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val action = intent.action
@@ -124,7 +128,13 @@ class CompanionPrototypeService : Service() {
                 telemetrySink = AndroidTelemetrySink(applicationContext)
                 telemetry = CompanionTelemetry(telemetrySink!!, store)
                 // Complete SQLite writes before notifying Flutter about this state.
-                store.onCommitted = { recordTelemetry { telemetry?.observe(store.control()) } }
+                store.onCommitted = {
+                    recordTelemetry { telemetry?.observe(store.control()) }
+                    val state = store.control()
+                    val phase = if (runtime?.active == true) state["phase"] as? String
+                        else if (state["desired_running"] == true) "connecting" else "stopped"
+                    updateNotificationPhase(phase ?: "disconnected")
+                }
                 link.healthReceive = { message, generation -> recordTelemetry { telemetry?.activity(message, generation) } }
                 runtime = PrototypeRuntime(store, link) { reason -> firmware?.fenced(reason) }.also { link.runtime = it }
                 firmware = NativePrototypeFirmware(PrototypeHub.worker, store, runtime!!, link)
@@ -134,7 +144,6 @@ class CompanionPrototypeService : Service() {
                     foreground = { enabled ->
                         if (instance === this) {
                             publishForeground(enabled)
-                            gpsForeground = enabled
                         } else check(!enabled) { "Companion service was destroyed" }
                     }, send = link::sendGps)
                 link.mediaReady = { media?.ready(it) }
@@ -169,7 +178,7 @@ class CompanionPrototypeService : Service() {
             return START_NOT_STICKY
         }
         try {
-            publishForeground(gpsForeground)
+            publishForeground()
         } catch (error: Exception) {
             LifecycleLogger.log("CompanionPrototype", "foreground_failed ${error.javaClass.simpleName}")
             stopSelf()
@@ -262,25 +271,57 @@ class CompanionPrototypeService : Service() {
         }
     }
 
-    private fun publishForeground(location: Boolean) {
+    private fun publishForeground(location: Boolean? = null) = synchronized(notificationLock) {
+        val sharingLocation = location ?: gpsForeground
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(
             NotificationChannel(CHANNEL, "ZSWatch companion", NotificationManager.IMPORTANCE_LOW))
+        val notification = foregroundNotification(sharingLocation)
+        if (Build.VERSION.SDK_INT >= 29) {
+            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
+                if (sharingLocation) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
+            startForeground(NOTIFICATION, notification, type)
+        } else startForeground(NOTIFICATION, notification)
+        gpsForeground = sharingLocation
+        foregroundPublished = true
+    }
+
+    private fun updateNotificationPhase(phase: String) {
+        PrototypeHub.main.post {
+            synchronized(notificationLock) {
+                if (instance !== this || notificationPhase == phase) return@post
+                notificationPhase = phase
+                if (foregroundPublished) runCatching {
+                    getSystemService(NotificationManager::class.java)
+                        .notify(NOTIFICATION, foregroundNotification(gpsForeground))
+                }.onFailure { error ->
+                    LifecycleLogger.log("CompanionPrototype", "notification_update_failed ${error.javaClass.simpleName}")
+                }
+            }
+        }
+    }
+
+    private fun foregroundNotification(location: Boolean): Notification {
+        val connection = when (notificationPhase) {
+            "ready" -> "Watch connected"
+            "connecting" -> "Connecting to watch"
+            "bonding" -> "Pairing with watch"
+            "discovering" -> "Discovering watch services"
+            "subscribing" -> "Setting up watch connection"
+            "upgrading" -> "Updating watch firmware"
+            else -> "Watch disconnected"
+        }
         val open = packageManager.getLaunchIntentForPackage(packageName)
         val stop = Intent(this, CompanionPrototypeService::class.java).setAction(STOP)
-        val notification = NotificationCompat.Builder(this, CHANNEL)
+        return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle("ZSWatch companion")
-            .setContentText(if (location) "Sharing phone location with watch" else "Keeping your watch connected")
+            .setContentText(if (location) "$connection · Sharing phone location" else connection)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setContentIntent(PendingIntent.getActivity(this, 20, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             .addAction(0, "Stop", PendingIntent.getService(this, 21, stop, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             .build()
-        if (Build.VERSION.SDK_INT >= 29) {
-            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
-                if (location) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
-            startForeground(NOTIFICATION, notification, type)
-        } else startForeground(NOTIFICATION, notification)
     }
 
     private fun safely(action: () -> Unit) {
