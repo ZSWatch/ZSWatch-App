@@ -54,10 +54,38 @@ final companionFirmwareStatusProvider =
 
 // Local UI dismissal never resets, cancels or replays native work.
 final _submittedFirmwareGenerationProvider = StateProvider<int?>((ref) => null);
-final _dismissedFirmwareProvider = StateProvider<String?>((ref) => null);
+final _dismissedFirmwareProvider =
+    StateNotifierProvider<_FirmwareResultDismissal, String?>((ref) {
+      final dismissal = _FirmwareResultDismissal();
+      ref.listen(companionFirmwareStatusProvider, (_, next) {
+        dismissal.observe(
+          next.valueOrNull,
+          acceptedId: ref.read(_acceptedFirmwareProvider)?.id,
+        );
+      }, fireImmediately: true);
+      return dismissal;
+    });
 final _acceptedFirmwareProvider = StateProvider<CompanionFirmwareAcceptance?>(
   (ref) => null,
 );
+
+/// Show terminal results only for updates started or observed by this UI session.
+class _FirmwareResultDismissal extends StateNotifier<String?> {
+  _FirmwareResultDismissal() : super(null);
+
+  String? _observedActiveId;
+
+  void observe(CompanionFirmwareStatus? status, {String? acceptedId}) {
+    if (status == null) return;
+    if (status.busy) {
+      _observedActiveId = status.id;
+    } else if (status.id != _observedActiveId && status.id != acceptedId) {
+      state = status.id;
+    }
+  }
+
+  void dismiss(String? id) => state = id;
+}
 
 /// Metadata for display; retained native work remains busy after UI reattachment.
 final effectiveDfuOperationStateProvider = Provider<DfuOperationState>((ref) {
@@ -80,9 +108,10 @@ final firmwareFilesystemStateProvider = Provider<FilesystemUploadState>((ref) {
     return ref.watch(filesystemUploadStateProvider);
   }
   final status = ref.watch(companionFirmwareStatusProvider).valueOrNull;
+  final dismissed = ref.watch(_dismissedFirmwareProvider);
   if (status == null ||
       status.resource == null ||
-      (!status.busy && status.id == ref.watch(_dismissedFirmwareProvider))) {
+      (!status.busy && status.id == dismissed)) {
     return const FilesystemUploadState();
   }
   return FilesystemUploadState(
@@ -107,6 +136,8 @@ final firmwareFilesystemStateProvider = Provider<FilesystemUploadState>((ref) {
 final dfuStateProvider = Provider<DfuState>((ref) {
   if (ref.watch(nativeCompanionRuntimeProvider)) {
     final asyncStatus = ref.watch(companionFirmwareStatusProvider);
+    // Subscribe before returning an active state so its completion is observed.
+    final dismissed = ref.watch(_dismissedFirmwareProvider);
     if (asyncStatus.hasError || asyncStatus.isLoading) {
       return const DfuState(
         status: DfuStatus.failed,
@@ -142,7 +173,7 @@ final dfuStateProvider = Provider<DfuState>((ref) {
     if (local.isUpdating || (receipt != null && status?.id != receipt.id)) {
       return const DfuState(status: DfuStatus.preparing);
     }
-    if (status == null || status.id == ref.watch(_dismissedFirmwareProvider)) {
+    if (status == null || status.id == dismissed) {
       return DfuState.idle;
     }
     return status.dfuState;
@@ -529,7 +560,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       );
       if (!mounted) return; // UI disposal never stops accepted native work.
       _ref.read(_acceptedFirmwareProvider.notifier).state = receipt;
-      _ref.read(_dismissedFirmwareProvider.notifier).state = null;
+      _ref.read(_dismissedFirmwareProvider.notifier).dismiss(null);
       state = state.copyWith(isUpdating: false);
     } catch (error) {
       if (mounted && attempt == _nativeAttempt) {
@@ -718,7 +749,7 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       final status = _ref.read(companionFirmwareStatusProvider).valueOrNull;
       if (state.isUpdating || status?.busy == true) return;
       _nativeAttempt++;
-      _ref.read(_dismissedFirmwareProvider.notifier).state = status?.id;
+      _ref.read(_dismissedFirmwareProvider.notifier).dismiss(status?.id);
       _ref.read(_acceptedFirmwareProvider.notifier).state = null;
       _ref.read(_submittedFirmwareGenerationProvider.notifier).state = null;
       _firmwareManager.resetProgress();
