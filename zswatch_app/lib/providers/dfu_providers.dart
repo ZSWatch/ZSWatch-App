@@ -61,6 +61,7 @@ final _dismissedFirmwareProvider =
         dismissal.observe(
           next.valueOrNull,
           acceptedId: ref.read(_acceptedFirmwareProvider)?.id,
+          submittedGeneration: ref.read(_submittedFirmwareGenerationProvider),
         );
       }, fireImmediately: true);
       return dismissal;
@@ -75,11 +76,17 @@ class _FirmwareResultDismissal extends StateNotifier<String?> {
 
   String? _observedActiveId;
 
-  void observe(CompanionFirmwareStatus? status, {String? acceptedId}) {
+  void observe(
+    CompanionFirmwareStatus? status, {
+    String? acceptedId,
+    int? submittedGeneration,
+  }) {
     if (status == null) return;
     if (status.busy) {
       _observedActiveId = status.id;
-    } else if (status.id != _observedActiveId && status.id != acceptedId) {
+    } else if (status.id != _observedActiveId &&
+        status.id != acceptedId &&
+        status.generation != submittedGeneration) {
       state = status.id;
     }
   }

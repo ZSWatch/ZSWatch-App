@@ -876,6 +876,56 @@ void main() {
     expect(calls.map((call) => call.method), ['prepareShell', 'startFirmware']);
   });
   test(
+    'terminal results stay visible when the start receipt was lost',
+    () async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        if (call.method == 'prepareShell') {
+          return {'version': 1, 'generation': 8, 'prepared_from_generation': 7};
+        }
+        throw const FormatException('Lost receipt');
+      });
+      for (final outcome in {
+        'completed': DfuStatus.completed,
+        'failed': DfuStatus.failed,
+        'cancelled': DfuStatus.cancelled,
+      }.entries) {
+        final states = StreamController<CompanionPrototypeSnapshot>();
+        final c = container(states.stream);
+        try {
+          await emit(c, states, snapshot());
+          final notifier = c.read(dfuNotifierProvider.notifier);
+          await notifier.loadLocalFile(manager.images.first.filePath);
+          await notifier.startUpdate();
+          expect(c.read(dfuStateProvider).status, DfuStatus.failed);
+          final callsBeforeResult = calls.length;
+          await emit(
+            c,
+            states,
+            snapshot(
+              operation: firmware(
+                outcome.key,
+                unknown: outcome.key == 'failed',
+              ),
+              generation: 11,
+            ),
+          );
+          expect(c.read(dfuStateProvider).status, outcome.value);
+          await notifier.startUpdate();
+          expect(calls.length, callsBeforeResult);
+          notifier.reset();
+          expect(c.read(dfuStateProvider).status, DfuStatus.idle);
+          await notifier.loadLocalFile(manager.images.first.filePath);
+          expect(c.read(dfuNotifierProvider).downloadedImage, isNotNull);
+          expect(calls.length, callsBeforeResult);
+        } finally {
+          c.dispose();
+          await states.close();
+        }
+      }
+    },
+  );
+  test(
     'status errors and foreign watch receipts do not show verified success',
     () async {
       final states = StreamController<CompanionPrototypeSnapshot>();
