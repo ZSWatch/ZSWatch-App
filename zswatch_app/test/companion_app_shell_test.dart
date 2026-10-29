@@ -16,9 +16,7 @@ import 'package:zswatch_app/ui/screens/health/health_screen.dart';
 import 'package:zswatch_app/ui/screens/health/heart_rate_screen.dart';
 import 'package:zswatch_app/ui/screens/analytics/analytics_screen.dart';
 import 'package:zswatch_app/providers/auto_reconnect_provider.dart';
-import 'package:zswatch_app/providers/dfu_providers.dart';
 import 'package:zswatch_app/providers/developer_providers.dart';
-import 'package:zswatch_app/providers/filesystem_providers.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/demo_mode_provider.dart';
 import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
@@ -154,10 +152,6 @@ void main() {
             permissionRequests++;
             if (denyPermission) throw StateError('Permission denied');
           }),
-          dfuServiceProvider.overrideWith((ref) => legacy('legacy DFU')),
-          filesystemUploadServiceProvider.overrideWith(
-            (ref) => legacy('legacy FS'),
-          ),
           database.databaseProvider.overrideWith((ref) => db),
           watchServiceProvider.overrideWith(
             (ref) => legacy('Dart WatchService'),

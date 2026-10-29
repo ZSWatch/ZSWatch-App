@@ -92,12 +92,6 @@ void main() {
             nativeCompanionRuntimeProvider.overrideWithValue(true),
             companionSnapshotProvider.overrideWith((ref) => states.stream),
             transferProgressClockProvider.overrideWithValue(() => clock),
-            dfuServiceProvider.overrideWith(
-              (ref) => throw StateError('Legacy DFU created'),
-            ),
-            filesystemUploadServiceProvider.overrideWith(
-              (ref) => throw StateError('Legacy FS created'),
-            ),
             watchServiceProvider.overrideWith(
               (ref) => throw StateError('Legacy BLE created'),
             ),
