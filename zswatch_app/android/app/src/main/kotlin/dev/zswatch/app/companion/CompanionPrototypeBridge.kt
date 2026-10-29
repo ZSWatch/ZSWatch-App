@@ -90,7 +90,6 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                 "setLogStreaming" -> PrototypeHub.worker.post {
                     try {
                         val enabled = call.argument<Boolean>("enabled") ?: error("Boolean enabled required")
-                        if (enabled) check(PrototypeHub.logObservers.contains(logChanged)) { "Open the log viewer first" }
                         val link = CompanionPrototypeService.instance?.transport ?: error("Service not running")
                         link.setLogStreaming(enabled)
                         PrototypeHub.main.post { result.success(mapOf("version" to 1, "accepted" to true)) }
@@ -559,8 +558,10 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                     // Activity disposal can race a queued listen.
                     if (logSink !== eventSink) return@post
                     PrototypeHub.logObservers.add(logChanged)
-                    logChanged(CompanionPrototypeService.instance?.transport?.liveLogs?.state()
-                        ?: mapOf("version" to 1, "kind" to "state", "requested" to false, "written" to false, "pending" to false))
+                    val capture = CompanionPrototypeService.instance?.transport?.liveLogs
+                    if (capture != null) capture.replay().forEach(logChanged)
+                    else logChanged(mapOf("version" to 1, "kind" to "state", "requested" to
+                        (PrototypeHub.journal(context).control()["log_streaming"] == true), "written" to false, "pending" to false))
                 }
             }
             override fun onCancel(arguments: Any?) { detachLogs() }
@@ -612,14 +613,6 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
         logSink = null
         PrototypeHub.worker.post {
             PrototypeHub.logObservers.remove(logChanged)
-            if (PrototypeHub.logObservers.isEmpty()) {
-                val link = CompanionPrototypeService.instance?.transport
-                if (link?.liveLogs?.state()?.get("requested") == true) {
-                    // Detaching diagnostics never stops the companion. If the
-                    // link is already gone, reset has fenced the pending write.
-                    runCatching { link.setLogStreaming(false) }.onFailure { link.liveLogs.reset() }
-                }
-            }
         }
     }
 

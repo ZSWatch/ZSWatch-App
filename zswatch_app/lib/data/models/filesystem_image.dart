@@ -203,6 +203,11 @@ abstract class FilesystemUploadState with _$FilesystemUploadState {
 
   /// Human-readable upload speed
   String get formattedSpeed {
+    if (status == FilesystemUploadStatus.uploading &&
+        speedBytesPerSecond == 0 &&
+        speedHistory.isEmpty) {
+      return 'calculating...';
+    }
     if (speedBytesPerSecond < 1024) {
       return '$speedBytesPerSecond B/s';
     } else if (speedBytesPerSecond < 1024 * 1024) {
@@ -214,12 +219,18 @@ abstract class FilesystemUploadState with _$FilesystemUploadState {
 
   /// Estimated time remaining
   String get formattedTimeRemaining {
+    if (status == FilesystemUploadStatus.uploading && totalBytes > 0) {
+      if (bytesTransferred >= totalBytes) return '0s';
+      if (speedBytesPerSecond <= 0) {
+        return speedHistory.isEmpty ? 'calculating...' : 'Waiting for data';
+      }
+    }
     if (speedBytesPerSecond <= 0 || bytesTransferred >= totalBytes) {
       return '--:--';
     }
 
     final remaining = totalBytes - bytesTransferred;
-    final seconds = remaining ~/ speedBytesPerSecond;
+    final seconds = (remaining / speedBytesPerSecond).ceil();
 
     if (seconds < 60) {
       return '${seconds}s';
@@ -230,7 +241,8 @@ abstract class FilesystemUploadState with _$FilesystemUploadState {
     } else {
       final h = seconds ~/ 3600;
       final m = (seconds % 3600) ~/ 60;
-      return '$h:${m.toString().padLeft(2, '0')}:00';
+      final s = seconds % 60;
+      return '$h:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
     }
   }
 

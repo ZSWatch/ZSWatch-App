@@ -25,19 +25,17 @@ final logFilterProvider = StateProvider<LogFilter>((ref) => LogFilter.all);
 /// Provider for whether log streaming is enabled on watch
 final logStreamingEnabledProvider = StateProvider<bool>((ref) => false);
 
-// Only the log view observes payloads; leaving it cancels capture through the
-// bridge without changing the native companion's lifetime or connection.
-final companionLiveLogEventsProvider =
-    StreamProvider.autoDispose<Map<String, Object?>>((ref) {
-      return ref.watch(companionClientProvider).liveLogs();
-    });
+// Capture outlives the viewer. The native owner also buffers logs while the
+// Flutter engine is detached and replays them when this stream attaches.
+final companionLiveLogEventsProvider = StreamProvider<Map<String, Object?>>((
+  ref,
+) {
+  return ref.watch(companionClientProvider).liveLogs();
+});
 
 /// Provider for log streaming state (with pending/error tracking)
 final logStreamingStateProvider =
-    StateNotifierProvider.autoDispose<
-      LogStreamingStateNotifier,
-      LogStreamingState
-    >((ref) {
+    StateNotifierProvider<LogStreamingStateNotifier, LogStreamingState>((ref) {
       if (ref.watch(nativeCompanionRuntimeProvider)) {
         final notifier = LogStreamingStateNotifier.native(
           ref.watch(companionClientProvider).setLogStreaming,
@@ -48,7 +46,6 @@ final logStreamingStateProvider =
         });
         return notifier;
       }
-      ref.keepAlive(); // Preserve the existing deferred iOS provider lifetime.
       final watchService = ref.watch(watchServiceProvider);
       return LogStreamingStateNotifier(watchService);
     });
@@ -129,21 +126,25 @@ class LogStreamingStateNotifier extends StateNotifier<LogStreamingState> {
 
 /// Provider for all log entries (maintains a buffer)
 final logEntriesProvider =
-    StateNotifierProvider.autoDispose<LogEntriesNotifier, List<LogEntry>>((
-      ref,
-    ) {
+    StateNotifierProvider<LogEntriesNotifier, List<LogEntry>>((ref) {
       if (ref.watch(nativeCompanionRuntimeProvider)) {
         final notifier = LogEntriesNotifier.native();
         ref.listen(companionLiveLogEventsProvider, (previous, next) {
           next.whenData((event) {
             if (event['kind'] == 'log' && event['message'] is String) {
-              notifier._emitLogEntry(event['message']! as String);
+              notifier._emitLogEntry(
+                event['message']! as String,
+                timestamp: event['utc_ms'] is int
+                    ? DateTime.fromMillisecondsSinceEpoch(
+                        event['utc_ms']! as int,
+                      )
+                    : null,
+              );
             }
           });
         });
         return notifier;
       }
-      ref.keepAlive(); // Preserve the existing deferred iOS log buffer lifetime.
       final watchService = ref.watch(watchServiceProvider);
       return LogEntriesNotifier(watchService);
     });
@@ -232,7 +233,7 @@ class LogEntriesNotifier extends StateNotifier<List<LogEntry>> {
   }
 
   /// Emit a log entry (from BLELOG wrapper)
-  void _emitLogEntry(String logContent) {
+  void _emitLogEntry(String logContent, {DateTime? timestamp}) {
     if (logContent.isEmpty) return;
 
     final entry = LogEntry.incoming(
@@ -242,7 +243,7 @@ class LogEntriesNotifier extends StateNotifier<List<LogEntry>> {
       type: LogEntryType.log,
       isJson: false,
     );
-    _addEntry(entry);
+    _addEntry(timestamp == null ? entry : entry.copyWith(timestamp: timestamp));
   }
 
   void _addEntry(LogEntry entry) {

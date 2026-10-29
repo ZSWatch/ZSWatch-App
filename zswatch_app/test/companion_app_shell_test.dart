@@ -972,7 +972,7 @@ void main() {
   );
 
   testWidgets(
-    'existing log view observes native logs and detaches without stopping BLE',
+    'log view retains native capture across navigation and reconnects',
     (tester) async {
       await mount(tester, snapshot(active: true, ready: true));
       router(tester).go(AppRoutes.developer);
@@ -1024,6 +1024,40 @@ void main() {
       );
       scope.read(logEntriesProvider.notifier).clear();
       expect(scope.read(logEntriesProvider), isEmpty);
+      router(tester).pop();
+      await tester.pumpAndSettle();
+      expect(logSubscriptions, ['listen']);
+      expect(commands().map((call) => call.method), ['setLogStreaming']);
+      expect(find.text('Developer Tools'), findsOneWidget);
+      await logEvent({
+        'kind': 'log',
+        'message': 'captured while viewer closed',
+      });
+      await logEvent({
+        'kind': 'state',
+        'requested': true,
+        'written': false,
+        'pending': false,
+      });
+      await tester.tap(find.text('Log Viewer'));
+      await tester.pumpAndSettle();
+      expect(logSubscriptions, ['listen']);
+      expect(
+        scope.read(logEntriesProvider).single.message,
+        'captured while viewer closed',
+      );
+      expect(find.text('Enabled — waiting for watch'), findsOneWidget);
+      expect(tester.widget<Switch>(find.byType(Switch)).value, true);
+      await logEvent({
+        'kind': 'state',
+        'requested': true,
+        'written': true,
+        'pending': false,
+      });
+      expect(find.text('Enabled'), findsOneWidget);
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      expect(commands().last.arguments, {'version': 1, 'enabled': false});
       await logEvent({
         'kind': 'state',
         'requested': false,
@@ -1031,11 +1065,10 @@ void main() {
         'pending': false,
       });
       expect(find.text('Disabled'), findsOneWidget);
-      router(tester).pop();
-      await tester.pumpAndSettle();
-      expect(logSubscriptions, ['listen', 'cancel']);
-      expect(commands().map((call) => call.method), ['setLogStreaming']);
-      expect(find.text('Developer Tools'), findsOneWidget);
+      expect(commands().map((call) => call.method), [
+        'setLogStreaming',
+        'setLogStreaming',
+      ]);
     },
   );
 
