@@ -1,22 +1,11 @@
-import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
 
 import '../core/utils/watchface_image_processor.dart';
-import '../data/models/filesystem_image.dart';
-import '../services/dfu/filesystem_upload_service.dart';
-import 'filesystem_providers.dart';
-import 'watch_service_provider.dart';
 import 'companion_runtime_providers.dart';
 import '../data/models/companion_watchface_status.dart';
-
-/// Target path for the background upload (temp name to avoid race condition)
-const _uploadTargetPath = '/user/bg_new.bin';
 
 /// Built-in background definition
 class BuiltinBackground {
@@ -275,24 +264,14 @@ class WatchfaceBackgroundState {
 /// Notifier for managing watchface background uploads
 class WatchfaceBackgroundNotifier
     extends StateNotifier<WatchfaceBackgroundState> {
-  final FilesystemUploadService? _uploadService;
-  final bool native;
   bool _localPreparing = false;
   String? _requestAddress, _lastId, _lastPhase;
-  FilesystemUploadService get _legacyUpload =>
-      _uploadService ?? (throw StateError('Native upload is service-owned'));
   final Ref _ref;
-  StreamSubscription<FilesystemUploadState>? _uploadSub;
-  int _smpConnectionGeneration = -1;
 
-  WatchfaceBackgroundNotifier(
-    this._uploadService,
-    this._ref, {
-    this.native = false,
-  }) : super(const WatchfaceBackgroundState());
+  WatchfaceBackgroundNotifier(this._ref)
+    : super(const WatchfaceBackgroundState());
 
   bool _beginNative() {
-    if (!native) return true;
     if (state.isUploading || state.isApplying) return false;
     final snapshot = _ref.read(companionSnapshotProvider).valueOrNull;
     if (snapshot?.protocolReady != true) {
@@ -346,20 +325,11 @@ class WatchfaceBackgroundNotifier
     try {
       state = const WatchfaceBackgroundState(isUploading: true);
 
-      // Copy asset to temp file
       final data = await rootBundle.load(bg.assetBinPath);
-      if (native) {
-        await _startNativeUpload(
-          data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
-          bg.name,
-        );
-        return;
-      }
-      final dir = await getTemporaryDirectory();
-      final tempPath = p.join(dir.path, 'bg_upload.bin');
-      await File(tempPath).writeAsBytes(data.buffer.asUint8List());
-
-      await _startUpload(tempPath, bg.name);
+      await _startNativeUpload(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+        bg.name,
+      );
     } catch (e) {
       _localPreparing = false;
       if (mounted) {
@@ -374,18 +344,11 @@ class WatchfaceBackgroundNotifier
     try {
       state = const WatchfaceBackgroundState(isUploading: true);
 
-      // Process image: crop, resize, circular mask, convert to LVGL binary
-      if (native) {
-        final bytes = await File(imagePath).readAsBytes();
-        await _startNativeUpload(
-          WatchfaceImageProcessor.processImageBytes(bytes),
-          'Custom Background',
-        );
-        return;
-      }
-      final binPath = await WatchfaceImageProcessor.processImageFile(imagePath);
-
-      await _startUpload(binPath, 'Custom Background');
+      final bytes = await File(imagePath).readAsBytes();
+      await _startNativeUpload(
+        WatchfaceImageProcessor.processImageBytes(bytes),
+        'Custom Background',
+      );
     } catch (e) {
       _localPreparing = false;
       if (mounted) {
@@ -401,16 +364,7 @@ class WatchfaceBackgroundNotifier
       state = const WatchfaceBackgroundState(isUploading: true);
 
       final bin = WatchfaceImageProcessor.processImageBytes(imageBytes);
-      if (native) {
-        await _startNativeUpload(bin, 'Custom Background');
-        return;
-      }
-
-      final dir = await getTemporaryDirectory();
-      final outPath = p.join(dir.path, 'watchface_bg.bin');
-      await File(outPath).writeAsBytes(bin);
-
-      await _startUpload(outPath, 'Custom Background');
+      await _startNativeUpload(bin, 'Custom Background');
     } catch (e) {
       _localPreparing = false;
       if (mounted) {
@@ -425,25 +379,10 @@ class WatchfaceBackgroundNotifier
     try {
       state = const WatchfaceBackgroundState(isApplying: true);
 
-      if (native) {
-        final snapshot = _ref.read(companionSnapshotProvider).requireValue;
-        final client = _ref.read(companionClientProvider);
-        await client.resetWatchface(snapshot.generation);
-        _localPreparing = false;
-        return;
-      }
-      final watchService = _ref.read(watchServiceProvider);
-      final result = await watchService.resetWatchfaceBackground();
-      if (result['ok'] != true) {
-        state = WatchfaceBackgroundState(
-          error: 'Reset failed: ${_resultError(result)}',
-        );
-        return;
-      }
-
-      state = const WatchfaceBackgroundState(
-        successMessage: 'Background reset to default',
-      );
+      final snapshot = _ref.read(companionSnapshotProvider).requireValue;
+      final client = _ref.read(companionClientProvider);
+      await client.resetWatchface(snapshot.generation);
+      _localPreparing = false;
     } catch (e) {
       _localPreparing = false;
       if (mounted) {
@@ -467,136 +406,8 @@ class WatchfaceBackgroundNotifier
     _localPreparing = false;
   }
 
-  Future<void> _startUpload(String filePath, String name) async {
-    if (native) {
-      await _startNativeUpload(await File(filePath).readAsBytes(), name);
-      return;
-    }
-    final connection = _ref.read(watchConnectionProvider);
-    if (!connection.isConnected || connection.watchId.isEmpty) {
-      state = const WatchfaceBackgroundState(error: 'Watch not connected');
-      return;
-    }
-
-    final watchService = _ref.read(watchServiceProvider);
-
-    // Always enable SMP + rediscover services before upload.
-    // Cannot rely on hasSmpService — it caches stale discovery results
-    // after a previous SMP disable.
-    try {
-      _smpConnectionGeneration = watchService.connectionGeneration;
-      await watchService.enableSmp();
-      await Future<void>.delayed(const Duration(seconds: 2));
-      final smpReady = await watchService.rediscoverServices();
-      if (!smpReady) {
-        _disableSmp();
-        state = const WatchfaceBackgroundState(
-          error: 'SMP service did not become available',
-        );
-        return;
-      }
-    } catch (e) {
-      _disableSmp();
-      state = WatchfaceBackgroundState(error: 'Failed to enable SMP: $e');
-      return;
-    }
-
-    final image = FilesystemImage(
-      name: name,
-      filePath: filePath,
-      targetPath: _uploadTargetPath,
-      size: await File(filePath).length(),
-    );
-
-    // Reset service state from any previous upload so the BehaviorSubject
-    // doesn't immediately replay a stale 'completed'/'failed' status.
-    _legacyUpload.reset();
-
-    // Listen for completion to trigger the GadgetBridge apply command.
-    await _uploadSub?.cancel();
-    _uploadSub = _legacyUpload.stateStream
-        .where((s) => s.status != FilesystemUploadStatus.idle)
-        .listen((uploadState) {
-          if (uploadState.status == FilesystemUploadStatus.completed) {
-            unawaited(_applyBackground());
-          } else if (uploadState.status == FilesystemUploadStatus.failed) {
-            state = WatchfaceBackgroundState(
-              error: 'Upload failed: ${uploadState.errorMessage}',
-            );
-            _disableSmp();
-            unawaited(_uploadSub?.cancel() ?? Future<void>.value());
-          } else if (uploadState.status == FilesystemUploadStatus.cancelled) {
-            state = const WatchfaceBackgroundState();
-            _disableSmp();
-            unawaited(_uploadSub?.cancel() ?? Future<void>.value());
-          }
-        });
-
-    try {
-      await _legacyUpload.startUpload(
-        deviceId: connection.watchId,
-        image: image,
-      );
-    } catch (e) {
-      await _uploadSub?.cancel();
-      _uploadSub = null;
-      _disableSmp();
-      state = WatchfaceBackgroundState(error: 'Upload failed to start: $e');
-    }
-  }
-
-  void _disableSmp() {
-    try {
-      final watchService = _ref.read(watchServiceProvider);
-      unawaited(
-        watchService.disableSmpIfConnectionUnchanged(_smpConnectionGeneration),
-      );
-    } catch (e) {
-      debugPrint('[WatchfaceBackground] Failed to disable SMP: $e');
-    }
-  }
-
-  Future<void> _applyBackground() async {
-    await _uploadSub?.cancel();
-    state = const WatchfaceBackgroundState(isApplying: true);
-
-    try {
-      final watchService = _ref.read(watchServiceProvider);
-      final result = await watchService.applyWatchfaceBackground();
-      if (result['ok'] != true) {
-        state = WatchfaceBackgroundState(
-          error: 'Apply failed: ${_resultError(result)}',
-        );
-        return;
-      }
-
-      state = const WatchfaceBackgroundState(
-        successMessage: 'Background applied!',
-      );
-    } catch (e) {
-      state = WatchfaceBackgroundState(error: 'Apply failed: $e');
-    } finally {
-      _disableSmp();
-    }
-  }
-
-  String _resultError(Map<String, dynamic> result) {
-    final error = result['error'] as String?;
-    final rc = result['rc'];
-    if (error == null || error.isEmpty) {
-      return rc == null ? 'unknown error' : 'error $rc';
-    }
-    return rc == null ? error : '$error ($rc)';
-  }
-
   void clearMessages() {
     state = state.copyWith(error: null, successMessage: null);
-  }
-
-  @override
-  void dispose() {
-    unawaited(_uploadSub?.cancel() ?? Future<void>.value());
-    super.dispose();
   }
 }
 
@@ -606,19 +417,13 @@ final watchfaceBackgroundProvider =
       WatchfaceBackgroundNotifier,
       WatchfaceBackgroundState
     >((ref) {
-      if (ref.watch(nativeCompanionRuntimeProvider)) {
-        final notifier = WatchfaceBackgroundNotifier(null, ref, native: true);
-        ref.listen(companionWatchfaceStatusProvider, (_, next) {
-          notifier.observeNative(
-            next.valueOrNull,
-            ref.read(companionSnapshotProvider).valueOrNull?.fields['address']
-                as String?,
-          );
-        }, fireImmediately: true);
-        return notifier;
-      }
-      return WatchfaceBackgroundNotifier(
-        ref.watch(filesystemUploadServiceProvider),
-        ref,
-      );
+      final notifier = WatchfaceBackgroundNotifier(ref);
+      ref.listen(companionWatchfaceStatusProvider, (_, next) {
+        notifier.observeNative(
+          next.valueOrNull,
+          ref.read(companionSnapshotProvider).valueOrNull?.fields['address']
+              as String?,
+        );
+      }, fireImmediately: true);
+      return notifier;
     });

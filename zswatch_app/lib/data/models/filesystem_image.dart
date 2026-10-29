@@ -152,46 +152,6 @@ abstract class FilesystemUploadState with _$FilesystemUploadState {
     String? imageName,
   }) = _FilesystemUploadState;
 
-  /// Create uploading state
-  factory FilesystemUploadState.uploading({
-    required int totalBytes,
-    String? imageName,
-    DateTime? startedAt,
-  }) {
-    return FilesystemUploadState(
-      status: FilesystemUploadStatus.uploading,
-      totalBytes: totalBytes,
-      imageName: imageName,
-      startedAt: startedAt ?? DateTime.now(),
-    );
-  }
-
-  /// Create completed state
-  factory FilesystemUploadState.completed({DateTime? startedAt}) {
-    return FilesystemUploadState(
-      status: FilesystemUploadStatus.completed,
-      progress: 1.0,
-      startedAt: startedAt,
-    );
-  }
-
-  /// Create failed state
-  factory FilesystemUploadState.failed(String message, {DateTime? startedAt}) {
-    return FilesystemUploadState(
-      status: FilesystemUploadStatus.failed,
-      errorMessage: message,
-      startedAt: startedAt,
-    );
-  }
-
-  /// Create cancelled state
-  factory FilesystemUploadState.cancelled({DateTime? startedAt}) {
-    return FilesystemUploadState(
-      status: FilesystemUploadStatus.cancelled,
-      startedAt: startedAt,
-    );
-  }
-
   /// Progress percentage (0-100)
   int get progressPercent => (progress * 100).round();
 

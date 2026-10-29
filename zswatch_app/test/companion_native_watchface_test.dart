@@ -171,10 +171,6 @@ void main() {
             legacy++;
             throw StateError('Legacy BLE');
           }),
-          filesystemUploadServiceProvider.overrideWith((ref) {
-            legacy++;
-            throw StateError('Legacy FS');
-          }),
         ],
       );
       addTearDown(() async {
@@ -263,9 +259,6 @@ void main() {
           watchServiceProvider.overrideWith(
             (ref) => throw StateError('Legacy BLE'),
           ),
-          filesystemUploadServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy FS'),
-          ),
         ],
       );
       await container.read(companionSnapshotProvider.future);
@@ -302,9 +295,6 @@ void main() {
           watchServiceProvider.overrideWith(
             (ref) => throw StateError('Legacy BLE'),
           ),
-          filesystemUploadServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy FS'),
-          ),
         ],
       );
       await container.read(companionSnapshotProvider.future);
@@ -335,9 +325,6 @@ void main() {
           ),
           watchServiceProvider.overrideWith(
             (ref) => throw StateError('Legacy BLE'),
-          ),
-          filesystemUploadServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy FS'),
           ),
         ],
       );
@@ -375,9 +362,6 @@ void main() {
               generation: 9,
             ),
           ),
-        ),
-        filesystemUploadServiceProvider.overrideWith(
-          (ref) => throw StateError('Legacy FS'),
         ),
       ],
     );

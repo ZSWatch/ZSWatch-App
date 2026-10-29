@@ -12,7 +12,6 @@ import 'package:zswatch_app/data/models/filesystem_image.dart';
 import 'package:zswatch_app/data/models/firmware_image.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/dfu_providers.dart';
-import 'package:zswatch_app/providers/filesystem_providers.dart';
 import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/services/dfu/firmware_manager.dart';
@@ -187,12 +186,6 @@ void main() {
           nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => states),
           firmwareManagerProvider.overrideWithValue(manager),
-          dfuServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy DFU created'),
-          ),
-          filesystemUploadServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy FS created'),
-          ),
           watchServiceProvider.overrideWith(
             (ref) => throw StateError('Legacy BLE created'),
           ),

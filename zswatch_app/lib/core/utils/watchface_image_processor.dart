@@ -1,10 +1,7 @@
-import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
 
 import 'lvgl_image_converter.dart';
 
@@ -14,33 +11,6 @@ import 'lvgl_image_converter.dart';
 class WatchfaceImageProcessor {
   static const int watchSize = 240;
   static const int radius = watchSize ~/ 2;
-
-  /// Process an image file into an LVGL binary suitable for the watch.
-  ///
-  /// Steps: decode → center-crop to square → resize to 240×240 →
-  /// circular mask (black outside) → convert to LVGL RGB565 binary.
-  ///
-  /// Returns the path to the temporary .bin file.
-  static Future<String> processImageFile(String imagePath) async {
-    final bytes = await File(imagePath).readAsBytes();
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) {
-      throw Exception('Failed to decode image: $imagePath');
-    }
-
-    final processed = _processImage(decoded);
-    final rgba = _imageToRgba(processed);
-    final bin = LvglImageConverter.rgbaToLvglBin(
-      rgba: rgba,
-      width: watchSize,
-      height: watchSize,
-    );
-
-    final dir = await getTemporaryDirectory();
-    final outPath = p.join(dir.path, 'watchface_bg.bin');
-    await File(outPath).writeAsBytes(bin);
-    return outPath;
-  }
 
   /// Process an already-decoded image into LVGL binary bytes.
   static Uint8List processImageBytes(Uint8List imageBytes) {

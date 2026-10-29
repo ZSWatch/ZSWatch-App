@@ -3,9 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mcumgr_flutter/mcumgr_flutter.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../data/models/dfu_state.dart';
@@ -14,35 +12,16 @@ import '../core/constants/filesystem_constants.dart';
 import 'companion_runtime_providers.dart';
 import '../data/models/filesystem_image.dart';
 import '../data/models/firmware_image.dart';
-import '../services/dfu/dfu_service.dart';
 import '../services/dfu/firmware_manager.dart';
-import 'filesystem_providers.dart';
-import 'watch_service_provider.dart';
 import 'transfer_progress_providers.dart';
 
 part 'dfu_providers.freezed.dart';
-
-/// Provider for the DFU service singleton
-final dfuServiceProvider = Provider<DfuService>((ref) {
-  if (ref.watch(nativeCompanionRuntimeProvider)) {
-    throw StateError('Native firmware owner is selected');
-  }
-  final service = DfuService();
-  ref.onDispose(() => service.dispose());
-  return service;
-});
 
 /// Provider for the firmware manager singleton
 final firmwareManagerProvider = Provider<FirmwareManager>((ref) {
   final manager = FirmwareManager();
   ref.onDispose(() => manager.dispose());
   return manager;
-});
-
-/// Stream provider for DFU state
-final dfuStateStreamProvider = StreamProvider<DfuState>((ref) {
-  final service = ref.watch(dfuServiceProvider);
-  return service.stateStream;
 });
 
 final companionFirmwareStatusProvider =
@@ -98,7 +77,6 @@ class _FirmwareResultDismissal extends StateNotifier<String?> {
 /// Metadata for display; retained native work remains busy after UI reattachment.
 final effectiveDfuOperationStateProvider = Provider<DfuOperationState>((ref) {
   final local = ref.watch(dfuNotifierProvider);
-  if (!ref.watch(nativeCompanionRuntimeProvider)) return local;
   final status = ref.watch(companionFirmwareStatusProvider).valueOrNull;
   final both =
       status?.resource != null && status!.indices.isNotEmpty && status.busy;
@@ -112,9 +90,6 @@ final effectiveDfuOperationStateProvider = Provider<DfuOperationState>((ref) {
 
 /// Resource state comes from the same service-owned package, never watchface receipts.
 final firmwareFilesystemStateProvider = Provider<FilesystemUploadState>((ref) {
-  if (!ref.watch(nativeCompanionRuntimeProvider)) {
-    return ref.watch(filesystemUploadStateProvider);
-  }
   final status = ref.watch(companionFirmwareStatusProvider).valueOrNull;
   final dismissed = ref.watch(_dismissedFirmwareProvider);
   final rate = ref.watch(
@@ -147,58 +122,54 @@ final firmwareFilesystemStateProvider = Provider<FilesystemUploadState>((ref) {
 
 /// Provider for current DFU state
 final dfuStateProvider = Provider<DfuState>((ref) {
-  if (ref.watch(nativeCompanionRuntimeProvider)) {
-    final asyncStatus = ref.watch(companionFirmwareStatusProvider);
-    // Subscribe before returning an active state so its completion is observed.
-    final dismissed = ref.watch(_dismissedFirmwareProvider);
-    if (asyncStatus.hasError || asyncStatus.isLoading) {
-      return const DfuState(
-        status: DfuStatus.failed,
-        errorMessage:
-            'Firmware status is unavailable. Reopen the screen when companion status is available.',
-      );
-    }
-    final status = asyncStatus.valueOrNull;
-    final submitted = ref.watch(_submittedFirmwareGenerationProvider);
-    final receipt = ref.watch(_acceptedFirmwareProvider);
-    final local = ref.watch(dfuNotifierProvider);
-    if (status?.busy == true) {
-      if (ref.watch(companionSnapshotProvider).valueOrNull?.runtimeActive !=
-          true) {
-        return const DfuState(
-          status: DfuStatus.failed,
-          errorMessage:
-              'The background service is unavailable during a firmware operation. The installed firmware is unverified. Reconnect and check the watch.',
-        );
-      }
-      final rate = ref.watch(
-        nativeTransferRateProvider(NativeImageTransfer.firmware),
-      );
-      return status!.dfuState.copyWith(
-        speedBytesPerSecond: rate.bytesPerSecond,
-        speedHistory: rate.history,
-      );
-    }
-    if (!local.isUpdating &&
-        submitted != null &&
-        status?.generation != submitted &&
-        receipt == null) {
-      return const DfuState(
-        status: DfuStatus.failed,
-        errorMessage:
-            'Firmware acceptance is unknown. Check companion status and the watch before selecting another update.',
-      );
-    }
-    if (local.isUpdating || (receipt != null && status?.id != receipt.id)) {
-      return const DfuState(status: DfuStatus.preparing);
-    }
-    if (status == null || status.id == dismissed) {
-      return DfuState.idle;
-    }
-    return status.dfuState;
+  final asyncStatus = ref.watch(companionFirmwareStatusProvider);
+  // Subscribe before returning an active state so its completion is observed.
+  final dismissed = ref.watch(_dismissedFirmwareProvider);
+  if (asyncStatus.hasError || asyncStatus.isLoading) {
+    return const DfuState(
+      status: DfuStatus.failed,
+      errorMessage:
+          'Firmware status is unavailable. Reopen the screen when companion status is available.',
+    );
   }
-  final asyncValue = ref.watch(dfuStateStreamProvider);
-  return asyncValue.valueOrNull ?? DfuState.idle;
+  final status = asyncStatus.valueOrNull;
+  final submitted = ref.watch(_submittedFirmwareGenerationProvider);
+  final receipt = ref.watch(_acceptedFirmwareProvider);
+  final local = ref.watch(dfuNotifierProvider);
+  if (status?.busy == true) {
+    if (ref.watch(companionSnapshotProvider).valueOrNull?.runtimeActive !=
+        true) {
+      return const DfuState(
+        status: DfuStatus.failed,
+        errorMessage:
+            'The background service is unavailable during a firmware operation. The installed firmware is unverified. Reconnect and check the watch.',
+      );
+    }
+    final rate = ref.watch(
+      nativeTransferRateProvider(NativeImageTransfer.firmware),
+    );
+    return status!.dfuState.copyWith(
+      speedBytesPerSecond: rate.bytesPerSecond,
+      speedHistory: rate.history,
+    );
+  }
+  if (!local.isUpdating &&
+      submitted != null &&
+      status?.generation != submitted &&
+      receipt == null) {
+    return const DfuState(
+      status: DfuStatus.failed,
+      errorMessage:
+          'Firmware acceptance is unknown. Check companion status and the watch before selecting another update.',
+    );
+  }
+  if (local.isUpdating || (receipt != null && status?.id != receipt.id)) {
+    return const DfuState(status: DfuStatus.preparing);
+  }
+  if (status == null || status.id == dismissed) {
+    return DfuState.idle;
+  }
+  return status.dfuState;
 });
 
 /// Provider for DFU status
@@ -279,12 +250,11 @@ final workflowRunsProvider =
 
 /// State notifier for DFU operations
 class DfuNotifier extends StateNotifier<DfuOperationState> {
-  final DfuService? _dfuService;
   int _nativeAttempt = 0;
   final FirmwareManager _firmwareManager;
   final Ref _ref;
 
-  DfuNotifier(this._dfuService, this._firmwareManager, this._ref)
+  DfuNotifier(this._firmwareManager, this._ref)
     : super(const DfuOperationState());
 
   // A terminal native receipt releases admission for an explicit retry. Keep
@@ -302,11 +272,9 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
   }
 
   bool get _nativeSelectionBlocked =>
-      _ref.read(nativeCompanionRuntimeProvider) &&
-      (state.isAnyInProgress ||
-          _ref.read(companionFirmwareStatusProvider).valueOrNull?.busy ==
-              true ||
-          _nativeReceiptPending);
+      state.isAnyInProgress ||
+      _ref.read(companionFirmwareStatusProvider).valueOrNull?.busy == true ||
+      _nativeReceiptPending;
 
   /// Download firmware from a GitHub release asset
   Future<void> downloadReleaseAsset(
@@ -391,81 +359,8 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     }
   }
 
-  /// Ensure SMP is enabled on the watch before DFU/FS operations.
-  ///
-  /// Sends the GadgetBridge `smp_enable` command, waits for the watch to
-  /// register the SMP BT transport, then re-discovers services so the
-  /// MCUmgr GATT service appears.
-  Future<void> _ensureSmpEnabled() async {
-    final watchService = _ref.read(watchServiceProvider);
-
-    // Do not trust the cached discovery state here. SMP may have been
-    // disabled on the watch after the last service discovery, leaving
-    // hasSmpService stuck at true until we explicitly re-discover.
-    debugPrint('[DfuNotifier] Ensuring SMP is enabled...');
-    await watchService.enableSmp();
-    await Future<void>.delayed(const Duration(seconds: 2));
-    final ready = await watchService.rediscoverServices();
-    if (!ready) {
-      throw Exception(
-        'SMP service did not become available. '
-        'If your watch firmware is older, you may need to manually enable it: '
-        'on the watch go to Apps → Update → Enable FW Update.',
-      );
-    }
-    _ref.invalidate(hasSmpServiceProvider);
-    debugPrint('[DfuNotifier] SMP enabled and discovered');
-  }
-
-  /// Start the DFU process (firmware only)
-  Future<void> startUpdate() async {
-    if (_ref.read(nativeCompanionRuntimeProvider)) {
-      await _startNativeFirmware();
-      return;
-    }
-    final image = state.downloadedImage;
-    if (image == null) {
-      state = state.copyWith(error: 'No firmware selected');
-      return;
-    }
-
-    state = state.copyWith(isUpdating: true, error: null);
-
-    try {
-      // Prepare firmware (extract if needed)
-      final images = await _firmwareManager.prepareFirmware(image);
-      state = state.copyWith(preparedImages: images);
-
-      // Get the connected device
-      final watchService = _ref.read(watchServiceProvider);
-      if (!watchService.isConnected) {
-        throw Exception('Watch not connected');
-      }
-
-      // Auto-enable SMP on the watch if needed
-      await _ensureSmpEnabled();
-
-      // The device ID is needed to create a BluetoothDevice
-      final connection = watchService.currentConnection;
-      final deviceId = connection.watchId;
-      if (deviceId.isEmpty) {
-        throw Exception('No device ID available');
-      }
-
-      // Create a BluetoothDevice from the ID
-      final bluetoothDevice = BluetoothDevice.fromId(deviceId);
-
-      // Start the DFU
-      await _dfuService!.startUpdate(
-        device: bluetoothDevice,
-        firmwareImages: images,
-      );
-
-      state = state.copyWith(isUpdating: false);
-    } catch (e) {
-      state = state.copyWith(isUpdating: false, error: e.toString());
-    }
-  }
+  /// Submit firmware to the native companion, which owns the transfer.
+  Future<void> startUpdate() => _startNativeFirmware();
 
   Future<void> _startNativeFirmware({
     bool firmware = true,
@@ -603,195 +498,39 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
     }
   }
 
-  /// Start filesystem upload only
-  Future<void> startFilesystemUpload() async {
-    if (_ref.read(nativeCompanionRuntimeProvider)) {
-      await _startNativeFirmware(firmware: false, resources: true);
-      return;
-    }
-    final fsImage = state.filesystemImage;
-    if (fsImage == null) {
-      state = state.copyWith(error: 'No filesystem image available');
-      return;
-    }
+  /// Submit resources to the native companion.
+  Future<void> startFilesystemUpload() =>
+      _startNativeFirmware(firmware: false, resources: true);
 
-    state = state.copyWith(isFilesystemUploading: true, error: null);
-
-    try {
-      // Get the connected device
-      final watchService = _ref.read(watchServiceProvider);
-      if (!watchService.isConnected) {
-        throw Exception('Watch not connected');
-      }
-
-      // Auto-enable SMP on the watch if needed
-      await _ensureSmpEnabled();
-
-      final connection = watchService.currentConnection;
-      final deviceId = connection.watchId;
-      if (deviceId.isEmpty) {
-        throw Exception('No device ID available');
-      }
-
-      // Start the filesystem upload
-      final fsService = _ref.read(filesystemUploadServiceProvider);
-      await fsService.startUpload(deviceId: deviceId, image: fsImage);
-
-      // Wait for filesystem upload to complete before restarting
-      await fsService.stateStream.firstWhere((s) => s.status.isTerminal);
-
-      if (fsService.currentState.status == FilesystemUploadStatus.completed) {
-        // Restart the watch so the new filesystem resources take effect
-        debugPrint('[DfuNotifier] FS upload complete, restarting watch...');
-        try {
-          await Future<void>.delayed(const Duration(milliseconds: 500));
-          await OsManager.reset(deviceId);
-          debugPrint('[DfuNotifier] Watch restart command sent');
-        } catch (e) {
-          debugPrint(
-            '[DfuNotifier] Failed to restart watch after FS upload: $e',
-          );
-          // Don't fail the overall operation — the upload itself succeeded
-        }
-      }
-
-      state = state.copyWith(isFilesystemUploading: false);
-    } catch (e) {
-      state = state.copyWith(isFilesystemUploading: false, error: e.toString());
-    }
-  }
-
-  /// Start both filesystem upload and firmware update (filesystem first, then firmware)
-  Future<void> startBothUpdates() async {
-    if (_ref.read(nativeCompanionRuntimeProvider)) {
-      await _startNativeFirmware(firmware: true, resources: true);
-      return;
-    }
-    final fsImage = state.filesystemImage;
-    final fwImage = state.downloadedImage;
-
-    if (fsImage == null && fwImage == null) {
-      state = state.copyWith(error: 'No images available');
-      return;
-    }
-
-    state = state.copyWith(
-      isBothUpdating: true,
-      currentStep: fsImage != null ? 1 : 2,
-      totalSteps: fsImage != null ? 2 : 1,
-      error: null,
-    );
-
-    try {
-      // Get the connected device
-      final watchService = _ref.read(watchServiceProvider);
-      if (!watchService.isConnected) {
-        throw Exception('Watch not connected');
-      }
-
-      // Auto-enable SMP on the watch if needed
-      await _ensureSmpEnabled();
-
-      final connection = watchService.currentConnection;
-      final deviceId = connection.watchId;
-      if (deviceId.isEmpty) {
-        throw Exception('No device ID available');
-      }
-
-      // Step 1: Upload filesystem if available
-      if (fsImage != null) {
-        state = state.copyWith(currentStep: 1);
-
-        final fsService = _ref.read(filesystemUploadServiceProvider);
-        await fsService.startUpload(deviceId: deviceId, image: fsImage);
-
-        // Wait for filesystem upload to complete
-        await fsService.stateStream.firstWhere((s) => s.status.isTerminal);
-
-        final fsState = fsService.currentState;
-        if (fsState.status != FilesystemUploadStatus.completed) {
-          throw Exception('Filesystem upload failed: ${fsState.errorMessage}');
-        }
-
-        // Give BLE transport time to fully release before DFU
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-      }
-
-      // Step 2: Start firmware update if available
-      if (fwImage != null) {
-        state = state.copyWith(currentStep: 2);
-
-        // Prepare firmware (extract if needed)
-        final images = await _firmwareManager.prepareFirmware(fwImage);
-        state = state.copyWith(preparedImages: images);
-
-        // Create a BluetoothDevice from the ID
-        final bluetoothDevice = BluetoothDevice.fromId(deviceId);
-
-        // Start the DFU
-        await _dfuService!.startUpdate(
-          device: bluetoothDevice,
-          firmwareImages: images,
-        );
-      }
-
-      state = state.copyWith(isBothUpdating: false);
-    } catch (e) {
-      state = state.copyWith(isBothUpdating: false, error: e.toString());
-    }
-  }
+  /// Native owns ordering: upload resources before firmware reboots the watch.
+  Future<void> startBothUpdates() =>
+      _startNativeFirmware(firmware: true, resources: true);
 
   /// Cancel the current operation
   Future<void> cancel() async {
-    if (_ref.read(nativeCompanionRuntimeProvider)) {
-      final status = _ref.read(companionFirmwareStatusProvider).valueOrNull;
-      if (status != null && status.busy) {
-        if (!status.canCancel) return;
-        try {
-          await _ref.read(companionClientProvider).cancelFirmware(status.id);
-        } catch (error) {
-          if (mounted) state = state.copyWith(error: error.toString());
-        }
-        return; // Wait for Nordic terminal status; do not invent cancellation.
+    final status = _ref.read(companionFirmwareStatusProvider).valueOrNull;
+    if (status != null && status.busy) {
+      if (!status.canCancel) return;
+      try {
+        await _ref.read(companionClientProvider).cancelFirmware(status.id);
+      } catch (error) {
+        if (mounted) state = state.copyWith(error: error.toString());
       }
-      if (state.isUpdating) return; // Start receipt may still be in flight.
-      _firmwareManager.cancelDownload();
-      state = state.copyWith(isDownloading: false);
-      return;
+      return; // Wait for Nordic terminal status; do not invent cancellation.
     }
-    if (_dfuService!.isInProgress) {
-      await _dfuService.cancel();
-    }
-
-    final fsService = _ref.read(filesystemUploadServiceProvider);
-    if (fsService.isInProgress) {
-      await fsService.cancel();
-    }
-
+    if (state.isUpdating) return; // Start receipt may still be in flight.
     _firmwareManager.cancelDownload();
-    state = state.copyWith(
-      isDownloading: false,
-      isUpdating: false,
-      isFilesystemUploading: false,
-      isBothUpdating: false,
-    );
+    state = state.copyWith(isDownloading: false);
   }
 
   /// Reset state
   void reset() {
-    if (_ref.read(nativeCompanionRuntimeProvider)) {
-      final status = _ref.read(companionFirmwareStatusProvider).valueOrNull;
-      if (state.isUpdating || status?.busy == true) return;
-      _nativeAttempt++;
-      _ref.read(_dismissedFirmwareProvider.notifier).dismiss(status?.id);
-      _ref.read(_acceptedFirmwareProvider.notifier).state = null;
-      _ref.read(_submittedFirmwareGenerationProvider.notifier).state = null;
-      _firmwareManager.resetProgress();
-      state = const DfuOperationState();
-      return;
-    }
-    _dfuService!.reset();
-    _ref.read(filesystemUploadServiceProvider).reset();
+    final status = _ref.read(companionFirmwareStatusProvider).valueOrNull;
+    if (state.isUpdating || status?.busy == true) return;
+    _nativeAttempt++;
+    _ref.read(_dismissedFirmwareProvider.notifier).dismiss(status?.id);
+    _ref.read(_acceptedFirmwareProvider.notifier).state = null;
+    _ref.read(_submittedFirmwareGenerationProvider.notifier).state = null;
     _firmwareManager.resetProgress();
     state = const DfuOperationState();
   }
@@ -810,11 +549,8 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
 /// Provider for DFU notifier
 final dfuNotifierProvider =
     StateNotifierProvider<DfuNotifier, DfuOperationState>((ref) {
-      final dfuService = ref.watch(nativeCompanionRuntimeProvider)
-          ? null
-          : ref.watch(dfuServiceProvider);
       final firmwareManager = ref.watch(firmwareManagerProvider);
-      return DfuNotifier(dfuService, firmwareManager, ref);
+      return DfuNotifier(firmwareManager, ref);
     });
 
 /// State for DFU operations
@@ -894,28 +630,18 @@ abstract class DfuOperationState with _$DfuOperationState {
 /// Provider for DFU logs (combined from all services)
 final dfuLogsProvider = StreamProvider<String>((ref) {
   final firmwareManager = ref.watch(firmwareManagerProvider);
-  if (ref.watch(nativeCompanionRuntimeProvider)) {
-    return Rx.merge([
-      firmwareManager.logStream,
-      companionValues(ref, (snapshot) {
-        CompanionFirmwareStatus? status;
-        try {
-          status = CompanionFirmwareStatus.decode(snapshot.fields);
-        } on FormatException {
-          return 'Firmware status unavailable';
-        }
-        return status == null
-            ? 'Companion firmware status available'
-            : 'Firmware: ${status.phase}${status.error == null ? '' : ' (${status.error})'}';
-      }).distinct(),
-    ]);
-  }
-  final dfuService = ref.watch(dfuServiceProvider);
-  final fsService = ref.watch(filesystemUploadServiceProvider);
-
   return Rx.merge([
-    dfuService.logStream,
     firmwareManager.logStream,
-    fsService.logStream,
+    companionValues(ref, (snapshot) {
+      CompanionFirmwareStatus? status;
+      try {
+        status = CompanionFirmwareStatus.decode(snapshot.fields);
+      } on FormatException {
+        return 'Firmware status unavailable';
+      }
+      return status == null
+          ? 'Companion firmware status available'
+          : 'Firmware: ${status.phase}${status.error == null ? '' : ' (${status.error})'}';
+    }).distinct(),
   ]);
 });

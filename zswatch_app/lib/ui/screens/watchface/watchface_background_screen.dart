@@ -28,13 +28,13 @@ class _WatchfaceBackgroundScreenState
   Widget build(BuildContext context) {
     final bgState = ref.watch(watchfaceBackgroundProvider);
     final uploadState = ref.watch(filesystemUploadStateProvider);
-    final native = ref.watch(nativeCompanionRuntimeProvider);
-    final nativeStatus = native
-        ? ref.watch(companionWatchfaceStatusProvider).valueOrNull
-        : null;
-    final selectedAddress = native
-        ? ref.watch(companionSnapshotProvider).valueOrNull?.fields['address']
-        : null;
+    final nativeStatus = ref
+        .watch(companionWatchfaceStatusProvider)
+        .valueOrNull;
+    final selectedAddress = ref
+        .watch(companionSnapshotProvider)
+        .valueOrNull
+        ?.fields['address'];
 
     // Show snackbar on success/error
     ref.listen<WatchfaceBackgroundState>(watchfaceBackgroundProvider, (
@@ -70,18 +70,9 @@ class _WatchfaceBackgroundScreenState
           if (bgState.isUploading)
             _UploadProgressBar(
               uploadState: uploadState,
-              nativePhase: ref.watch(nativeCompanionRuntimeProvider)
-                  ? ref
-                                .watch(companionWatchfaceStatusProvider)
-                                .valueOrNull
-                                ?.busy ==
-                            true
-                        ? ref
-                              .watch(companionWatchfaceStatusProvider)
-                              .valueOrNull
-                              ?.phase
-                        : 'preparing'
-                  : null,
+              nativePhase: nativeStatus?.busy == true
+                  ? nativeStatus!.phase
+                  : 'preparing',
             ),
           if (bgState.isApplying) const LinearProgressIndicator(),
 
@@ -296,8 +287,11 @@ class _BackgroundTile extends StatelessWidget {
 class _UploadProgressBar extends StatelessWidget {
   final FilesystemUploadState uploadState;
 
-  final String? nativePhase;
-  const _UploadProgressBar({required this.uploadState, this.nativePhase});
+  final String nativePhase;
+  const _UploadProgressBar({
+    required this.uploadState,
+    required this.nativePhase,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -308,22 +302,20 @@ class _UploadProgressBar extends StatelessWidget {
         children: [
           const SizedBox(height: AppTheme.spacingSm),
           LinearProgressIndicator(
-            value: nativePhase != null && nativePhase != 'uploading'
-                ? null
-                : uploadState.progress,
+            value: nativePhase != 'uploading' ? null : uploadState.progress,
           ),
           const SizedBox(height: AppTheme.spacingXs),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                nativePhase != null && nativePhase != 'uploading'
+                nativePhase != 'uploading'
                     ? ''
                     : '${uploadState.progressPercent}%',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               Text(
-                nativePhase == null || nativePhase == 'uploading'
+                nativePhase == 'uploading'
                     ? '${uploadState.formattedSpeed} - ETA ${uploadState.formattedTimeRemaining}'
                     : nativePhase == 'preparing'
                     ? 'Preparing background'
