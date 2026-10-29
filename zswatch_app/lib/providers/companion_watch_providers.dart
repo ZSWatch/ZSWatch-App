@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../data/database/app_database.dart';
 import '../services/background/companion_prototype_client.dart';
 import '../services/background/companion_watch_catalogue.dart';
@@ -16,9 +15,6 @@ import 'watch_providers.dart';
 /// history, primary selection, receipts and all processing state. No BLE call.
 final companionRenameWatchProvider =
     Provider<Future<void> Function(String, String?)>((ref) {
-      if (!ref.watch(nativeCompanionRuntimeProvider)) {
-        throw StateError('Native companion is not selected');
-      }
       final db = ref.watch(databaseProvider);
       return (id, name) async {
         final trimmed = name?.trim();
@@ -41,9 +37,6 @@ final companionRenameWatchProvider =
 final companionForgetWatchProvider = Provider<Future<void> Function(String)>((
   ref,
 ) {
-  if (!ref.watch(nativeCompanionRuntimeProvider)) {
-    throw StateError('Native companion is not selected');
-  }
   final db = ref.watch(databaseProvider);
   final client = ref.watch(companionClientProvider);
   return (id) async {
@@ -67,9 +60,6 @@ final companionForgetWatchProvider = Provider<Future<void> Function(String)>((
 
 final companionWatchCatalogueWriterProvider =
     Provider<Future<void> Function(CompanionWatchMetadata)>((ref) {
-      if (!ref.watch(nativeCompanionRuntimeProvider)) {
-        throw StateError('Native companion is not selected');
-      }
       return CompanionWatchCatalogue(ref.watch(databaseProvider)).save;
     });
 
@@ -181,8 +171,7 @@ final companionWatchPersistenceStateProvider =
 /// App-lifetime projection, independent of which Flutter screen is visible.
 /// Disposal cancels observation; native BLE and its durable journal continue.
 final companionWatchPersistenceProvider = Provider<void>((ref) {
-  if (!ref.watch(nativeCompanionRuntimeProvider) ||
-      ref.watch(demoModeProvider)) {
+  if (ref.watch(demoModeProvider)) {
     return;
   }
   final writer = ref.watch(companionWatchPersistenceStateProvider.notifier);

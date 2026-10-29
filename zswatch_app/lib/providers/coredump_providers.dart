@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../data/database/app_database.dart';
 import '../data/repositories/crash_report_repository.dart';
 import '../services/coredump/coredump_service.dart';
@@ -21,16 +20,14 @@ final nativeCoredumpInspectionProvider = FutureProvider.autoDispose<void>((
 });
 
 final coredumpServiceProvider = Provider<CoredumpService>((ref) {
-  final service = ref.watch(nativeCompanionRuntimeProvider)
-      ? CoredumpService.native(() async {
-          final client = ref.read(companionClientProvider);
-          final snapshot = await client.snapshot();
-          if (!snapshot.protocolReady) {
-            throw StateError('Connect the watch first');
-          }
-          return client.downloadCoredump(snapshot.generation);
-        })
-      : CoredumpService(ref.watch(watchServiceProvider));
+  final service = CoredumpService.native(() async {
+    final client = ref.read(companionClientProvider);
+    final snapshot = await client.snapshot();
+    if (!snapshot.protocolReady) {
+      throw StateError('Connect the watch first');
+    }
+    return client.downloadCoredump(snapshot.generation);
+  });
   ref.onDispose(() => service.dispose());
   return service;
 });

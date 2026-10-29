@@ -72,7 +72,6 @@ android {
 
     defaultConfig {
         applicationId = "com.zswatch.app"
-        // minSdk 21 required for BLE reliability (flutter_blue_plus requirement)
         minSdk = flutter.minSdkVersion
         targetSdk = 36
         versionCode = flutter.versionCode

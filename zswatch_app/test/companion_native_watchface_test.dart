@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/models/companion_watchface_status.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/filesystem_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/providers/watchface_background_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/watchface/watchface_background_screen.dart';
@@ -161,16 +160,10 @@ void main() {
   test(
     'existing built-in upload prepares Nordic then accepts service-owned work without legacy BLE',
     () async {
-      var legacy = 0;
       final states = StreamController<CompanionPrototypeSnapshot>();
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => states.stream),
-          watchServiceProvider.overrideWith((ref) {
-            legacy++;
-            throw StateError('Legacy BLE');
-          }),
         ],
       );
       addTearDown(() async {
@@ -199,7 +192,6 @@ void main() {
         container.read(watchfaceBackgroundProvider).successMessage,
         'Background applied!',
       );
-      expect(legacy, 0);
     },
   );
   test(
@@ -208,7 +200,6 @@ void main() {
       final states = StreamController<CompanionPrototypeSnapshot>();
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => states.stream),
         ],
       );
@@ -252,12 +243,8 @@ void main() {
       });
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith(
             (ref) => Stream.value(snapshot()),
-          ),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy BLE'),
           ),
         ],
       );
@@ -288,12 +275,8 @@ void main() {
       });
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith(
             (ref) => Stream.value(snapshot()),
-          ),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy BLE'),
           ),
         ],
       );
@@ -317,14 +300,10 @@ void main() {
     (tester) async {
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith(
             (ref) => Stream.value(
               snapshot(state: operation('uploading'), generation: 8),
             ),
-          ),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy BLE'),
           ),
         ],
       );
@@ -354,7 +333,6 @@ void main() {
   ) async {
     final container = ProviderContainer(
       overrides: [
-        nativeCompanionRuntimeProvider.overrideWithValue(true),
         companionSnapshotProvider.overrideWith(
           (ref) => Stream.value(
             snapshot(

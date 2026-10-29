@@ -4,9 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/models/log_entry.dart';
 import 'package:zswatch_app/data/models/log_filter.dart';
-import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/developer_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 
 void main() {
   test(
@@ -18,11 +16,7 @@ void main() {
       );
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionLiveLogEventsProvider.overrideWith((ref) => events.stream),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy BLE created'),
-          ),
         ],
       );
       addTearDown(() async {

@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/database/app_database.dart';
-import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/companion_watch_providers.dart';
 import 'package:zswatch_app/providers/watch_providers.dart' as database;
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
@@ -90,10 +89,7 @@ void main() {
         return _forgottenSnapshot();
       });
       final container = ProviderContainer(
-        overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
-          database.databaseProvider.overrideWithValue(db),
-        ],
+        overrides: [database.databaseProvider.overrideWithValue(db)],
       );
       addTearDown(container.dispose);
 
@@ -108,10 +104,7 @@ void main() {
       throw PlatformException(code: 'COMMAND_FAILED');
     });
     final container = ProviderContainer(
-      overrides: [
-        nativeCompanionRuntimeProvider.overrideWithValue(true),
-        database.databaseProvider.overrideWithValue(db),
-      ],
+      overrides: [database.databaseProvider.overrideWithValue(db)],
     );
     addTearDown(container.dispose);
 
@@ -161,10 +154,7 @@ void main() {
         return _forgottenSnapshot();
       });
       final container = ProviderContainer(
-        overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
-          database.databaseProvider.overrideWithValue(db),
-        ],
+        overrides: [database.databaseProvider.overrideWithValue(db)],
       );
       addTearDown(container.dispose);
       await container.read(companionForgetWatchProvider)(id);
@@ -179,10 +169,7 @@ void main() {
       return _forgottenSnapshot()..remove('forget_receipt');
     });
     final container = ProviderContainer(
-      overrides: [
-        nativeCompanionRuntimeProvider.overrideWithValue(true),
-        database.databaseProvider.overrideWithValue(db),
-      ],
+      overrides: [database.databaseProvider.overrideWithValue(db)],
     );
     addTearDown(container.dispose);
     await expectLater(

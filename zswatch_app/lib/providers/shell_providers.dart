@@ -2,11 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mcumgr_flutter/mcumgr_flutter.dart';
-
 import '../data/models/thread_monitor_data.dart';
 import '../services/shell/shell_service.dart';
-import 'watch_service_provider.dart';
+
 import 'companion_runtime_providers.dart';
 
 // The interactive terminal surfaces non-zero return codes in the UI; the live
@@ -15,32 +13,19 @@ import 'companion_runtime_providers.dart';
 
 /// Provider for the shell service singleton.
 final shellServiceProvider = Provider<ShellService>((ref) {
-  final native = ref.watch(nativeCompanionRuntimeProvider);
   final service = ShellService(
-    nativeExecute: native
-        ? (command) async {
-            final snapshot = ref.read(companionSnapshotProvider).requireValue;
-            if (!snapshot.protocolReady) {
-              throw StateError('Current Ready session required');
-            }
-            final client = ref.read(companionClientProvider);
-            final generation = await client.prepareShell(snapshot.generation);
-            final reply = await client.executeShell(generation, command);
-            return ShellCommandResult(
-              output: reply.output,
-              returnCode: reply.returnCode,
-            );
-          }
-        : null,
+    nativeExecute: ((command) async {
+      final snapshot = ref.read(companionSnapshotProvider).requireValue;
+      if (!snapshot.protocolReady) {
+        throw StateError('Current Ready session required');
+      }
+      final client = ref.read(companionClientProvider);
+      final generation = await client.prepareShell(snapshot.generation);
+      final reply = await client.executeShell(generation, command);
+      return reply;
+    }),
   );
   ref.onDispose(() => service.dispose());
-
-  // Auto-set device when connection changes.
-  ref.listen(watchConnectionProvider, (prev, next) {
-    if (next.isConnected && next.watchId.isNotEmpty) {
-      service.setDevice(next.watchId);
-    }
-  }, fireImmediately: true);
 
   return service;
 });

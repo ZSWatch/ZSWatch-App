@@ -326,13 +326,9 @@ void main() {
       );
       ProviderContainer attach() => ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           database.databaseProvider.overrideWithValue(db),
           companionSnapshotProvider.overrideWith(
             (ref) => Stream.value(snapshot()),
-          ),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy BLE'),
           ),
         ],
       );

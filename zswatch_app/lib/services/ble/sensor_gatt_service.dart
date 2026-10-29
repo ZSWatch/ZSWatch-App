@@ -1,15 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-
-import '../../core/constants/ble_constants.dart';
 import '../../data/models/sensor_fusion_data.dart';
 import '../../data/models/sensor_reading.dart';
 import '../background/companion_prototype_client.dart';
-
-// Convert String UUIDs to Guid for flutter_blue_plus
-Guid _guid(String uuid) => Guid(uuid);
 
 /// Service client for zsw_gatt_sensor_server on watch
 ///
@@ -25,35 +19,16 @@ Guid _guid(String uuid) => Guid(uuid);
 ///
 /// Data is streamed via GATT notifications at ~10Hz when enabled.
 class SensorGattService {
-  // ignore: unused_field
-  final BluetoothDevice? _device;
-  final CompanionPrototypeClient? _native;
+  final CompanionPrototypeClient _native;
   StreamSubscription<Map<String, Object?>>? _nativeSubscription;
   final _connectionController = StreamController<bool>.broadcast();
   final Set<String> _nativeAvailable = {};
   int _nativeGeneration = 0;
   bool _disposed = false;
-  List<BluetoothService>? _services;
 
   // Characteristics for each sensor type
-  BluetoothCharacteristic? _tempChar;
-  BluetoothCharacteristic? _accelChar;
-  BluetoothCharacteristic? _lightChar;
-  BluetoothCharacteristic? _gyroChar;
-  BluetoothCharacteristic? _magChar;
-  BluetoothCharacteristic? _humidityChar;
-  BluetoothCharacteristic? _pressureChar;
-  BluetoothCharacteristic? _fusionChar;
 
   // Subscriptions
-  StreamSubscription<List<int>>? _tempSubscription;
-  StreamSubscription<List<int>>? _accelSubscription;
-  StreamSubscription<List<int>>? _lightSubscription;
-  StreamSubscription<List<int>>? _gyroSubscription;
-  StreamSubscription<List<int>>? _magSubscription;
-  StreamSubscription<List<int>>? _humiditySubscription;
-  StreamSubscription<List<int>>? _pressureSubscription;
-  StreamSubscription<List<int>>? _fusionSubscription;
 
   // Stream controllers
   final _tempController = StreamController<SensorReading>.broadcast();
@@ -67,12 +42,11 @@ class SensorGattService {
 
   bool _isConnected = false;
 
-  SensorGattService(this._device) : _native = null;
-  SensorGattService.native(this._native) : _device = null;
+  SensorGattService.native(this._native);
   Stream<bool> get connectionChanges => _connectionController.stream;
 
   Future<bool> initializeNative() async {
-    final client = _native!;
+    final client = _native;
     _nativeSubscription = client.sensors().listen(
       _nativeEvent,
       onError: (Object error) {
@@ -133,7 +107,7 @@ class SensorGattService {
 
   Future<void> _nativeChange(String sensor, bool enabled) {
     if (!_isConnected) throw StateError('Connect the watch first');
-    return _native!.setSensor(_nativeGeneration, sensor, enabled);
+    return _native.setSensor(_nativeGeneration, sensor, enabled);
   }
 
   /// Stream of temperature readings
@@ -177,107 +151,14 @@ class SensorGattService {
   bool get isConnected => _isConnected;
 
   /// Which sensors are available
-  bool get hasTemperature => _native != null
-      ? _nativeAvailable.contains('temperature')
-      : _tempChar != null;
-  bool get hasAccelerometer => _native != null
-      ? _nativeAvailable.contains('accelerometer')
-      : _accelChar != null;
-  bool get hasLight =>
-      _native != null ? _nativeAvailable.contains('light') : _lightChar != null;
-  bool get hasGyroscope => _native != null
-      ? _nativeAvailable.contains('gyroscope')
-      : _gyroChar != null;
-  bool get hasMagnetometer => _native != null
-      ? _nativeAvailable.contains('magnetometer')
-      : _magChar != null;
-  bool get hasHumidity => _native != null
-      ? _nativeAvailable.contains('humidity')
-      : _humidityChar != null;
-  bool get hasPressure => _native != null
-      ? _nativeAvailable.contains('pressure')
-      : _pressureChar != null;
-  bool get hasSensorFusion => _native != null
-      ? _nativeAvailable.contains('fusion')
-      : _fusionChar != null;
-
-  /// Initialize the sensor service
-  ///
-  /// Call this after the BLE connection is established and services are discovered.
-  /// Each sensor type has its own GATT service in the Adafruit format.
-  Future<bool> initialize(List<BluetoothService> services) async {
-    try {
-      _services = services;
-
-      // Find characteristics in their respective services
-      _tempChar = _findCharInService(
-        SensorServiceUuids.temperatureService,
-        SensorServiceUuids.temperatureChar,
-      );
-      _accelChar = _findCharInService(
-        SensorServiceUuids.accelerometerService,
-        SensorServiceUuids.accelerometerChar,
-      );
-      _lightChar = _findCharInService(
-        SensorServiceUuids.lightService,
-        SensorServiceUuids.lightChar,
-      );
-      _gyroChar = _findCharInService(
-        SensorServiceUuids.gyroscopeService,
-        SensorServiceUuids.gyroscopeChar,
-      );
-      _magChar = _findCharInService(
-        SensorServiceUuids.magnetometerService,
-        SensorServiceUuids.magnetometerChar,
-      );
-      _humidityChar = _findCharInService(
-        SensorServiceUuids.humidityService,
-        SensorServiceUuids.humidityChar,
-      );
-      _pressureChar = _findCharInService(
-        SensorServiceUuids.pressureService,
-        SensorServiceUuids.pressureChar,
-      );
-      _fusionChar = _findCharInService(
-        SensorServiceUuids.sensorFusionService,
-        SensorServiceUuids.sensorFusionChar,
-      );
-
-      debugPrint(
-        '[SensorGatt] Found sensors: '
-        'temp=${_tempChar != null}, '
-        'accel=${_accelChar != null}, '
-        'light=${_lightChar != null}, '
-        'gyro=${_gyroChar != null}, '
-        'mag=${_magChar != null}, '
-        'humidity=${_humidityChar != null}, '
-        'pressure=${_pressureChar != null}, '
-        'fusion=${_fusionChar != null}',
-      );
-
-      _isConnected = true;
-      return true;
-    } catch (e) {
-      debugPrint('[SensorGatt] Initialize error: $e');
-      return false;
-    }
-  }
-
-  BluetoothCharacteristic? _findCharInService(
-    String serviceUuid,
-    String charUuid,
-  ) {
-    final service = _services?.cast<BluetoothService?>().firstWhere(
-      (s) => s?.uuid == _guid(serviceUuid),
-      orElse: () => null,
-    );
-    if (service == null) return null;
-
-    return service.characteristics.cast<BluetoothCharacteristic?>().firstWhere(
-      (c) => c?.uuid == _guid(charUuid),
-      orElse: () => null,
-    );
-  }
+  bool get hasTemperature => _nativeAvailable.contains('temperature');
+  bool get hasAccelerometer => _nativeAvailable.contains('accelerometer');
+  bool get hasLight => _nativeAvailable.contains('light');
+  bool get hasGyroscope => _nativeAvailable.contains('gyroscope');
+  bool get hasMagnetometer => _nativeAvailable.contains('magnetometer');
+  bool get hasHumidity => _nativeAvailable.contains('humidity');
+  bool get hasPressure => _nativeAvailable.contains('pressure');
+  bool get hasSensorFusion => _nativeAvailable.contains('fusion');
 
   // =========================================================================
   // Temperature
@@ -285,34 +166,12 @@ class SensorGattService {
 
   /// Start streaming temperature data
   Future<void> startTemperature() async {
-    if (_native != null) return _nativeChange('temperature', true);
-    if (_tempChar == null) {
-      debugPrint('[SensorGatt] Temperature not available');
-      return;
-    }
-
-    try {
-      await _tempChar!.setNotifyValue(true);
-      _tempSubscription = _tempChar!.onValueReceived.listen(_handleTempData);
-      debugPrint('[SensorGatt] Temperature streaming started');
-    } catch (e) {
-      debugPrint('[SensorGatt] Failed to start temperature: $e');
-    }
+    return _nativeChange('temperature', true);
   }
 
   /// Stop streaming temperature data
   Future<void> stopTemperature() async {
-    if (_native != null) return _nativeChange('temperature', false);
-    await _tempSubscription?.cancel();
-    _tempSubscription = null;
-    try {
-      await _tempChar?.setNotifyValue(false);
-    } catch (e) {
-      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint(
-        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
-      );
-    }
+    return _nativeChange('temperature', false);
   }
 
   void _handleTempData(List<int> data) {
@@ -331,34 +190,12 @@ class SensorGattService {
 
   /// Start streaming accelerometer data
   Future<void> startAccelerometer() async {
-    if (_native != null) return _nativeChange('accelerometer', true);
-    if (_accelChar == null) {
-      debugPrint('[SensorGatt] Accelerometer not available');
-      return;
-    }
-
-    try {
-      await _accelChar!.setNotifyValue(true);
-      _accelSubscription = _accelChar!.onValueReceived.listen(_handleAccelData);
-      debugPrint('[SensorGatt] Accelerometer streaming started');
-    } catch (e) {
-      debugPrint('[SensorGatt] Failed to start accelerometer: $e');
-    }
+    return _nativeChange('accelerometer', true);
   }
 
   /// Stop streaming accelerometer data
   Future<void> stopAccelerometer() async {
-    if (_native != null) return _nativeChange('accelerometer', false);
-    await _accelSubscription?.cancel();
-    _accelSubscription = null;
-    try {
-      await _accelChar?.setNotifyValue(false);
-    } catch (e) {
-      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint(
-        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
-      );
-    }
+    return _nativeChange('accelerometer', false);
   }
 
   void _handleAccelData(List<int> data) {
@@ -379,34 +216,12 @@ class SensorGattService {
 
   /// Start streaming light sensor data
   Future<void> startLight() async {
-    if (_native != null) return _nativeChange('light', true);
-    if (_lightChar == null) {
-      debugPrint('[SensorGatt] Light sensor not available');
-      return;
-    }
-
-    try {
-      await _lightChar!.setNotifyValue(true);
-      _lightSubscription = _lightChar!.onValueReceived.listen(_handleLightData);
-      debugPrint('[SensorGatt] Light streaming started');
-    } catch (e) {
-      debugPrint('[SensorGatt] Failed to start light: $e');
-    }
+    return _nativeChange('light', true);
   }
 
   /// Stop streaming light sensor data
   Future<void> stopLight() async {
-    if (_native != null) return _nativeChange('light', false);
-    await _lightSubscription?.cancel();
-    _lightSubscription = null;
-    try {
-      await _lightChar?.setNotifyValue(false);
-    } catch (e) {
-      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint(
-        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
-      );
-    }
+    return _nativeChange('light', false);
   }
 
   void _handleLightData(List<int> data) {
@@ -425,34 +240,12 @@ class SensorGattService {
 
   /// Start streaming gyroscope data
   Future<void> startGyroscope() async {
-    if (_native != null) return _nativeChange('gyroscope', true);
-    if (_gyroChar == null) {
-      debugPrint('[SensorGatt] Gyroscope not available');
-      return;
-    }
-
-    try {
-      await _gyroChar!.setNotifyValue(true);
-      _gyroSubscription = _gyroChar!.onValueReceived.listen(_handleGyroData);
-      debugPrint('[SensorGatt] Gyroscope streaming started');
-    } catch (e) {
-      debugPrint('[SensorGatt] Failed to start gyroscope: $e');
-    }
+    return _nativeChange('gyroscope', true);
   }
 
   /// Stop streaming gyroscope data
   Future<void> stopGyroscope() async {
-    if (_native != null) return _nativeChange('gyroscope', false);
-    await _gyroSubscription?.cancel();
-    _gyroSubscription = null;
-    try {
-      await _gyroChar?.setNotifyValue(false);
-    } catch (e) {
-      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint(
-        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
-      );
-    }
+    return _nativeChange('gyroscope', false);
   }
 
   void _handleGyroData(List<int> data) {
@@ -473,34 +266,12 @@ class SensorGattService {
 
   /// Start streaming magnetometer data
   Future<void> startMagnetometer() async {
-    if (_native != null) return _nativeChange('magnetometer', true);
-    if (_magChar == null) {
-      debugPrint('[SensorGatt] Magnetometer not available');
-      return;
-    }
-
-    try {
-      await _magChar!.setNotifyValue(true);
-      _magSubscription = _magChar!.onValueReceived.listen(_handleMagData);
-      debugPrint('[SensorGatt] Magnetometer streaming started');
-    } catch (e) {
-      debugPrint('[SensorGatt] Failed to start magnetometer: $e');
-    }
+    return _nativeChange('magnetometer', true);
   }
 
   /// Stop streaming magnetometer data
   Future<void> stopMagnetometer() async {
-    if (_native != null) return _nativeChange('magnetometer', false);
-    await _magSubscription?.cancel();
-    _magSubscription = null;
-    try {
-      await _magChar?.setNotifyValue(false);
-    } catch (e) {
-      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint(
-        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
-      );
-    }
+    return _nativeChange('magnetometer', false);
   }
 
   void _handleMagData(List<int> data) {
@@ -521,36 +292,12 @@ class SensorGattService {
 
   /// Start streaming humidity data
   Future<void> startHumidity() async {
-    if (_native != null) return _nativeChange('humidity', true);
-    if (_humidityChar == null) {
-      debugPrint('[SensorGatt] Humidity not available');
-      return;
-    }
-
-    try {
-      await _humidityChar!.setNotifyValue(true);
-      _humiditySubscription = _humidityChar!.onValueReceived.listen(
-        _handleHumidityData,
-      );
-      debugPrint('[SensorGatt] Humidity streaming started');
-    } catch (e) {
-      debugPrint('[SensorGatt] Failed to start humidity: $e');
-    }
+    return _nativeChange('humidity', true);
   }
 
   /// Stop streaming humidity data
   Future<void> stopHumidity() async {
-    if (_native != null) return _nativeChange('humidity', false);
-    await _humiditySubscription?.cancel();
-    _humiditySubscription = null;
-    try {
-      await _humidityChar?.setNotifyValue(false);
-    } catch (e) {
-      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint(
-        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
-      );
-    }
+    return _nativeChange('humidity', false);
   }
 
   void _handleHumidityData(List<int> data) {
@@ -569,36 +316,12 @@ class SensorGattService {
 
   /// Start streaming pressure data
   Future<void> startPressure() async {
-    if (_native != null) return _nativeChange('pressure', true);
-    if (_pressureChar == null) {
-      debugPrint('[SensorGatt] Pressure not available');
-      return;
-    }
-
-    try {
-      await _pressureChar!.setNotifyValue(true);
-      _pressureSubscription = _pressureChar!.onValueReceived.listen(
-        _handlePressureData,
-      );
-      debugPrint('[SensorGatt] Pressure streaming started');
-    } catch (e) {
-      debugPrint('[SensorGatt] Failed to start pressure: $e');
-    }
+    return _nativeChange('pressure', true);
   }
 
   /// Stop streaming pressure data
   Future<void> stopPressure() async {
-    if (_native != null) return _nativeChange('pressure', false);
-    await _pressureSubscription?.cancel();
-    _pressureSubscription = null;
-    try {
-      await _pressureChar?.setNotifyValue(false);
-    } catch (e) {
-      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint(
-        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
-      );
-    }
+    return _nativeChange('pressure', false);
   }
 
   void _handlePressureData(List<int> data) {
@@ -617,36 +340,12 @@ class SensorGattService {
 
   /// Start streaming sensor fusion (quaternion) data
   Future<void> startSensorFusion() async {
-    if (_native != null) return _nativeChange('fusion', true);
-    if (_fusionChar == null) {
-      debugPrint('[SensorGatt] Sensor fusion not available');
-      return;
-    }
-
-    try {
-      await _fusionChar!.setNotifyValue(true);
-      _fusionSubscription = _fusionChar!.onValueReceived.listen(
-        _handleFusionData,
-      );
-      debugPrint('[SensorGatt] Sensor fusion streaming started');
-    } catch (e) {
-      debugPrint('[SensorGatt] Failed to start sensor fusion: $e');
-    }
+    return _nativeChange('fusion', true);
   }
 
   /// Stop streaming sensor fusion data
   Future<void> stopSensorFusion() async {
-    if (_native != null) return _nativeChange('fusion', false);
-    await _fusionSubscription?.cancel();
-    _fusionSubscription = null;
-    try {
-      await _fusionChar?.setNotifyValue(false);
-    } catch (e) {
-      // setNotifyValue(false) may fail if device already disconnected — non-fatal cleanup.
-      debugPrint(
-        '[SensorGatt] setNotifyValue(false) failed during stop (ignored): $e',
-      );
-    }
+    return _nativeChange('fusion', false);
   }
 
   void _handleFusionData(List<int> data) {
@@ -679,31 +378,18 @@ class SensorGattService {
 
   /// Stop all sensors
   Future<void> stopAll() async {
-    if (_native != null) {
-      for (final name in _nativeAvailable.toList()) {
-        await _nativeChange(name, false);
-      }
-      return;
+    for (final name in _nativeAvailable.toList()) {
+      await _nativeChange(name, false);
     }
-    await stopTemperature();
-    await stopAccelerometer();
-    await stopLight();
-    await stopGyroscope();
-    await stopMagnetometer();
-    await stopHumidity();
-    await stopPressure();
-    await stopSensorFusion();
   }
 
   /// Dispose resources
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    if (_native != null) {
-      await _nativeSubscription?.cancel();
-    } else {
-      await stopAll();
-    }
+
+    await _nativeSubscription?.cancel();
+
     await _tempController.close();
     await _accelController.close();
     await _lightController.close();

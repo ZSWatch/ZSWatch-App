@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,17 +9,7 @@ import 'package:zswatch_app/providers/watch_service_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test('Android and iOS select native ownership without a build flag', () {
-    final original = debugDefaultTargetPlatformOverride;
-    try {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      expect(useNativeCompanionRuntime, isTrue);
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      expect(useNativeCompanionRuntime, isTrue);
-    } finally {
-      debugDefaultTargetPlatformOverride = original;
-    }
-  });
+
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   const methods = MethodChannel('dev.zswatch.app/companion_v1');
@@ -83,11 +72,8 @@ void main() {
     });
     container = ProviderContainer(
       overrides: [
-        nativeCompanionRuntimeProvider.overrideWithValue(true),
         database.allWatchesProvider.overrideWith((ref) => Stream.value([])),
-        watchServiceProvider.overrideWith(
-          (ref) => throw StateError('Legacy protocol instantiated'),
-        ),
+
         database.databaseProvider.overrideWith(
           (ref) => throw StateError('Unexpected DB owner'),
         ),
@@ -122,10 +108,7 @@ void main() {
       expect(container.read(batteryLevelProvider), 87);
       expect(container.read(ble.currentConnectionProvider)?.mtu, 247);
       expect(container.read(hasSmpServiceProvider), false);
-      expect(
-        () => container.read(bleConnectionServiceProvider),
-        throwsStateError,
-      );
+
       expect(subscriptions, ['listen']);
       expect(calls, isEmpty);
       container.dispose();

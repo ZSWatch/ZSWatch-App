@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/database/app_database.dart';
-import 'package:zswatch_app/providers/auto_reconnect_provider.dart';
+
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/companion_watch_providers.dart';
 import 'package:zswatch_app/providers/watch_providers.dart' as database;
@@ -202,12 +202,8 @@ void main() {
       final snapshots = StreamController<CompanionPrototypeSnapshot>();
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           database.databaseProvider.overrideWithValue(db),
           companionSnapshotProvider.overrideWith((ref) => snapshots.stream),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy BLE'),
-          ),
         ],
       );
       container.listen(currentWatchProvider, (_, _) {});
@@ -272,7 +268,6 @@ void main() {
         );
     final container = ProviderContainer(
       overrides: [
-        nativeCompanionRuntimeProvider.overrideWithValue(true),
         database.databaseProvider.overrideWithValue(db),
         companionSnapshotProvider.overrideWith(
           (ref) => Stream.value(CompanionPrototypeSnapshot.decode(state())),
@@ -315,7 +310,6 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
-              nativeCompanionRuntimeProvider.overrideWithValue(true),
               database.allWatchesProvider.overrideWith(
                 (ref) => catalogue.stream,
               ),
@@ -337,12 +331,6 @@ void main() {
                 () async {
                   permissions++;
                 },
-              ),
-              watchServiceProvider.overrideWith(
-                (ref) => throw StateError('Legacy BLE'),
-              ),
-              autoReconnectServiceProvider.overrideWith(
-                (ref) => throw StateError('Legacy reconnect'),
               ),
             ],
             child: const MaterialApp(home: StartPageScreen()),

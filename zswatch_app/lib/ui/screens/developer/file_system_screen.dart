@@ -4,10 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-
 import '../../../data/models/fs_file_entry.dart';
 import '../../../providers/file_system_provider.dart';
-import '../../../providers/companion_runtime_providers.dart';
 
 class FileSystemScreen extends ConsumerStatefulWidget {
   const FileSystemScreen({super.key});
@@ -67,10 +65,7 @@ class _LogsTab extends ConsumerWidget {
       children: [
         _LogsContent(fsState: fsState),
         if (fsState.downloadingPath != null)
-          _DownloadOverlay(
-            progress: fsState.downloadProgress,
-            native: ref.watch(nativeCompanionRuntimeProvider),
-          ),
+          _DownloadOverlay(progress: fsState.downloadProgress, native: true),
       ],
     );
   }

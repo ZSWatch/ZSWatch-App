@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../navigation/app_router.dart';
-
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/connection.dart';
 import '../../../data/models/crash_summary.dart';
@@ -11,8 +9,6 @@ import '../../../providers/developer_providers.dart';
 import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../dashboard/companion_find_watch_button.dart';
-import '../../widgets/developer/music_debug_section.dart';
-import '../../widgets/developer/notification_debug_section.dart';
 
 class DeveloperScreen extends ConsumerWidget {
   const DeveloperScreen({super.key});
@@ -47,7 +43,6 @@ class _DeveloperToolsBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final native = ref.watch(nativeCompanionRuntimeProvider);
     final toolTiles = [
       _BlendToolTile(
         icon: Icons.article_outlined,
@@ -125,30 +120,13 @@ class _DeveloperToolsBody extends ConsumerWidget {
         Row(
           children: [
             Expanded(
-              child: native
-                  ? CompanionFindWatchButton(
-                      builder: (onPressed) => _BlendActionChip(
-                        icon: Icons.vibration,
-                        label: 'Find watch',
-                        onTap: onPressed,
-                      ),
-                    )
-                  : _BlendActionChip(
-                      icon: Icons.vibration,
-                      label: 'Find watch',
-                      onTap: connection.isConnected
-                          ? () async {
-                              final watchService = ref.read(
-                                watchServiceProvider,
-                              );
-                              await watchService.findDevice(true);
-                              await Future<void>.delayed(
-                                const Duration(seconds: 2),
-                              );
-                              await watchService.findDevice(false);
-                            }
-                          : null,
-                    ),
+              child: CompanionFindWatchButton(
+                builder: (onPressed) => _BlendActionChip(
+                  icon: Icons.vibration,
+                  label: 'Find watch',
+                  onTap: onPressed,
+                ),
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -157,13 +135,10 @@ class _DeveloperToolsBody extends ConsumerWidget {
                 label: 'Sync Time',
                 onTap: connection.isConnected
                     ? () async {
-                        if (native) {
-                          await ref
-                              .read(companionClientProvider)
-                              .command('syncTime');
-                        } else {
-                          await ref.read(watchServiceProvider).syncTime();
-                        }
+                        await ref
+                            .read(companionClientProvider)
+                            .command('syncTime');
+
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -183,15 +158,10 @@ class _DeveloperToolsBody extends ConsumerWidget {
                 label: 'Device Info',
                 onTap: connection.isConnected
                     ? () async {
-                        if (native) {
-                          await ref
-                              .read(companionClientProvider)
-                              .command('requestDeviceInfo');
-                        } else {
-                          await ref
-                              .read(watchServiceProvider)
-                              .requestDeviceInfo();
-                        }
+                        await ref
+                            .read(companionClientProvider)
+                            .command('requestDeviceInfo');
+
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -206,12 +176,6 @@ class _DeveloperToolsBody extends ConsumerWidget {
             ),
           ],
         ),
-        if (!native) ...[
-          const SizedBox(height: AppTheme.spacingLg),
-          const _BlendTerminalSectionTitle('DEBUG'),
-          const SizedBox(height: AppTheme.spacingSm),
-          const _CompactDebugToolsHub(),
-        ],
       ],
     );
   }
@@ -356,133 +320,6 @@ class _BlendActionChip extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _CompactDebugToolsHub extends StatelessWidget {
-  const _CompactDebugToolsHub();
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppTheme.spacingMd,
-          vertical: AppTheme.spacingSm,
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.tune,
-                size: 18,
-                color: AppTheme.primaryColor,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Debug Tools',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'monospace',
-                  color: AppTheme.primaryColor,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: () => _showDebugToolsSheet(context),
-              child: const Text('Open'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showDebugToolsSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          top: false,
-          child: FractionallySizedBox(
-            heightFactor: 0.82,
-            child: DefaultTabController(
-              length: 2,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Debug Tools',
-                      style: Theme.of(sheetContext).textTheme.titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 16),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: TabBar(
-                        dividerColor: Colors.transparent,
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        indicator: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        labelColor: AppTheme.primaryColor,
-                        unselectedLabelColor: AppTheme.textSecondary,
-                        tabs: const [
-                          Tab(text: 'Notifications'),
-                          Tab(text: 'Music'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Expanded(
-                      child: TabBarView(
-                        children: [
-                          _DebugToolSheetPage(
-                            child: NotificationDebugSection(),
-                          ),
-                          _DebugToolSheetPage(child: MusicDebugSection()),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _DebugToolSheetPage extends StatelessWidget {
-  final Widget child;
-
-  const _DebugToolSheetPage({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return ScrollConfiguration(
-      behavior: const MaterialScrollBehavior().copyWith(overscroll: false),
-      child: SingleChildScrollView(child: child),
     );
   }
 }

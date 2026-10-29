@@ -8,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/models/companion_log_files.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/file_system_provider.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/developer/file_system_screen.dart';
 
@@ -147,15 +146,9 @@ void main() {
   testWidgets(
     'existing Files screen uses prepared native generation and no legacy BLE',
     (tester) async {
-      var legacy = 0;
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => Stream.value(ready)),
-          watchServiceProvider.overrideWith((ref) {
-            legacy++;
-            throw StateError('Legacy BLE');
-          }),
         ],
       );
       addTearDown(container.dispose);
@@ -169,7 +162,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('log0000'), findsOneWidget);
       expect(find.text('2 B'), findsOneWidget);
-      expect(legacy, 0);
       expect(calls.map((c) => c.method), ['prepareShell', 'inspectLogs']);
       expect((calls.last.arguments as Map)['generation'], 8);
     },
@@ -186,7 +178,6 @@ void main() {
       });
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => Stream.value(ready)),
         ],
       );
@@ -220,11 +211,7 @@ void main() {
       final snapshots = StreamController<CompanionPrototypeSnapshot>();
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => snapshots.stream),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy BLE'),
-          ),
         ],
       );
       addTearDown(container.dispose);
@@ -291,7 +278,6 @@ void main() {
       final snapshots = StreamController<CompanionPrototypeSnapshot>();
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => snapshots.stream),
         ],
       );

@@ -2,7 +2,6 @@ import 'package:zswatch_app/providers/watch_providers.dart' as database;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/models/connection_state.dart';
 import 'package:zswatch_app/data/models/connection_phase.dart';
@@ -521,7 +520,6 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            nativeCompanionRuntimeProvider.overrideWithValue(true),
             database.allWatchesProvider.overrideWith((ref) => Stream.value([])),
           ],
           child: const CompanionPrototypeApp(),
@@ -551,7 +549,6 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            nativeCompanionRuntimeProvider.overrideWithValue(true),
             database.allWatchesProvider.overrideWith((ref) => Stream.value([])),
           ],
           child: const CompanionPrototypeApp(),

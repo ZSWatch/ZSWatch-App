@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../data/models/health_sample.dart';
 import '../data/repositories/health_repository.dart';
 import '../services/health/health_sync_service.dart';
@@ -29,40 +28,34 @@ final healthRepositoryProvider = Provider<HealthRepository>((ref) {
 final healthSyncServiceProvider = Provider<HealthSyncService>((ref) {
   final healthRepository = ref.watch(healthRepositoryProvider);
   final HealthSyncService service;
-  if (ref.watch(nativeCompanionRuntimeProvider)) {
-    // Reset live readings when the owner/watch/generation changes, retaining
-    // history in the shared database. Snapshot observation never starts BLE.
-    ref.watch(
-      companionSnapshotProvider.select((value) {
-        final s = value.valueOrNull;
-        return (s?.fields['address'], s?.generation, s?.protocolReady);
-      }),
-    );
-    final activity =
-        companionValues<Map<String, dynamic>?>(ref, (s) {
-              final value = s.fields['latest_health'];
-              if (!s.protocolReady ||
-                  value is! Map ||
-                  value['address'] != s.fields['address'] ||
-                  value['generation'] != s.generation) {
-                return null;
-              }
-              return Map<String, dynamic>.from(value)..['t'] = 'act';
-            })
-            .where((value) => value != null)
-            .cast<Map<String, dynamic>>()
-            .distinct((a, b) => a['sequence'] == b['sequence']);
-    service = HealthSyncService.forCompanion(
-      healthRepository: healthRepository,
-      watchId: () => ref.read(currentWatchProvider)?.id,
-      activity: activity,
-    );
-  } else {
-    service = HealthSyncService(
-      watchService: ref.watch(watchServiceProvider),
-      healthRepository: healthRepository,
-    );
-  }
+
+  // Reset live readings when the owner/watch/generation changes, retaining
+  // history in the shared database. Snapshot observation never starts BLE.
+  ref.watch(
+    companionSnapshotProvider.select((value) {
+      final s = value.valueOrNull;
+      return (s?.fields['address'], s?.generation, s?.protocolReady);
+    }),
+  );
+  final activity =
+      companionValues<Map<String, dynamic>?>(ref, (s) {
+            final value = s.fields['latest_health'];
+            if (!s.protocolReady ||
+                value is! Map ||
+                value['address'] != s.fields['address'] ||
+                value['generation'] != s.generation) {
+              return null;
+            }
+            return Map<String, dynamic>.from(value)..['t'] = 'act';
+          })
+          .where((value) => value != null)
+          .cast<Map<String, dynamic>>()
+          .distinct((a, b) => a['sequence'] == b['sequence']);
+  service = HealthSyncService.forCompanion(
+    healthRepository: healthRepository,
+    watchId: () => ref.read(currentWatchProvider)?.id,
+    activity: activity,
+  );
 
   ref.onDispose(() => service.dispose());
   return service;
@@ -114,7 +107,6 @@ class HeartRateReading {
 class HeartRateStreamingNotifier
     extends StateNotifier<HeartRateStreamingState> {
   final HealthSyncService _healthSyncService;
-  final Ref _ref;
 
   StreamSubscription<int?>? _hrSubscription;
   StreamSubscription<bool>? _streamingSubscription;
@@ -123,7 +115,7 @@ class HeartRateStreamingNotifier
   /// Maximum number of readings to keep for chart
   static const int maxReadings = 120; // 2 minutes at 1 reading/second
 
-  HeartRateStreamingNotifier(this._healthSyncService, this._ref)
+  HeartRateStreamingNotifier(this._healthSyncService)
     : super(const HeartRateStreamingState()) {
     _initialize();
   }
@@ -165,20 +157,6 @@ class HeartRateStreamingNotifier
     );
   }
 
-  /// Start heart rate streaming
-  Future<void> startStreaming() async {
-    final connection = _ref.read(watchConnectionProvider);
-    if (!connection.isConnected) return;
-
-    await _healthSyncService.startHeartRateStreaming(connection.watchId);
-  }
-
-  /// Stop heart rate streaming
-  Future<void> stopStreaming() async {
-    await _healthSyncService.stopHeartRateStreaming();
-    state = state.copyWith(isStreaming: false, currentBpm: null);
-  }
-
   /// Clear reading history
   void clearReadings() {
     if (_disposed) return;
@@ -200,7 +178,7 @@ final heartRateStreamingProvider =
       ref,
     ) {
       final healthSyncService = ref.watch(healthSyncServiceProvider);
-      return HeartRateStreamingNotifier(healthSyncService, ref);
+      return HeartRateStreamingNotifier(healthSyncService);
     });
 
 // ==================== Activity Breakdown Provider ====================

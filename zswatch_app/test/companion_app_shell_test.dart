@@ -15,20 +15,18 @@ import 'package:zswatch_app/providers/analytics_providers.dart';
 import 'package:zswatch_app/ui/screens/health/health_screen.dart';
 import 'package:zswatch_app/ui/screens/health/heart_rate_screen.dart';
 import 'package:zswatch_app/ui/screens/analytics/analytics_screen.dart';
-import 'package:zswatch_app/providers/auto_reconnect_provider.dart';
+
 import 'package:zswatch_app/providers/developer_providers.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/demo_mode_provider.dart';
 import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
 import 'package:zswatch_app/providers/companion_watch_providers.dart';
 import 'package:zswatch_app/services/background/companion_watch_catalogue.dart';
-import 'package:zswatch_app/providers/foreground_service_providers.dart';
 import 'package:zswatch_app/providers/health_providers.dart';
-import 'package:zswatch_app/providers/notification_providers.dart';
+
 import 'package:zswatch_app/providers/permission_providers.dart';
 import 'package:zswatch_app/providers/voice_memo_providers.dart';
 import 'package:zswatch_app/providers/watch_providers.dart' as database;
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/ui/navigation/app_router.dart';
 import 'package:zswatch_app/ui/screens/dashboard/dashboard_screen.dart';
 
@@ -134,7 +132,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           if (!showOnboarding)
             permissionOnboardingCompletedProvider.overrideWith(
               (ref) async => true,
@@ -153,42 +150,17 @@ void main() {
             if (denyPermission) throw StateError('Permission denied');
           }),
           database.databaseProvider.overrideWith((ref) => db),
-          watchServiceProvider.overrideWith(
-            (ref) => legacy('Dart WatchService'),
-          ),
-          bleConnectionServiceProvider.overrideWith(
-            (ref) => legacy('Dart BLE'),
-          ),
-          autoReconnectServiceProvider.overrideWith(
-            (ref) => legacy('Dart reconnect'),
-          ),
-          permissionNotifierProvider.overrideWith(
-            (ref) => legacy('legacy onboarding'),
-          ),
-          foregroundServiceNotifierProvider.overrideWith(
-            (ref) => legacy('legacy FGS notifier'),
-          ),
+
           lifecycleLogEntriesProvider.overrideWith((ref, id) async => []),
-          batteryStorageServiceProvider.overrideWith(
-            (ref) => legacy('Dart battery collector'),
-          ),
-          connectionAnalyticsServiceProvider.overrideWith(
-            (ref) => legacy('Dart connection collector'),
-          ),
+
           voiceMemoRecoveryProvider.overrideWith(
             (ref) => legacy('legacy voice recovery'),
           ),
-          voiceMemoSyncServiceProvider.overrideWith(
-            (ref) => legacy('legacy voice sync'),
-          ),
+
           transcriptionEngineProvider.overrideWith(
             (ref) => legacy('transcription'),
           ),
           llmServiceProvider.overrideWith((ref) => legacy('LLM')),
-          notificationForwardingProvider.overrideWith(
-            (ref) => legacy('Dart forwarding'),
-          ),
-          mediaControlProvider.overrideWith((ref) => legacy('media')),
         ],
         child: const ZSWatchApp(),
       ),
