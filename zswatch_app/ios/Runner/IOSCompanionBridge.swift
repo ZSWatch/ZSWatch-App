@@ -239,6 +239,7 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
         case "configureHttp":
           guard let enabled = args["enabled"] as? Bool else { throw CompanionFailure.invalid("HTTP policy required") }
           try owner.configureHttp(enabled); reply(owner.snapshot())
+        case "clearCommunicationTraffic": owner.traffic.clear(); reply(nil)
         case "setLogStreaming":
           guard let enabled = args["enabled"] as? Bool else { throw CompanionFailure.invalid("Log policy required") }
           try owner.setLogStreaming(enabled)
@@ -319,7 +320,10 @@ private final class CompanionDiagnosticStream: NSObject, FlutterStreamHandler {
         self.owner.logReplay.forEach(callback)
       } else if self.kind == "sensors" {
         self.owner.sensors.observer = callback; self.owner.sensors.attached()
-      } else { self.owner.trafficObserver = callback }
+      } else {
+        self.owner.trafficObserver = callback
+        self.owner.traffic.replay.forEach(callback)
+      }
     }
     return nil
   }

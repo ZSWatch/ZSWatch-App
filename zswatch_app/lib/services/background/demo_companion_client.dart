@@ -36,6 +36,8 @@ class DemoCompanionClient extends CompanionPrototypeClient {
   Stream<Map<String, Object?>> liveLogs() => const Stream.empty();
   @override
   Stream<Map<String, Object?>> communicationTraffic() => const Stream.empty();
+  @override
+  Future<void> clearCommunicationTraffic() async {}
 }
 
 class _DemoMethods extends MethodChannel {

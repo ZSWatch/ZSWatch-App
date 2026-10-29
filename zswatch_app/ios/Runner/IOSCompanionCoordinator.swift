@@ -204,6 +204,10 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     logObserver?(event)
   }
   var trafficObserver: (([String: Any]) -> Void)?
+  let traffic = CompanionTraffic()
+  private func receiveTraffic(_ event: [String: Any]) {
+    if traffic.append(event) { trafficObserver?(event) }
+  }
 
   init(root: URL, restoredLaunch: Bool) {
     restorationPending = restoredLaunch
@@ -698,7 +702,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   private func finishWrite() {
     guard let first = writes.first, first.offset == first.data.count else { return }
     writes.removeFirst()
-    trafficObserver?(["version": 1, "direction": "tx", "data": String(data: first.data, encoding: .utf8) ?? "",
+    receiveTraffic(["version": 1, "direction": "tx", "data": String(data: first.data, encoding: .utf8) ?? "",
       "size_bytes": first.data.count, "chunk_count": first.chunks, "utc_ms": CompanionJournal.now, "generation": journal.generation])
     first.done()
   }
@@ -790,7 +794,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       }
     }
     framer.feed(data, message: {
-      self.trafficObserver?(["version": 1, "direction": "rx", "generation": generation,
+      self.receiveTraffic(["version": 1, "direction": "rx", "generation": generation,
         "utc_ms": CompanionJournal.now, "data": String(data: self.framer.lastMessageData, encoding: .utf8) ?? "",
         "size_bytes": self.framer.lastMessageData.count, "chunk_count": self.framer.lastMessageChunks])
       self.receiveMessage($0)
