@@ -1,15 +1,11 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../data/database/app_database.dart';
 import '../data/repositories/watch_repository.dart';
-import 'companion_runtime_providers.dart';
 
 /// Provider for the database singleton
 final databaseProvider = Provider<AppDatabase>((ref) {
-  final db = ref.watch(nativeCompanionRuntimeProvider)
-      ? AppDatabase.forCompanion()
-      : AppDatabase();
+  final db = AppDatabase.forCompanion();
   ref.onDispose(() => db.close());
   return db;
 });
@@ -136,20 +132,6 @@ class WatchNotifier extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
     try {
       await _repository.renameWatch(watchId, customName);
-      state = const AsyncValue.data(null);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-
-  /// Forget a watch completely (T115, T118)
-  ///
-  /// Removes the watch from the database AND unbonds the BLE device.
-  /// After calling this, the user will need to re-pair to use the watch again.
-  Future<void> forgetWatch(String watchId) async {
-    state = const AsyncValue.loading();
-    try {
-      await _repository.forgetWatch(watchId);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

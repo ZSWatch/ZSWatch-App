@@ -6,10 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 import '../../../core/theme/app_theme.dart';
 import '../../../providers/ai_providers.dart';
-import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/openrouter_providers.dart';
 import '../../../providers/settings_providers.dart';
 import '../../../providers/voice_memo_providers.dart';
@@ -55,34 +53,31 @@ class AiModelsSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final native = ref.watch(nativeCompanionRuntimeProvider);
     // OpenRouter runs only through the native companion's jobs.
-    final onDevice = !native || ref.watch(onDeviceProcessingProvider);
+    final onDevice = ref.watch(onDeviceProcessingProvider);
     final localLlm = LlmService.localModelsSupported && onDevice;
     return Scaffold(
       appBar: AppBar(title: const Text('Voice Memo AI')),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 32),
         children: [
-          if (native) ...[
-            if (!onDevice) const OpenRouterSettingsSection(),
-            SwitchListTile(
-              title: const Text('Experimental: on-device processing'),
-              subtitle: Text(
-                LlmService.localModelsSupported
-                    ? 'Transcribe with Whisper and analyze with a local model '
-                          'instead of OpenRouter. Slower; audio stays on '
-                          'this phone.'
-                    : 'Transcribe with Whisper instead of OpenRouter. '
-                          'Transcription only, no reminders or timers; '
-                          'audio stays on this phone.',
-              ),
-              value: onDevice,
-              onChanged: (value) =>
-                  ref.read(onDeviceProcessingProvider.notifier).set(value),
+          if (!onDevice) const OpenRouterSettingsSection(),
+          SwitchListTile(
+            title: const Text('Experimental: on-device processing'),
+            subtitle: Text(
+              LlmService.localModelsSupported
+                  ? 'Transcribe with Whisper and analyze with a local model '
+                        'instead of OpenRouter. Slower; audio stays on '
+                        'this phone.'
+                  : 'Transcribe with Whisper instead of OpenRouter. '
+                        'Transcription only, no reminders or timers; '
+                        'audio stays on this phone.',
             ),
-            const Divider(height: 1),
-          ],
+            value: onDevice,
+            onChanged: (value) =>
+                ref.read(onDeviceProcessingProvider.notifier).set(value),
+          ),
+          const Divider(height: 1),
           // ---- Transcription section ----
           if (onDevice) ...[
             const _SectionHeader(
@@ -90,13 +85,10 @@ class AiModelsSettingsScreen extends ConsumerWidget {
               subtitle: 'Speech-to-text engine used for voice memos',
             ),
             const _TranscriptionModelSelector(),
-            if (native)
-              const CompanionVoiceBatchButton(
-                operation: 'retranscribe',
-                label: 'Re-transcribe all with selected model',
-              )
-            else
-              const _RetranscribeButton(),
+            const CompanionVoiceBatchButton(
+              operation: 'retranscribe',
+              label: 'Re-transcribe all with selected model',
+            ),
 
             const SizedBox(height: 24),
             const Divider(height: 1),
@@ -109,42 +101,39 @@ class AiModelsSettingsScreen extends ConsumerWidget {
               title: 'AI Processing Model',
               subtitle: 'Local LLM for summarisation & classification',
             ),
-            if (!native) const _AiTogglesTile(),
-            if (native)
-              SwitchListTile(
-                title: const Text('Correct transcription before analysis'),
-                value: ref.watch(aiCorrectionEnabledProvider),
-                onChanged: (value) => ref
-                    .read(aiCorrectionEnabledProvider.notifier)
-                    .setEnabled(value),
-              ),
+
+            SwitchListTile(
+              title: const Text('Correct transcription before analysis'),
+              value: ref.watch(aiCorrectionEnabledProvider),
+              onChanged: (value) => ref
+                  .read(aiCorrectionEnabledProvider.notifier)
+                  .setEnabled(value),
+            ),
             const _AiModelSelector(),
             const _ImportModelTile(),
           ],
-          if (native) const CompanionVoicePolicyTile(),
-          if (native && (localLlm || !onDevice))
+          const CompanionVoicePolicyTile(),
+          if (localLlm || !onDevice)
             const CompanionVoiceBatchButton(
               operation: 'process',
               label: 'Process all unprocessed',
             ),
 
-          if (native || ref.watch(localAiEnabledProvider)) ...[
-            const SizedBox(height: 24),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
+          const SizedBox(height: 24),
+          const Divider(height: 1),
+          const SizedBox(height: 8),
 
-            // ---- Calendar / Reminders section ----
-            const _SectionHeader(
-              title: 'Calendar Integration',
-              subtitle:
-                  'When a voice memo mentions a meeting, deadline, or '
-                  'reminder, the AI can create it directly in your calendar. '
-                  'Grant access below to enable this.',
-            ),
-            const _CalendarPermissionTile(),
-            if (Platform.isIOS) const _RemindersPermissionTile(),
-            if (Platform.isAndroid) const _CalendarPickerTile(),
-          ],
+          // ---- Calendar / Reminders section ----
+          const _SectionHeader(
+            title: 'Calendar Integration',
+            subtitle:
+                'When a voice memo mentions a meeting, deadline, or '
+                'reminder, the AI can create it directly in your calendar. '
+                'Grant access below to enable this.',
+          ),
+          const _CalendarPermissionTile(),
+          if (Platform.isIOS) const _RemindersPermissionTile(),
+          if (Platform.isAndroid) const _CalendarPickerTile(),
 
           if (localLlm) ...[
             const SizedBox(height: 24),
@@ -163,16 +152,15 @@ class AiModelsSettingsScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           // The existing Clock controls use the productivity channel only.
           // They do not depend on legacy BLE, repositories or local inference.
-          ...[
-            // ---- Timer / Alarm test section ----
-            _SectionHeader(
-              title: 'Timer & Alarm Test',
-              subtitle: Platform.isIOS
-                  ? 'Test timer and alarm notifications from ZSWatch without connecting a watch.'
-                  : 'Test creating timers and alarms via the system clock app without connecting a watch.',
-            ),
-            const _TimerAlarmTestSection(),
-          ],
+
+          // ---- Timer / Alarm test section ----
+          _SectionHeader(
+            title: 'Timer & Alarm Test',
+            subtitle: Platform.isIOS
+                ? 'Test timer and alarm notifications from ZSWatch without connecting a watch.'
+                : 'Test creating timers and alarms via the system clock app without connecting a watch.',
+          ),
+          const _TimerAlarmTestSection(),
         ],
       ),
     );
@@ -623,214 +611,6 @@ class _TranscriptionModelCard extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Re-transcribe button
-// ---------------------------------------------------------------------------
-
-class _RetranscribeButton extends ConsumerWidget {
-  const _RetranscribeButton();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final actionsState = ref.watch(voiceMemoActionsProvider);
-    final isBusy = actionsState.isLoading;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppTheme.spacingMd,
-        4,
-        AppTheme.spacingMd,
-        0,
-      ),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          style: TextButton.styleFrom(
-            foregroundColor: AppTheme.textSecondary,
-            textStyle: Theme.of(context).textTheme.bodySmall,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          icon: isBusy
-              ? const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.refresh, size: 16),
-          label: Text(
-            isBusy
-                ? 'Re-transcribing...'
-                : 'Re-transcribe all with selected model',
-          ),
-          onPressed: isBusy
-              ? null
-              : () async {
-                  final confirmed =
-                      await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Re-transcribe all memos?'),
-                          content: const Text(
-                            'This will overwrite existing transcriptions '
-                            'using the currently selected model.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                              child: const Text('Re-transcribe'),
-                            ),
-                          ],
-                        ),
-                      ) ??
-                      false;
-
-                  if (!confirmed || !context.mounted) return;
-
-                  try {
-                    final count = await ref
-                        .read(voiceMemoActionsProvider.notifier)
-                        .retranscribeAll();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            count == 0
-                                ? 'No downloaded memos to re-transcribe'
-                                : 'Started re-transcribing $count memos',
-                          ),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Re-transcription failed: $e')),
-                      );
-                    }
-                  }
-                },
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// AI Processing toggles
-// ---------------------------------------------------------------------------
-
-class _AiTogglesTile extends ConsumerWidget {
-  const _AiTogglesTile();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final localAiEnabled = ref.watch(localAiEnabledProvider);
-    final autoProcess = ref.watch(autoProcessVoiceNotesProvider);
-    final autoCreate = ref.watch(autoCreateActionsProvider);
-    final correctionEnabled = ref.watch(aiCorrectionEnabledProvider);
-    final bothEnabled = localAiEnabled && autoProcess;
-
-    return Column(
-      children: [
-        SwitchListTile(
-          secondary: Icon(
-            Icons.auto_awesome,
-            color: localAiEnabled
-                ? AppTheme.primaryColor
-                : AppTheme.textSecondary,
-          ),
-          title: const Text('Enable Local AI'),
-          subtitle: const Text('Process voice notes with on-device LLM'),
-          value: localAiEnabled,
-          onChanged: (value) {
-            ref.read(localAiEnabledProvider.notifier).setEnabled(value);
-          },
-        ),
-        Opacity(
-          opacity: localAiEnabled ? 1.0 : 0.5,
-          child: SwitchListTile(
-            secondary: Icon(
-              Icons.autorenew,
-              color: autoProcess && localAiEnabled
-                  ? AppTheme.primaryColor
-                  : AppTheme.textSecondary,
-            ),
-            title: const Text('Auto-process after transcription'),
-            subtitle: Text(
-              localAiEnabled
-                  ? 'Automatically run AI after each transcription'
-                  : 'Enable Local AI first',
-            ),
-            value: autoProcess,
-            onChanged: localAiEnabled
-                ? (value) {
-                    ref
-                        .read(autoProcessVoiceNotesProvider.notifier)
-                        .setEnabled(value);
-                  }
-                : null,
-          ),
-        ),
-        Opacity(
-          opacity: bothEnabled ? 1.0 : 0.5,
-          child: SwitchListTile(
-            secondary: Icon(
-              Icons.event_available,
-              color: autoCreate && bothEnabled
-                  ? AppTheme.primaryColor
-                  : AppTheme.textSecondary,
-            ),
-            title: const Text('Auto-create calendar events'),
-            subtitle: Text(
-              bothEnabled
-                  ? 'Create events automatically (watch have undo window)'
-                  : 'Enable Local AI and auto-process first',
-            ),
-            value: autoCreate,
-            onChanged: bothEnabled
-                ? (value) {
-                    ref
-                        .read(autoCreateActionsProvider.notifier)
-                        .setEnabled(value);
-                  }
-                : null,
-          ),
-        ),
-        Opacity(
-          opacity: localAiEnabled ? 1.0 : 0.5,
-          child: SwitchListTile(
-            secondary: Icon(
-              Icons.spellcheck,
-              color: correctionEnabled && localAiEnabled
-                  ? AppTheme.primaryColor
-                  : AppTheme.textSecondary,
-            ),
-            title: const Text('AI transcript correction'),
-            subtitle: Text(
-              localAiEnabled
-                  ? 'Fix transcription errors before classification'
-                  : 'Enable Local AI first',
-            ),
-            value: correctionEnabled,
-            onChanged: localAiEnabled
-                ? (value) {
-                    ref
-                        .read(aiCorrectionEnabledProvider.notifier)
-                        .setEnabled(value);
-                  }
-                : null,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
 // AI Model selector (dropdown + status + download/delete/import)
 // ---------------------------------------------------------------------------
 
@@ -1172,7 +952,6 @@ class _AiModelSelectorState extends ConsumerState<_AiModelSelector> {
                 ),
 
                 // Process all button
-                _ProcessAllButton(),
               ],
             );
           },
@@ -1265,94 +1044,6 @@ class _ImportModelTile extends ConsumerWidget {
       subtitle: const Text('Use a local .gguf file from your device'),
       trailing: const Icon(Icons.chevron_right, size: 18),
       onTap: () => _importModel(context, ref),
-    );
-  }
-}
-
-class _ProcessAllButton extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Native recordings are scheduled from their verified receipt in Voice Notes.
-    // The legacy batch reads a different repository and cannot process these rows.
-    if (ref.watch(nativeCompanionRuntimeProvider)) {
-      return const SizedBox.shrink();
-    }
-    final localAiEnabled = ref.watch(localAiEnabledProvider);
-    final aiActionsState = ref.watch(aiActionsProvider);
-    final isBusy = aiActionsState.isLoading;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppTheme.spacingMd,
-        4,
-        AppTheme.spacingMd,
-        0,
-      ),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          style: TextButton.styleFrom(
-            foregroundColor: AppTheme.textSecondary,
-            textStyle: Theme.of(context).textTheme.bodySmall,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          icon: isBusy
-              ? const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.auto_awesome, size: 16),
-          label: Text(isBusy ? 'Processing...' : 'Process all unprocessed'),
-          onPressed: isBusy || !localAiEnabled
-              ? null
-              : () async {
-                  final confirmed =
-                      await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Process all unprocessed?'),
-                          content: const Text(
-                            'All voice memos not yet AI-processed will be processed now.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                              child: const Text('Process'),
-                            ),
-                          ],
-                        ),
-                      ) ??
-                      false;
-
-                  if (!confirmed || !context.mounted) return;
-
-                  try {
-                    await ref
-                        .read(aiActionsProvider.notifier)
-                        .processAllUnprocessed();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Started processing unprocessed memos'),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Processing failed: $e')),
-                      );
-                    }
-                  }
-                },
-        ),
-      ),
     );
   }
 }

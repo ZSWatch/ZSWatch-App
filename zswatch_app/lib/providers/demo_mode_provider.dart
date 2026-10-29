@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../data/models/connection.dart';
 import '../data/models/connection_state.dart';
 import '../data/models/watch.dart';
@@ -34,8 +33,7 @@ class DemoModeController {
 
   /// Demo Mode never survives a restart; resume the watch it stopped.
   Future<void> recoverInterrupted() async {
-    if (!ref.read(nativeCompanionRuntimeProvider) ||
-        ref.read(demoModeProvider)) {
+    if (ref.read(demoModeProvider)) {
       return;
     }
     final prefs = await SharedPreferences.getInstance();
@@ -52,10 +50,6 @@ class DemoModeController {
     }
     ref.read(demoModeBusyProvider.notifier).state = true;
     try {
-      if (!ref.read(nativeCompanionRuntimeProvider)) {
-        ref.read(demoModeProvider.notifier).state = enabled;
-        return;
-      }
       if (enabled) {
         final client = ref.read(companionClientProvider);
         final before = await client.snapshot();

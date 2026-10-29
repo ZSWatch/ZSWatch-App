@@ -1,13 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:rxdart/rxdart.dart';
-
-import '../../core/constants/ble_constants.dart';
-import '../../data/models/health_sample.dart';
 import '../../data/repositories/health_repository.dart';
-import '../watch_service.dart';
 
 /// Activity states from the watch
 ///
@@ -115,14 +110,11 @@ class ActivityBreakdown {
 /// - Activity data sync via Gadgetbridge protocol (placeholder)
 /// - Data persistence to health repository
 class HealthSyncService {
-  final WatchService? _watchService;
-  final String? Function()? _companionWatchId;
+  final String? Function() _companionWatchId;
   bool _disposed = false;
-  String? get _watchId =>
-      _companionWatchId?.call() ?? _watchService?.currentWatch?.id;
+  String? get _watchId => _companionWatchId();
   final HealthRepository _healthRepository;
 
-  StreamSubscription<List<int>>? _hrSubscription;
   StreamSubscription<Map<String, dynamic>>? _activitySubscription;
 
   // Heart rate streaming state
@@ -135,9 +127,6 @@ class HealthSyncService {
   // Activity state tracking (breakdown is calculated from database)
   final _activityBreakdownController =
       BehaviorSubject<ActivityBreakdown>.seeded(const ActivityBreakdown());
-
-  BluetoothDevice? _device;
-  BluetoothCharacteristic? _hrMeasurementChar;
 
   /// Stream of real-time heart rate values
   Stream<int?> get heartRateStream => _heartRateController.stream;
@@ -165,218 +154,19 @@ class HealthSyncService {
   ActivityBreakdown get currentActivityBreakdown =>
       _activityBreakdownController.value;
 
-  HealthSyncService({
-    required WatchService watchService,
-    required HealthRepository healthRepository,
-  }) : _watchService = watchService,
-       _companionWatchId = null,
-       _healthRepository = healthRepository {
-    _initialize();
-  }
-
   /// UI projection only: the native owner has already committed these samples.
   /// This path never creates a BluetoothDevice or writes duplicate rows.
   HealthSyncService.forCompanion({
     required HealthRepository healthRepository,
     required String? Function() watchId,
     required Stream<Map<String, dynamic>> activity,
-  }) : _watchService = null,
-       _companionWatchId = watchId,
+  }) : _companionWatchId = watchId,
        _healthRepository = healthRepository {
     _activitySubscription = activity.listen(
       _handleActivityMessage,
       onError: (Object error) =>
           debugPrint('[HealthSync] Observer error: $error'),
     );
-  }
-
-  void _initialize() {
-    // Listen for activity messages from watch (Gadgetbridge protocol)
-    _activitySubscription = _watchService!.incomingMessages.listen(
-      _handleActivityMessage,
-    );
-  }
-
-  /// Start heart rate streaming
-  ///
-  /// Subscribes to the standard BLE Heart Rate Service (0x180D)
-  /// and emits readings in real-time.
-  Future<void> startHeartRateStreaming(String deviceId) async {
-    if (_companionWatchId != null) {
-      // The product Heart Rate view consumes the watch's regular act messages.
-      // Standard GATT streaming is not used by that view and remains native-owned.
-      return;
-    }
-    if (_isStreamingController.value) {
-      debugPrint('[HealthSync] HR streaming already active');
-      return;
-    }
-
-    try {
-      _device = BluetoothDevice.fromId(deviceId);
-
-      // Check if already connected
-      final isConnected = _device!.isConnected;
-      if (!isConnected) {
-        debugPrint(
-          '[HealthSync] Device not connected, cannot start HR streaming',
-        );
-        return;
-      }
-
-      // Discover services if not already done
-      List<BluetoothService> services = _device!.servicesList;
-      if (services.isEmpty) {
-        services = await _device!.discoverServices();
-      }
-
-      // Find Heart Rate Service
-      final hrService = services.cast<BluetoothService?>().firstWhere(
-        (s) => s?.uuid == Guid(HeartRateUuids.service),
-        orElse: () => null,
-      );
-
-      if (hrService == null) {
-        debugPrint('[HealthSync] Heart Rate Service not found');
-        return;
-      }
-
-      // Find HR Measurement characteristic
-      _hrMeasurementChar = hrService.characteristics
-          .cast<BluetoothCharacteristic?>()
-          .firstWhere(
-            (c) => c?.uuid == Guid(HeartRateUuids.measurement),
-            orElse: () => null,
-          );
-
-      if (_hrMeasurementChar == null) {
-        debugPrint('[HealthSync] HR Measurement characteristic not found');
-        return;
-      }
-
-      // Subscribe to notifications
-      await _hrMeasurementChar!.setNotifyValue(true);
-
-      await _hrSubscription?.cancel();
-      _hrSubscription = _hrMeasurementChar!.onValueReceived.listen(
-        _handleHeartRateData,
-        onError: (Object e) => debugPrint('[HealthSync] HR stream error: $e'),
-      );
-
-      _isStreamingController.add(true);
-      debugPrint('[HealthSync] HR streaming started');
-    } catch (e) {
-      debugPrint('[HealthSync] Failed to start HR streaming: $e');
-      _isStreamingController.add(false);
-    }
-  }
-
-  /// Stop heart rate streaming
-  Future<void> stopHeartRateStreaming() async {
-    if (!_isStreamingController.value) return;
-
-    try {
-      await _hrSubscription?.cancel();
-      _hrSubscription = null;
-
-      if (_hrMeasurementChar != null) {
-        try {
-          await _hrMeasurementChar!.setNotifyValue(false);
-        } catch (e) {
-          // Ignore errors when disabling notifications (device may have disconnected)
-          debugPrint('[HealthSync] Error disabling HR notifications: $e');
-        }
-      }
-
-      _hrMeasurementChar = null;
-      _isStreamingController.add(false);
-      _heartRateController.add(null);
-      debugPrint('[HealthSync] HR streaming stopped');
-    } catch (e) {
-      debugPrint('[HealthSync] Error stopping HR streaming: $e');
-    }
-  }
-
-  /// Parse heart rate measurement data according to BLE Heart Rate Profile
-  ///
-  /// Format (per BLE HRS specification):
-  /// Byte 0: Flags
-  ///   - Bit 0: Heart Rate Value Format (0 = UINT8, 1 = UINT16)
-  ///   - Bit 1-2: Sensor Contact Status
-  ///   - Bit 3: Energy Expended Present
-  ///   - Bit 4: RR-Interval Present
-  /// Byte 1 (or 1-2): Heart Rate Value
-  void _handleHeartRateData(List<int> data) {
-    if (data.isEmpty) return;
-
-    try {
-      final flags = data[0];
-      final isUint16 = (flags & 0x01) != 0;
-
-      int heartRate;
-      if (isUint16) {
-        // 16-bit heart rate value
-        if (data.length < 3) return;
-        heartRate = data[1] | (data[2] << 8);
-      } else {
-        // 8-bit heart rate value
-        if (data.length < 2) return;
-        heartRate = data[1];
-      }
-
-      // Validate range (30-250 BPM is reasonable)
-      if (heartRate < 30 || heartRate > 250) {
-        debugPrint('[HealthSync] Invalid HR value: $heartRate');
-        return;
-      }
-
-      debugPrint('[HealthSync] HR: $heartRate BPM');
-      _heartRateController.add(heartRate);
-
-      // Persist to repository
-      _persistHeartRate(heartRate);
-    } catch (e) {
-      debugPrint('[HealthSync] Error parsing HR data: $e');
-    }
-  }
-
-  /// Persist heart rate reading to database
-  Future<void> _persistHeartRate(int bpm, [DateTime? timestamp]) async {
-    final watchId = _watchId;
-    if (watchId == null) return;
-
-    try {
-      await _healthRepository.insertHeartRate(
-        watchId: watchId,
-        bpm: bpm,
-        timestamp: timestamp,
-      );
-    } catch (e) {
-      debugPrint('[HealthSync] Error persisting HR: $e');
-    }
-  }
-
-  /// Persist step count to database
-  ///
-  /// Note: The watch sends cumulative daily steps, so we store
-  /// the latest value with a "daily" granularity, updating the same
-  /// record throughout the day.
-  Future<void> _persistSteps(
-    String watchId,
-    int steps, [
-    DateTime? timestamp,
-  ]) async {
-    try {
-      final ts = timestamp ?? DateTime.now();
-      await _healthRepository.insertSteps(
-        watchId: watchId,
-        steps: steps,
-        timestamp: ts,
-        granularity: Granularity.realtime,
-      );
-    } catch (e) {
-      debugPrint('[HealthSync] Error persisting steps: $e');
-    }
   }
 
   /// Handle activity messages from Gadgetbridge protocol
@@ -421,9 +211,6 @@ class HealthSyncService {
 
     if (steps != null) {
       _stepsController.add(steps);
-      if (_companionWatchId == null) {
-        unawaited(_persistSteps(watchId, steps, timestamp));
-      }
     }
 
     if (heartRate != null) {
@@ -431,40 +218,11 @@ class HealthSyncService {
         '[HealthSync] Activity update - HR: $heartRate, ts: $timestamp',
       );
       _heartRateController.add(heartRate);
-      if (_companionWatchId == null) {
-        unawaited(_persistHeartRate(heartRate, timestamp));
-      }
     }
 
     // Track activity state
     if (activityString != null) {
-      final newState = ActivityState.fromString(activityString);
-      if (_companionWatchId == null) {
-        unawaited(_persistAndUpdateActivityState(watchId, newState, timestamp));
-      } else {
-        unawaited(_refreshActivityBreakdown(watchId));
-      }
-    }
-  }
-
-  /// Persist activity state to database and update breakdown
-  Future<void> _persistAndUpdateActivityState(
-    String watchId,
-    ActivityState state,
-    DateTime timestamp,
-  ) async {
-    try {
-      // Persist to database
-      await _healthRepository.insertActivity(
-        watchId: watchId,
-        activityStateValue: state.value,
-        timestamp: timestamp,
-      );
-
-      // Refresh breakdown from database
-      await _refreshActivityBreakdown(watchId);
-    } catch (e) {
-      debugPrint('[HealthSync] Error persisting activity: $e');
+      unawaited(_refreshActivityBreakdown(watchId));
     }
   }
 
@@ -554,7 +312,7 @@ class HealthSyncService {
   /// Dispose resources
   Future<void> dispose() async {
     _disposed = true;
-    await stopHeartRateStreaming();
+
     await _activitySubscription?.cancel();
     await _heartRateController.close();
     await _isStreamingController.close();

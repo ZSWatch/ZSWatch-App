@@ -5,13 +5,11 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/connection.dart';
 import '../../../data/models/thread_monitor_data.dart';
 import '../../../providers/shell_providers.dart';
 import '../../../providers/watch_service_provider.dart';
-import '../../../providers/companion_runtime_providers.dart';
 
 /// Shell screen with tabs: Terminal, Quick Actions, Remote Control, Live Monitor.
 class ShellScreen extends ConsumerStatefulWidget {
@@ -24,18 +22,12 @@ class ShellScreen extends ConsumerStatefulWidget {
 class _ShellScreenState extends ConsumerState<ShellScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool _smpEnabling = false;
-
-  void _setSmpEnabling(bool value) {
-    if (mounted) setState(() => _smpEnabling = value);
-  }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(_onTabChanged);
-    _enableSmp();
   }
 
   @override
@@ -49,10 +41,6 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
       Future(monitorNotifier.stop);
     }
 
-    if (!ref.read(nativeCompanionRuntimeProvider)) {
-      final watchService = ref.read(watchServiceProvider);
-      unawaited(watchService.disableSmp());
-    }
     super.deactivate();
   }
 
@@ -61,34 +49,6 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
-  }
-
-  Future<void> _enableSmp() async {
-    if (ref.read(nativeCompanionRuntimeProvider)) return;
-    if (_smpEnabling) return;
-    _setSmpEnabling(true);
-    try {
-      final watchService = ref.read(watchServiceProvider);
-      await watchService.enableSmp();
-      await Future<void>.delayed(const Duration(seconds: 2));
-      final hasSmp = await watchService.rediscoverServices();
-      if (!hasSmp && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'SMP service not found. If your watch firmware is older, '
-              'you may need to manually enable it: '
-              'on the watch go to Apps → Update → Enable FW Update.',
-            ),
-            duration: Duration(seconds: 8),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('[ShellScreen] Failed to enable SMP: $e');
-    } finally {
-      _setSmpEnabling(false);
-    }
   }
 
   void _onTabChanged() {
@@ -104,9 +64,8 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
   @override
   Widget build(BuildContext context) {
     final connection = ref.watch(watchConnectionProvider);
-    final native = ref.watch(nativeCompanionRuntimeProvider);
 
-    // Re-enable SMP whenever the watch reconnects while this screen is open.
+    // Stop UI polling when the native connection drops.
     ref.listen<Connection>(watchConnectionProvider, (prev, next) {
       if (!next.isConnected) {
         final monitor = ref.read(liveMonitorProvider);
@@ -116,28 +75,12 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
         return;
       }
 
-      if (next.isConnected && prev != null && !prev.isConnected) {
-        _enableSmp();
-      }
+      if (next.isConnected && prev != null && !prev.isConnected) {}
     });
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Shell'),
-        actions: [
-          if (!native)
-            IconButton(
-              icon: _smpEnabling
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh),
-              tooltip: 'Re-enable SMP',
-              onPressed: _smpEnabling ? null : _enableSmp,
-            ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -151,31 +94,29 @@ class _ShellScreenState extends ConsumerState<ShellScreen>
           ],
         ),
       ),
-      body: !native && !connection.isConnected
-          ? const Center(child: Text('Watch not connected'))
-          : Column(
-              children: [
-                if (native && !connection.isConnected)
-                  const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Text('Watch not connected'),
-                  ),
-                // Preserve pending UI results through native SMP preparation.
-                Expanded(
-                  key: const ValueKey('shell-tabs'),
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: const [
-                      _TerminalTab(),
-                      _QuickActionsTab(),
-                      _RemoteControlTab(),
-                      _LiveMonitorTab(),
-                      _TestTab(),
-                    ],
-                  ),
-                ),
+      body: Column(
+        children: [
+          if (!connection.isConnected)
+            const Padding(
+              padding: EdgeInsets.all(8),
+              child: Text('Watch not connected'),
+            ),
+          // Preserve pending UI results through native SMP preparation.
+          Expanded(
+            key: const ValueKey('shell-tabs'),
+            child: TabBarView(
+              controller: _tabController,
+              children: const [
+                _TerminalTab(),
+                _QuickActionsTab(),
+                _RemoteControlTab(),
+                _LiveMonitorTab(),
+                _TestTab(),
               ],
             ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1025,7 +966,7 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
         ),
         if (_appList != null) ...[
           const SizedBox(height: AppTheme.spacingSm),
-          ...(_appList!.map(
+          ..._appList!.map(
             (app) => Card(
               margin: const EdgeInsets.only(bottom: AppTheme.spacingXs),
               child: ListTile(
@@ -1042,7 +983,7 @@ class _RemoteControlTabState extends ConsumerState<_RemoteControlTab> {
                 ),
               ),
             ),
-          )),
+          ),
         ],
       ],
     );

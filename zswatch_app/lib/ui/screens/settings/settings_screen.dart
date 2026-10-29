@@ -1,23 +1,15 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:go_router/go_router.dart';
-
 import '../../../core/theme/app_theme.dart';
-import '../../../providers/ai_providers.dart';
-import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/demo_mode_provider.dart';
-import '../../../providers/permission_providers.dart';
 import '../../../providers/settings_providers.dart';
-import '../../../services/voice_memo/transcription_engine.dart';
 import '../../navigation/app_router.dart';
-import '../onboarding/permission_onboarding_screen.dart';
+
 import 'companion_settings_view.dart';
 import 'companion_permissions_summary.dart';
 
@@ -42,70 +34,19 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final native = ref.watch(nativeCompanionRuntimeProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
           // Connection Settings
           const _SectionHeader(title: 'Connection'),
-          if (native) const CompanionConnectionSettings(),
-          if (!native)
-            _SettingsTile(
-              leading: Icon(
-                ref.watch(backgroundConnectionEnabledProvider)
-                    ? Icons.bluetooth_connected
-                    : Icons.bluetooth_disabled,
-                color: ref.watch(backgroundConnectionEnabledProvider)
-                    ? AppTheme.primaryColor
-                    : AppTheme.textSecondary,
-              ),
-              title: 'Persistent Connection',
-              subtitle: 'Keep watch connected when app is in background',
-              trailing: Switch(
-                value: ref.watch(backgroundConnectionEnabledProvider),
-                onChanged: (value) async {
-                  if (value && Platform.isAndroid) {
-                    // Check notification permission before enabling
-                    final permState = ref.read(permissionNotifierProvider);
-                    if (!permState.status.isNotificationGranted) {
-                      // Request notification permission
-                      final result = await ref
-                          .read(permissionNotifierProvider.notifier)
-                          .requestNotificationPermission();
-                      if (!result.isGranted && context.mounted) {
-                        // Show warning that feature won't work properly
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Notification permission is required for the persistent connection indicator',
-                            ),
-                            duration: Duration(seconds: 3),
-                          ),
-                        );
-                      }
-                    }
-                  }
-                  ref
-                      .read(backgroundConnectionEnabledProvider.notifier)
-                      .setEnabled(value);
-                  // If disabling while connected, the service will keep running
-                  // until the watch is disconnected
-                  if (!value && context.mounted) {
-                    _showPersistentConnectionDisabledDialog(context);
-                  }
-                },
-              ),
-            ),
+          const CompanionConnectionSettings(),
 
           const Divider(height: 32),
 
           // Permissions Section (consolidated)
           const _SectionHeader(title: 'Permissions'),
-          if (native)
-            const CompanionPermissionsSummary()
-          else
-            _PermissionsSummaryTile(),
+          const CompanionPermissionsSummary(),
 
           const Divider(height: 32),
 
@@ -132,16 +73,13 @@ class SettingsScreen extends ConsumerWidget {
 
           // Voice Memo AI (sub-page)
           const _SectionHeader(title: 'Voice Memo AI'),
-          if (native)
-            _SettingsTile(
-              leading: const Icon(Icons.mic, color: AppTheme.primaryColor),
-              title: 'Voice memo models',
-              subtitle: 'Transcription, analysis and automatic processing',
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push(AppRoutes.aiModels),
-            )
-          else
-            _AiTranscriptionNavTile(),
+          _SettingsTile(
+            leading: const Icon(Icons.mic, color: AppTheme.primaryColor),
+            title: 'Voice memo models',
+            subtitle: 'Transcription, analysis and automatic processing',
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.aiModels),
+          ),
 
           const Divider(height: 32),
 
@@ -202,9 +140,8 @@ class SettingsScreen extends ConsumerWidget {
                   : AppTheme.textSecondary,
             ),
             title: 'Demo Mode',
-            subtitle: native
-                ? 'Preview the app; a real watch is temporarily disconnected'
-                : 'Simulate a connected watch without hardware',
+            subtitle:
+                ('Preview the app; a real watch is temporarily disconnected'),
             trailing: Switch(
               value: ref.watch(demoModeProvider),
               onChanged: ref.watch(demoModeBusyProvider)
@@ -284,27 +221,6 @@ class SettingsScreen extends ConsumerWidget {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
-
-  void _showPersistentConnectionDisabledDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Persistent Connection Disabled'),
-        content: const Text(
-          'The background connection service will stop when you disconnect from '
-          'your watch. Notifications will not be forwarded while the app is in '
-          'the background.\n\n'
-          'Your current connection will remain active until you disconnect.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -360,174 +276,6 @@ class _SettingsTile extends StatelessWidget {
       ),
       trailing: trailing,
       onTap: onTap,
-    );
-  }
-}
-
-/// Compact summary tile that navigates to the Voice Memo AI sub-page.
-class _AiTranscriptionNavTile extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final transcriptionType = ref.watch(transcriptionEngineTypeProvider);
-    final transcriptionInfo = TranscriptionModelCatalog.info(transcriptionType);
-    final localAiEnabled = ref.watch(localAiEnabledProvider);
-    final aiModelName = ref
-        .watch(selectedLlmModelInfoProvider)
-        .whenOrNull(data: (m) => m.displayName);
-
-    return _SettingsTile(
-      leading: const Icon(Icons.mic, color: AppTheme.primaryColor),
-      title: 'Voice Memo AI',
-      subtitle:
-          'Transcription: ${transcriptionInfo.name}  ·  '
-          'AI: ${localAiEnabled ? (aiModelName ?? 'Loading...') : 'Off'}',
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => context.push(AppRoutes.aiModels),
-    );
-  }
-}
-
-/// Consolidated permissions summary tile
-///
-/// Shows an overview of permission status and allows users to manage all permissions
-class _PermissionsSummaryTile extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final permState = ref.watch(permissionNotifierProvider);
-    final status = permState.status;
-    final missingCount = status.missingPermissions.length;
-
-    // Calculate overall status
-    final allGranted = status.hasAllPermissions;
-    final hasCritical = status.hasCriticalPermissions;
-
-    Color statusColor;
-    IconData statusIcon;
-    String statusText;
-
-    if (allGranted) {
-      statusColor = AppTheme.successColor;
-      statusIcon = Icons.check_circle;
-      statusText = 'All permissions granted';
-    } else if (hasCritical) {
-      statusColor = AppTheme.warningColor;
-      statusIcon = Icons.warning_amber;
-      statusText =
-          '$missingCount optional permission${missingCount > 1 ? 's' : ''} missing';
-    } else {
-      statusColor = AppTheme.errorColor;
-      statusIcon = Icons.error;
-      statusText = 'Required permissions missing';
-    }
-
-    return Column(
-      children: [
-        _SettingsTile(
-          leading: Icon(statusIcon, color: statusColor),
-          title: 'App Permissions',
-          subtitle: statusText,
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _openPermissionsScreen(context),
-        ),
-
-        // Show quick status for each permission
-        if (!allGranted) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingMd),
-            child: Column(
-              children: [
-                // Bluetooth
-                _QuickPermissionRow(
-                  icon: Icons.bluetooth,
-                  label: 'Bluetooth',
-                  isGranted: status.bluetoothGranted,
-                ),
-
-                // Notifications (Android only)
-                if (Platform.isAndroid)
-                  _QuickPermissionRow(
-                    icon: Icons.notifications,
-                    label: 'Notifications',
-                    isGranted: status.isNotificationGranted,
-                  ),
-
-                // Battery Optimization (Android only)
-                if (Platform.isAndroid)
-                  _QuickPermissionRow(
-                    icon: Icons.battery_full,
-                    label: 'Battery Optimization',
-                    isGranted: status.batteryOptimizationDisabled,
-                  ),
-
-                // Location
-                _QuickPermissionRow(
-                  icon: Icons.location_on,
-                  label: 'Location',
-                  isGranted: status.isLocationGranted,
-                ),
-
-                // Notification Listener (Android only)
-                if (Platform.isAndroid)
-                  _QuickPermissionRow(
-                    icon: Icons.notifications_active,
-                    label: 'Notification Access',
-                    isGranted: status.notificationListenerEnabled,
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  void _openPermissionsScreen(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (context) =>
-            const PermissionOnboardingScreen(isInitialOnboarding: false),
-      ),
-    );
-  }
-}
-
-/// Quick permission status row
-class _QuickPermissionRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isGranted;
-
-  const _QuickPermissionRow({
-    required this.icon,
-    required this.label,
-    required this.isGranted,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isGranted ? AppTheme.successColor : AppTheme.warningColor;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: AppTheme.textSecondary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
-            ),
-          ),
-          Icon(
-            isGranted ? Icons.check_circle : Icons.cancel,
-            size: 16,
-            color: color,
-          ),
-        ],
-      ),
     );
   }
 }

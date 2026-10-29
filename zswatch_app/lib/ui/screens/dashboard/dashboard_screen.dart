@@ -2,13 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../navigation/app_router.dart';
-import 'package:mcumgr_flutter/mcumgr_flutter.dart';
-
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/watch.dart';
-import '../../../providers/auto_reconnect_provider.dart';
 import '../../../providers/companion_runtime_providers.dart';
 import 'companion_find_watch_button.dart';
 import '../../../providers/demo_mode_provider.dart';
@@ -49,17 +45,12 @@ Future<void> _restartWatch(BuildContext context, WidgetRef ref) async {
   if (deviceId.isEmpty) return;
 
   try {
-    if (ref.read(nativeCompanionRuntimeProvider)) {
-      final snapshot = ref.read(companionSnapshotProvider).asData?.value;
-      if (snapshot?.protocolReady != true) {
-        throw StateError('Current watch connection required');
-      }
-      await ref
-          .read(companionClientProvider)
-          .restartWatch(snapshot!.generation);
-    } else {
-      await OsManager.reset(deviceId);
+    final snapshot = ref.read(companionSnapshotProvider).asData?.value;
+    if (snapshot?.protocolReady != true) {
+      throw StateError('Current watch connection required');
     }
+    await ref.read(companionClientProvider).restartWatch(snapshot!.generation);
+
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Restart command sent to watch')),
@@ -82,7 +73,6 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final native = ref.watch(nativeCompanionRuntimeProvider);
     final watch = ref.watch(currentWatchProvider);
     final connection = ref.watch(watchConnectionProvider);
     final healthSummary = ref.watch(healthSummaryProvider);
@@ -127,9 +117,7 @@ class DashboardScreen extends ConsumerWidget {
 
             // Stats row - 4 compact cards
             _StatsRow(
-              batteryLevel: native
-                  ? ref.watch(batteryLevelProvider)
-                  : watch?.batteryLevel,
+              batteryLevel: ref.watch(batteryLevelProvider),
               firmwareVersion: watch?.shortFirmwareVersion,
               todaySteps: healthSummary.todaySteps,
               latestHeartRate: healthSummary.latestHeartRate,
@@ -153,30 +141,22 @@ class DashboardScreen extends ConsumerWidget {
                   return;
                 }
                 // Suppress auto-reconnect when user manually disconnects
-                if (!native) {
-                  ref
-                      .read(autoReconnectNotifierProvider.notifier)
-                      .suppressForSession();
-                }
+
                 final notifier = ref.read(watchNotifierProvider.notifier);
                 await notifier.disconnect();
                 if (context.mounted) {
                   context.go(AppRoutes.home);
                 }
               },
-              onRestartWatch: (native || ref.watch(hasSmpServiceProvider))
-                  ? () => _restartWatch(context, ref)
-                  : null,
-              findWatch: native
-                  ? CompanionFindWatchButton(
-                      builder: (onPressed) => OutlinedButton.icon(
-                        onPressed: onPressed,
-                        icon: const Icon(Icons.vibration, size: 18),
-                        label: const Text('Find watch'),
-                        style: compactButtonStyle(context),
-                      ),
-                    )
-                  : null,
+              onRestartWatch: (() => _restartWatch(context, ref)),
+              findWatch: CompanionFindWatchButton(
+                builder: (onPressed) => OutlinedButton.icon(
+                  onPressed: onPressed,
+                  icon: const Icon(Icons.vibration, size: 18),
+                  label: const Text('Find watch'),
+                  style: compactButtonStyle(context),
+                ),
+              ),
             ),
 
             const SizedBox(height: AppTheme.spacingMd),

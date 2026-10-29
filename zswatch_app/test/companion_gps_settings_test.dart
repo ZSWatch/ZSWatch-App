@@ -9,8 +9,7 @@ import 'package:zswatch_app/providers/companion_permission_setup_providers.dart'
 import 'package:zswatch_app/providers/settings_providers.dart';
 import 'package:zswatch_app/data/models/companion_gps_status.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
-import 'package:zswatch_app/providers/gps_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
+
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/settings/companion_gps_settings_tile.dart';
 
@@ -279,15 +278,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => stream),
           companionGpsPermissionsProvider.overrideWithValue(permission),
-          gpsServiceProvider.overrideWith(
-            (ref) => throw StateError('No Dart location acquisition'),
-          ),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('No Dart BLE'),
-          ),
         ],
         child: const MaterialApp(
           home: Scaffold(body: CompanionGpsSettingsTile()),

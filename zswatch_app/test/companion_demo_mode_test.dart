@@ -49,9 +49,7 @@ void main() {
     failStop = false;
     stopGate = null;
     state = realState();
-    container = ProviderContainer(
-      overrides: [nativeCompanionRuntimeProvider.overrideWithValue(true)],
-    );
+    container = ProviderContainer(overrides: []);
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call.method);
       if (call.method == 'snapshot') return state;
@@ -112,9 +110,7 @@ void main() {
     expect(calls, ['snapshot', 'stop']);
     // A new process starts outside Demo Mode with the native Stop persisted.
     container.dispose();
-    container = ProviderContainer(
-      overrides: [nativeCompanionRuntimeProvider.overrideWithValue(true)],
-    );
+    container = ProviderContainer(overrides: []);
     await container.read(demoModeControllerProvider).recoverInterrupted();
     expect(calls, ['snapshot', 'stop', 'start']);
     await container.read(demoModeControllerProvider).recoverInterrupted();

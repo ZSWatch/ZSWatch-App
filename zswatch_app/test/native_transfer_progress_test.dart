@@ -7,7 +7,6 @@ import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/dfu_providers.dart';
 import 'package:zswatch_app/providers/filesystem_providers.dart';
 import 'package:zswatch_app/providers/transfer_progress_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 
 CompanionPrototypeSnapshot transferSnapshot(
@@ -89,12 +88,8 @@ void main() {
         final states = StreamController<CompanionPrototypeSnapshot>();
         final container = ProviderContainer(
           overrides: [
-            nativeCompanionRuntimeProvider.overrideWithValue(true),
             companionSnapshotProvider.overrideWith((ref) => states.stream),
             transferProgressClockProvider.overrideWithValue(() => clock),
-            watchServiceProvider.overrideWith(
-              (ref) => throw StateError('Legacy BLE created'),
-            ),
           ],
         );
         addTearDown(() async {

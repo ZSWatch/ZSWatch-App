@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-
 import '../../../core/theme/app_theme.dart';
 import '../../../data/database/app_database.dart';
 import '../../../data/models/crash_summary.dart';
@@ -19,21 +18,18 @@ class CrashReportScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final native = ref.watch(nativeCompanionRuntimeProvider);
-    final inspection = native
-        ? ref.watch(nativeCoredumpInspectionProvider)
-        : null;
+    final inspection = ref.watch(nativeCoredumpInspectionProvider);
     // History remains in the existing UI repository. This provider uses
     // the native summary stream on Android and never constructs WatchService.
-    if (native) ref.watch(crashReportPersistenceProvider);
-    final current = inspection?.isLoading == true
+    ref.watch(crashReportPersistenceProvider);
+    final current = inspection.isLoading == true
         ? const Center(child: CircularProgressIndicator())
-        : inspection?.hasError == true
+        : inspection.hasError == true
         ? Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
-                'Could not inspect current crash: ${inspection!.error}',
+                'Could not inspect current crash: ${inspection.error}',
               ),
             ),
           )
@@ -44,14 +40,13 @@ class CrashReportScreen extends ConsumerWidget {
         appBar: AppBar(
           title: const Text('Crash Reports'),
           actions: [
-            if (native)
-              IconButton(
-                tooltip: 'Refresh crash summary',
-                icon: const Icon(Icons.refresh),
-                onPressed: inspection?.isLoading == true
-                    ? null
-                    : () => ref.invalidate(nativeCoredumpInspectionProvider),
-              ),
+            IconButton(
+              tooltip: 'Refresh crash summary',
+              icon: const Icon(Icons.refresh),
+              onPressed: inspection.isLoading == true
+                  ? null
+                  : () => ref.invalidate(nativeCoredumpInspectionProvider),
+            ),
           ],
           bottom: const TabBar(
             tabs: [
@@ -682,13 +677,9 @@ class _ActionButtons extends ConsumerWidget {
     if (confirmed != true) return;
     if (!context.mounted) return;
 
-    if (ref.read(nativeCompanionRuntimeProvider)) {
-      final client = ref.read(companionClientProvider);
-      final snapshot = await client.snapshot();
-      await client.inspectCoredump(snapshot.generation, erase: true);
-    } else {
-      await ref.read(watchServiceProvider).eraseCoredump();
-    }
+    final client = ref.read(companionClientProvider);
+    final snapshot = await client.snapshot();
+    await client.inspectCoredump(snapshot.generation, erase: true);
 
     if (context.mounted) {
       ScaffoldMessenger.of(

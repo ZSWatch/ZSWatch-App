@@ -12,7 +12,6 @@ import 'package:zswatch_app/data/models/filesystem_image.dart';
 import 'package:zswatch_app/data/models/firmware_image.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/dfu_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/services/dfu/firmware_manager.dart';
 import 'package:zswatch_app/ui/screens/firmware/firmware_update_screen.dart';
@@ -183,12 +182,8 @@ void main() {
   ProviderContainer container(Stream<CompanionPrototypeSnapshot> states) =>
       ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => states),
           firmwareManagerProvider.overrideWithValue(manager),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Legacy BLE created'),
-          ),
         ],
       );
   Future<void> emit(

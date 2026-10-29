@@ -6,8 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/models/companion_notification_status.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
-import 'package:zswatch_app/providers/notification_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
+
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/notifications/notification_settings_screen.dart';
 import 'package:zswatch_app/ui/screens/developer/companion_prototype_app.dart';
@@ -127,19 +126,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
-          companionSnapshotProvider.overrideWith((ref) => states),
-          notificationForwardingProvider.overrideWith(
-            (ref) => throw StateError('Unexpected Dart forwarding'),
-          ),
-          notificationServiceProvider.overrideWith(
-            (ref) => throw StateError('Unexpected Dart listener'),
-          ),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Unexpected Dart BLE'),
-          ),
-        ],
+        overrides: [companionSnapshotProvider.overrideWith((ref) => states)],
         child: const MaterialApp(home: NotificationSettingsScreen()),
       ),
     );
@@ -312,7 +299,6 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            nativeCompanionRuntimeProvider.overrideWithValue(true),
             companionSnapshotProvider.overrideWith(
               (ref) => Stream.value(CompanionPrototypeSnapshot.decode(saved)),
             ),
@@ -359,7 +345,6 @@ void main() {
       });
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith(
             (ref) => Stream.value(CompanionPrototypeSnapshot.decode(policy())),
           ),

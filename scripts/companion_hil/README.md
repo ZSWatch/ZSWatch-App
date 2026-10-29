@@ -257,39 +257,12 @@ the original SHA-256. Cleanup succeeded and the recording count remained zero.
 Artifacts are in `.companion-hil-runs/20261002-usb-file-reconnect/`.
 This does not prove BLE resumption on Android/iOS or native plugin behavior.
 
-## Existing Flutter/Nordic transfer baseline
+## Historical Flutter transfer baseline
 
-`zswatch_app/tool/companion_flutter_transfer_probe.dart` calls the existing
-`WatchService`, `BleConnectionService` and `FileSystemService`, including the
-normal SMP enable, two-second wait and service rediscovery. File transfers go
-through the unchanged `mcumgr_flutter` wrapper and Nordic's native transport.
-It starts no voice-sync/AI provider and deletes no watch recording.
-
-Build from `zswatch_app`, choosing the actual bonded address and one to four
-existing filenames (without `.zsw_opus`):
-
-```bash
-flutter build apk --debug --no-pub \
-  --target tool/companion_flutter_transfer_probe.dart \
-  --dart-define=HIL_WATCH_ADDRESS=VERIFIED_MAC \
-  --dart-define=HIL_RECORDINGS=EXISTING_FILENAME_1,EXISTING_FILENAME_2
-```
-
-Preserve the built APK under a run-specific path before another build. Install
-that saved file with targeted `adb -s "$ZSW_PHONE_SERIAL" install -r`; do not
-uninstall the app or clear its data. Launch, unlock the phone, and press **Run
-foreground transfer diagnostic**. Wait for protocol-ready state, not merely the
-return from `connectById`. The diagnostic writes unverified local receipts and
-`result.json` under the phone's private `app_flutter/companion-flutter-probe/`
-with a unique run directory. A 60-second caller timeout cancels through the
-existing wrapper and ends the batch rather than overlapping another transfer.
-
-Hash/read each selected source through USB SMP before the BLE run, with no USB
-filesystem traffic during the BLE transfers. Afterwards, compare each received
-file's bytes, length and SHA-256 with an independent USB read. Read real audio
-into host memory only; save metadata/hashes as evidence. `received_unverified`
-is not an integrity pass. Preserve failed trials and all watch originals.
-This diagnostic is a foreground SDK baseline, not a background/kill-recovery test.
+The old `companion_flutter_transfer_probe.dart` was removed with the retired
+Dart BLE owner. Android and iOS transfers now run through the native companion;
+use the native companion HIL flows below for current testing. Existing receipts
+under `.companion-hil-runs/` remain historical evidence.
 
 ## Android companion-presence prototype
 

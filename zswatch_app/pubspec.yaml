@@ -17,10 +17,7 @@ dependencies:
   fl_chart: ^0.69.2
   flutter_svg: ^2.0.10+1
 
-  # BLE Communication
-  flutter_blue_plus: ^2.0.2
-
-  # Firmware Updates (MCUmgr/SMP)
+  # Supplies the native MCUmgr/SMP SDKs; transport is owned by the companion.
   # Fork: https://github.com/ZSWatch/Flutter-nRF-Connect-Device-Manager
   # Included as a git submodule in ../Flutter-nRF-Connect-Device-Manager
   mcumgr_flutter:
@@ -43,7 +40,6 @@ dependencies:
   # HTTP / Networking
   http: ^1.2.2
   archive: ^4.0.0
-  xml: ^6.5.0
 
   # Permissions
   permission_handler: ^11.3.1
@@ -73,11 +69,7 @@ dependencies:
 
   # Speech-to-Text (offline Whisper inference)
   whisper_ggml_plus: ^1.3.5
-  whisper_ggml_plus_ffmpeg: ^1.0.0
   ffmpeg_kit_flutter_new_min: ^3.1.0
-
-  # Location (for GPS requests from watch)
-  geolocator: ^13.0.2
 
   # Local LLM inference (llama.cpp via fllama)
   # Git submodule (ZSWatch/fllama fork). Android only: iOS runs no local LLM.

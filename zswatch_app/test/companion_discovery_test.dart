@@ -6,9 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zswatch_app/data/models/companion_watch_selection.dart';
-import 'package:zswatch_app/providers/ble_providers.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/connection/scan_screen.dart';
 
@@ -79,7 +77,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith(
             (ref) => Stream.value(
               CompanionPrototypeSnapshot.decode({
@@ -94,15 +91,6 @@ void main() {
           ),
           companionConnectionPermissionsProvider.overrideWithValue(
             () => requestPermissions(),
-          ),
-          bleScannerProvider.overrideWith(
-            (ref) => throw StateError('No Flutter scanner'),
-          ),
-          bleConnectionServiceProvider.overrideWith(
-            (ref) => throw StateError('No Flutter GATT'),
-          ),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('No Dart protocol'),
           ),
         ],
         child: MaterialApp.router(routerConfig: router),
@@ -295,25 +283,6 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('PRIVATE_EXPIRED'), findsNothing);
-    },
-  );
-
-  test(
-    'native selection guards legacy scanner and adapter observers before plugin calls',
-    () async {
-      final container = ProviderContainer(
-        overrides: [nativeCompanionRuntimeProvider.overrideWithValue(true)],
-      );
-      addTearDown(container.dispose);
-      expect(() => container.read(bleScannerProvider), throwsStateError);
-      await expectLater(
-        container.read(bluetoothAdapterStateProvider.future),
-        throwsStateError,
-      );
-      await expectLater(
-        container.read(isScanningProvider.future),
-        throwsStateError,
-      );
     },
   );
 

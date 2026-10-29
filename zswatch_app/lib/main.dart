@@ -1,27 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:whisper_ggml_plus_ffmpeg/whisper_ggml_plus_ffmpeg.dart';
 
 import 'app.dart';
 import 'core/licenses/native_licenses.dart';
-import 'providers/companion_runtime_providers.dart';
 import 'services/background/companion_dart_worker.dart';
 
 @pragma('vm:entry-point')
 void companionWorkerMain() {
-  if (useNativeCompanionRuntime) {
-    startCompanionDartWorker();
-  }
+  startCompanionDartWorker();
 }
 
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
   registerNativeLicenses();
-
-  // Register Whisper FFmpeg converter for Ogg/Opus → WAV transcription support
-  if (!useNativeCompanionRuntime) WhisperFFmpegConverter.register();
 
   // Set preferred orientations (portrait only for mobile)
   await SystemChrome.setPreferredOrientations([

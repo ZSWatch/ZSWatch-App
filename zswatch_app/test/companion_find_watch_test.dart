@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/dashboard/companion_find_watch_button.dart';
 
@@ -71,9 +70,6 @@ void main() {
         overrides: [
           companionSnapshotProvider.overrideWith(
             (ref) => Stream.value(CompanionPrototypeSnapshot.decode(value)),
-          ),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('No Dart BLE owner'),
           ),
         ],
         child: const MaterialApp(

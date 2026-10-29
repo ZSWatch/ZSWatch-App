@@ -1,11 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../data/database/app_database.dart';
 import '../data/repositories/battery_repository.dart';
 import '../data/repositories/connection_analytics_repository.dart';
 import '../core/utils/lifecycle_logger.dart';
-import '../services/analytics/battery_storage_service.dart';
-import '../services/analytics/connection_analytics_service.dart';
 import 'foreground_service_providers.dart';
 import 'companion_runtime_providers.dart';
 import 'demo_mode_provider.dart';
@@ -23,17 +20,12 @@ export '../data/repositories/connection_analytics_repository.dart'
         ConnectionSegment,
         ConnectionSegmentType,
         ConnectionStats;
-export '../services/analytics/battery_storage_service.dart'
-    show batteryStorageServiceProvider;
-export '../services/analytics/connection_analytics_service.dart'
-    show connectionAnalyticsServiceProvider;
 export '../core/utils/lifecycle_logger.dart' show LifecycleLogEntry;
 export 'foreground_service_providers.dart' show foregroundServiceProvider;
 
 /// A committed native health/battery/connection change invalidates queries.
 /// Job progress and other high-volume snapshots do not recreate these providers.
 final companionTelemetryRevisionProvider = Provider<Object?>((ref) {
-  if (!ref.watch(nativeCompanionRuntimeProvider)) return null;
   return ref.watch(
     companionSnapshotProvider.select((value) {
       final s = value.valueOrNull;
@@ -54,8 +46,7 @@ final companionTelemetryRevisionProvider = Provider<Object?>((ref) {
 /// Android commits native SQLite writes. iOS hands durable native receipts to
 /// Flutter's sole Drift writer before acknowledging them.
 final companionTelemetryUpdatesProvider = Provider<void>((ref) {
-  if (!ref.watch(nativeCompanionRuntimeProvider) ||
-      ref.watch(demoModeProvider)) {
+  if (ref.watch(demoModeProvider)) {
     return;
   }
   final db = ref.watch(databaseProvider);
@@ -353,12 +344,6 @@ final currentWatchConnectionEventsProvider =
 /// Provider that ensures analytics services are initialized
 /// Should be watched in a top-level widget to start the services
 final analyticsServicesInitializedProvider = Provider<bool>((ref) {
-  if (ref.watch(nativeCompanionRuntimeProvider)) {
-    ref.watch(companionTelemetryUpdatesProvider);
-    return true; // Collection belongs to the native service, not this screen.
-  }
-  // Watch the services to ensure they're started
-  ref.watch(batteryStorageServiceProvider);
-  ref.watch(connectionAnalyticsServiceProvider);
-  return true;
+  ref.watch(companionTelemetryUpdatesProvider);
+  return true; // Collection belongs to the native service, not this screen.
 });

@@ -6,7 +6,6 @@ import 'package:zswatch_app/data/models/companion_recording.dart';
 import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/voice_memo_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/voice_memos/companion_voice_memos_view.dart';
 
@@ -31,14 +30,11 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => Stream.value(state)),
           companionRecordingImportsProvider.overrideWith(
             (ref) => Stream.value([]),
           ),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Dart BLE must remain closed'),
-          ),
+
           transcriptionEngineProvider.overrideWith(
             (ref) =>
                 throw StateError('Opening controls must not start inference'),

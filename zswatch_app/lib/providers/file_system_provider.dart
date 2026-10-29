@@ -3,15 +3,11 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-
 import '../data/models/fs_file_entry.dart';
-import '../services/filesystem/file_system_service.dart';
-import '../services/watch_service.dart';
-import 'watch_service_provider.dart';
+
 import 'companion_runtime_providers.dart';
 import '../data/models/companion_log_files.dart';
 
@@ -64,15 +60,11 @@ class FileSystemState {
 const _sentinel = Object();
 
 class FileSystemNotifier extends StateNotifier<FileSystemState> {
-  final FileSystemService _service;
-  final WatchService? _watchService;
-  final Future<CompanionLogFiles> Function(String? path)? _nativeInspect;
+  final Future<CompanionLogFiles> Function(String? path) _nativeInspect;
   final String? _cacheScope;
 
-  FileSystemNotifier(
-    this._service,
-    this._watchService, {
-    Future<CompanionLogFiles> Function(String? path)? nativeInspect,
+  FileSystemNotifier({
+    required Future<CompanionLogFiles> Function(String? path) nativeInspect,
     String? nativeAddress,
   }) : _nativeInspect = nativeInspect,
        _cacheScope = nativeAddress == null
@@ -85,60 +77,25 @@ class FileSystemNotifier extends StateNotifier<FileSystemState> {
   Future<void> refreshLogs() async {
     if (state.isLoadingLogs || state.downloadingPath != null) return;
     final native = _nativeInspect;
-    if (native != null) {
-      // The firmware exposes sizes, not a revision or content hash. A fresh
-      // listing cannot establish that a previously downloaded file is unchanged.
-      state = state.copyWith(
-        isLoadingLogs: true,
-        loadError: null,
-        downloadedPaths: const {},
-      );
-      try {
-        final result = await native(null);
-        if (mounted) {
-          state = state.copyWith(isLoadingLogs: false, logFiles: result.files);
-        }
-      } catch (error) {
-        if (mounted) {
-          state = state.copyWith(
-            isLoadingLogs: false,
-            loadError: error.toString(),
-          );
-        }
-      }
-      return;
-    }
-    final device = _watchService!.device;
-    if (device == null) {
-      state = state.copyWith(loadError: 'No device connected');
-      return;
-    }
 
-    state = state.copyWith(isLoadingLogs: true, loadError: null);
-    final smpGen = _watchService.connectionGeneration;
+    // The firmware exposes sizes, not a revision or content hash. A fresh
+    // listing cannot establish that a previously downloaded file is unchanged.
+    state = state.copyWith(
+      isLoadingLogs: true,
+      loadError: null,
+      downloadedPaths: const {},
+    );
     try {
-      await _watchService.enableSmp();
-      await Future<void>.delayed(const Duration(seconds: 2));
-      final smpReady = await _watchService.rediscoverServices();
-      if (!smpReady) {
-        throw Exception('SMP service did not become available');
+      final result = await native(null);
+      if (mounted) {
+        state = state.copyWith(isLoadingLogs: false, logFiles: result.files);
       }
-
-      final files = await _service.probeFiles(
-        FileSystemService.logDir,
-        FileSystemService.logFilePrefix,
-        FileSystemService.logFilesLimit,
-        device.remoteId.str,
-      );
-      state = state.copyWith(isLoadingLogs: false, logFiles: files);
-    } catch (e) {
-      _log('refreshLogs failed: $e');
-      state = state.copyWith(isLoadingLogs: false, loadError: e.toString());
-    } finally {
-      try {
-        await _watchService.disableSmpIfConnectionUnchanged(smpGen);
-      } catch (e) {
-        _log('Failed to disable SMP: $e');
+    } catch (error) {
+      if (mounted) {
+        state = state.copyWith(
+          isLoadingLogs: false,
+          loadError: error.toString(),
+        );
       }
     }
   }
@@ -150,82 +107,27 @@ class FileSystemNotifier extends StateNotifier<FileSystemState> {
   Future<void> downloadFile(FsFileEntry entry) async {
     if (state.downloadingPath != null || state.isLoadingLogs) return;
     final native = _nativeInspect;
-    if (native != null) {
-      state = state.copyWith(
-        downloadingPath: entry.path,
-        downloadProgress: 0.0,
-      );
-      try {
-        final result = await native(entry.path);
-        if (!mounted) return;
-        final localPath = await _saveToLocalStorage(
-          result.files.single.name,
-          result.bytes!,
-        );
-        if (mounted) {
-          state = state.copyWith(
-            downloadingPath: null,
-            downloadProgress: 0.0,
-            downloadedPaths: {...state.downloadedPaths, entry.path: localPath},
-          );
-        }
-      } catch (_) {
-        if (mounted) {
-          state = state.copyWith(downloadingPath: null, downloadProgress: 0.0);
-        }
-        rethrow;
-      }
-      return;
-    }
-
-    final device = _watchService!.device;
-    if (device == null) {
-      _log('No device connected');
-      return;
-    }
 
     state = state.copyWith(downloadingPath: entry.path, downloadProgress: 0.0);
-
-    final smpGen = _watchService.connectionGeneration;
     try {
-      _log('Enabling SMP server for file download');
-      await _watchService.enableSmp();
-      await Future<void>.delayed(const Duration(seconds: 2));
-      final smpReady = await _watchService.rediscoverServices();
-      if (!smpReady) {
-        throw Exception('SMP service did not become available');
+      final result = await native(entry.path);
+      if (!mounted) return;
+      final localPath = await _saveToLocalStorage(
+        result.files.single.name,
+        result.bytes!,
+      );
+      if (mounted) {
+        state = state.copyWith(
+          downloadingPath: null,
+          downloadProgress: 0.0,
+          downloadedPaths: {...state.downloadedPaths, entry.path: localPath},
+        );
       }
-
-      final data = await _service.downloadFile(
-        entry.path,
-        device.remoteId.str,
-        (progress) {
-          state = state.copyWith(downloadProgress: progress);
-        },
-      );
-
-      final localPath = await _saveToLocalStorage(entry.name, data);
-      _log('Saved to: $localPath');
-
-      final updated = Map<String, String>.from(state.downloadedPaths);
-      updated[entry.path] = localPath;
-
-      state = state.copyWith(
-        downloadingPath: null,
-        downloadProgress: 0.0,
-        downloadedPaths: updated,
-      );
-    } catch (e) {
-      _log('downloadFile failed: $e');
-      state = state.copyWith(downloadingPath: null, downloadProgress: 0.0);
+    } catch (_) {
+      if (mounted) {
+        state = state.copyWith(downloadingPath: null, downloadProgress: 0.0);
+      }
       rethrow;
-    } finally {
-      _log('Disabling SMP server');
-      try {
-        await _watchService.disableSmpIfConnectionUnchanged(smpGen);
-      } catch (e) {
-        _log('Failed to disable SMP: $e');
-      }
     }
   }
 
@@ -241,43 +143,29 @@ class FileSystemNotifier extends StateNotifier<FileSystemState> {
     await file.writeAsBytes(data);
     return file.path;
   }
-
-  void _log(String message) {
-    debugPrint('[FileSystem] $message');
-  }
 }
-
-final fileSystemServiceProvider = Provider<FileSystemService>((ref) {
-  return FileSystemService();
-});
 
 final fileSystemProvider =
     StateNotifierProvider<FileSystemNotifier, FileSystemState>((ref) {
-      final service = ref.watch(fileSystemServiceProvider);
-      if (ref.watch(nativeCompanionRuntimeProvider)) {
-        // Replacing the selected watch disposes in-flight UI state. Reconnects
-        // and unrelated status updates keep the same notifier; native generation
-        // fences still protect the service-owned SMP operation itself.
-        final address = ref.watch(
-          companionSnapshotProvider.select(
-            (snapshot) => snapshot.valueOrNull?.fields['address'] as String?,
-          ),
-        );
-        return FileSystemNotifier(
-          service,
-          null,
-          nativeAddress: address,
-          nativeInspect: (path) async {
-            final snapshot = ref.read(companionSnapshotProvider).requireValue;
-            if (!snapshot.protocolReady ||
-                snapshot.fields['address'] != address) {
-              throw StateError('Current Ready session required');
-            }
-            final client = ref.read(companionClientProvider);
-            final generation = await client.prepareShell(snapshot.generation);
-            return client.inspectLogs(generation, path: path);
-          },
-        );
-      }
-      return FileSystemNotifier(service, ref.watch(watchServiceProvider));
+      // Replacing the selected watch disposes in-flight UI state. Reconnects
+      // and unrelated status updates keep the same notifier; native generation
+      // fences still protect the service-owned SMP operation itself.
+      final address = ref.watch(
+        companionSnapshotProvider.select(
+          (snapshot) => snapshot.valueOrNull?.fields['address'] as String?,
+        ),
+      );
+      return FileSystemNotifier(
+        nativeAddress: address,
+        nativeInspect: (path) async {
+          final snapshot = ref.read(companionSnapshotProvider).requireValue;
+          if (!snapshot.protocolReady ||
+              snapshot.fields['address'] != address) {
+            throw StateError('Current Ready session required');
+          }
+          final client = ref.read(companionClientProvider);
+          final generation = await client.prepareShell(snapshot.generation);
+          return client.inspectLogs(generation, path: path);
+        },
+      );
     });

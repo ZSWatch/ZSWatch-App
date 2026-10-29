@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
-
 import '../services/background/companion_prototype_client.dart';
 import '../services/background/demo_companion_client.dart';
 import '../data/models/companion_recording.dart';
@@ -15,16 +14,6 @@ import 'watch_providers.dart' show databaseProvider;
 import 'demo_mode_provider.dart';
 import 'settings_providers.dart'
     show autoCreateActionsProvider, selectedProductivityCalendarIdProvider;
-
-/// Mobile UI observes the platform owner without creating a legacy BLE session.
-bool get useNativeCompanionRuntime =>
-    !kIsWeb &&
-    (defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS);
-
-final nativeCompanionRuntimeProvider = Provider<bool>((ref) {
-  return useNativeCompanionRuntime;
-});
 
 final companionClientProvider = Provider<CompanionPrototypeClient>((ref) {
   if (ref.watch(demoModeProvider)) {
@@ -121,9 +110,6 @@ final companionConnectionPermissionsProvider =
 
 final companionNotificationStatusProvider =
     FutureProvider.autoDispose<CompanionNotificationStatus>((ref) {
-      if (!ref.watch(nativeCompanionRuntimeProvider)) {
-        throw StateError('Native companion runtime is not selected');
-      }
       return ref.watch(companionClientProvider).notificationStatus();
     });
 
@@ -146,7 +132,6 @@ final companionRecordingsProvider =
 /// Keeps the native owner's auto-create setting and calendar in sync; the
 /// owner creates actions after the undo window without Flutter running.
 final companionVoiceActionsSyncProvider = Provider<void>((ref) {
-  if (!ref.watch(nativeCompanionRuntimeProvider)) return;
   final client = ref.watch(companionClientProvider);
   void sync() => unawaited(
     client
@@ -170,9 +155,6 @@ final companionVoiceActionsSyncProvider = Provider<void>((ref) {
 final companionSnapshotProvider = StreamProvider<CompanionPrototypeSnapshot>((
   ref,
 ) {
-  if (!ref.watch(nativeCompanionRuntimeProvider)) {
-    throw StateError('Native companion runtime is not selected');
-  }
   final values = StreamController<CompanionPrototypeSnapshot>();
   final observer = ref
       .watch(companionClientProvider)

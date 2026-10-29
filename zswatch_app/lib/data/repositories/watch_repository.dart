@@ -1,6 +1,4 @@
 import 'package:drift/drift.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-
 import '../database/app_database.dart';
 import '../models/watch.dart';
 import 'base_repository.dart';
@@ -138,28 +136,6 @@ class WatchRepository extends BaseRepository<Watch, WatchEntity> {
   /// Delete a watch and all associated data
   Future<void> deleteWatch(String watchId) async {
     await _db.deleteWatch(watchId);
-  }
-
-  /// Forget a watch completely (T115)
-  ///
-  /// This removes the watch from the database AND removes the BLE bond.
-  /// After calling this, the user will need to re-pair if they want to
-  /// use the watch again.
-  ///
-  /// Note: removeBond() only works on Android. On iOS, users must
-  /// manually forget the device in Bluetooth settings.
-  Future<void> forgetWatch(String watchId) async {
-    // First, remove the BLE bond
-    try {
-      final device = BluetoothDevice.fromId(watchId);
-      await device.removeBond();
-    } catch (e) {
-      // Bond removal may fail if device is not bonded or on iOS
-      // Continue with database deletion anyway
-    }
-
-    // Then delete from database
-    await deleteWatch(watchId);
   }
 
   /// Delete all watches

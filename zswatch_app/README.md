@@ -424,8 +424,7 @@ flutter build ios
 ## Dependencies
 
 ### Core
-- **flutter_blue_plus** - BLE communication
-- **mcumgr_flutter** - MCUmgr/SMP firmware updates
+- **mcumgr_flutter** - Supplies native MCUmgr/SMP SDKs
 - **flutter_riverpod** - State management
 - **drift** - SQLite database
 - **go_router** - Navigation
@@ -436,7 +435,7 @@ flutter build ios
 
 ### Networking
 - **http** - HTTP requests
-- **geolocator** - GPS location
+- Native Android/iOS companions own BLE, GPS, HTTP relay, and background work.
 
 See `pubspec.yaml` for complete list.
 

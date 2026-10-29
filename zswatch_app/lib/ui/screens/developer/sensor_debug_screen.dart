@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/sensor_fusion_data.dart';
 import '../../../data/models/sensor_reading.dart';
@@ -57,46 +56,27 @@ class _SensorDebugScreenState extends ConsumerState<SensorDebugScreen> {
   }
 
   Future<void> _initializeSensorService() async {
-    if (ref.read(nativeCompanionRuntimeProvider)) {
-      final service = SensorGattService.native(
-        ref.read(companionClientProvider),
-      );
-      _sensorService = service;
-      _sensorConnection = service.connectionChanges.listen((connected) {
-        if (!mounted) return;
-        setState(() {
-          if (!connected) {
-            for (final sub in _subscriptions.values) {
-              unawaited(sub?.cancel());
-            }
-            _subscriptions.clear();
-            unawaited(_fusionSubscription?.cancel());
-            _fusionSubscription = null;
-            _enabledSensors.updateAll((_, _) => false);
-            _fusionEnabled = false;
-            _latestFusionData = null;
-            _orientationOffset = null;
+    final service = SensorGattService.native(ref.read(companionClientProvider));
+    _sensorService = service;
+    _sensorConnection = service.connectionChanges.listen((connected) {
+      if (!mounted) return;
+      setState(() {
+        if (!connected) {
+          for (final sub in _subscriptions.values) {
+            unawaited(sub?.cancel());
           }
-        });
+          _subscriptions.clear();
+          unawaited(_fusionSubscription?.cancel());
+          _fusionSubscription = null;
+          _enabledSensors.updateAll((_, _) => false);
+          _fusionEnabled = false;
+          _latestFusionData = null;
+          _orientationOffset = null;
+        }
       });
-      await service.initializeNative();
-      if (mounted) setState(() {});
-      return;
-    }
-    final watchService = ref.read(watchServiceProvider);
-    final device = watchService.device;
-    if (device == null) return;
-
-    final services = watchService.services;
-    if (services == null || services.isEmpty) return;
-
-    _sensorService = SensorGattService(device);
-    final success = await _sensorService!.initialize(services);
-
-    if (success && mounted) {
-      setState(() {});
-      debugPrint('[SensorDebug] Sensor service initialized');
-    }
+    });
+    await service.initializeNative();
+    if (mounted) setState(() {});
   }
 
   @override

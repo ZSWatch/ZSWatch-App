@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/models/companion_shell_result.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/shell_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/developer/shell_screen.dart';
 
@@ -102,15 +101,9 @@ void main() {
   testWidgets(
     'existing native shell screen and disposal never use legacy BLE',
     (tester) async {
-      var legacy = 0;
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => Stream.value(ready)),
-          watchServiceProvider.overrideWith((ref) {
-            legacy++;
-            throw StateError('Legacy BLE owner');
-          }),
         ],
       );
       addTearDown(container.dispose);
@@ -129,7 +122,6 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
       expect(calls.map((c) => c.method), ['prepareShell', 'executeShell']);
-      expect(legacy, 0);
     },
   );
 
@@ -148,7 +140,6 @@ void main() {
     });
     final container = ProviderContainer(
       overrides: [
-        nativeCompanionRuntimeProvider.overrideWithValue(true),
         companionSnapshotProvider.overrideWith((ref) => Stream.value(ready)),
       ],
     );
@@ -177,7 +168,6 @@ void main() {
       });
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith((ref) => Stream.value(ready)),
         ],
       );
@@ -234,11 +224,7 @@ void main() {
     });
     final container = ProviderContainer(
       overrides: [
-        nativeCompanionRuntimeProvider.overrideWithValue(true),
         companionSnapshotProvider.overrideWith((ref) => states.stream),
-        watchServiceProvider.overrideWith(
-          (ref) => throw StateError('Legacy BLE owner'),
-        ),
       ],
     );
     addTearDown(container.dispose);
@@ -286,11 +272,7 @@ void main() {
   Future<void> openVoiceTest(WidgetTester tester) async {
     final container = ProviderContainer(
       overrides: [
-        nativeCompanionRuntimeProvider.overrideWithValue(true),
         companionSnapshotProvider.overrideWith((ref) => Stream.value(ready)),
-        watchServiceProvider.overrideWith(
-          (ref) => throw StateError('Legacy BLE owner'),
-        ),
       ],
     );
     addTearDown(container.dispose);

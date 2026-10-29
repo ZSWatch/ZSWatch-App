@@ -9,7 +9,6 @@ import 'package:zswatch_app/providers/ai_providers.dart';
 import 'package:zswatch_app/providers/openrouter_providers.dart';
 import 'package:zswatch_app/providers/settings_providers.dart';
 import 'package:zswatch_app/providers/voice_memo_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/services/voice_memo/transcription_engine.dart';
 import 'package:zswatch_app/ui/widgets/companion_voice_policy_tile.dart';
@@ -152,9 +151,7 @@ void main() {
           overrides: [
             _onDevice,
             companionSnapshotProvider.overrideWith((ref) => values.stream),
-            watchServiceProvider.overrideWith(
-              (ref) => throw StateError('No Dart BLE'),
-            ),
+
             transcriptionEngineTypeProvider.overrideWith(
               (ref) =>
                   TranscriptionEngineTypeNotifier(null)

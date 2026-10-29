@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../services/ai/voice_model_config.dart';
 import '../services/voice_memo/transcription_engine.dart';
 import 'ai_providers.dart';
@@ -16,8 +15,7 @@ import 'voice_memo_providers.dart';
 /// leaving on-device processing or adding a key needs no "Apply". Chat
 /// questions use the saved models also while automatic processing is off.
 final companionVoicePolicySyncProvider = Provider<void>((ref) {
-  if (!ref.watch(nativeCompanionRuntimeProvider) ||
-      ref.watch(demoModeProvider) ||
+  if (ref.watch(demoModeProvider) ||
       // Before the preferences load the config shows the defaults.
       ref.watch(sharedPreferencesProvider).valueOrNull == null) {
     return;

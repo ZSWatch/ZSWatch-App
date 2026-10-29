@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zswatch_app/data/models/companion_http_status.dart';
 import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/http_providers.dart';
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/settings/settings_screen.dart';
 
@@ -155,7 +154,6 @@ void main() {
     () async {
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith(
             (ref) => Stream.value(
               CompanionPrototypeSnapshot.decode({
@@ -170,9 +168,6 @@ void main() {
       await container.read(companionSnapshotProvider.future);
       expect(container.read(httpRelayEnabledProvider), true);
       expect(container.read(httpRelayPendingCountProvider), 2);
-      expect(container.read(httpRelayRecentRequestsProvider), isEmpty);
-      expect(() => container.read(httpRelayServiceProvider), throwsStateError);
-      expect(() => container.read(httpRelayNotifierProvider), throwsStateError);
     },
   );
 
@@ -182,16 +177,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
-          companionSnapshotProvider.overrideWith((ref) => values),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('No Dart BLE'),
-          ),
-          httpRelayServiceProvider.overrideWith(
-            (ref) => throw StateError('No Dart HTTP'),
-          ),
-        ],
+        overrides: [companionSnapshotProvider.overrideWith((ref) => values)],
         child: const MaterialApp(home: SettingsScreen()),
       ),
     );

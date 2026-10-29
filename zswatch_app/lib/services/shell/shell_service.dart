@@ -1,52 +1,19 @@
-import 'dart:async';
+import '../../data/models/companion_shell_result.dart';
 
-import 'package:flutter/foundation.dart';
-import 'package:mcumgr_flutter/mcumgr_flutter.dart';
-
-/// Service for executing shell commands on the watch via SMP (group 9).
-///
-/// Uses the mcumgr_flutter ShellManager which communicates over BLE
-/// using the SMP protocol.
+/// Executes shell commands through the native companion owner.
 class ShellService {
-  final Future<ShellCommandResult> Function(String)? _nativeExecute;
-  ShellService({Future<ShellCommandResult> Function(String)? nativeExecute})
-    : _nativeExecute = nativeExecute;
-  String? _deviceId;
+  final Future<CompanionShellResult> Function(String) _execute;
   bool _disposed = false;
+  ShellService({
+    required Future<CompanionShellResult> Function(String) nativeExecute,
+  }) : _execute = nativeExecute;
 
-  /// Set the device to communicate with.
-  void setDevice(String deviceId) {
-    if (_nativeExecute == null && _deviceId != null && _deviceId != deviceId) {
-      ShellManager.kill(_deviceId!);
-    }
-    _deviceId = deviceId;
-  }
-
-  /// Execute a shell command and return the result.
-  ///
-  /// Throws if no device is set or on communication error.
-  Future<ShellCommandResult> execute(String command) async {
+  Future<CompanionShellResult> execute(String command) async {
     if (_disposed) throw StateError('Shell service disposed');
-    if (_nativeExecute != null) return _nativeExecute(command);
-    final deviceId = _deviceId;
-    if (deviceId == null) {
-      throw StateError('No device connected for shell commands');
-    }
-
-    debugPrint('[ShellService] Execute: $command');
-    final result = await ShellManager.execute(deviceId, command);
-    debugPrint(
-      '[ShellService] Result (rc=${result.returnCode}): ${result.output.length} chars',
-    );
-    return result;
+    return _execute(command);
   }
 
   void dispose() {
-    if (_disposed) return;
     _disposed = true;
-    if (_deviceId != null) {
-      if (_nativeExecute == null) ShellManager.kill(_deviceId!);
-      _deviceId = null;
-    }
   }
 }

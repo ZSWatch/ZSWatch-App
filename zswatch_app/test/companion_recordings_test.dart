@@ -10,7 +10,6 @@ import 'package:zswatch_app/providers/companion_runtime_providers.dart';
 import 'package:zswatch_app/providers/companion_recording_import_providers.dart';
 import 'package:zswatch_app/providers/voice_memo_providers.dart';
 import 'package:zswatch_app/providers/watch_providers.dart' as database;
-import 'package:zswatch_app/providers/watch_service_provider.dart';
 import 'package:zswatch_app/services/background/companion_prototype_client.dart';
 import 'package:zswatch_app/ui/screens/voice_memos/voice_memos_screen.dart';
 
@@ -93,7 +92,6 @@ void main() {
           ProviderScope(
             key: ValueKey(preferSaved),
             overrides: [
-              nativeCompanionRuntimeProvider.overrideWithValue(true),
               companionSnapshotProvider.overrideWith(
                 (ref) => Stream.value(state),
               ),
@@ -119,9 +117,7 @@ void main() {
               database.databaseProvider.overrideWith(
                 (ref) => throw StateError('Unexpected DB'),
               ),
-              watchServiceProvider.overrideWith(
-                (ref) => throw StateError('Unexpected Dart BLE'),
-              ),
+
               transcriptionEngineProvider.overrideWith(
                 (ref) => throw StateError('Unexpected inference'),
               ),
@@ -237,7 +233,6 @@ void main() {
       final secondWatch = record(address: 'second-watch');
       final container = ProviderContainer(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionRecordingImportsProvider.overrideWith(
             (ref) => Stream.value([]),
           ),
@@ -302,7 +297,6 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            nativeCompanionRuntimeProvider.overrideWithValue(true),
             companionRecordingImportsProvider.overrideWith(
               (ref) => Stream.value([]),
             ),
@@ -312,12 +306,7 @@ void main() {
             database.databaseProvider.overrideWith(
               (ref) => throw StateError('Unexpected DB'),
             ),
-            watchServiceProvider.overrideWith(
-              (ref) => throw StateError('Unexpected Dart BLE'),
-            ),
-            voiceMemoSyncServiceProvider.overrideWith(
-              (ref) => throw StateError('Unexpected legacy sync'),
-            ),
+
             voiceMemoRepositoryProvider.overrideWith(
               (ref) => throw StateError('Unexpected repository'),
             ),
@@ -369,7 +358,6 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            nativeCompanionRuntimeProvider.overrideWithValue(true),
             companionSnapshotProvider.overrideWith(
               (ref) => Stream.value(state),
             ),
@@ -380,12 +368,7 @@ void main() {
               prepares++;
               return pending.future;
             }),
-            watchServiceProvider.overrideWith(
-              (ref) => throw StateError('Unexpected Dart BLE'),
-            ),
-            voiceMemoSyncServiceProvider.overrideWith(
-              (ref) => throw StateError('Unexpected sync'),
-            ),
+
             transcriptionEngineProvider.overrideWith(
               (ref) => throw StateError('Unexpected AI'),
             ),
@@ -428,7 +411,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          nativeCompanionRuntimeProvider.overrideWithValue(true),
           companionSnapshotProvider.overrideWith(
             (ref) =>
                 Stream.value(snapshot({identity(saved): saved}, ready: false)),
@@ -440,9 +422,7 @@ void main() {
             prepares++;
             throw StateError('invalid');
           }),
-          watchServiceProvider.overrideWith(
-            (ref) => throw StateError('Unexpected Dart BLE'),
-          ),
+
           transcriptionEngineProvider.overrideWith(
             (ref) => throw StateError('Unexpected AI'),
           ),
@@ -502,7 +482,6 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            nativeCompanionRuntimeProvider.overrideWithValue(true),
             companionSnapshotProvider.overrideWith(
               (ref) => Stream.value(
                 snapshot({identity(saved): saved}, ready: false),
@@ -517,9 +496,7 @@ void main() {
               prepares++;
               return stale.copyWith(sourceSha256: hash);
             }),
-            watchServiceProvider.overrideWith(
-              (ref) => throw StateError('Unexpected Dart BLE'),
-            ),
+
             transcriptionEngineProvider.overrideWith(
               (ref) => throw StateError('Unexpected AI'),
             ),
