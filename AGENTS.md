@@ -54,8 +54,8 @@ Root-level `*.md` planning/progress files are history. Current status lives in
 
 `ui/` (screens per feature, `go_router` routes in `AppRoutes`) → `providers/`
 (Riverpod, one file per domain) → `services/` (plain Dart classes exposing
-streams) → `data/` (Drift DB, models, repositories). `core/` holds constants
-(BLE UUIDs in `core/constants/ble_constants.dart`), extensions and theme.
+streams) → `data/` (Drift DB, models, repositories). `core/` holds constants,
+extensions and theme. BLE UUIDs live with the native companion transports.
 
 ## Conventions
 

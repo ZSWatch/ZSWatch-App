@@ -138,6 +138,7 @@ the pushed package when testing is complete.
 | `testFindWatch` | watch buzzes |
 | `testSyncTime` | sets the watch clock |
 | `testLogStreaming` | toggles watch log streaming; ends off |
+| `testLogCaptureSurvivesNavigationAndBackground` | verifies enabled state and buffered logs survive leaving the view and backgrounding; restores the initial logging preference |
 | `testSensorsStartStop` | starts/stops each sensor stream; ends all off |
 | `testWatchfaceApplyBundledBackground` | changes the watchface background |
 | `testWatchfaceResetToDefault` | resets the background to default |

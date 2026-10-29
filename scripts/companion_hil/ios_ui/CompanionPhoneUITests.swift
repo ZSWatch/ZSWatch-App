@@ -899,6 +899,38 @@ final class CompanionPhoneUITests: XCTestCase {
         try home()
     }
 
+    /// Log capture belongs to the native owner across navigation and background.
+    /// Restores the initial logging preference after the check.
+    func testLogCaptureSurvivesNavigationAndBackground() throws {
+        try openDeveloperRoute("Log Viewer", heading: "Log Viewer")
+        let toggle = app.switches.firstMatch
+        try require(toggle.waitForExistence(timeout: 15), "No log streaming switch")
+        let wasEnabled = isOn(toggle)
+        try flip(toggle, to: true)
+        let count = any("label MATCHES %@", "[1-9][0-9]* entries")
+        try require(count.waitForExistence(timeout: 30), "No received watch logs", capture: "logs-empty")
+        let before = Int(count.label.split(separator: " ").first ?? "") ?? 0
+        screenshot("logs-before-navigation")
+
+        try home()
+        try openDeveloperRoute("Shell", heading: "Shell")
+        try shell("app state", expect: "UI state:")
+        try openDeveloperRoute("Log Viewer", heading: "Log Viewer")
+        try require(toggle.waitForExistence(timeout: 15) && isOn(toggle), "Logging preference lost after navigation", capture: "logs-navigation")
+        try require(count.waitForExistence(timeout: 15), "Log buffer lost after navigation")
+        let afterNavigation = Int(count.label.split(separator: " ").first ?? "") ?? 0
+        try require(afterNavigation >= before, "Received logs disappeared after navigation")
+
+        try sendToBackground(for: Config.backgroundSeconds)
+        try require(toggle.waitForExistence(timeout: 15) && isOn(toggle), "Logging preference lost after background", capture: "logs-background")
+        try require(count.waitForExistence(timeout: 15), "Log buffer lost after background")
+        let afterBackground = Int(count.label.split(separator: " ").first ?? "") ?? 0
+        try require(afterBackground >= afterNavigation, "Received logs disappeared after background")
+        screenshot("logs-after-background")
+        try flip(toggle, to: wasEnabled)
+        try home()
+    }
+
     /// Developer > Sync Time. State: sets the watch clock.
     func testSyncTime() throws {
         try openRoute("Developer", heading: "Developer Tools")
