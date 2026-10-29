@@ -469,7 +469,11 @@ class NativePrototypeTransport(private val context: Context, private val handler
     // off, so it times out until the phone wakes. After one timeout, wait in a
     // background connect instead: the controller keeps that one going in Doze.
     private var backgroundConnect = false
-    val liveLogs = CompanionLiveLogs(PrototypeHub::publishLiveLog)
+    val liveLogs = CompanionLiveLogs(
+        initiallyRequested = store.control()["log_streaming"] == true,
+        persist = { enabled -> store.update("log_policy", mapOf("log_streaming" to enabled)) },
+        emit = PrototypeHub::publishLiveLog,
+    )
     internal val sensors = PrototypeSensors(PrototypeHub::publishSensor)
     private var sensorDescriptor: BluetoothGattDescriptor? = null
     internal fun setSensor(generation: Long, name: String, enabled: Boolean, done: (Result<Unit>) -> Unit) {
@@ -647,7 +651,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 retryDelay = 5000
                 timeSyncDeferred = false; recordingListDeferred = false
                 readInitialBattery(client, session)
-                command("GB({\"t\":\"log\",\"status\":false})")
+                if (store.control()["log_streaming"] == true) setLogStreaming(true)
                 syncTime()
                 requestDeviceInfo()
                 flushNotifications()

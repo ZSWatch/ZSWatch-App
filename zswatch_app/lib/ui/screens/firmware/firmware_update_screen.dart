@@ -1665,7 +1665,24 @@ class _ActionButtons extends ConsumerWidget {
                 child: const Text('Reset'),
               ),
               const SizedBox(width: AppTheme.spacingMd),
-              if (!native)
+              if (native)
+                FilledButton(
+                  onPressed: nativeStatus?.busy == true || !isConnected
+                      ? null
+                      : nativeStatus?.resource != null
+                      ? (nativeStatus!.indices.isEmpty
+                            ? (operationState.canStartFilesystemUpload
+                                  ? onStartFilesystem
+                                  : null)
+                            : (operationState.canStartBoth
+                                  ? onStartBoth
+                                  : null))
+                      : (operationState.canStartFirmwareUpdate
+                            ? onStartFirmware
+                            : null),
+                  child: const Text('Retry'),
+                )
+              else
                 FilledButton(
                   onPressed: isFsFailed && dfuState.status != DfuStatus.failed
                       ? (operationState.canStartFilesystemUpload

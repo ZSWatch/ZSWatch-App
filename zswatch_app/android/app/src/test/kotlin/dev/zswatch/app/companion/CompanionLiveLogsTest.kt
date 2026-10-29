@@ -49,14 +49,14 @@ class CompanionLiveLogsTest {
 
     @Test fun writeCompletionIsFencedByDisableAndDisconnect() {
         val events = mutableListOf<Map<String, Any?>>()
-        val capture = CompanionLiveLogs(events::add)
+        val capture = CompanionLiveLogs(emit = events::add)
         val completions = mutableListOf<() -> Unit>()
         val writes = mutableListOf<Boolean>()
         val write: (Boolean, () -> Unit) -> Unit = { enabled, done -> writes.add(enabled); completions.add(done) }
-        capture.receive("off"); assertTrue(events.isEmpty())
+        capture.receive("already enabled"); assertEquals(true, capture.state()["requested"])
         capture.request(true, write)
         assertEquals(true, capture.state()["pending"])
-        assertEquals(false, capture.state()["written"])
+        assertEquals(true, capture.state()["written"])
         capture.request(false, write)
         completions[0]()
         assertEquals(false, capture.state()["requested"])
@@ -66,10 +66,37 @@ class CompanionLiveLogsTest {
         capture.request(true, write); completions[2]()
         capture.receive("actual log")
         assertEquals("actual log", events.last()["message"])
-        capture.reset(); completions[2](); capture.receive("late log")
+        capture.reset(); completions[2]()
         assertEquals(false, capture.state()["written"])
         assertEquals("state", events.last()["kind"])
+        assertEquals(true, capture.state()["requested"])
         assertEquals(listOf(true, false, true), writes)
+    }
+
+    @Test fun detachedCaptureReplaysBoundedHistoryAndPersistsOnlyPolicy() {
+        val policies = mutableListOf<Boolean>()
+        val events = mutableListOf<Map<String, Any?>>()
+        val capture = CompanionLiveLogs(persist = policies::add, emit = events::add)
+        capture.request(true) { _, done -> done() }
+        repeat(1005) { capture.receive("log $it") }
+        capture.reset()
+        assertEquals(true, capture.state()["requested"])
+        assertEquals(false, capture.state()["written"])
+        val replay = capture.replay()
+        assertEquals(1001, replay.size)
+        assertEquals("state", replay.first()["kind"])
+        assertEquals("log 5", replay[1]["message"])
+        assertEquals("log 1004", replay.last()["message"])
+        assertTrue(replay.last()["utc_ms"] is Long)
+        assertEquals(listOf(true), policies)
+        val restored = CompanionLiveLogs(initiallyRequested = policies.last(), emit = {})
+        assertEquals(true, restored.state()["requested"])
+        restored.request(true) { enabled, done -> assertTrue(enabled); done() }
+        assertEquals(true, restored.state()["written"])
+        restored.request(false) { _, done -> done() }
+        restored.receive("trailing packet")
+        assertEquals(false, restored.state()["requested"])
+        assertEquals("trailing packet", restored.replay().last()["message"])
     }
 
     @Test fun missingLogTailExpiresWithoutExecutingJsonInsideAnActiveLog() {

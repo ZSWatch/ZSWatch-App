@@ -356,8 +356,10 @@ void main() {
         container.read(filesystemUploadStateProvider).bytesTransferred,
         10,
       );
-      expect(find.text('Uploading background'), findsOneWidget);
+      expect(find.textContaining('ETA calculating...'), findsOneWidget);
       expect(calls, isEmpty);
+      await tester.pumpWidget(const SizedBox());
+      container.dispose();
     },
   );
   testWidgets('process interruption remains visible when gallery reattaches', (

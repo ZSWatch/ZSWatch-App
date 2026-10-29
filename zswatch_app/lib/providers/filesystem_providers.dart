@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/filesystem_image.dart';
 import '../services/dfu/filesystem_upload_service.dart';
 import 'companion_runtime_providers.dart';
+import 'transfer_progress_providers.dart';
 
 /// Provider for the filesystem upload service singleton
 final filesystemUploadServiceProvider = Provider<FilesystemUploadService>((
@@ -25,6 +26,9 @@ final filesystemUploadStateProvider = Provider<FilesystemUploadState>((ref) {
   if (ref.watch(nativeCompanionRuntimeProvider)) {
     final snapshot = ref.watch(companionSnapshotProvider).valueOrNull;
     final status = ref.watch(companionWatchfaceStatusProvider).valueOrNull;
+    final rate = ref.watch(
+      nativeTransferRateProvider(NativeImageTransfer.watchface),
+    );
     if (status == null || status.address != snapshot?.fields['address']) {
       return const FilesystemUploadState();
     }
@@ -37,6 +41,8 @@ final filesystemUploadStateProvider = Provider<FilesystemUploadState>((ref) {
       progress: status.progress,
       bytesTransferred: status.current,
       totalBytes: status.total,
+      speedBytesPerSecond: rate.bytesPerSecond,
+      speedHistory: rate.history,
       imageName: status.name,
       errorMessage: status.error,
     );

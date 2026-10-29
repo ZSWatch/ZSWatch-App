@@ -316,7 +316,7 @@ private final class CompanionDiagnosticStream: NSObject, FlutterStreamHandler {
       self.registeredToken = stream
       if self.kind == "logs" {
         self.owner.logObserver = callback
-        callback(self.owner.logStreamingState)
+        self.owner.logReplay.forEach(callback)
       } else if self.kind == "sensors" {
         self.owner.sensors.observer = callback; self.owner.sensors.attached()
       } else { self.owner.trafficObserver = callback }

@@ -177,10 +177,9 @@ abstract class DfuState with _$DfuState {
 
   /// Human-readable speed
   String get formattedSpeed {
-    // During active upload, show "calculating..." instead of "--" when speed is 0
     if (speedBytesPerSecond == 0) {
-      if (status == DfuStatus.uploading && bytesTransferred > 0) {
-        return 'calculating...';
+      if (status == DfuStatus.uploading && totalBytes > 0) {
+        return speedHistory.isEmpty ? 'calculating...' : '0 B/s';
       }
       return '--';
     }
@@ -191,18 +190,22 @@ abstract class DfuState with _$DfuState {
   int? get estimatedSecondsRemaining {
     if (speedBytesPerSecond <= 0 || bytesTransferred >= totalBytes) return null;
     final remaining = totalBytes - bytesTransferred;
-    return (remaining / speedBytesPerSecond).round();
+    return (remaining / speedBytesPerSecond).ceil();
   }
 
   /// Human-readable time remaining
   String get formattedTimeRemaining {
+    if (status == DfuStatus.uploading &&
+        totalBytes > 0 &&
+        bytesTransferred >= totalBytes) {
+      return '0 sec';
+    }
     final seconds = estimatedSecondsRemaining;
     if (seconds == null) {
-      // During active upload, show "calculating..." instead of "--"
       if (status == DfuStatus.uploading &&
-          bytesTransferred > 0 &&
+          totalBytes > 0 &&
           speedBytesPerSecond == 0) {
-        return 'calculating...';
+        return speedHistory.isEmpty ? 'calculating...' : 'Waiting for data';
       }
       return '--';
     }

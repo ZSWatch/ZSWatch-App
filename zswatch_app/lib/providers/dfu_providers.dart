@@ -18,6 +18,7 @@ import '../services/dfu/dfu_service.dart';
 import '../services/dfu/firmware_manager.dart';
 import 'filesystem_providers.dart';
 import 'watch_service_provider.dart';
+import 'transfer_progress_providers.dart';
 
 part 'dfu_providers.freezed.dart';
 
@@ -116,6 +117,9 @@ final firmwareFilesystemStateProvider = Provider<FilesystemUploadState>((ref) {
   }
   final status = ref.watch(companionFirmwareStatusProvider).valueOrNull;
   final dismissed = ref.watch(_dismissedFirmwareProvider);
+  final rate = ref.watch(
+    nativeTransferRateProvider(NativeImageTransfer.firmware),
+  );
   if (status == null ||
       status.resource == null ||
       (!status.busy && status.id == dismissed)) {
@@ -132,6 +136,8 @@ final firmwareFilesystemStateProvider = Provider<FilesystemUploadState>((ref) {
     progress: status.total == 0 ? 0 : status.current / status.total,
     bytesTransferred: status.current,
     totalBytes: status.total,
+    speedBytesPerSecond: rate.bytesPerSecond,
+    speedHistory: rate.history,
     imageName: status.phase == 'resource_verifying'
         ? 'Verifying LVGL resources'
         : 'LVGL resources',
@@ -165,7 +171,13 @@ final dfuStateProvider = Provider<DfuState>((ref) {
               'The background service is unavailable during a firmware operation. The installed firmware is unverified. Reconnect and check the watch.',
         );
       }
-      return status!.dfuState;
+      final rate = ref.watch(
+        nativeTransferRateProvider(NativeImageTransfer.firmware),
+      );
+      return status!.dfuState.copyWith(
+        speedBytesPerSecond: rate.bytesPerSecond,
+        speedHistory: rate.history,
+      );
     }
     if (!local.isUpdating &&
         submitted != null &&
@@ -275,13 +287,26 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
   DfuNotifier(this._dfuService, this._firmwareManager, this._ref)
     : super(const DfuOperationState());
 
+  // A terminal native receipt releases admission for an explicit retry. Keep
+  // blocking when acceptance is still unknown or a prior snapshot is stale.
+  bool get _nativeReceiptPending {
+    final status = _ref.read(companionFirmwareStatusProvider).valueOrNull;
+    final receipt = _ref.read(_acceptedFirmwareProvider);
+    final submitted = _ref.read(_submittedFirmwareGenerationProvider);
+    if (receipt == null && submitted == null) return false;
+    return status == null ||
+        status.busy ||
+        (receipt != null
+            ? status.id != receipt.id
+            : status.generation != submitted);
+  }
+
   bool get _nativeSelectionBlocked =>
       _ref.read(nativeCompanionRuntimeProvider) &&
       (state.isAnyInProgress ||
           _ref.read(companionFirmwareStatusProvider).valueOrNull?.busy ==
               true ||
-          _ref.read(_acceptedFirmwareProvider) != null ||
-          _ref.read(_submittedFirmwareGenerationProvider) != null);
+          _nativeReceiptPending);
 
   /// Download firmware from a GitHub release asset
   Future<void> downloadReleaseAsset(
@@ -448,11 +473,8 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
   }) async {
     final nativeStatus = _ref.read(companionFirmwareStatusProvider);
     if (state.isAnyInProgress ||
-        _ref.read(_submittedFirmwareGenerationProvider) != null ||
-        _ref.read(_acceptedFirmwareProvider) != null ||
-        (nativeStatus.valueOrNull != null &&
-            nativeStatus.valueOrNull!.id !=
-                _ref.read(_dismissedFirmwareProvider))) {
+        _nativeReceiptPending ||
+        nativeStatus.valueOrNull?.busy == true) {
       return;
     }
     if (nativeStatus.hasError || nativeStatus.isLoading) {
@@ -475,6 +497,11 @@ class DfuNotifier extends StateNotifier<DfuOperationState> {
       return;
     }
     final address = snapshot.fields['address'];
+    _ref.read(_acceptedFirmwareProvider.notifier).state = null;
+    _ref.read(_submittedFirmwareGenerationProvider.notifier).state = null;
+    _ref
+        .read(_dismissedFirmwareProvider.notifier)
+        .dismiss(nativeStatus.valueOrNull?.id);
     final attempt = ++_nativeAttempt;
     state = state.copyWith(isUpdating: true, error: null);
     try {

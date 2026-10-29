@@ -323,13 +323,15 @@ class _UploadProgressBar extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               Text(
-                nativePhase == null
+                nativePhase == null || nativePhase == 'uploading'
                     ? '${uploadState.formattedSpeed} - ETA ${uploadState.formattedTimeRemaining}'
                     : nativePhase == 'preparing'
                     ? 'Preparing background'
                     : nativePhase == 'verifying'
                     ? 'Verifying background'
-                    : 'Uploading background',
+                    : nativePhase == 'resetting'
+                    ? 'Restoring default background'
+                    : 'Applying background',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],

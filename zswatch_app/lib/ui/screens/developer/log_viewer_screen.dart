@@ -336,10 +336,12 @@ class _LogStreamingBar extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 Text(
-                  streamingState.enabledOnWatch
-                      ? 'Enabled'
-                      : streamingState.pending
+                  streamingState.pending
                       ? 'Updating...'
+                      : streamingState.enabledOnWatch
+                      ? 'Enabled'
+                      : streamingState.requestedByApp
+                      ? 'Enabled — waiting for watch'
                       : 'Disabled',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppTheme.textSecondary,

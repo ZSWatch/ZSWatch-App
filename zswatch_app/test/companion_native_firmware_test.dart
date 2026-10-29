@@ -447,6 +447,75 @@ void main() {
       expect(calls.length, 2); // Reset only dismisses the UI receipt.
     },
   );
+  for (final phase in ['failed', 'cancelled']) {
+    test(
+      '$phase native update can retry the selected package without reset',
+      () async {
+        final states = StreamController<CompanionPrototypeSnapshot>();
+        final c = container(states.stream);
+        addTearDown(() async {
+          c.dispose();
+          await states.close();
+        });
+        await emit(c, states, snapshot());
+        final notifier = c.read(dfuNotifierProvider.notifier);
+        await notifier.loadLocalFile(manager.images.first.filePath);
+        await notifier.startUpdate();
+        await emit(
+          c,
+          states,
+          snapshot(
+            operation: firmware('uploading'),
+            generation: 9,
+            ready: false,
+          ),
+        );
+        await notifier.startUpdate();
+        expect(
+          calls.length,
+          2,
+        ); // A running upload still rejects duplicate starts.
+        await emit(
+          c,
+          states,
+          snapshot(operation: firmware(phase, unknown: true), generation: 11),
+        );
+        expect(c.read(dfuStateProvider).status, DfuStatus.failed);
+        messenger.setMockMethodCallHandler(channel, (call) async {
+          calls.add(call);
+          return call.method == 'prepareShell'
+              ? {'version': 1, 'prepared_from_generation': 11, 'generation': 12}
+              : {
+                  'version': 1,
+                  'accepted': true,
+                  'id': 'retry-dfu',
+                  'generation': 13,
+                };
+        });
+        await notifier.startUpdate();
+        expect(calls.map((call) => call.method), [
+          'prepareShell',
+          'startFirmware',
+          'prepareShell',
+          'startFirmware',
+        ]);
+        expect((calls.last.arguments as Map)['generation'], 12);
+        expect(c.read(dfuNotifierProvider).hasError, false);
+        expect(c.read(dfuStateProvider).status, DfuStatus.preparing);
+        await emit(
+          c,
+          states,
+          snapshot(
+            operation: firmware('uploading', id: 'retry-dfu', generation: 13),
+            generation: 13,
+            ready: false,
+          ),
+        );
+        expect(c.read(dfuStateProvider).status, DfuStatus.uploading);
+      },
+    );
+  }
+
   test(
     'reattached UI derives running operation and reset cannot clear it',
     () async {
@@ -876,12 +945,17 @@ void main() {
     expect(calls.map((call) => call.method), ['prepareShell', 'startFirmware']);
   });
   test(
-    'terminal results stay visible when the start receipt was lost',
+    'lost start receipts retain terminal results and allow an explicit retry',
     () async {
       messenger.setMockMethodCallHandler(channel, (call) async {
         calls.add(call);
         if (call.method == 'prepareShell') {
-          return {'version': 1, 'generation': 8, 'prepared_from_generation': 7};
+          final generation = (call.arguments as Map)['generation'] as int;
+          return {
+            'version': 1,
+            'generation': generation + 1,
+            'prepared_from_generation': generation,
+          };
         }
         throw const FormatException('Lost receipt');
       });
@@ -912,12 +986,12 @@ void main() {
           );
           expect(c.read(dfuStateProvider).status, outcome.value);
           await notifier.startUpdate();
-          expect(calls.length, callsBeforeResult);
+          expect(calls.length, callsBeforeResult + 2);
           notifier.reset();
           expect(c.read(dfuStateProvider).status, DfuStatus.idle);
           await notifier.loadLocalFile(manager.images.first.filePath);
           expect(c.read(dfuNotifierProvider).downloadedImage, isNotNull);
-          expect(calls.length, callsBeforeResult);
+          expect(calls.length, callsBeforeResult + 2);
         } finally {
           c.dispose();
           await states.close();
@@ -976,8 +1050,48 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
       expect(calls, isEmpty);
+      c.dispose(); // Dispose the externally owned rate timer before test teardown.
     },
   );
+  testWidgets('native failed upload exposes a working Retry button', (
+    tester,
+  ) async {
+    final states = StreamController<CompanionPrototypeSnapshot>();
+    final c = container(states.stream);
+    addTearDown(() async {
+      c.dispose();
+      await states.close();
+    });
+    states.add(snapshot());
+    await c.read(companionSnapshotProvider.future);
+    await c
+        .read(dfuNotifierProvider.notifier)
+        .loadLocalFile(manager.images.first.filePath);
+    expect(c.read(dfuStateProvider).status, DfuStatus.idle);
+    states.add(snapshot(operation: firmware('uploading')));
+    await tester.pump();
+    expect(c.read(dfuStateProvider).status, DfuStatus.uploading);
+    states.add(snapshot(operation: firmware('failed', unknown: true)));
+    await tester.pump();
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: const MaterialApp(home: FirmwareUpdateScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Retry'), findsOneWidget);
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Retry'));
+      // Allow the selected firmware's real file reads outside FakeAsync.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(calls.where((call) => call.method == 'startFirmware').length, 1);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+  });
+
   testWidgets(
     'native upload cancellation remains visible until explicit UI dismissal',
     (tester) async {

@@ -157,6 +157,9 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   private var logWriteToken = UUID()
   private var logWritePending = false
   private var logWritten = false
+  private var inferLogState = true
+  private var logHistory: [[String: Any]] = []
+  var logReplay: [[String: Any]] { [logStreamingState] + logHistory }
   var logStreamingState: [String: Any] {
     ["version": 1, "kind": "state", "generation": journal.generation,
      "requested": journal.fields["log_streaming"] as? Bool == true,
@@ -171,6 +174,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     let token = UUID(); logWriteToken = token
     let generation = journal.generation
     logWritePending = true
+    inferLogState = enabled
     logObserver?(logStreamingState)
     do {
       try send("GB({\"t\":\"log\",\"status\":\(enabled ? "true" : "false")})", done: { [weak self] in
@@ -184,6 +188,20 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
       logObserver?(logStreamingState)
       throw error
     }
+  }
+  private func receiveLog(_ message: String, generation: Int) {
+    // The watch may retain logging across a disconnect, even if Flutter has
+    // never opened the viewer. Infer that state without dropping its logs.
+    if !logWritePending, inferLogState, journal.fields["log_streaming"] as? Bool != true {
+      try? journal.update("log_policy_observed", ["log_streaming": true])
+      logWritten = true
+      logObserver?(logStreamingState)
+    }
+    let event: [String: Any] = ["version": 1, "kind": "log", "generation": generation,
+      "utc_ms": CompanionJournal.now, "message": message]
+    logHistory.append(event)
+    if logHistory.count > 1000 { logHistory.removeFirst(logHistory.count - 1000) }
+    logObserver?(event)
   }
   var trafficObserver: (([String: Any]) -> Void)?
 
@@ -614,7 +632,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   private func closeLink() {
     phase = "disconnected"
     restoredConnectionWaitingForPower = false
-    logWriteToken = UUID(); logWritePending = false; logWritten = false
+    logWriteToken = UUID(); logWritePending = false; logWritten = false; inferLogState = true
     logObserver?(logStreamingState)
     gpsRequested = false; gpsToken = UUID()
     http.close(); gps.close()
@@ -777,7 +795,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
         "size_bytes": self.framer.lastMessageData.count, "chunk_count": self.framer.lastMessageChunks])
       self.receiveMessage($0)
     }, logger: {
-      self.logObserver?(["version": 1, "kind": "log", "generation": generation, "utc_ms": CompanionJournal.now, "message": $0])
+      self.receiveLog($0, generation: generation)
     })
   }
 
