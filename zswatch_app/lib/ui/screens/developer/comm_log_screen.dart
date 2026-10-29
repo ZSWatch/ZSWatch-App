@@ -169,8 +169,20 @@ class _CommLogScreenState extends ConsumerState<CommLogScreen> {
           IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: 'Clear log',
-            onPressed: () {
-              ref.read(commLogRepositoryProvider.notifier).clear();
+            onPressed: () async {
+              try {
+                await ref.read(commLogRepositoryProvider.notifier).clear();
+              } catch (error) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Could not clear communication log: $error',
+                      ),
+                    ),
+                  );
+                }
+              }
             },
           ),
 

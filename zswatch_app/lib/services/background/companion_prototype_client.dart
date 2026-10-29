@@ -241,8 +241,8 @@ class CompanionPrototypeClient {
     return reply['bytes'] as Uint8List;
   }
 
-  /// Ephemeral completed NUS writes and reassembled protocol messages. Opening
-  /// this stream observes the existing owner; it neither enables logs nor BLE.
+  /// Recent completed NUS writes and reassembled protocol messages, followed by
+  /// live traffic. The native owner captures history without a Flutter listener.
   Stream<Map<String, Object?>> communicationTraffic() =>
       const EventChannel(
         'dev.zswatch.app/companion_traffic_v1',
@@ -262,6 +262,12 @@ class CompanionPrototypeClient {
         }
         return Map<String, Object?>.from(event);
       });
+
+  Future<void> clearCommunicationTraffic() async {
+    await methods.invokeMethod<Object?>('clearCommunicationTraffic', {
+      'version': 1,
+    });
+  }
 
   Future<CompanionWatchSelection> discoverWatch() async =>
       CompanionWatchSelection.decode(

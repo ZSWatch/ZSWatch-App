@@ -1034,7 +1034,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         if (item.advance()) {
             writes.remove()
             // Observe completed NUS writes, never queued or failed attempts.
-            if (PrototypeHub.trafficObservers.isNotEmpty()) PrototypeHub.publishTraffic("tx",
+            PrototypeHub.publishTraffic("tx",
                 item.bytes.toString(Charsets.UTF_8), item.bytes.size, item.chunkCount, token)
             item.done()
         }
@@ -1092,7 +1092,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         for (text in frames) {
             // The existing framer has already removed firmware logs and joined
             // split UTF-8/JSON. Diagnostic capture does not participate in parsing.
-            if (PrototypeHub.trafficObservers.isNotEmpty()) PrototypeHub.publishTraffic("rx",
+            PrototypeHub.publishTraffic("rx",
                 text, text.toByteArray(Charsets.UTF_8).size, 1, token)
             val message = JSONObject(text)
             // A notification may precede the CCCD completion callback. Readiness

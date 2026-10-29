@@ -885,7 +885,7 @@ void main() {
   });
 
   testWidgets(
-    'existing Comm Log observes native protocol traffic and detaches',
+    'Comm Log retains traffic while closed and clears native history',
     (tester) async {
       await mount(tester, snapshot(active: true, ready: true));
       router(tester).go(AppRoutes.developer);
@@ -921,19 +921,19 @@ void main() {
       expect(entries.last.chunkCount, 2);
       expect(entries.last.timestamp.millisecondsSinceEpoch, 1700000000123);
       expect(scope.read(commLogStatsProvider).totalTxBytes, 11);
-      scope.read(commLogRepositoryProvider.notifier).clear();
+      await scope.read(commLogRepositoryProvider.notifier).clear();
       expect(scope.read(commLogEntriesProvider), isEmpty);
       router(tester).pop();
       await tester.pumpAndSettle();
-      expect(trafficSubscriptions, ['listen', 'cancel']);
+      expect(trafficSubscriptions, ['listen']);
       expect(
-        calls.length,
-        before,
-      ); // Observing/closing neither commands nor stops BLE.
+        calls.skip(before).map((call) => call.method),
+        ['clearCommunicationTraffic'],
+      ); // Only Clear commands the native history; observation never stops BLE.
       await tester.tap(find.text('Comm Log'));
       await tester.pumpAndSettle();
       expect(scope.read(commLogEntriesProvider), isEmpty);
-      expect(trafficSubscriptions, ['listen', 'cancel', 'listen']);
+      expect(trafficSubscriptions, ['listen']);
     },
   );
 

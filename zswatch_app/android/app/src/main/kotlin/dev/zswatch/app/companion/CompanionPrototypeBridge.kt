@@ -87,6 +87,10 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                         }
                     } catch (error: Exception) { PrototypeHub.main.post { result.error("SENSOR_FAILED", error.message, null) } }
                 }
+                "clearCommunicationTraffic" -> PrototypeHub.worker.post {
+                    PrototypeHub.traffic.clear()
+                    PrototypeHub.main.post { result.success(null) }
+                }
                 "setLogStreaming" -> PrototypeHub.worker.post {
                     try {
                         val enabled = call.argument<Boolean>("enabled") ?: error("Boolean enabled required")
@@ -573,7 +577,14 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                 }
                 trafficSink = eventSink
                 PrototypeHub.worker.post {
-                    if (trafficSink === eventSink) PrototypeHub.trafficObservers.add(trafficChanged)
+                    if (trafficSink !== eventSink) return@post
+                    PrototypeHub.trafficObservers.add(trafficChanged)
+                    val history = PrototypeHub.traffic.replay()
+                    // Replay is already bounded. Deliver it in one queued task,
+                    // outside the live-event queue's 64-message overflow guard.
+                    PrototypeHub.main.post {
+                        if (trafficSink === eventSink) history.forEach(eventSink::success)
+                    }
                 }
             }
             override fun onCancel(arguments: Any?) { detachTraffic() }

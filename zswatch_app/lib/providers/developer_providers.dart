@@ -176,11 +176,11 @@ final filteredLogEntriesProvider = Provider<List<LogEntry>>((ref) {
 /// Provider for the communication log repository
 /// Projects the native companion traffic stream.
 final commLogRepositoryProvider =
-    StateNotifierProvider.autoDispose<CommLogNotifier, List<CommLogEntry>>((
-      ref,
-    ) {
+    StateNotifierProvider<CommLogNotifier, List<CommLogEntry>>((ref) {
+      final client = ref.watch(companionClientProvider);
       return CommLogNotifier.native(
-        ref.watch(companionClientProvider).communicationTraffic(),
+        client.communicationTraffic(),
+        clearNative: client.clearCommunicationTraffic,
       );
     });
 
@@ -190,8 +190,13 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
 
   StreamSubscription<Map<String, Object?>>? _nativeSubscription;
   int _nativeId = 1;
+  final Future<void> Function() _clearNative;
 
-  CommLogNotifier.native(Stream<Map<String, Object?>> events) : super([]) {
+  CommLogNotifier.native(
+    Stream<Map<String, Object?>> events, {
+    required Future<void> Function() clearNative,
+  }) : _clearNative = clearNative,
+       super([]) {
     _nativeSubscription = events.listen((event) {
       final chunks = event['chunk_count']! as int;
       _repo.add(
@@ -215,7 +220,8 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
 
   CommLogRepository get repository => _repo;
 
-  void clear() {
+  Future<void> clear() async {
+    await _clearNative();
     _repo.clear();
     state = [];
   }

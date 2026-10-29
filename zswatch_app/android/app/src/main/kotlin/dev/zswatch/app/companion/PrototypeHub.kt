@@ -17,14 +17,11 @@ object PrototypeHub {
     val logObservers = CopyOnWriteArraySet<(Map<String, Any?>) -> Unit>()
     fun publishLiveLog(event: Map<String, Any?>) { logObservers.forEach { it(event) } }
     val trafficObservers = CopyOnWriteArraySet<(Map<String, Any?>) -> Unit>()
+    val traffic = CompanionTraffic { event -> trafficObservers.forEach { it(event) } }
     val sensorObservers = CopyOnWriteArraySet<(Map<String, Any?>) -> Unit>()
     fun publishSensor(event: Map<String, Any?>) { sensorObservers.forEach { it(event) } }
     fun publishTraffic(direction: String, text: String, bytes: Int, chunks: Int, generation: Long) {
-        if (trafficObservers.isEmpty() || bytes > 65536) return
-        val event = mapOf("version" to 1, "direction" to direction, "data" to text,
-            "size_bytes" to bytes, "chunk_count" to chunks,
-            "utc_ms" to System.currentTimeMillis(), "generation" to generation)
-        trafficObservers.forEach { it(event) }
+        traffic.publish(direction, text, bytes, chunks, generation)
     }
     private val notifyPending = AtomicBoolean(false)
     /** Coalesce commit bursts (one BLE message commits many times) into one UI snapshot. */
