@@ -14,10 +14,11 @@ class RunnerTests: XCTestCase {
     XCTAssertEqual(traffic.replay.compactMap { $0["data"] as? String }, ["räven 🦊", "while detached"])
     XCTAssertEqual(traffic.replay.first?["utc_ms"] as? Int, 1234)
     XCTAssertEqual(traffic.replay.first?["chunk_count"] as? Int, 2)
-    traffic.clear()
+    XCTAssertEqual(traffic.clear(), 2)
     XCTAssertTrue(traffic.replay.isEmpty)
     traffic.append(first)
     XCTAssertEqual(traffic.replay.count, 1)
+    XCTAssertEqual(traffic.replay.first?["sequence"] as? Int, 3)
   }
 
   func testTrafficRotatesAtEntryAndByteLimits() {
@@ -29,8 +30,8 @@ class RunnerTests: XCTestCase {
     for index in 0..<81 { traffic.append(["data": "\(index)", "size_bytes": 65536]) }
     XCTAssertEqual(traffic.replay.count, 80)
     XCTAssertEqual(traffic.replay.first?["data"] as? String, "1")
-    XCTAssertFalse(traffic.append(["data": "oversized", "size_bytes": 65537]))
-    XCTAssertFalse(traffic.append(["data": "empty", "size_bytes": 0]))
+    XCTAssertNil(traffic.append(["data": "oversized", "size_bytes": 65537]))
+    XCTAssertNil(traffic.append(["data": "empty", "size_bytes": 0]))
     XCTAssertEqual(traffic.replay.count, 80)
   }
 

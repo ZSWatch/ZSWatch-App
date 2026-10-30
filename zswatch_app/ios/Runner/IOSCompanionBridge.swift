@@ -239,7 +239,7 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
         case "configureHttp":
           guard let enabled = args["enabled"] as? Bool else { throw CompanionFailure.invalid("HTTP policy required") }
           try owner.configureHttp(enabled); reply(owner.snapshot())
-        case "clearCommunicationTraffic": owner.traffic.clear(); reply(nil)
+        case "clearCommunicationTraffic": reply(["version": 1, "cleared_through": owner.traffic.clear()])
         case "setLogStreaming":
           guard let enabled = args["enabled"] as? Bool else { throw CompanionFailure.invalid("Log policy required") }
           try owner.setLogStreaming(enabled)

@@ -249,6 +249,8 @@ class CompanionPrototypeClient {
       ).receiveBroadcastStream({'version': 1}).map((event) {
         if (event is! Map ||
             event['version'] != 1 ||
+            event['sequence'] is! int ||
+            (event['sequence'] as int) < 1 ||
             !const ['rx', 'tx'].contains(event['direction']) ||
             event['data'] is! String ||
             event['size_bytes'] is! int ||
@@ -263,10 +265,19 @@ class CompanionPrototypeClient {
         return Map<String, Object?>.from(event);
       });
 
-  Future<void> clearCommunicationTraffic() async {
-    await methods.invokeMethod<Object?>('clearCommunicationTraffic', {
-      'version': 1,
-    });
+  /// Clear native history and return the sequence cutoff for in-flight events.
+  Future<int> clearCommunicationTraffic() async {
+    final reply = await methods.invokeMethod<Object?>(
+      'clearCommunicationTraffic',
+      {'version': 1},
+    );
+    if (reply is! Map ||
+        reply['version'] != 1 ||
+        reply['cleared_through'] is! int ||
+        (reply['cleared_through'] as int) < 0) {
+      throw const FormatException('Unsupported communication clear reply');
+    }
+    return reply['cleared_through'] as int;
   }
 
   Future<CompanionWatchSelection> discoverWatch() async =>

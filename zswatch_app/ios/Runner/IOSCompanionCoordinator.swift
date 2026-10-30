@@ -206,7 +206,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
   var trafficObserver: (([String: Any]) -> Void)?
   let traffic = CompanionTraffic()
   private func receiveTraffic(_ event: [String: Any]) {
-    if traffic.append(event) { trafficObserver?(event) }
+    if let captured = traffic.append(event) { trafficObserver?(captured) }
   }
 
   init(root: URL, restoredLaunch: Bool) {
