@@ -189,19 +189,23 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
   final CommLogRepository _repo = CommLogRepository();
 
   StreamSubscription<Map<String, Object?>>? _nativeSubscription;
-  int _nativeId = 1;
-  final Future<void> Function() _clearNative;
+  int _lastSequence = 0;
+  int _clearedThrough = 0;
+  final Future<int> Function() _clearNative;
 
   CommLogNotifier.native(
     Stream<Map<String, Object?>> events, {
-    required Future<void> Function() clearNative,
+    required Future<int> Function() clearNative,
   }) : _clearNative = clearNative,
        super([]) {
     _nativeSubscription = events.listen((event) {
+      final sequence = event['sequence']! as int;
+      if (sequence <= _clearedThrough || sequence <= _lastSequence) return;
+      _lastSequence = sequence;
       final chunks = event['chunk_count']! as int;
       _repo.add(
         CommLogEntry(
-          id: _nativeId++,
+          id: sequence,
           timestamp: DateTime.fromMillisecondsSinceEpoch(
             event['utc_ms']! as int,
           ),
@@ -220,10 +224,19 @@ class CommLogNotifier extends StateNotifier<List<CommLogEntry>> {
 
   CommLogRepository get repository => _repo;
 
+  /// Fence pre-clear deliveries while keeping traffic newer than the native cutoff.
   Future<void> clear() async {
-    await _clearNative();
+    final through = await _clearNative();
+    if (!mounted) return;
+    if (through > _clearedThrough) _clearedThrough = through;
+    final retained = _repo.entries
+        .where((entry) => entry.id > _clearedThrough)
+        .toList();
     _repo.clear();
-    state = [];
+    for (final entry in retained) {
+      _repo.add(entry);
+    }
+    state = _repo.entries;
   }
 
   @override

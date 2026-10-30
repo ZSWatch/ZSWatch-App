@@ -34,17 +34,8 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
         }
     }
     @Volatile private var trafficSink: EventChannel.EventSink? = null
-    private val pendingTraffic = AtomicInteger()
-    private val trafficChanged: (Map<String, Any?>) -> Unit = { event ->
-        val expected = trafficSink
-        if (expected != null) {
-            // A slow/closing UI must never grow the main queue or stall BLE.
-            if (pendingTraffic.incrementAndGet() <= 64) PrototypeHub.main.post {
-                try { if (trafficSink === expected) expected.success(event) }
-                finally { pendingTraffic.decrementAndGet() }
-            } else pendingTraffic.decrementAndGet()
-        }
-    }
+    private var trafficDelivery: CompanionTrafficDelivery? = null // Companion worker only.
+    private val trafficChanged: (Map<String, Any?>) -> Unit = { trafficDelivery?.changed() }
     @Volatile private var logSink: EventChannel.EventSink? = null
     private val logChanged: (Map<String, Any?>) -> Unit = { event ->
         val expected = logSink
@@ -88,8 +79,8 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                     } catch (error: Exception) { PrototypeHub.main.post { result.error("SENSOR_FAILED", error.message, null) } }
                 }
                 "clearCommunicationTraffic" -> PrototypeHub.worker.post {
-                    PrototypeHub.traffic.clear()
-                    PrototypeHub.main.post { result.success(null) }
+                    val through = PrototypeHub.traffic.clear()
+                    PrototypeHub.main.post { result.success(mapOf("version" to 1, "cleared_through" to through)) }
                 }
                 "setLogStreaming" -> PrototypeHub.worker.post {
                     try {
@@ -578,13 +569,16 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                 trafficSink = eventSink
                 PrototypeHub.worker.post {
                     if (trafficSink !== eventSink) return@post
-                    PrototypeHub.trafficObservers.add(trafficChanged)
-                    val history = PrototypeHub.traffic.replay()
-                    // Replay is already bounded. Deliver it in one queued task,
-                    // outside the live-event queue's 64-message overflow guard.
-                    PrototypeHub.main.post {
-                        if (trafficSink === eventSink) history.forEach(eventSink::success)
+                    trafficDelivery?.close()
+                    val delivery = CompanionTrafficDelivery(PrototypeHub.traffic) { batch, completed ->
+                        PrototypeHub.main.post {
+                            try { if (trafficSink === eventSink) batch.forEach(eventSink::success) }
+                            finally { PrototypeHub.worker.post { completed() } }
+                        }
                     }
+                    trafficDelivery = delivery
+                    PrototypeHub.trafficObservers.add(trafficChanged)
+                    delivery.changed()
                 }
             }
             override fun onCancel(arguments: Any?) { detachTraffic() }
@@ -629,7 +623,10 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
 
     private fun detachTraffic() {
         trafficSink = null
-        PrototypeHub.worker.post { PrototypeHub.trafficObservers.remove(trafficChanged) }
+        PrototypeHub.worker.post {
+            PrototypeHub.trafficObservers.remove(trafficChanged)
+            trafficDelivery?.close(); trafficDelivery = null
+        }
     }
 
     private fun detachSensors() {

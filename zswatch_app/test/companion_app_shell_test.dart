@@ -207,6 +207,9 @@ void main() {
     });
     messenger.setMockMethodCallHandler(methods, (call) async {
       calls.add(call);
+      if (call.method == 'clearCommunicationTraffic') {
+        return {'version': 1, 'cleared_through': 2};
+      }
       if (call.method == 'cloudCredential') {
         return {'version': 1, 'key': hasCloudKey ? 'fixture-key' : null};
       }
@@ -904,6 +907,7 @@ void main() {
           const StandardMethodCodec().encodeSuccessEnvelope({
             'version': 1,
             'direction': direction,
+            'sequence': direction == 'rx' ? 1 : 2,
             'data': 'räven 🦊',
             'size_bytes': 11,
             'chunk_count': direction == 'tx' ? 2 : 1,
