@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -636,20 +638,33 @@ class _ActionButtons extends ConsumerWidget {
         ? sha.substring(0, 7)
         : sha;
 
-    final savePath = await FilePicker.platform.saveFile(
-      dialogTitle: 'Save coredump.txt',
-      fileName: 'coredump_$suffix.txt',
-    );
+    try {
+      final bytes = Uint8List.fromList(utf8.encode(coredumpTxt));
+      final mobile =
+          defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS;
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save coredump.txt',
+        fileName: 'coredump_$suffix.txt',
+        // Mobile pickers write through the document provider. Desktop pickers
+        // return a path instead; macOS rejects the bytes argument.
+        bytes: mobile ? bytes : null,
+      );
+      if (savePath == null) return;
+      if (!mobile) await File(savePath).writeAsBytes(bytes);
 
-    if (savePath == null) return;
-    if (!context.mounted) return;
-
-    await File(savePath).writeAsString(coredumpTxt);
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Coredump saved to $savePath')));
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Coredump saved to $savePath')));
+      }
+    } catch (error, stack) {
+      debugPrint('[CrashReportScreen] Coredump export failed: $error\n$stack');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not export coredump: $error')),
+        );
+      }
     }
   }
 
