@@ -3,6 +3,7 @@ package dev.zswatch.app.companion
 import io.runtime.mcumgr.McuMgrErrorCode
 import io.runtime.mcumgr.exception.McuMgrException
 import io.runtime.mcumgr.exception.McuMgrErrorException
+import io.runtime.mcumgr.exception.McuMgrTimeoutException
 import io.runtime.mcumgr.response.HasReturnCode.GroupReturnCode
 import io.runtime.mcumgr.response.fs.McuMgrFsStatusResponse
 import org.junit.Assert.*
@@ -30,5 +31,13 @@ class PrototypeLogStatusTest {
     }
     @Test fun negativeSuccessfulSizeIsRejected() {
         assertTrue(PrototypeLogStatus.response(McuMgrFsStatusResponse().also { it.len = -1 }).isFailure)
+    }
+    @Test fun errorsKeepTheirMessageAndCauseInsteadOfAnObfuscatedClassName() {
+        for (error in listOf(McuMgrTimeoutException(), McuMgrException("connection lost"))) {
+            val failure = PrototypeLogStatus.failure(error).exceptionOrNull()!!
+            assertSame(error, failure.cause)
+            assertTrue(failure.message!!.startsWith("Watch file status failed: "))
+            assertTrue(failure.message!!.contains(error.message ?: "No response from watch"))
+        }
     }
 }

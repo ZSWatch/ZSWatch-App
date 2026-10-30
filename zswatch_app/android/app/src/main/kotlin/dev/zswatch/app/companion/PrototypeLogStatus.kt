@@ -17,7 +17,8 @@ internal object PrototypeLogStatus {
     }
     fun failure(error: McuMgrException): Result<Int?> =
         if (missing(error)) Result.success(null)
-        else Result.failure(IllegalStateException(error.javaClass.simpleName))
+        else Result.failure(IllegalStateException(
+            "Watch file status failed: ${error.message ?: "No response from watch"}", error))
 
     private fun missing(error: Throwable): Boolean {
         if (error !is McuMgrErrorException) return false

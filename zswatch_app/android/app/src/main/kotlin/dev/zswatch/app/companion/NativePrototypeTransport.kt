@@ -200,23 +200,32 @@ class NativePrototypeTransport(private val context: Context, private val handler
         owns = { generation -> runtime.owns(generation) && token == generation && store.control()["phase"] == "ready" },
         later = { delay, action -> handler.postDelayed(action, delay) },
         status = { path, done ->
-            FsManager(mcuTransport(store.control()["address"] as String, token)).status(path,
+            android.util.Log.i("ZSWCompanionFiles", "status_start path=$path")
+            DiagnosticFsManager(mcuTransport(store.control()["address"] as String, token)).status(path,
                 object : McuMgrCallback<McuMgrFsStatusResponse> {
                     override fun onResponse(response: McuMgrFsStatusResponse) { handler.post {
+                        android.util.Log.i("ZSWCompanionFiles", "status_response path=$path success=${response.isSuccess} size=${response.len}")
                         done(PrototypeLogStatus.response(response))
                     } }
                     override fun onError(error: McuMgrException) { handler.post {
+                        android.util.Log.w("ZSWCompanionFiles", "status_failed path=$path message=${error.message}")
                         done(PrototypeLogStatus.failure(error))
                     } }
                 })
         },
         download = { path, size, done ->
+            android.util.Log.i("ZSWCompanionFiles", "download_start path=$path size=$size")
             logTransfer = CheckedFsManager(mcuTransport(store.control()["address"] as String, token), size) { _, _, _ -> }
                 .fileDownload(path, object : DownloadCallback {
                     override fun onDownloadProgressChanged(current: Int, total: Int, timestamp: Long) {}
-                    override fun onDownloadCompleted(bytes: ByteArray) { handler.post { done(Result.success(bytes)) } }
+                    override fun onDownloadCompleted(bytes: ByteArray) { handler.post {
+                        android.util.Log.i("ZSWCompanionFiles", "download_complete path=$path size=${bytes.size}")
+                        done(Result.success(bytes))
+                    } }
                     override fun onDownloadFailed(error: McuMgrException) { handler.post {
-                        done(Result.failure(IllegalStateException(error.javaClass.simpleName)))
+                        android.util.Log.w("ZSWCompanionFiles", "download_failed path=$path message=${error.message}")
+                        done(Result.failure(IllegalStateException(
+                            "Watch file download failed: ${error.message ?: "No response from watch"}", error)))
                     } }
                     override fun onDownloadCanceled() { handler.post { done(Result.failure(IllegalStateException("Log download cancelled"))) } }
                 })
