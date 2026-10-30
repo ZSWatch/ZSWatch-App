@@ -4,6 +4,7 @@ import io.runtime.mcumgr.McuMgrErrorCode
 import io.runtime.mcumgr.exception.McuMgrException
 import io.runtime.mcumgr.exception.McuMgrErrorException
 import io.runtime.mcumgr.response.fs.McuMgrFsStatusResponse
+import java.io.IOException
 
 /** Nordic can deliver missing-file status as a response or an error callback. */
 internal object PrototypeLogStatus {
@@ -18,7 +19,13 @@ internal object PrototypeLogStatus {
     fun failure(error: McuMgrException): Result<Int?> =
         if (missing(error)) Result.success(null)
         else Result.failure(IllegalStateException(
-            "Watch file status failed: ${error.message ?: "No response from watch"}", error))
+            "Watch file status failed: ${failureMessage(error)}", error))
+
+    /** Decoder IOExceptions can quote file contents; keep those out of logs and UI errors. */
+    fun failureMessage(error: McuMgrException): String =
+        if (generateSequence<Throwable>(error) { it.cause }.any { it is IOException })
+            "Invalid file response from watch"
+        else error.message ?: "No response from watch"
 
     private fun missing(error: Throwable): Boolean {
         if (error !is McuMgrErrorException) return false

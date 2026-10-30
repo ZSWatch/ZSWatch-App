@@ -208,7 +208,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                         done(PrototypeLogStatus.response(response))
                     } }
                     override fun onError(error: McuMgrException) { handler.post {
-                        android.util.Log.w("ZSWCompanionFiles", "status_failed path=$path message=${error.message}")
+                        android.util.Log.w("ZSWCompanionFiles", "status_failed path=$path message=${PrototypeLogStatus.failureMessage(error)}")
                         done(PrototypeLogStatus.failure(error))
                     } }
                 })
@@ -223,9 +223,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
                         done(Result.success(bytes))
                     } }
                     override fun onDownloadFailed(error: McuMgrException) { handler.post {
-                        android.util.Log.w("ZSWCompanionFiles", "download_failed path=$path message=${error.message}")
+                        val message = PrototypeLogStatus.failureMessage(error)
+                        android.util.Log.w("ZSWCompanionFiles", "download_failed path=$path message=$message")
                         done(Result.failure(IllegalStateException(
-                            "Watch file download failed: ${error.message ?: "No response from watch"}", error)))
+                            "Watch file download failed: $message", error)))
                     } }
                     override fun onDownloadCanceled() { handler.post { done(Result.failure(IllegalStateException("Log download cancelled"))) } }
                 })
