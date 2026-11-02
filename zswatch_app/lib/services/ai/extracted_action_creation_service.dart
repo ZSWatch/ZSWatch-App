@@ -386,6 +386,34 @@ class ExtractedActionCreationService {
     });
   }
 
+  /// Adds a voice result's shopping items to the connected ICA list. The
+  /// native owner runs the request; no OS permission is involved.
+  Future<void> addCompanionShopping(
+    String jobId,
+    int index,
+    Map<Object?, Object?> action,
+  ) async {
+    await _channel.invokeMethod<void>('companionAction', {
+      'jobId': jobId,
+      'index': index,
+      'operation': 'create',
+      'draft': {
+        'actionType': 'shopping',
+        'title': action['title'],
+        'items': action['items'],
+        'skipUi': true,
+      },
+    });
+  }
+
+  Future<void> removeCompanionShopping(String jobId, int index) async {
+    await _channel.invokeMethod<void>('companionAction', {
+      'jobId': jobId,
+      'index': index,
+      'operation': 'undo',
+    });
+  }
+
   Future<void> undoCompanionAction(String jobId, int index) async {
     if (!Platform.isIOS) {
       await _ensurePermissions(ExtractedActionType.calendarEvent);

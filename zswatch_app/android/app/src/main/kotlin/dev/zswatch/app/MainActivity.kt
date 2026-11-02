@@ -18,6 +18,7 @@ import io.flutter.plugin.common.MethodChannel
 import dev.zswatch.app.companion.PrototypeHub
 import dev.zswatch.app.companion.PrototypeJobs
 import dev.zswatch.app.companion.CompanionVoiceActions
+import dev.zswatch.app.companion.IcaShoppingList
 import org.json.JSONObject
 
 /**
@@ -240,6 +241,19 @@ class MainActivity : FlutterActivity() {
                 val jobs = PrototypeJobs(PrototypeHub.jobJournal(applicationContext))
                 require(jobs.state(id).getJSONObject("spec").getString("watch_id") ==
                     PrototypeHub.journal(applicationContext).control()["address"])
+                val type = jobs.state(id).getJSONObject("result").getJSONArray("actions").getJSONObject(index).getString("type")
+                if (type == "shopping" && operation in listOf("create", "undo")) {
+                    fun reply(outcome: Result<Any?>) = PrototypeHub.main.post {
+                        outcome.fold(result::success) { failure ->
+                            Log.w(TAG, "Companion action $operation failed", failure)
+                            result.error((failure as? IcaShoppingList.IcaFailure)?.code ?: "ACTION_FAILED", failure.message, null)
+                        }
+                    }
+                    if (operation == "create") CompanionVoiceActions.createShopping(applicationContext, id, index,
+                        JSONObject(draft ?: error("Draft required"))) { reply(it) }
+                    else CompanionVoiceActions.undoShopping(applicationContext, id, index) { reply(it) }
+                    return@post
+                }
                 val response: Any? = when (operation) {
                     "dismiss" -> { jobs.dismissAction(id, index); null }
                     "undo" -> { CompanionVoiceActions.undoCreated(applicationContext, id, index); null }

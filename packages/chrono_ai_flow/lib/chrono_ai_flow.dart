@@ -3,5 +3,6 @@ export 'src/extraction_pipeline.dart';
 export 'src/models.dart';
 export 'src/prompt_template.dart';
 export 'src/parser.dart';
+export 'src/shopping_intent.dart';
 export 'src/time_expression_resolver.dart';
 export 'src/openrouter_request.dart';

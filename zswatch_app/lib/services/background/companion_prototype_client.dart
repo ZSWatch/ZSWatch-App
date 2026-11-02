@@ -14,6 +14,7 @@ import '../../data/models/companion_log_files.dart';
 import '../../data/models/companion_watchface_status.dart';
 import '../../data/models/companion_firmware_status.dart';
 import '../../data/models/crash_summary.dart';
+import '../../data/models/ica_status.dart';
 
 /// V1 snapshot survives UI attachment changes; events are diagnostic replay.
 class CompanionPrototypeSnapshot {
@@ -530,6 +531,24 @@ class CompanionPrototypeClient {
     final key = result is Map ? result['key'] : null;
     return key is String && key.isNotEmpty ? key : null;
   }
+
+  /// The ICA shopping-list connection held by the native owner, with the
+  /// user's lists. [session] comes from `IcaSessionService.finishEmailLogin`.
+  Future<IcaStatus> setIcaSession(Map<String, Object?> session) =>
+      _ica('setIcaSession', session);
+
+  Future<IcaStatus> clearIcaSession() => _ica('clearIcaSession', const {});
+
+  Future<IcaStatus> icaStatus() => _ica('icaStatus', const {});
+
+  /// Voice items go to the newest list, or to [listId] when [newest] is off.
+  Future<IcaStatus> setIcaTarget({required bool newest, String? listId}) =>
+      _ica('setIcaTarget', {'newest': newest, 'list_id': listId});
+
+  Future<IcaStatus> _ica(String method, Map<String, Object?> args) async =>
+      IcaStatus.decode(
+        await methods.invokeMethod<Object?>(method, {'version': 1, ...args}),
+      );
 
   /// Whether voice results create their actions when the undo window ends,
   /// and which Android calendar they go to.

@@ -213,7 +213,10 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
         (analyzerFactory?.call() ??
               LlmService(isCancelled: () => control.isCancelled))
           ..selectModel(models[1])
-          ..referenceTime = recording.timestampUtc.toLocal();
+          ..referenceTime = recording.timestampUtc.toLocal()
+          // The native owner holds the list credential and executes the add.
+          ..shoppingList =
+              (request['integrations'] as Map?)?['shopping_list'] == true;
     if (client != null) analyzer.useOpenRouter(client);
     llm = analyzer;
     if (!await analyzer.isModelDownloaded()) {
@@ -259,6 +262,7 @@ Future<Map<String, Object?>> processCompanionVoiceRecording(
             if (a.location != null) 'location': a.location,
             if (a.durationSeconds != null)
               'duration_seconds': a.durationSeconds,
+            if (a.items.isNotEmpty) 'items': a.items,
           },
       ],
     };

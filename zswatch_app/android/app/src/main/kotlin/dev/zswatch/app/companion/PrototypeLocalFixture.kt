@@ -192,7 +192,10 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
             }
             val input = if (real) mapOf("recording" to service.runtime!!.store.record(claim.spec.getString("recording_id")),
                 "transcript" to jobs.state(claim.id).optString("transcript").takeIf { it.isNotEmpty() }) +
-                (if (cloudKey != null) mapOf("credentials" to mapOf("openrouter_key" to cloudKey)) else emptyMap())
+                (if (cloudKey != null) mapOf("credentials" to mapOf("openrouter_key" to cloudKey)) else emptyMap()) +
+                // Only cloud analysis offers the shopping intent; the add itself runs here, not in Dart.
+                (if (cloudKey != null && IcaShoppingList(context).stored() != null)
+                    mapOf("integrations" to mapOf("shopping_list" to true)) else emptyMap())
                 else emptyMap()
             currentEngine.execute(claim, input, checkpoint = { text ->
                 running() && busy && execution == operation && jobs.checkpointTranscript(claim, System.currentTimeMillis() / 1000, text)

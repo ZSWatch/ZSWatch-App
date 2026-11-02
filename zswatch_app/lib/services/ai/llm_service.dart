@@ -131,7 +131,8 @@ class LlmServiceState {
 
 /// One extracted action from the LLM output.
 class ExtractedActionResult {
-  final String type; // "task", "calendar_event", "reminder", "timer", "alarm"
+  final String
+  type; // "task", "calendar_event", "reminder", "timer", "alarm", "shopping"
   final String title;
   final String? notes;
   final String? dueDate;
@@ -141,6 +142,9 @@ class ExtractedActionResult {
   /// Duration in seconds for timer intents.
   final int? durationSeconds;
 
+  /// Products for a shopping action; its title lists them for display.
+  final List<String> items;
+
   const ExtractedActionResult({
     required this.type,
     required this.title,
@@ -149,6 +153,7 @@ class ExtractedActionResult {
     this.startTime,
     this.location,
     this.durationSeconds,
+    this.items = const [],
   });
 }
 
@@ -252,6 +257,10 @@ class LlmService {
   /// minutes") resolve against it, not against when analysis runs.
   DateTime? referenceTime;
   DateTime get _now => referenceTime ?? DateTime.now();
+
+  /// A shopping list is connected. Cloud analysis then extracts products to
+  /// buy as a shopping action instead of a note.
+  bool shoppingList = false;
 
   void _checkCancelled() {
     if (_isCancelled?.call() == true) {
@@ -1294,7 +1303,10 @@ class LlmService {
 
   String _buildClassifyPrompt(String transcript, {int? effectiveCtx}) {
     const template = ChronoPromptTemplate.compactTemplate;
-    return _renderClassifyPromptTemplate(template, transcript: transcript);
+    return _renderClassifyPromptTemplate(
+      shoppingList && isCloud ? ShoppingIntent.addTo(template) : template,
+      transcript: transcript,
+    );
   }
 
   String _renderClassifyPromptTemplate(
@@ -1718,6 +1730,7 @@ JSON:
       }
       return first.title.isNotEmpty ? 'Alarm — ${first.title}' : 'Alarm';
     }
+    if (first.intent == ShoppingIntent.intent) return first.items.join(', ');
     return first.title.isNotEmpty ? first.title : raw.trim();
   }
 
@@ -1732,6 +1745,20 @@ JSON:
 
     final times = _pipeline.resolveTimes(extractions, _now);
     for (final (index, extraction) in extractions.indexed) {
+      if (extraction.intent == ShoppingIntent.intent) {
+        final title = extraction.items.join(', ');
+        actions.add(
+          ExtractedActionResult(
+            type: ShoppingIntent.intent,
+            title: title,
+            items: extraction.items,
+          ),
+        );
+        chronoDetails.add(
+          ActionChronoDebug(intent: extraction.intent, title: title),
+        );
+        continue;
+      }
       final title = extraction.title.isNotEmpty ? extraction.title : raw.trim();
 
       if (extraction.intent == 'note') {
@@ -1857,7 +1884,11 @@ JSON:
 
     // Try parsing via chrono parser first (handles both array and object)
     final arrayStr = _chronoLlmParser.extractFirstJsonArray(cleaned);
-    final extractions = _pipeline.extract(cleaned);
+    // Only a prompt with the shopping section may yield shopping items.
+    final extractions = _pipeline
+        .extract(cleaned)
+        .where((e) => shoppingList || e.intent != ShoppingIntent.intent)
+        .toList();
     if (extractions.isNotEmpty) {
       return _buildTranscriptResultFromChronoExtractions(extractions, raw);
     }

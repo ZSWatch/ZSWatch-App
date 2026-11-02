@@ -43,6 +43,7 @@ class ChronoExtractionPipeline {
   List<ChronoLlmExtraction> extract(String raw) => [
     for (final e in parser.parse(raw).extractions)
       if (e.title.isNotEmpty ||
+          e.items.isNotEmpty ||
           e.datetimeExpressionEnglish != null ||
           e.durationSeconds != null)
         if (e.intent == 'timer')
@@ -121,7 +122,12 @@ class ChronoExtractionPipeline {
     return parser
         .parse(raw)
         .extractions
-        .any((e) => foreign(e.title) || foreign(e.datetimeExpressionOriginal));
+        .any(
+          (e) =>
+              foreign(e.title) ||
+              foreign(e.datetimeExpressionOriginal) ||
+              e.items.any(foreign),
+        );
   }
 
   static List<String> _words(String text) => text

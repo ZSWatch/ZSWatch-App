@@ -296,6 +296,8 @@ class _FakeAnalyzer extends Fake implements LlmService {
   bool disposed = false;
   @override
   DateTime? referenceTime;
+  @override
+  bool shoppingList = false;
 
   @override
   void selectModel(String modelId) {}

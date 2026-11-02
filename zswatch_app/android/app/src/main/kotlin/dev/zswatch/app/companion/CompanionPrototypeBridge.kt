@@ -124,6 +124,23 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
                             "key" to if (call.method == "cloudCredential") key else null)) }
                     } catch (error: Exception) { PrototypeHub.main.post { result.error("CREDENTIAL_FAILED", error.message, null) } }
                 }
+                "setIcaSession", "clearIcaSession", "setIcaTarget", "icaStatus" -> IcaShoppingList.executor.execute {
+                    try {
+                        val ica = IcaShoppingList(context)
+                        val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                        when (call.method) {
+                            "setIcaSession" -> ica.store(IcaShoppingList.session(args, ica.stored(), System.currentTimeMillis()))
+                            "clearIcaSession" -> ica.clear()
+                            "setIcaTarget" -> ica.setTarget(args["newest"] as Boolean, args["list_id"] as? String)
+                        }
+                        val status = icaStatus(ica, lists = call.method != "clearIcaSession")
+                        PrototypeHub.main.post { result.success(status) }
+                    } catch (error: IcaShoppingList.IcaFailure) {
+                        PrototypeHub.main.post { result.error(error.code, error.message, null) }
+                    } catch (error: Exception) {
+                        PrototypeHub.main.post { result.error("ICA_FAILED", error.message, null) }
+                    }
+                }
                 "configureVoiceActions" -> PrototypeHub.worker.post {
                     try {
                         val args = call.arguments as Map<*, *>
@@ -635,6 +652,25 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
             PrototypeHub.sensorObservers.remove(sensorChanged)
             if (PrototypeHub.sensorObservers.isEmpty()) CompanionPrototypeService.instance?.transport?.stopSensors()
         }
+    }
+
+    /** Connection state and the user's lists, never the tokens. A list fetch failure keeps the session. */
+    private fun icaStatus(ica: IcaShoppingList, lists: Boolean): Map<String, Any?> {
+        val session = ica.stored() ?: return mapOf("version" to 1, "connected" to false)
+        val status = mutableMapOf<String, Any?>("version" to 1, "connected" to true,
+            "newest" to session.optBoolean("newest", true), "list_id" to session.opt("list_id")?.takeIf { it != org.json.JSONObject.NULL })
+        if (!lists) return status
+        try {
+            val all = ica.lists()
+            status["lists"] = all.map { mapOf("id" to it.id, "title" to it.title,
+                "items" to it.rows.count { row -> !row.checked }) }
+            status["target_id"] = ica.target(all)?.id
+        } catch (error: IcaShoppingList.IcaFailure) {
+            status["error"] = error.code
+        } catch (error: java.io.IOException) {
+            status["error"] = "ICA_OFFLINE"
+        }
+        return status
     }
 
     fun dispose() {
