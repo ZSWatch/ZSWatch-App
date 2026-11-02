@@ -265,9 +265,16 @@ final class CompanionVoiceJobs {
           transcriptionOnly ? summary.isEmpty && category.isEmpty && actions.isEmpty : !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
           (try canonical(result)).utf8.count <= 65536 else { throw CompanionFailure.invalid("Invalid voice result") }
     for action in actions {
-      guard let type = action["type"] as? String, ["task", "calendar_event", "reminder", "timer", "alarm"].contains(type),
+      guard let type = action["type"] as? String, ["task", "calendar_event", "reminder", "timer", "alarm", "shopping"].contains(type),
             let title = action["title"] as? String, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            Set(action.keys).isSubset(of: ["type", "title", "due_date", "start_time", "notes", "location", "duration_seconds"]) else { throw CompanionFailure.invalid("Invalid action draft") }
+            Set(action.keys).isSubset(of: ["type", "title", "due_date", "start_time", "notes", "location", "duration_seconds", "items"]),
+            (action["items"] != nil) == (type == "shopping") else { throw CompanionFailure.invalid("Invalid action draft") }
+      if let items = action["items"] {
+        guard let items = items as? [String], (1...IOSIcaShoppingList.maxItems).contains(items.count),
+              items.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.count <= 240 }) else {
+          throw CompanionFailure.invalid("Invalid shopping items")
+        }
+      }
       for key in ["due_date", "start_time", "notes", "location"] where action[key] != nil { guard action[key] is String else { throw CompanionFailure.invalid("Invalid action field") } }
       if action["duration_seconds"] != nil { guard let seconds = CompanionRecordingFiles.integer(action["duration_seconds"]), seconds > 0 else { throw CompanionFailure.invalid("Invalid action duration") } }
     }
