@@ -41,6 +41,15 @@ class PrototypeSmpPreparationTest {
         assertFalse(r.preparation.busy)
     }
 
+    @Test fun staticSmpServiceSkipsTheServiceChangedWait() {
+        val r = Rig(); r.state = r.state.copy(static = true); r.start()
+        // Still enabled, for older firmware that already had SMP registered.
+        assertEquals(1, r.enabled)
+        r.advance(0); assertEquals(listOf(7L), r.connections.map { it.first })
+        r.state = r.state.copy(available = true); r.advance(200)
+        assertEquals(7L, r.results.single().getOrThrow())
+    }
+
     @Test fun stopWatchReplacementAndStopThenStartRejectPreparation() {
         for (changed in listOf(PrototypeSmpSession(8, "watch", false, false, true),
             PrototypeSmpSession(8, "other", true, true, true),

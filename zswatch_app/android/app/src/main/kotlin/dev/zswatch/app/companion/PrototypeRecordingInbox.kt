@@ -3,17 +3,24 @@ package dev.zswatch.app.companion
 import org.json.JSONException
 import org.json.JSONObject
 
-/** Only list entries contain the timestamp stored in the recording's header. */
+/** "new" events and list entries both carry the timestamp stored in the recording's header. */
 class PrototypeRecordingInbox(
     private val store: PrototypeStore,
     private val deleteOnWatch: (String) -> Unit = {},
+    private val queued: () -> Unit = {},
     private val requestList: () -> Unit,
 ) {
     fun receive(message: JSONObject) {
         if (message.optString("t") != "voice_memo") return
         when (message.optString("action")) {
-            // Firmware's new-event timestamp is stop time, not the file's start time.
-            "new" -> requestList()
+            "new" -> {
+                // The event matches the file's list entry, so it is queued without
+                // asking for the list. Invalid metadata falls back to the list.
+                val direct = try { queue(message) == Queued.OK }
+                    catch (_: JSONException) { false }
+                    catch (_: IllegalArgumentException) { false }
+                if (direct) queued() else requestList()
+            }
             "list_result" -> {
                 val list = message.optJSONArray("recordings") ?: return
                 var skipped = 0

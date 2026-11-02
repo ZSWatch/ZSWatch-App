@@ -11,6 +11,8 @@ internal class PrototypeShellOperation(
     private val enable: (Long, () -> Unit) -> Unit,
     private val execute: (String, (Result<PrototypeShellReply>) -> Unit) -> Unit,
     private val release: (Long) -> Unit,
+    // Time for older firmware to register SMP after the enable command.
+    private val settle: () -> Long = { 2000L },
 ) {
     private class Request(val generation: Long, val command: String,
                           val done: (Result<PrototypeShellReply>) -> Unit) {
@@ -29,7 +31,7 @@ internal class PrototypeShellOperation(
         try {
             later(30000) { finish(entry, Result.failure(IllegalStateException("Shell command timed out"))) }
             enable(generation) {
-                if (current(entry)) later(2000) {
+                if (current(entry)) later(settle()) {
                     if (current(entry) && !entry.started) {
                         entry.started = true
                         try { execute(entry.command) { finish(entry, it) } }

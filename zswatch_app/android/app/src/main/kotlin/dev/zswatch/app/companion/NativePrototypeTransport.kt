@@ -57,7 +57,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
             PrototypeSmpSession((state["generation"] as Number).toLong(), state["address"] as? String,
                 state["desired_running"] == true,
                 runtime.owns(token) && state["phase"] == "ready",
-                fileTransport?.isReady == true)
+                fileTransport?.isReady == true, smpStatic)
         },
         later = { delay, action -> handler.postDelayed(action, delay) },
         enable = { command("GB({\"t\":\"smp\",\"status\":true})") },
@@ -90,7 +90,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
         { delay, action -> handler.postDelayed(action, delay) },
         { generation ->
             if (!closing && generation == token && runtime.owns(generation) &&
-                store.control()["phase"] == "ready" && !restart.busy && !smpPreparation.busy && !shellOperation.busy && !logFiles.busy && !watchface.busy && !firmwareBusy() && !downloading) safely {
+                store.control()["phase"] == "ready" && !restart.busy && !smpPreparation.busy && !shellOperation.busy && !logFiles.busy && !watchface.busy && !firmwareBusy() && !downloading && !smpStatic) safely {
                 val previous = fileTransport; fileTransport = null
                 previous?.release()
                 command("GB({\"t\":\"smp\",\"status\":false})")
@@ -104,6 +104,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
             smpIdleLease.hold(generation)
             if (warm) enabled() else command("GB({\"t\":\"smp\",\"status\":true})", enabled)
         },
+        settle = { if (smpStatic) 0L else 2000L },
         execute = { text, done ->
             val generation = token
             val parts = text.trim().split(Regex("\\s+"))
@@ -501,6 +502,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var servicesHandled = false
     private var servicesStale = false
     private var rediscovering = false
+    // Newer firmware keeps SMP registered, so the service is already in the
+    // first discovery and enabling it needs no wait for Service Changed.
+    // Older firmware registers it on demand and sends Service Changed.
+    private var smpStatic = false
     private var discoveryAddress: String? = null
     private val discoveryRecovery = PrototypeDiscoveryRecovery<BluetoothGatt>(
         current = { session, client -> runtime.owns(session) && gatt === client &&
@@ -512,7 +517,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
     )
     private var bonding: PrototypeBonding? = null
     private var bondReceiver: BroadcastReceiver? = null
-    private val recordingInbox = PrototypeRecordingInbox(store, { deleteRecordingOnWatch(it) }) {
+    private val recordingInbox = PrototypeRecordingInbox(store, { deleteRecordingOnWatch(it) },
+        { handler.post { if (runtime.owns(token)) safely { downloadNext() } } }) {
         // Subscription completion always requests a list, including for early hints.
         if (store.control()["phase"] == "ready") requestRecordings(deferIfFull = true)
     }
@@ -523,6 +529,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private var writing = false
     private var noResponse = false
     private var fileTransport: McuMgrBleTransport? = null
+    // Callers waiting for warmSmp() to open the SDK connection, null when idle.
+    private var smpWarming: MutableList<() -> Unit>? = null
     private var transfer: TransferController? = null
     private var downloading = false
     private var fileOperation = 0L
@@ -602,8 +610,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
                     discover(client, session)
                     return@accept
                 }
-                // The watch adds/removes its SMP service around every SMP use.
+                // Older firmware adds/removes its SMP service around every SMP use.
                 // Rediscover on this link; the Nordic SDK has its own client.
+                smpStatic = false
                 servicesStale = true
                 pump()
             }
@@ -651,6 +660,8 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 if (descriptor.characteristic.uuid != RX || store.control()["phase"] != "subscribing") return@accept
                 check(status == BluetoothGatt.GATT_SUCCESS) { "CCCD write failed: $status" }
                 operation++
+                smpStatic = client.getService(SMP_SERVICE) != null
+                android.util.Log.i("ZSWCompanionBle", "smp_static session=$session static=$smpStatic")
                 runtime.phase(session, "ready")
                 discoveryRecovery.reset()
                 sensors.reset(session, PrototypeSensors.specs.filter { spec ->
@@ -668,6 +679,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                 requestRecordings()
                 recoverReceipts()
                 downloadNext()
+                warmSmp()
                 mediaReady(session)
                 gpsReady(session)
                 firmwareReady(address)
@@ -795,6 +807,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     private fun refreshStaleGatt(session: Long) {
         if (!runtime.owns(session) || smpRefreshAttempts >= 2) return
         smpRefreshAttempts++
+        smpStatic = false
         val client = gatt ?: return
         val refreshed = runCatching {
             client.javaClass.getMethod("refresh").invoke(client) as Boolean
@@ -1204,6 +1217,31 @@ class NativePrototypeTransport(private val context: Context, private val handler
         }
     }
 
+    /**
+     * Opens the SDK connection ahead of the first transfer when the watch keeps
+     * SMP registered (MTU exchange and CCCD write take about 2 s at the idle
+     * interval), then runs [then]. It stays open until the link drops.
+     */
+    private fun warmSmp(then: () -> Unit = {}) {
+        smpWarming?.let { it.add(then); return }
+        if (!smpStatic || fileTransport?.isReady == true || firmwareBusy() || !runtime.owns(token) ||
+            store.control()["phase"] != "ready") { then(); return }
+        val waiters = mutableListOf(then)
+        smpWarming = waiters
+        val session = token
+        mcuTransport(store.control()["address"] as String, session).connect(object : McuMgrTransport.ConnectionCallback {
+            // A failure is reported again, and handled, by the transfer that follows.
+            private fun finish() { handler.post {
+                if (smpWarming !== waiters) return@post
+                smpWarming = null
+                if (runtime.owns(session)) safely { waiters.forEach { it() } }
+            } }
+            override fun onConnected() = finish()
+            override fun onDeferred() = finish()
+            override fun onError(error: Throwable) = finish()
+        })
+    }
+
     private fun downloadNext() {
         if (restart.busy) return
         if (firmwareBusy() || downloading || shellOperation.busy || logFiles.busy || watchface.busy || smpPreparation.busy || !runtime.owns(token) || store.control()["phase"] != "ready") return
@@ -1218,7 +1256,12 @@ class NativePrototypeTransport(private val context: Context, private val handler
         val session = token
         val transferId = ++fileOperation
         store.putRecord(key, metadata + mapOf("state" to "downloading"))
-        command("GB({\"t\":\"smp\",\"status\":true})") {
+        // SMP found in this connection's discovery is there to stay: newer firmware
+        // never unregisters it, so there is nothing to enable or wait for.
+        val enableSmp: (() -> Unit) -> Unit = if (smpStatic) { start -> warmSmp(start) } else { start ->
+            command("GB({\"t\":\"smp\",\"status\":true})", start)
+        }
+        enableSmp {
             handler.postDelayed({
                 if (runtime.owns(session) && downloading && fileOperation == transferId) safely {
                     val transport = mcuTransport(address, session)
@@ -1298,6 +1341,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                                         return
                                     }
                                 store.putRecord(key, receipt)
+                                CompanionPrototypeService.instance?.localFixture?.runNow()
                                 // Free the watch only when the phone copy matches the watch's hash.
                                 if (verified) deleteRecordingOnWatch(metadata["filename"] as String)
                                 finishFile(key, receipt, null)
@@ -1318,7 +1362,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
                         }
                     }, 300000)
                 }
-            }, 2000)
+            }, if (smpStatic) 0L else 2000L)
         }
     }
 
@@ -1339,8 +1383,12 @@ class NativePrototypeTransport(private val context: Context, private val handler
             if ((store.control()["recording_list"] as? Map<*, *>)?.get("more") == true &&
                 runtime.owns(token) && store.control()["phase"] == "ready") requestRecordings(deferIfFull = true)
             smpIdleLease.close()
-            fileTransport?.release(); fileTransport = null
-            if (runtime.owns(token) && store.control()["phase"] == "ready") command("GB({\"t\":\"smp\",\"status\":false})")
+            // Static SMP needs nothing turned off, and reopening the SDK connection
+            // for the next recording costs several connection events.
+            if (!smpStatic) {
+                fileTransport?.release(); fileTransport = null
+                if (runtime.owns(token) && store.control()["phase"] == "ready") command("GB({\"t\":\"smp\",\"status\":false})")
+            }
         }
         val session = token
         handler.postDelayed({ if (runtime.owns(session)) safely { downloadNext() } }, 100)
@@ -1386,9 +1434,10 @@ class NativePrototypeTransport(private val context: Context, private val handler
         sensors.reset(token, emptySet())
         awaitingMtu = false; payloadSize = 20
         linkConnected = false; servicesHandled = false
-        servicesStale = false; rediscovering = false
+        servicesStale = false; rediscovering = false; smpStatic = false
         runCatching { transfer?.cancel() }; transfer = null
         runCatching { fileTransport?.release() }; fileTransport = null
+        smpWarming = null
         val previous = gatt; gatt = null; tx = null
         runCatching { previous?.disconnect() }; runCatching { previous?.close() }
         framer.reset()
@@ -1401,6 +1450,7 @@ class NativePrototypeTransport(private val context: Context, private val handler
     companion object {
         @Volatile var traceMcuPackets = false
         private const val CONNECT_TIMEOUT = "Connection timed out"
+        private val SMP_SERVICE = UUID.fromString("8d53dc1d-1db7-4cd3-868b-8a527460aa84")
         private val NUS = UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
         private val TX = UUID.fromString("6e400002-b5a3-f393-e0a9-e50e24dcca9e")
         private val RX = UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e")

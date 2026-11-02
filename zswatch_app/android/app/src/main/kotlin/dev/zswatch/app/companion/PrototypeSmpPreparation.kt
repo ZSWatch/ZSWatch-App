@@ -1,7 +1,9 @@
 package dev.zswatch.app.companion
 
 internal data class PrototypeSmpSession(val generation: Long, val address: String?,
-    val desired: Boolean, val ready: Boolean, val available: Boolean)
+    val desired: Boolean, val ready: Boolean, val available: Boolean,
+    // The watch keeps SMP registered (newer firmware), so no Service Changed to wait for.
+    val static: Boolean = false)
 internal class PrototypeSmpServicePending : IllegalStateException("SMP service change pending")
 
 /** Preparation never executes a shell command. A service-change reconnect may
@@ -34,7 +36,7 @@ internal class PrototypeSmpPreparation(
             if (state.available) poll(entry)
             else {
                 enable()
-                later(2000) { poll(entry) }
+                later(if (state.static) 0 else 2000) { poll(entry) }
             }
         } catch (error: Exception) { finish(entry, Result.failure(error)) }
     }
