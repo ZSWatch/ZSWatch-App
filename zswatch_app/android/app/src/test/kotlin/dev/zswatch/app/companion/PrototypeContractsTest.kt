@@ -358,29 +358,25 @@ class PrototypeContractsTest {
         "size_bytes" to 5472L, "state" to "downloading")
     private fun files() = ReceiptFiles(File(temporary.root, "recordings"))
 
-    @Test fun newRecordingUsesListHeaderTimestampAndPublishesOnlyOneReceipt() {
+    @Test fun newRecordingQueuesWithoutTheList() {
         val journal = store(); journal.update("selected", mapOf("address" to address))
         var requests = 0
-        val inbox = PrototypeRecordingInbox(journal) { requests++ }
-        // zsw_recording_manager.c emits stop time; the list reads start time from the header.
-        val event = JSONObject("""{"t":"voice_memo","action":"new","filename":"REC_001",
-            "timestamp":1700000002,"size_bytes":5472,"duration_ms":1600}""")
-        inbox.receive(event)
-        assertEquals(1, requests)
-        assertTrue((journal.control()["recordings"] as Map<*, *>).isEmpty())
-        val response = JSONObject("""{"t":"voice_memo","action":"list_result","recordings":[
-            {"filename":"REC_001","timestamp":1700000000,"size_bytes":5472,"duration_ms":1600}]}""")
-        inbox.receive(response)
+        var queued = 0
+        val inbox = PrototypeRecordingInbox(journal, {}, { queued++ }) { requests++ }
+        inbox.receive(JSONObject("""{"t":"voice_memo","action":"new","filename":"REC_001",
+            "timestamp":1700000000,"size_bytes":5472,"duration_ms":1600}"""))
+        assertEquals(0, requests)
+        assertEquals(1, queued)
         val key = (journal.control()["recordings"] as Map<*, *>).keys.single() as String
-        val receipt = files().publish(key, journal.record(key)!!, fixture())
-        journal.putRecord(key, receipt)
-        inbox.receive(event); inbox.receive(response)
-        val reopened = store()
-        assertEquals(2, requests)
-        assertEquals(1, (reopened.control()["recordings"] as Map<*, *>).size)
-        assertEquals("downloaded", reopened.record(key)!!["state"])
-        assertEquals(1700000000L, (reopened.record(key)!!["timestamp"] as Number).toLong())
-        assertArrayEquals(fixture(), File(receipt["local_path"] as String).readBytes())
+        assertEquals("pending", journal.record(key)!!["state"])
+        // The later list entry for the same file is the same record.
+        inbox.receive(JSONObject("""{"t":"voice_memo","action":"list_result","recordings":[
+            {"filename":"REC_001","timestamp":1700000000,"size_bytes":5472,"duration_ms":1600}]}"""))
+        assertEquals(1, (journal.control()["recordings"] as Map<*, *>).size)
+        // Invalid metadata falls back to the list.
+        inbox.receive(JSONObject("""{"t":"voice_memo","action":"new","filename":"../x",
+            "timestamp":1700000000,"size_bytes":5472,"duration_ms":1600}"""))
+        assertEquals(1, requests)
     }
 
     @Test fun newRecordingHintDoesNotRequireOrTrustItsMetadata() {

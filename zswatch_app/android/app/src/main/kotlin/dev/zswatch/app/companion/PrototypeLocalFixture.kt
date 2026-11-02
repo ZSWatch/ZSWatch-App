@@ -39,6 +39,11 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
         }
     }
     fun startMaintenance() { PrototypeHub.worker.post(tick) }
+    /** Run the next maintenance pass now instead of at the next 2 s tick. */
+    fun runNow() {
+        // On the worker thread, so the pending tick is replaced, not doubled.
+        PrototypeHub.worker.post { PrototypeHub.worker.removeCallbacks(tick); tick.run() }
+    }
     fun startFixture(): String {
         check(BuildConfig.DEBUG && running()) { "Running prototype required" }
         val spec = context.assets.open("job-v1.json").bufferedReader().use { JSONObject(it.readText()) }
@@ -206,6 +211,8 @@ class PrototypeLocalFixture(private val context: Context, private val service: C
                     }
                     validated.fold({ result ->
                         if (jobs.complete(claim, received, result, null)) {
+                            // Send it to the watch now, not at the next tick.
+                            runNow()
                             LifecycleLogger.log("CompanionLocalJobs", "result_committed pluginReady=true activityRequired=false")
                             CompanionVoiceActions.resultReady(context, claim.id)
                         }

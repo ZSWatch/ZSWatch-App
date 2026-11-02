@@ -9,6 +9,7 @@ class PrototypeShellOperationTest {
         var generation = 1L
         var synchronous = false
         var enableThrows = false
+        var settle = 2000L
         val timers = mutableListOf<Pair<Long, () -> Unit>>()
         val enables = mutableListOf<() -> Unit>()
         val executions = mutableListOf<Pair<String, (Result<PrototypeShellReply>) -> Unit>>()
@@ -19,7 +20,7 @@ class PrototypeShellOperationTest {
             { _, done -> if (enableThrows) error("Enable failed") else enables.add(done) },
             { command, done -> executions.add(command to done)
                 if (synchronous) done(Result.success(PrototypeShellReply("ok", 0))) },
-            { releases.add(it) })
+            { releases.add(it) }, { settle })
         fun start(command: String = "power status") = operation.start(generation, command) { results.add(it) }
         fun advance(ms: Long) {
             time += ms
@@ -47,6 +48,13 @@ class PrototypeShellOperationTest {
         r.advance(30000)
         assertEquals(-2L, r.results.single().getOrThrow().returnCode)
         assertEquals(listOf(1L), r.releases); assertFalse(r.operation.busy)
+    }
+
+    @Test fun staticSmpExecutesWithoutTheSettleDelay() {
+        val r = Rig(); r.settle = 0; r.start(); r.enables.single()(); r.advance(0)
+        assertEquals("power status", r.executions.single().first)
+        val old = Rig(); old.start(); old.enables.single()(); old.advance(1999)
+        assertTrue(old.executions.isEmpty()); old.advance(1); assertEquals(1, old.executions.size)
     }
 
     @Test fun synchronousCompletionAndEnableFailureReleaseExactlyOnce() {
