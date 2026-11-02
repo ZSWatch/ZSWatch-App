@@ -44,8 +44,12 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
   Future<void> _load() async {
     try {
       final connected = await _session.hasSession;
+      final preferredId = connected ? await _session.preferredListId : null;
       if (!mounted) return;
-      setState(() => _connected = connected);
+      setState(() {
+        _connected = connected;
+        _selectedId = preferredId;
+      });
       if (connected) await _refresh();
     } catch (error) {
       _showError(error);
@@ -77,6 +81,7 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
         ? _selectedId
         : (lists.isEmpty ? null : lists.first.id);
     final selected = id == null ? null : await _api.list(id);
+    await _session.setPreferredListId(id);
     if (mounted) {
       setState(() {
         _lists = lists;
@@ -254,7 +259,7 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
             DropdownButtonFormField<String>(
               key: ValueKey(_selectedId),
               initialValue: _selectedId,
-              decoration: const InputDecoration(labelText: 'ICA list'),
+              decoration: const InputDecoration(labelText: 'Default ICA list'),
               items: [
                 for (final list in _lists)
                   DropdownMenuItem(value: list.id, child: Text(list.title)),
@@ -265,6 +270,7 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
                       if (id == null) return;
                       _selectedId = id;
                       _selected = await _api.list(id);
+                      await _session.setPreferredListId(id);
                       if (mounted) setState(() {});
                     }),
             ),

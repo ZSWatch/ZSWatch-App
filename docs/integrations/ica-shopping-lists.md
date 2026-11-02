@@ -14,7 +14,7 @@ Raw probe scripts and responses are under gitignored `.companion-hil-runs/ica-re
 
 ## App design
 
-- Settings → Integrations → ICA shopping lists is opt-in. The app asks for an email and a one-time code, stores the resulting OAuth session in platform secure storage, then reads and writes lists directly from the phone. It never stores the email code.
+- Settings → Integrations → ICA shopping lists is opt-in. The app asks for an email and a one-time code, stores the resulting OAuth session in platform secure storage, then reads and writes lists directly from the phone. It never stores the email code. The selected default list ID is stored securely too; creating a list selects it as the default, and disconnecting clears the choice. It remains an ordinary ICA list visible in ICA's own app.
 - `IcaSessionService` owns the mobile OAuth flow and serialized token refresh. `IcaShoppingListApi` owns ICA list operations. An HTTP failure during an add does not trigger a blind retry, because the first attempt may have succeeded.
 - `packages/llm_integrations` owns the ICA-specific function definition and validates OpenRouter tool-call arguments against the source text. `OpenRouterClient.proposeTools` never executes a call. The app displays a proposal and requires a list selection and confirmation before an ICA write. ICA credentials, list IDs, and list contents are never sent to OpenRouter by this feature.
 - The normal voice memo pipeline still uses its existing calendar/task schema. This first integration screen accepts text to exercise the full transcript → OpenRouter proposal → review → ICA write path without changing the native companion journal. Automatic voice memo detection should be a separate opt-in step once on-device behavior is tested.
