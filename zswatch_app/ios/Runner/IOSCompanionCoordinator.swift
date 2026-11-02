@@ -471,7 +471,7 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     }
     guard !firmware.isActive else { throw CompanionFailure.unavailable("Wait for the firmware operation or stop it first") }
     if let expected {
-      guard let selected = UUID(uuidString: id), scans[selected] != nil,
+      guard let selected = UUID(uuidString: id), scans[selected] != nil || authorizedAccessoryIDs.contains(selected),
             expected == journal.generation, !journal.desired else {
         throw CompanionFailure.unavailable("Watch selection expired; choose again")
       }
@@ -508,11 +508,11 @@ final class IOSCompanionCoordinator: NSObject, CBCentralManagerDelegate {
     try changed("watch_forgotten")
   }
 
-  // With AccessorySetupKit the list holds watches set up through the picker, so
-  // drop any whose authorization was removed (forgotten here or in Settings).
+  // With AccessorySetupKit the list holds every authorized watch. The picker
+  // hides those, and a Forget whose removal prompt was declined leaves one.
   private var listedScans: [[String: Any]] {
     guard usesAccessorySetup, let authorized = accessorySetup?.identifiers else { return Array(scans.values) }
-    return scans.filter { authorized.contains($0.key) }.map(\.value)
+    return authorized.map { scans[$0] ?? ["address": $0.uuidString, "name": "ZSWatch", "rssi": -127] }
   }
 
   func scanStart() throws {
