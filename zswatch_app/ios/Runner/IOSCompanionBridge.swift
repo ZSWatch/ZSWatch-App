@@ -50,6 +50,24 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
     return nil
   }
 
+  /// Connection state and the user's lists, never the tokens. A list fetch failure keeps the session.
+  private static func icaStatus(lists: Bool) -> [String: Any] {
+    guard let session = IOSIcaShoppingList.stored() else { return ["version": 1, "connected": false] }
+    var status: [String: Any] = ["version": 1, "connected": true, "newest": session["newest"] as? Bool ?? true,
+                                 "list_id": session["list_id"] as? String ?? NSNull()]
+    guard lists else { return status }
+    do {
+      let all = try IOSIcaShoppingList.lists()
+      status["lists"] = all.map { ["id": $0.id, "title": $0.title, "items": $0.rows.filter { !$0.checked }.count] }
+      status["target_id"] = try IOSIcaShoppingList.target(all)?.id ?? NSNull()
+    } catch let failure as IOSIcaShoppingList.Failure {
+      status["error"] = failure.code
+    } catch {
+      status["error"] = "ICA_OFFLINE"
+    }
+    return status
+  }
+
   private func handle(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
     guard let args = call.arguments as? [String: Any], args["version"] as? Int == 1 else {
       result(FlutterError(code: "VERSION", message: "Unsupported companion version", details: nil)); return
@@ -207,6 +225,25 @@ final class IOSCompanionBridge: NSObject, FlutterStreamHandler {
           }
           owner.voice?.cloudCredentialChanged()
           reply(["version": 1, "stored": CompanionCloudCredential.read() != nil])
+        case "setIcaSession", "clearIcaSession", "setIcaTarget", "icaStatus":
+          IOSIcaShoppingList.queue.async {
+            do {
+              switch call.method {
+              case "setIcaSession":
+                try IOSIcaShoppingList.store(IOSIcaShoppingList.session(args, previous: IOSIcaShoppingList.stored(), now: CompanionJournal.now))
+              case "clearIcaSession": IOSIcaShoppingList.clear()
+              case "setIcaTarget":
+                guard let newest = args["newest"] as? Bool else { throw CompanionFailure.invalid("ICA target required") }
+                try IOSIcaShoppingList.setTarget(newest: newest, listId: args["list_id"] as? String)
+              default: break
+              }
+              reply(Self.icaStatus(lists: call.method != "clearIcaSession"))
+            } catch let failure as IOSIcaShoppingList.Failure {
+              reply(FlutterError(code: failure.code, message: failure.message, details: nil))
+            } catch {
+              reply(FlutterError(code: "ICA_FAILED", message: error.localizedDescription, details: nil))
+            }
+          }
         case "cloudCredential":
           guard args["provider"] as? String == "openrouter" else { throw CompanionFailure.invalid("Unknown provider") }
           let key: Any = CompanionCloudCredential.read() ?? NSNull()

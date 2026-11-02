@@ -64,6 +64,7 @@ final class IOSCompanionActions: NSObject, EKEventViewDelegate {
   /// a time) and for timed types without one; those stay in the app.
   static func autoDraft(_ action: [String: Any]) -> [String: Any]? {
     guard let type = action["type"] as? String, let title = action["title"] as? String else { return nil }
+    if type == "shopping" { return ["actionType": type, "title": title, "items": action["items"] ?? [], "skipUi": true] }
     var draft: [String: Any] = ["actionType": type, "title": title, "skipUi": true]
     draft["notes"] = action["notes"] as? String; draft["location"] = action["location"] as? String
     if type == "reminder" { draft["reminderMinutes"] = 0 }
@@ -146,6 +147,7 @@ final class IOSCompanionActions: NSObject, EKEventViewDelegate {
   private func create(_ id: String, _ index: Int, _ key: String, _ action: [String: Any], _ reply: @escaping (Any?) -> Void) {
     guard let draft = action["draft"] as? [String: Any], let type = draft["actionType"] as? String, let title = draft["title"] as? String else { unknown(reply); return }
     if ["timer", "alarm"].contains(type) { notification(id, index, key, action, draft, reply); return }
+    if type == "shopping" { shopping(id, index, draft, reply); return }
     authorize(type) { granted in
       guard granted else { self.reject(id, index, "Calendar or Reminders permission denied", reply); return }
       let marker = URL(string: "zswatch-action://" + key)!
@@ -190,6 +192,26 @@ final class IOSCompanionActions: NSObject, EKEventViewDelegate {
       }
     }
   }
+  /// Row IDs come from the action, so a retry after an interruption finds
+  /// the rows it already wrote instead of adding them twice.
+  private func shopping(_ id: String, _ index: Int, _ draft: [String: Any], _ reply: @escaping (Any?) -> Void) {
+    guard let items = draft["items"] as? [String] else { reject(id, index, "Shopping items required", reply); return }
+    IOSIcaShoppingList.queue.async {
+      do {
+        let response = try IOSIcaShoppingList.add(token: "zswatch://voice-action/\(id)/\(index)", items: items)
+        self.complete(id, index, response, reply)
+      } catch let failure as IOSIcaShoppingList.Failure where failure.noEffect {
+        self.owner.queue.async {
+          try? self.owner.voice?.jobs.releaseAction(id, index: index); self.owner.journalChanged()
+          reply(Self.icaError(failure))
+        }
+      } catch { reply(Self.icaError(error)) }
+    }
+  }
+  private static func icaError(_ error: Error) -> FlutterError {
+    let failure = error as? IOSIcaShoppingList.Failure
+    return FlutterError(code: failure?.code ?? "ACTION_FAILED", message: error.localizedDescription, details: nil)
+  }
   private func notification(_ id: String, _ index: Int, _ key: String, _ action: [String: Any], _ draft: [String: Any], _ reply: @escaping (Any?) -> Void) {
     let identifier = "zswatch.voice.alert." + key
     let center = UNUserNotificationCenter.current()
@@ -218,6 +240,18 @@ final class IOSCompanionActions: NSObject, EKEventViewDelegate {
   private func undo(_ id: String, _ index: Int, _ key: String, _ action: [String: Any], _ reply: @escaping (Any?) -> Void) {
     guard let draft = action["draft"] as? [String: Any], let type = draft["actionType"] as? String,
           let response = action["response"] as? [String: Any], let identifier = response["platformId"] as? String else { unknown(reply); return }
+    if type == "shopping" {
+      IOSIcaShoppingList.queue.async {
+        do {
+          try IOSIcaShoppingList.remove(listId: identifier, ids: response["rowIds"] as? [String] ?? [])
+          self.owner.queue.async {
+            do { try self.owner.voice?.jobs.finishUndo(id, index: index); self.owner.journalChanged(); reply(nil) }
+            catch { self.unknown(reply) }
+          }
+        } catch { reply(Self.icaError(error)) }
+      }
+      return
+    }
     authorize(type) { granted in
       guard granted else { self.unknown(reply); return }
       do {

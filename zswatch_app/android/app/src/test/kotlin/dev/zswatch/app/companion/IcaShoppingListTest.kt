@@ -16,6 +16,8 @@ class IcaShoppingListTest {
 
     @Test fun rowIdsAreStablePerActionAndDistinctAcrossActions() {
         val token = CompanionVoiceActions.token("a".repeat(64), 0)
+        // Same value as the iOS test: both platforms derive identical row IDs.
+        assertEquals(listOf("D3139376-98E8-37AA-9CDE-67D9AC94D7F9"), IcaShoppingList.rowIds("zswatch://voice-action/job/0", 1))
         assertEquals(IcaShoppingList.rowIds(token, 3), IcaShoppingList.rowIds(token, 3))
         assertEquals(3, IcaShoppingList.rowIds(token, 3).toSet().size)
         assertNotEquals(IcaShoppingList.rowIds(token, 1), IcaShoppingList.rowIds(CompanionVoiceActions.token("a".repeat(64), 1), 1))

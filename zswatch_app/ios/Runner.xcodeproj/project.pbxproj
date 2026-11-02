@@ -34,6 +34,7 @@
 		A1000000000000000000001C /* IOSDartVoiceWorker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* IOSDartVoiceWorker.swift */; };
 		A1000000000000000000001E /* IOSVoiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001D /* IOSVoiceCoordinator.swift */; };
 		A10000000000000000000020 /* IOSCompanionActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001F /* IOSCompanionActions.swift */; };
+		A10000000000000000000022 /* IOSIcaShoppingList.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* IOSIcaShoppingList.swift */; };
 		B85000000000000000000001 /* IOSAccessorySetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = B85000000000000000000002 /* IOSAccessorySetup.swift */; };
 		DFF97A3173C99B29AD3DFB3D /* CompanionFirmwareContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = F378617ADE1AFE8E9048487B /* CompanionFirmwareContract.swift */; };
 		E78D85215D5A3D113C24392C /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E26C8E899F826FCC65DF8BE4 /* Pods_Runner.framework */; };
@@ -98,6 +99,7 @@
 		A1000000000000000000001B /* IOSDartVoiceWorker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSDartVoiceWorker.swift; sourceTree = "<group>"; };
 		A1000000000000000000001D /* IOSVoiceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSVoiceCoordinator.swift; sourceTree = "<group>"; };
 		A1000000000000000000001F /* IOSCompanionActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSCompanionActions.swift; sourceTree = "<group>"; };
+		A10000000000000000000021 /* IOSIcaShoppingList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSIcaShoppingList.swift; sourceTree = "<group>"; };
 		A3ADEE59B91882B0D6F571D7 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		B85000000000000000000002 /* IOSAccessorySetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSAccessorySetup.swift; sourceTree = "<group>"; };
 		C237098BC23BD44ABA9C937B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -183,6 +185,7 @@
 				A10000000000000000000019 /* CompanionVoiceJobs.swift */,
 				A1000000000000000000001B /* IOSDartVoiceWorker.swift */,
 				A1000000000000000000001F /* IOSCompanionActions.swift */,
+				A10000000000000000000021 /* IOSIcaShoppingList.swift */,
 				A1000000000000000000001D /* IOSVoiceCoordinator.swift */,
 				A10000000000000000000017 /* IOSRecordingInbox.swift */,
 				A10000000000000000000013 /* CompanionBackgroundLease.swift */,
@@ -478,6 +481,7 @@
 				A1000000000000000000001A /* CompanionVoiceJobs.swift in Sources */,
 				A1000000000000000000001C /* IOSDartVoiceWorker.swift in Sources */,
 				A10000000000000000000020 /* IOSCompanionActions.swift in Sources */,
+				A10000000000000000000022 /* IOSIcaShoppingList.swift in Sources */,
 				A1000000000000000000001E /* IOSVoiceCoordinator.swift in Sources */,
 				A10000000000000000000018 /* IOSRecordingInbox.swift in Sources */,
 				A10000000000000000000014 /* CompanionBackgroundLease.swift in Sources */,

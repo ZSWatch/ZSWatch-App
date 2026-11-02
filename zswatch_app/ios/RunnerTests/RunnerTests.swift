@@ -5,6 +5,27 @@ import XCTest
 
 class RunnerTests: XCTestCase {
 
+  func testIcaRowIdsMatchAndroidAndNewestNeedsUniqueIds() {
+    XCTAssertEqual(IOSIcaShoppingList.rowIds("zswatch://voice-action/job/0", count: 1), ["D3139376-98E8-37AA-9CDE-67D9AC94D7F9"])
+    let list = { (id: String, server: Int?) in IOSIcaShoppingList.ShoppingList(id: id, serverId: server, title: id, rows: []) }
+    XCTAssertEqual(IOSIcaShoppingList.newest([list("a", 5), list("b", 9)])?.id, "b")
+    XCTAssertNil(IOSIcaShoppingList.newest([list("a", 5), list("b", nil)]))
+    XCTAssertNil(IOSIcaShoppingList.newest([list("a", 5), list("b", 5)]))
+  }
+
+  func testShoppingResultsCarryValidItemsOnly() throws {
+    let result = { (action: [String: Any]) -> [String: Any] in
+      ["version": 1, "transcript": "Köp mjölk", "summary": "mjölk", "category": "", "actions": [action]]
+    }
+    let shopping: [String: Any] = ["type": "shopping", "title": "mjölk", "items": ["mjölk"]]
+    XCTAssertNoThrow(try CompanionVoiceJobs.validate(result(shopping), transcriptionOnly: false))
+    for bad: [String: Any] in [["type": "shopping", "title": "mjölk"], ["type": "shopping", "title": "mjölk", "items": [String]()],
+                               ["type": "shopping", "title": "mjölk", "items": [" "]], ["type": "task", "title": "x", "items": ["mjölk"]]] {
+      XCTAssertThrowsError(try CompanionVoiceJobs.validate(result(bad), transcriptionOnly: false))
+    }
+    XCTAssertEqual(IOSCompanionActions.autoDraft(shopping)?["items"] as? [String], ["mjölk"])
+  }
+
   func testTrafficCapturedWithoutAViewerRetainsOrderAndMetadata() {
     let traffic = CompanionTraffic()
     let first: [String: Any] = ["data": "räven 🦊", "size_bytes": 11, "direction": "rx",
