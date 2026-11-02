@@ -108,15 +108,18 @@ class IcaSessionService {
     }
     _state = Uri.parse(authorize.location!).queryParameters['state'];
     await _followIms(authorize.location!);
-    final emailPage = await _request(
-      'GET',
-      '$_ims/authn/authenticate/icase-email',
+    final emailPage = await _followImsResponse(
+      await _request('GET', '$_ims/authn/authenticate/icase-email'),
+      Uri.parse('$_ims/authn/authenticate/icase-email'),
     );
     _check(emailPage);
-    final codePage = await _request(
-      'POST',
-      '$_ims/authn/authenticate/icase-email',
-      form: {'userName': email.trim()},
+    final codePage = await _followImsResponse(
+      await _request(
+        'POST',
+        '$_ims/authn/authenticate/icase-email',
+        form: {'userName': email.trim()},
+      ),
+      Uri.parse('$_ims/authn/authenticate/icase-email'),
     );
     _check(codePage);
     if (!codePage.body.contains('name="otp"')) {
@@ -133,10 +136,19 @@ class IcaSessionService {
         _verifier == null) {
       throw StateError('Start ICA email login and enter its six-digit code');
     }
-    final authenticated = await _request(
+    final codeResponse = await _request(
       'POST',
       _emailStep!,
       form: {'otp': code},
+    );
+    if (codeResponse.status == 400) {
+      throw StateError(
+        'ICA rejected this code or it expired. Send a new code.',
+      );
+    }
+    final authenticated = await _followImsResponse(
+      codeResponse,
+      Uri.parse(_emailStep!),
     );
     _check(authenticated);
     final token = RegExp(
@@ -249,17 +261,23 @@ class IcaSessionService {
   }
 
   Future<void> _followIms(String location) async {
-    var url = Uri.parse(location);
+    await _followImsResponse(_Reply(302, '', location), Uri.parse(_ims));
+  }
+
+  Future<_Reply> _followImsResponse(_Reply initial, Uri base) async {
+    var response = initial;
+    var url = base;
     for (var i = 0; i < 5; i++) {
+      final location = response.location;
+      if (location == null) {
+        _check(response);
+        return response;
+      }
+      url = url.resolve(location);
       if (url.host != 'ims.icagruppen.se') {
         throw StateError('Unexpected ICA redirect');
       }
-      final response = await _request('GET', url.toString());
-      if (response.location == null) {
-        _check(response);
-        return;
-      }
-      url = url.resolve(response.location!);
+      response = await _request('GET', url.toString());
     }
     throw StateError('Too many ICA redirects');
   }

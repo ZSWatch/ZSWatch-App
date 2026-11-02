@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_integrations/llm_integrations.dart';
 
+import '../../../providers/companion_runtime_providers.dart';
 import '../../../providers/openrouter_providers.dart';
 import '../../../services/ai/openrouter_client.dart';
 import '../../../services/integrations/ica_session_service.dart';
@@ -96,7 +97,7 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
   }
 
   Future<void> _propose() async {
-    final key = ref.read(openRouterKeyProvider).valueOrNull;
+    final key = await ref.read(companionClientProvider).cloudCredential();
     if (key == null || key.isEmpty) {
       throw StateError('Add an OpenRouter key under Voice memo models first');
     }
@@ -255,6 +256,15 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
                         await _refresh();
                       }),
                 child: const Text('Connect ICA'),
+              ),
+              TextButton(
+                onPressed: _busy
+                    ? null
+                    : () => _run(() async {
+                        await _session.startEmailLogin(_email.text);
+                        _code.clear();
+                      }),
+                child: const Text('Send a new code'),
               ),
             ],
           ] else ...[

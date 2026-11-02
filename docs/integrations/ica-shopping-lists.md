@@ -8,7 +8,9 @@ This optional integration uses ICA's **unofficial** mobile shopping-list API. Th
 - With that access token, `GET https://apimgw-pub.ica.se/sverige/digx/mobile/shoppinglistservice/v1/shoppinglists` returned HTTP 200.
 - A disposable test list was created, read, given one free-text row through `POST /{offlineId}/sync`, read again to confirm the row, and deleted. Each operation returned HTTP 200. The disposable list was removed.
 - Two further disposable lists showed numeric ICA list IDs increasing in creation order, both above the existing list IDs. The list response itself kept the older test list before the newer one, including after an edit. Both test lists were deleted. The newest-list policy therefore uses the highest numeric ICA ID, not response order or `latestChange`.
-- The production Dart OpenRouter proposal and ICA list adapter were exercised together against two disposable lists: the model proposed an item, the adapter chose the newer list, added it, read it back from that list only, and deleted both test lists. This verifies the service path but not the phone UI or phone secure storage.
+- The production Dart OpenRouter proposal and ICA list adapter were exercised together against two disposable lists: the model proposed an item, the adapter chose the newer list, added it, read it back from that list only, and deleted both test lists.
+- The current Flutter app was installed on an Android 36 emulator and exercised through its UI with a real OpenRouter key and ICA email code. The app connected to ICA, created two temporary lists, selected the newer one, proposed “one pack oatmeal” from text through OpenRouter, displayed the correct destination for confirmation, wrote the item, and showed it in the current list. An independent ICA API read confirmed one item in the newer list and zero in the older list. After force-stopping and relaunching the app, the ICA session, newest-list setting, selected list, and item were restored. Both temporary lists were deleted and confirmed absent.
+- This UI run exposed and fixed two issues: ICA redirects from the email form must be followed before checking for the code form, and the proposal must await the native companion's stored OpenRouter key. ICA rejected codes entered several minutes after the sign-in attempt began; a fresh code entered promptly succeeded. The code screen now offers a resend action and explains a rejected or expired code.
 - Refreshing the OAuth token with the returned refresh token also returned HTTP 200.
 - The older password authenticator returned HTTP 400/500 during the same investigation; ICA's [FAQ](https://www.ica.se/kundservice/vanliga-fragor/) says it removed four-digit password login on 20 January 2026 and recommends email plus one-time code.
 
@@ -28,7 +30,7 @@ Raw probe scripts and responses are under gitignored `.companion-hil-runs/ica-re
 
 ## Remaining validation
 
-- Test email-code login, token refresh and secure-storage restore on real Android and iOS devices. The sign-in protocol was confirmed in a Python session on this Mac, not on a phone.
+- Test email-code login, token refresh and secure-storage restore on physical Android and iOS devices. The complete UI flow passed on an Android emulator; the connected iPhone was locked during this run.
 - Verify list UI and writes in ICA's own app after a phone-side action.
 - Test revoked tokens, account disconnect, interrupted writes, concurrent household edits, and the geography-specific HTTP 451 case.
 - Before broad distribution, ask ICA about supported partner access. The current registration flow relies on ICA's existing mobile app client template and could change without notice.
