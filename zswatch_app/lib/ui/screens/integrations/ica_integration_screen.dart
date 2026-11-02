@@ -29,6 +29,7 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
   bool _connected = false;
   bool _awaitingCode = false;
   bool _busy = false;
+  bool _useNewestList = true;
   String? _error;
   String? _selectedId;
   List<IcaShoppingList> _lists = const [];
@@ -45,10 +46,12 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
     try {
       final connected = await _session.hasSession;
       final preferredId = connected ? await _session.preferredListId : null;
+      final useNewest = await _session.useNewestList;
       if (!mounted) return;
       setState(() {
         _connected = connected;
         _selectedId = preferredId;
+        _useNewestList = useNewest;
       });
       if (connected) await _refresh();
     } catch (error) {
@@ -77,9 +80,10 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
 
   Future<void> _refresh() async {
     final lists = await _api.lists();
-    final id = lists.any((list) => list.id == _selectedId)
-        ? _selectedId
-        : (lists.isEmpty ? null : lists.first.id);
+    final hasSelection = lists.any((list) => list.id == _selectedId);
+    final id = _useNewestList || !hasSelection
+        ? IcaShoppingListApi.newestList(lists)?.id
+        : _selectedId;
     final selected = id == null ? null : await _api.list(id);
     await _session.setPreferredListId(id);
     if (mounted) {
@@ -110,18 +114,22 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
   }
 
   Future<void> _confirmAdd(List<String> items, {String? hint}) async {
+    final currentLists = await _api.lists();
     final target = hint == null
-        ? _selected
-        : _lists
+        ? _useNewestList
+              ? IcaShoppingListApi.newestList(currentLists)
+              : currentLists.where((list) => list.id == _selectedId).firstOrNull
+        : currentLists
               .where((list) => list.title.toLowerCase() == hint.toLowerCase())
               .firstOrNull;
     if (target == null) {
       throw StateError(
         hint == null
-            ? 'Select an ICA list first'
+            ? 'Create or select an ICA list first'
             : 'No ICA list named "$hint". Create that list or change the memo.',
       );
     }
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -142,10 +150,26 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
       ),
     );
     if (confirmed != true) return;
+    if (hint == null && _useNewestList) {
+      final newest = IcaShoppingListApi.newestList(await _api.lists());
+      if (newest?.id != target.id) {
+        await _refresh();
+        throw StateError(
+          'A newer ICA list appeared. Review the destination again.',
+        );
+      }
+    }
     final updated = await _api.addItems(target.id, items);
+    if (hint == null && _useNewestList) {
+      await _session.setPreferredListId(target.id);
+    }
     if (mounted) {
       setState(() {
-        if (_selectedId == target.id) _selected = updated;
+        if (_selectedId == target.id || (hint == null && _useNewestList)) {
+          _selectedId = target.id;
+          _selected = updated;
+          _lists = currentLists;
+        }
         _item.clear();
         _proposal = null;
       });
@@ -249,6 +273,7 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
                               _selected = null;
                               _selectedId = null;
                               _proposal = null;
+                              _useNewestList = true;
                             });
                           }
                         }),
@@ -256,15 +281,33 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
                 ),
               ],
             ),
+            SwitchListTile(
+              title: const Text('Always use newest ICA list'),
+              subtitle: const Text(
+                'Automatically follows the latest list you create in ICA.',
+              ),
+              value: _useNewestList,
+              onChanged: _busy
+                  ? null
+                  : (value) => _run(() async {
+                      await _session.setUseNewestList(value);
+                      _useNewestList = value;
+                      await _refresh();
+                    }),
+            ),
             DropdownButtonFormField<String>(
               key: ValueKey(_selectedId),
               initialValue: _selectedId,
-              decoration: const InputDecoration(labelText: 'Default ICA list'),
+              decoration: InputDecoration(
+                labelText: _useNewestList
+                    ? 'Newest ICA list'
+                    : 'Selected ICA list',
+              ),
               items: [
                 for (final list in _lists)
                   DropdownMenuItem(value: list.id, child: Text(list.title)),
               ],
-              onChanged: _busy
+              onChanged: _busy || _useNewestList
                   ? null
                   : (id) => _run(() async {
                       if (id == null) return;
@@ -335,7 +378,10 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        draft.listName ?? 'Use selected list',
+                        draft.listName ??
+                            (_useNewestList
+                                ? 'Use newest ICA list'
+                                : 'Use selected list'),
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       for (final item in draft.items) Text('• $item'),

@@ -16,6 +16,7 @@ class IcaSessionService {
   static const _ims = 'https://ims.icagruppen.se';
   static const _stateKey = 'ica_mobile_oauth_v1';
   static const _preferredListKey = 'ica_preferred_list_v1';
+  static const _useNewestListKey = 'ica_use_newest_list_v1';
   static const _redirect = 'icacurity://app';
   static const _bootstrapId = 'ica-app-dcr-registration';
   static const _bootstrapSecret =
@@ -36,6 +37,12 @@ class IcaSessionService {
   }
 
   Future<String?> get preferredListId => _storage.read(key: _preferredListKey);
+
+  Future<bool> get useNewestList async =>
+      (await _storage.read(key: _useNewestListKey)) != 'false';
+
+  Future<void> setUseNewestList(bool value) =>
+      _storage.write(key: _useNewestListKey, value: value.toString());
 
   Future<void> setPreferredListId(String? id) async {
     if (id == null) {
@@ -238,6 +245,7 @@ class IcaSessionService {
     _saved = null;
     await _storage.delete(key: _stateKey);
     await _storage.delete(key: _preferredListKey);
+    await _storage.delete(key: _useNewestListKey);
   }
 
   Future<void> _followIms(String location) async {

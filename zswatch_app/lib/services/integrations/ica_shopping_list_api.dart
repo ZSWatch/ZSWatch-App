@@ -11,12 +11,14 @@ class IcaShoppingList {
     required this.id,
     required this.title,
     required this.rows,
+    this.serverId,
   });
 
   factory IcaShoppingList.fromJson(Map<String, dynamic> json) =>
       IcaShoppingList(
         id: json['offlineId'] as String,
         title: json['title'] as String,
+        serverId: json['id'] is int ? json['id'] as int : null,
         rows: [
           for (final row in (json['rows'] as List?) ?? const [])
             if (row is Map)
@@ -31,6 +33,10 @@ class IcaShoppingList {
   final String id;
   final String title;
   final List<IcaShoppingRow> rows;
+
+  /// ICA's numeric list ID increased across observed list creations. Unlike
+  /// latestChange, edits to an older list do not change this ID.
+  final int? serverId;
 }
 
 class IcaShoppingRow {
@@ -63,6 +69,17 @@ class IcaShoppingListApi {
   final bool _ownsClient;
   static const _uuid = Uuid();
   static final _random = Random.secure();
+
+  /// Choose the newest list by ICA's monotonic numeric ID. Fail closed if the
+  /// private API stops supplying unique IDs; array order is not newest-first.
+  static IcaShoppingList? newestList(List<IcaShoppingList> lists) {
+    if (lists.isEmpty) return null;
+    final ids = lists.map((list) => list.serverId).toList();
+    if (ids.any((id) => id == null) || ids.toSet().length != ids.length) {
+      throw const FormatException('Cannot identify ICA’s newest list');
+    }
+    return lists.reduce((a, b) => a.serverId! > b.serverId! ? a : b);
+  }
 
   Future<List<IcaShoppingList>> lists() async {
     final json = await _request('GET', '');

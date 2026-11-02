@@ -6,6 +6,25 @@ import 'package:http/testing.dart';
 import 'package:zswatch_app/services/integrations/ica_shopping_list_api.dart';
 
 void main() {
+  test('newest list follows ICA numeric ID rather than response order', () {
+    IcaShoppingList list(int? numericId, String name) =>
+        IcaShoppingList.fromJson({
+          'id': numericId,
+          'offlineId': name,
+          'title': name,
+          'rows': <Object>[],
+        });
+    final older = list(100, 'older');
+    final newer = list(101, 'newer');
+    expect(IcaShoppingListApi.newestList([older, newer]), newer);
+    expect(IcaShoppingListApi.newestList([newer, older]), newer);
+    expect(IcaShoppingListApi.newestList([]), isNull);
+    expect(
+      () => IcaShoppingListApi.newestList([older, list(null, 'unknown')]),
+      throwsFormatException,
+    );
+  });
+
   test(
     'creates a list and adds rows using the verified mobile contract',
     () async {
