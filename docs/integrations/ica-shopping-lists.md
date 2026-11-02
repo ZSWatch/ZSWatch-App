@@ -61,3 +61,27 @@ Verified live on a disposable list on 2026-11-02:
 - A new list gets the highest `id`.
 
 ICA can change or block this API at any time.
+
+## Benchmark
+
+`zswatch_app/test/benchmarks/shopping_benchmark_test.dart` sends 34
+synthetic memos through the production worker (`processCompanionVoiceRecording`
+with a saved transcript) to OpenRouter. Each run checks the extracted items,
+the other actions in the memo, and the long-memo (brain dump) path. It is
+skipped in CI.
+
+```sh
+cd zswatch_app
+ZSWATCH_BENCH=1 flutter test test/benchmarks/shopping_benchmark_test.dart
+```
+
+Optional settings:
+
+- `ZSWATCH_BENCH_MODEL`, default `google/gemini-3.1-flash-lite`.
+- `ZSWATCH_BENCH_RUNS`, default 3.
+- `ZSWATCH_BENCH_CASES`, a comma-separated list of case names.
+
+Reports, including the raw model replies, go to
+`.companion-hil-runs/shopping-bench/`. On 2026-11-02,
+gemini-3.1-flash-lite passed 102/102 cases (3 runs), with a median of about 1 s
+per memo.

@@ -23,6 +23,10 @@ Memo: "Lägg till bröd men inte smör på inköpslistan"
 
 ''';
 
+  /// For the long-memo (brain dump) prompt, whose actions are objects.
+  static const String brainDumpRule = '''
+- SHOPPING LIST (connected): products to buy (groceries, household supplies) go in ONE action {"type": "shopping", "title": "", "items": ["product with quantity, unit and brand", ...]}. Copy each product from the transcript, never translate. Not shopping: removed, already bought or negated products, buying at a time (a reminder), services and big purchases.''';
+
   /// [template] with [section] before its current-time block.
   static String addTo(String template) {
     final at = template.indexOf(_anchor);

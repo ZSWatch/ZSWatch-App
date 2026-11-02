@@ -341,6 +341,46 @@ void main() {
       }
     });
 
+    test('long memos keep their sections, actions and shopping', () async {
+      final memo = List.filled(60, 'ord').join(' ');
+      final result = await processCompanionVoiceRecording(
+        {...request(shopping: true), 'transcript': memo},
+        saveTranscript: (_) async {},
+        cloudFactory: (key) => OpenRouterClient(
+          key,
+          client: MockClient(
+            (_) async => _json(
+              _reply(
+                jsonEncode({
+                  'summary': 'Veckan.',
+                  'category': 'brain_dump',
+                  'sections': [
+                    {
+                      'header': 'Jobb',
+                      'bullets': ['Deadlines'],
+                    },
+                  ],
+                  'actions': [
+                    {'type': 'task', 'title': 'Prata med chefen'},
+                    {
+                      'type': 'shopping',
+                      'title': 'Inköp',
+                      'items': ['mjölk', 'två paket kaffe'],
+                    },
+                  ],
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(result['summary'], contains('## Jobb'));
+      final actions = (result['actions']! as List)
+          .cast<Map<Object?, Object?>>();
+      expect(actions.map((a) => a['type']), ['task', 'shopping']);
+      expect(actions.last['items'], ['mjölk', 'två paket kaffe']);
+    });
+
     test('a missing key blocks before any upload', () async {
       await expectLater(
         processCompanionVoiceRecording(

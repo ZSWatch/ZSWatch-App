@@ -1398,7 +1398,7 @@ Rules:
 - Extract ALL actionable items regardless of where they appear.
 - If no actions exist, return an empty array.
 - Preserve the transcript language.
-- Do not invent dates, times, or locations. Use null when unknown.
+- Do not invent dates, times, or locations. Use null when unknown.${shoppingList && isCloud ? '\n${ShoppingIntent.brainDumpRule}' : ''}
 
 Transcript: "$transcript"
 JSON:
@@ -1600,9 +1600,10 @@ JSON:
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
 
-    final parsedJson =
-        _chronoLlmParser.extractFirstJsonArray(raw) ??
-        _extractFirstJsonObject(raw);
+    final parsedJson = _startsWithObject(raw)
+        ? _extractFirstJsonObject(raw)
+        : _chronoLlmParser.extractFirstJsonArray(raw) ??
+              _extractFirstJsonObject(raw);
     final metrics = LlmInferenceMetrics(
       modelName: _selectedModelName,
       rawPrompt: prompt,
@@ -1879,6 +1880,14 @@ JSON:
     );
   }
 
+  /// A reply object, like a brain dump, may hold arrays such as "sections";
+  /// those are not the reply.
+  static bool _startsWithObject(String text) {
+    final object = text.indexOf('{');
+    final array = text.indexOf('[');
+    return object >= 0 && (array < 0 || object < array);
+  }
+
   TranscriptResult _parseTranscriptResult(String raw) {
     final cleaned = _sanitizeModelOutput(raw);
 
@@ -1892,7 +1901,9 @@ JSON:
     if (extractions.isNotEmpty) {
       return _buildTranscriptResultFromChronoExtractions(extractions, raw);
     }
-    if (arrayStr != null && _isJsonList(arrayStr)) {
+    if (arrayStr != null &&
+        !_startsWithObject(cleaned) &&
+        _isJsonList(arrayStr)) {
       // A valid array without content (noise, silence markers).
       return const TranscriptResult(summary: '', category: 'note');
     }
@@ -1919,6 +1930,21 @@ JSON:
       final parsedActions = parsed['actions'];
       if (parsedActions is List) {
         for (final action in parsedActions.whereType<Map<String, dynamic>>()) {
+          if (action['type'] == ShoppingIntent.intent) {
+            final items = shoppingList
+                ? ShoppingIntent.items(action['items'])
+                : null;
+            if (items != null) {
+              actions.add(
+                ExtractedActionResult(
+                  type: ShoppingIntent.intent,
+                  title: items.join(', '),
+                  items: items,
+                ),
+              );
+            }
+            continue;
+          }
           final actionTitle =
               ((action['title'] ?? action['summary']) as String?)?.trim() ?? '';
           if (actionTitle.isEmpty) {
