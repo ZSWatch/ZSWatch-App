@@ -1231,14 +1231,22 @@ class NativePrototypeTransport(private val context: Context, private val handler
         val session = token
         mcuTransport(store.control()["address"] as String, session).connect(object : McuMgrTransport.ConnectionCallback {
             // A failure is reported again, and handled, by the transfer that follows.
-            private fun finish() { handler.post {
+            private fun finish(missing: Boolean = false) { handler.post {
                 if (smpWarming !== waiters) return@post
                 smpWarming = null
-                if (runtime.owns(session)) safely { waiters.forEach { it() } }
+                if (!runtime.owns(session)) return@post
+                // smpStatic came from NUS's service list, which can be a stale
+                // cache. The SDK's own discovery wins: use the enable-and-wait path.
+                if (missing && smpStatic) {
+                    smpStatic = false
+                    runCatching { fileTransport?.release() }; fileTransport = null
+                    android.util.Log.i("ZSWCompanionBle", "smp_static session=$session static=false reason=sdk_discovery")
+                }
+                safely { waiters.forEach { it() } }
             } }
             override fun onConnected() = finish()
             override fun onDeferred() = finish()
-            override fun onError(error: Throwable) = finish()
+            override fun onError(error: Throwable) = finish(error is McuMgrNotSupportedException)
         })
     }
 
@@ -1258,8 +1266,9 @@ class NativePrototypeTransport(private val context: Context, private val handler
         store.putRecord(key, metadata + mapOf("state" to "downloading"))
         // SMP found in this connection's discovery is there to stay: newer firmware
         // never unregisters it, so there is nothing to enable or wait for.
-        val enableSmp: (() -> Unit) -> Unit = if (smpStatic) { start -> warmSmp(start) } else { start ->
-            command("GB({\"t\":\"smp\",\"status\":true})", start)
+        val enableSmp: (() -> Unit) -> Unit = { start ->
+            val enable = { command("GB({\"t\":\"smp\",\"status\":true})", start) }
+            if (smpStatic) warmSmp { if (smpStatic) start() else enable() } else enable()
         }
         enableSmp {
             handler.postDelayed({
