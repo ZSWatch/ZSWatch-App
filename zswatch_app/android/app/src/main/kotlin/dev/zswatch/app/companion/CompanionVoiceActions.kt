@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import dev.zswatch.app.ActionFailure
 import dev.zswatch.app.ProductivityActions
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -46,6 +47,50 @@ object CompanionVoiceActions {
         }
         jobs.finishAction(id, index, JSONObject(response))
         return response
+    }
+
+    /**
+     * Adds a shopping action's items to ICA. The network runs on the ICA
+     * executor; journal changes and [done] run on [PrototypeHub.worker].
+     */
+    fun createShopping(context: Context, id: String, index: Int, input: JSONObject, done: (Result<Map<String, Any?>>) -> Unit) {
+        val jobs = PrototypeJobs(PrototypeHub.jobJournal(context))
+        require(input.getString("actionType") == "shopping")
+        require(shoppingItems(input) != null) { "Invalid shopping items" }
+        val alreadyConfirmed = jobs.state(id).optJSONObject("action_states")?.has(index.toString()) == true
+        // A retry recovers the confirmed items, never a changed draft.
+        val items = shoppingItems(jobs.beginAction(id, index, input).getJSONObject("draft"))!!
+        IcaShoppingList.executor.execute {
+            val outcome = runCatching { IcaShoppingList(context).add(token(id, index), items) }
+            PrototypeHub.worker.post {
+                val result = outcome.mapCatching { response ->
+                    jobs.finishAction(id, index, response)
+                    PrototypeStore.asMap(response)
+                }
+                val failure = result.exceptionOrNull()
+                if (failure is IcaShoppingList.IcaFailure && failure.noEffect && !alreadyConfirmed)
+                    runCatching { jobs.releaseAction(id, index) }
+                if (failure != null) Log.w(TAG, "Shopping $id/$index not added: ${(failure as? IcaShoppingList.IcaFailure)?.code}")
+                done(result)
+            }
+        }
+    }
+
+    fun undoShopping(context: Context, id: String, index: Int, done: (Result<Unit>) -> Unit) {
+        val jobs = PrototypeJobs(PrototypeHub.jobJournal(context))
+        val response = jobs.beginUndoAction(id, index).getJSONObject("response")
+        val rows = response.getJSONArray("rowIds").let { ids -> (0 until ids.length()).map { ids.getString(it) } }
+        IcaShoppingList.executor.execute {
+            val outcome = runCatching { IcaShoppingList(context).remove(response.getString("platformId"), rows) }
+            PrototypeHub.worker.post { done(outcome.mapCatching { jobs.finishUndoAction(id, index) }) }
+        }
+    }
+
+    private fun shoppingItems(draft: JSONObject): List<String>? {
+        val items = draft.optJSONArray("items") ?: return null
+        if (items.length() !in 1..IcaShoppingList.MAX_ITEMS) return null
+        return (0 until items.length()).map { items.opt(it) as? String ?: return null }
+            .takeIf { list -> list.all { it.isNotBlank() && it.length <= 240 } }
     }
 
     fun undoCreated(context: Context, id: String, index: Int) {
@@ -130,7 +175,8 @@ object CompanionVoiceActions {
                 if (handled?.has(index.toString()) == true) continue
                 val draft = draft(actions.getJSONObject(index), calendarId) ?: continue
                 try {
-                    create(context, id, index, draft)
+                    if (draft.getString("actionType") == "shopping") createShopping(context, id, index, draft) {}
+                    else create(context, id, index, draft)
                 } catch (error: Exception) {
                     Log.w(TAG, "Auto-create $id/$index failed", error)
                 }
@@ -145,6 +191,8 @@ object CompanionVoiceActions {
      */
     fun draft(action: JSONObject, calendarId: Long?): JSONObject? {
         val type = action.getString("type")
+        if (type == "shopping") return JSONObject().put("actionType", type).put("title", action.getString("title"))
+            .put("items", JSONArray(action.getJSONArray("items").toString())).put("skipUi", true)
         val scheduled = (action.optString("start_time").ifEmpty { action.optString("due_date") }).ifEmpty { null }
             ?.let(::parseLocal)
         val draft = JSONObject().put("actionType", type).put("title", action.getString("title"))

@@ -80,6 +80,16 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push(AppRoutes.aiModels),
           ),
+          _SettingsTile(
+            leading: const Icon(
+              Icons.extension_outlined,
+              color: AppTheme.primaryColor,
+            ),
+            title: 'Integrations',
+            subtitle: 'Add shopping items from voice memos to ICA',
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.integrations),
+          ),
 
           const Divider(height: 32),
 

@@ -77,10 +77,15 @@ class _CompanionVoiceActionCardState
   }
 
   Future<void> undo(ExtractedActionCreationService service) async {
+    final shopping = widget.action['type'] == 'shopping';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove created calendar entry?'),
+        title: Text(
+          shopping
+              ? 'Remove the items from the ICA list?'
+              : 'Remove created calendar entry?',
+        ),
         content: const Text(
           'The transcript and original recording are retained.',
         ),
@@ -96,7 +101,10 @@ class _CompanionVoiceActionCardState
         ],
       ),
     );
-    if (confirmed == true) {
+    if (confirmed != true) return;
+    if (shopping) {
+      await service.removeCompanionShopping(widget.jobId, widget.index);
+    } else {
       await service.undoCompanionAction(widget.jobId, widget.index);
     }
   }
@@ -111,27 +119,40 @@ class _CompanionVoiceActionCardState
         widget.action['start_time'] == null;
     final response = widget.state?['response'] as Map<Object?, Object?>?;
     final confirmed = widget.state?['draft'] as Map<Object?, Object?>?;
-    final status = switch (state) {
-      'created' =>
-        defaultTargetPlatform == TargetPlatform.iOS &&
-                ['task', 'reminder'].contains(widget.action['type'])
-            ? 'Created in Reminders'
-            : 'Created in calendar',
-      'dispatched' =>
-        defaultTargetPlatform == TargetPlatform.iOS
-            ? 'Alert scheduled by ZSWatch.'
-            : 'Sent to Clock. Manage or remove it in the Clock app.',
-      'creating' when clock =>
-        defaultTargetPlatform == TargetPlatform.iOS
-            ? 'Scheduling was interrupted. An alert may already be scheduled.'
-            : 'Interrupted request. Check Clock before creating another timer or alarm.',
-      'creating' =>
-        'Creation interrupted. Recover the confirmed calendar entry.',
-      'undoing' => 'Removal interrupted. Retry to finish removal.',
-      'undone' => 'Calendar entry removed',
-      'dismissed' => 'Dismissed',
-      _ => note ? 'Saved note' : 'Suggested action • Review before creating',
-    };
+    final shopping = widget.action['type'] == 'shopping';
+    final items = (widget.action['items'] as List<Object?>? ?? const [])
+        .whereType<String>();
+    final status = shopping
+        ? switch (state) {
+            'created' => 'Added to ${response?['listTitle'] ?? 'ICA list'}',
+            'creating' => 'Adding was interrupted. Retry to finish.',
+            'undoing' => 'Removal interrupted. Retry to finish removal.',
+            'undone' => 'Removed from the ICA list',
+            'dismissed' => 'Dismissed',
+            _ => 'Shopping items',
+          }
+        : switch (state) {
+            'created' =>
+              defaultTargetPlatform == TargetPlatform.iOS &&
+                      ['task', 'reminder'].contains(widget.action['type'])
+                  ? 'Created in Reminders'
+                  : 'Created in calendar',
+            'dispatched' =>
+              defaultTargetPlatform == TargetPlatform.iOS
+                  ? 'Alert scheduled by ZSWatch.'
+                  : 'Sent to Clock. Manage or remove it in the Clock app.',
+            'creating' when clock =>
+              defaultTargetPlatform == TargetPlatform.iOS
+                  ? 'Scheduling was interrupted. An alert may already be scheduled.'
+                  : 'Interrupted request. Check Clock before creating another timer or alarm.',
+            'creating' =>
+              'Creation interrupted. Recover the confirmed calendar entry.',
+            'undoing' => 'Removal interrupted. Retry to finish removal.',
+            'undone' => 'Calendar entry removed',
+            'dismissed' => 'Dismissed',
+            _ =>
+              note ? 'Saved note' : 'Suggested action • Review before creating',
+          };
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -151,6 +172,7 @@ class _CompanionVoiceActionCardState
                   '${widget.action['duration_seconds']} seconds',
               ].whereType<String>().join(' • '),
             ),
+            for (final item in items) Text('• $item'),
             if (widget.action['notes'] is String)
               Text(widget.action['notes'] as String),
             Text(status),
@@ -165,7 +187,24 @@ class _CompanionVoiceActionCardState
             Wrap(
               spacing: 8,
               children: [
-                if (state == null && !note && widget.canCreate)
+                if (shopping &&
+                    (state == null || state == 'creating') &&
+                    widget.canCreate)
+                  TextButton(
+                    onPressed: busy
+                        ? null
+                        : () => run(
+                            (s) => s.addCompanionShopping(
+                              widget.jobId,
+                              widget.index,
+                              confirmed ?? widget.action,
+                            ),
+                          ),
+                    child: Text(
+                      state == null ? 'Add to ICA list' : 'Retry adding',
+                    ),
+                  ),
+                if (state == null && !note && !shopping && widget.canCreate)
                   TextButton(
                     onPressed: busy ? null : () => run(review),
                     child: const Text('Review & create'),
@@ -182,7 +221,10 @@ class _CompanionVoiceActionCardState
                           ),
                     child: const Text('Dismiss'),
                   ),
-                if (state == 'creating' && !clock && widget.canCreate)
+                if (state == 'creating' &&
+                    !clock &&
+                    !shopping &&
+                    widget.canCreate)
                   TextButton(
                     onPressed: busy
                         ? null
@@ -196,6 +238,7 @@ class _CompanionVoiceActionCardState
                     child: const Text('Recover creation'),
                   ),
                 if (state == 'created' &&
+                    !shopping &&
                     (defaultTargetPlatform != TargetPlatform.iOS ||
                         widget.action['type'] == 'calendar_event'))
                   TextButton(
@@ -216,7 +259,9 @@ class _CompanionVoiceActionCardState
                 if (state == 'created' || state == 'undoing')
                   TextButton(
                     onPressed: busy ? null : () => run(undo),
-                    child: const Text('Undo creation'),
+                    child: Text(
+                      shopping ? 'Remove from ICA list' : 'Undo creation',
+                    ),
                   ),
               ],
             ),

@@ -202,7 +202,10 @@ void main() {
       await root.delete(recursive: true);
     });
 
-    Map<String, Object?> request({String? key = 'sk-or-v1-test'}) => {
+    Map<String, Object?> request({
+      String? key = 'sk-or-v1-test',
+      bool shopping = false,
+    }) => {
       'version': 1,
       'spec': {
         'provider': 'dart-voice-v1',
@@ -225,6 +228,7 @@ void main() {
         'sha256': recording.sha256,
       },
       if (key != null) 'credentials': {'openrouter_key': key},
+      if (shopping) 'integrations': {'shopping_list': true},
     };
 
     test('transcribes and analyzes through OpenRouter', () async {
@@ -278,6 +282,63 @@ void main() {
       final action = (result['actions']! as List).single as Map;
       expect(action['type'], 'timer');
       expect(action['duration_seconds'], 600);
+    });
+
+    test('a connected shopping list adds the shopping intent', () async {
+      for (final connected in [true, false]) {
+        String? prompt;
+        final processing = processCompanionVoiceRecording(
+          request(shopping: connected),
+          saveTranscript: (_) async {},
+          cloudFactory: (key) => OpenRouterClient(
+            key,
+            client: MockClient((http) async {
+              final body = jsonDecode(http.body) as Map<String, Object?>;
+              final messages = body['messages']! as List;
+              if ((messages.first as Map)['role'] == 'system') {
+                return _json(_reply('MEMO'));
+              }
+              final content = (messages.single as Map)['content'];
+              if (content is List) {
+                return _json(_reply('Köp mjölk och två paket kaffe'));
+              }
+              prompt = content as String;
+              return _json(
+                _reply(
+                  jsonEncode([
+                    {
+                      'intent': 'shopping',
+                      'title': '',
+                      'items': ['mjölk', 'två paket kaffe'],
+                      'datetime_expression_original': null,
+                      'datetime_expression_english': null,
+                    },
+                  ]),
+                ),
+              );
+            }),
+          ),
+        );
+        if (!connected) {
+          // Shopping output from a prompt without the section is dropped.
+          await expectLater(
+            processing,
+            throwsA(
+              isA<PlatformException>().having(
+                (e) => e.code,
+                'code',
+                'ANALYSIS_EMPTY',
+              ),
+            ),
+          );
+          expect(prompt, isNot(contains('SHOPPING LIST')));
+          continue;
+        }
+        final action = ((await processing)['actions']! as List).single as Map;
+        expect(prompt, contains('SHOPPING LIST'));
+        expect(action['type'], 'shopping');
+        expect(action['items'], ['mjölk', 'två paket kaffe']);
+      }
     });
 
     test('a missing key blocks before any upload', () async {

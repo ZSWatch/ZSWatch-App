@@ -530,9 +530,17 @@ class PrototypeJobs(private val store: PrototypeStore) {
             if (transcriptionOnly) require(result.getJSONArray("actions").length() == 0) { "result_unexpected_actions" }
             for (i in 0 until result.getJSONArray("actions").length()) {
                 val action = result.getJSONArray("actions").getJSONObject(i)
-                require(action.get("type") in listOf("task", "calendar_event", "reminder", "timer", "alarm"))
+                require(action.get("type") in listOf("task", "calendar_event", "reminder", "timer", "alarm", "shopping"))
                 require(action.get("title") is String && action.getString("title").isNotBlank())
-                require(action.keys().asSequence().toSet().all { it in setOf("type", "title", "due_date", "start_time", "notes", "location", "duration_seconds") })
+                require(action.keys().asSequence().toSet().all { it in setOf("type", "title", "due_date", "start_time", "notes", "location", "duration_seconds", "items") })
+                // Shopping actions, and only they, carry the products to add.
+                require(action.has("items") == (action.getString("type") == "shopping"))
+                if (action.has("items")) {
+                    val items = action.get("items") as? JSONArray ?: throw IllegalArgumentException("result_items_type")
+                    require(items.length() in 1..IcaShoppingList.MAX_ITEMS && (0 until items.length()).all {
+                        (items.get(it) as? String)?.let { item -> item.isNotBlank() && item.length <= 240 } == true
+                    }) { "result_items" }
+                }
                 for (field in listOf("due_date", "start_time", "notes", "location"))
                     require(!action.has(field) || action.get(field) is String)
                 require(!action.has("duration_seconds") || (integer(action.get("duration_seconds")) && action.getLong("duration_seconds") > 0))

@@ -7,12 +7,16 @@ class ChronoLlmExtraction {
   /// Duration in seconds for timer intents. Null for all other intents.
   final int? durationSeconds;
 
+  /// Products for the shopping intent. Empty for all other intents.
+  final List<String> items;
+
   const ChronoLlmExtraction({
     required this.intent,
     required this.title,
     this.datetimeExpressionOriginal,
     this.datetimeExpressionEnglish,
     this.durationSeconds,
+    this.items = const [],
   });
 }
 

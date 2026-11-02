@@ -13,8 +13,9 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * The user's OpenRouter key, encrypted with a non-exportable Keystore key.
- * A restored backup cannot decrypt and reads as "no key".
+ * The user's OpenRouter key and other service credentials, encrypted with a
+ * non-exportable Keystore key. A restored backup cannot decrypt and reads as
+ * "no key".
  */
 object CompanionCloudCredential {
     private const val ALIAS = "dev.zswatch.app.openrouter"
@@ -34,8 +35,8 @@ object CompanionCloudCredential {
         }
     }
 
-    @Synchronized fun read(context: Context): String? {
-        val stored = prefs(context).getString(FIELD, null) ?: return null
+    @Synchronized fun read(context: Context, field: String = FIELD): String? {
+        val stored = prefs(context).getString(field, null) ?: return null
         return runCatching {
             val bytes = Base64.decode(stored, Base64.NO_WRAP)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -44,14 +45,14 @@ object CompanionCloudCredential {
         }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
 
-    @Synchronized fun write(context: Context, key: String) {
+    @Synchronized fun write(context: Context, key: String, field: String = FIELD) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, secret()) }
         val sealed = cipher.iv + cipher.doFinal(key.toByteArray(Charsets.UTF_8))
-        check(prefs(context).edit().putString(FIELD, Base64.encodeToString(sealed, Base64.NO_WRAP)).commit())
+        check(prefs(context).edit().putString(field, Base64.encodeToString(sealed, Base64.NO_WRAP)).commit())
     }
 
-    @Synchronized fun clear(context: Context) {
-        prefs(context).edit().remove(FIELD).commit()
+    @Synchronized fun clear(context: Context, field: String = FIELD) {
+        prefs(context).edit().remove(field).commit()
     }
 
     fun online(context: Context): Boolean {

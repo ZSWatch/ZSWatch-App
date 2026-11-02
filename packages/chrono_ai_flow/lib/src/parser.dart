@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'models.dart';
+import 'shopping_intent.dart';
 
 class ChronoLlmParser {
   const ChronoLlmParser();
@@ -62,6 +63,11 @@ class ChronoLlmParser {
     }
 
     final intent = _normalizeIntent(parsed['intent'] as String?);
+    if (intent == ShoppingIntent.intent) {
+      final items = ShoppingIntent.items(parsed['items']);
+      if (items == null) return null;
+      return ChronoLlmExtraction(intent: intent, title: '', items: items);
+    }
     final title =
         ((parsed['title'] ?? parsed['summary']) as String?)?.trim() ?? '';
     final datetimeOriginal = (parsed['datetime_expression_original'] as String?)
@@ -204,6 +210,8 @@ class ChronoLlmParser {
       case 'alarm':
       case 'wake':
         return 'alarm';
+      case 'shopping':
+        return ShoppingIntent.intent;
       default:
         return 'note';
     }
