@@ -20,7 +20,7 @@ class IcaIntegrationScreen extends ConsumerStatefulWidget {
 
 class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
   final _session = IcaSessionService();
-  late final IcaShoppingListApi _api = IcaShoppingListApi(_session);
+  late final IcaShoppingListApi _api = IcaShoppingListApi(_session.accessToken);
   final _email = TextEditingController();
   final _code = TextEditingController();
   final _listName = TextEditingController();

@@ -4,8 +4,6 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
-import 'ica_session_service.dart';
-
 class IcaShoppingList {
   const IcaShoppingList({
     required this.id,
@@ -53,12 +51,7 @@ class IcaShoppingRow {
 /// Small ICA-specific adapter. It sends only an OAuth access token to ICA;
 /// OpenRouter never sees list contents, IDs or account credentials.
 class IcaShoppingListApi {
-  IcaShoppingListApi(IcaSessionService session, {http.Client? client})
-    : _token = session.accessToken,
-      _client = client ?? http.Client(),
-      _ownsClient = client == null;
-
-  IcaShoppingListApi.withToken(this._token, {http.Client? client})
+  IcaShoppingListApi(this._token, {http.Client? client})
     : _client = client ?? http.Client(),
       _ownsClient = client == null;
 

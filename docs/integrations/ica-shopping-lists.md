@@ -8,6 +8,7 @@ This optional integration uses ICA's **unofficial** mobile shopping-list API. Th
 - With that access token, `GET https://apimgw-pub.ica.se/sverige/digx/mobile/shoppinglistservice/v1/shoppinglists` returned HTTP 200.
 - A disposable test list was created, read, given one free-text row through `POST /{offlineId}/sync`, read again to confirm the row, and deleted. Each operation returned HTTP 200. The disposable list was removed.
 - Two further disposable lists showed numeric ICA list IDs increasing in creation order, both above the existing list IDs. The list response itself kept the older test list before the newer one, including after an edit. Both test lists were deleted. The newest-list policy therefore uses the highest numeric ICA ID, not response order or `latestChange`.
+- The production Dart OpenRouter proposal and ICA list adapter were exercised together against two disposable lists: the model proposed an item, the adapter chose the newer list, added it, read it back from that list only, and deleted both test lists. This verifies the service path but not the phone UI or phone secure storage.
 - Refreshing the OAuth token with the returned refresh token also returned HTTP 200.
 - The older password authenticator returned HTTP 400/500 during the same investigation; ICA's [FAQ](https://www.ica.se/kundservice/vanliga-fragor/) says it removed four-digit password login on 20 January 2026 and recommends email plus one-time code.
 

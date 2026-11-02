@@ -75,10 +75,7 @@ void main() {
         }
         return http.Response('{}', 404);
       });
-      final api = IcaShoppingListApi.withToken(
-        () async => 'test-token',
-        client: client,
-      );
+      final api = IcaShoppingListApi(() async => 'test-token', client: client);
       final created = await api.create('Test list');
       final updated = await api.addItems(created.id, ['två liter mjölk']);
       expect(updated.rows.single.text, 'två liter mjölk');
@@ -102,10 +99,7 @@ void main() {
         if (request.method == 'POST') writes++;
         return http.Response('{}', 500);
       });
-      final api = IcaShoppingListApi.withToken(
-        () async => 'test-token',
-        client: client,
-      );
+      final api = IcaShoppingListApi(() async => 'test-token', client: client);
       await expectLater(api.addItems('test-list', ['mjölk']), throwsStateError);
       expect(writes, 1);
       api.close();
