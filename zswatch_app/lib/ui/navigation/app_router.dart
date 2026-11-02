@@ -22,6 +22,7 @@ import '../screens/notifications/notification_settings_screen.dart';
 import '../screens/onboarding/companion_onboarding_screen.dart';
 import '../screens/settings/ai_models_settings_screen.dart';
 import '../screens/settings/settings_screen.dart';
+import '../screens/integrations/ica_integration_screen.dart';
 import '../screens/start/start_page_screen.dart';
 import '../screens/voice_memos/alarms_timers_screen.dart';
 import '../screens/voice_memos/voice_memos_screen.dart';
@@ -57,6 +58,7 @@ abstract final class AppRoutes {
 
   // Settings sub-routes
   static const String aiModels = '/settings/ai-models';
+  static const String integrations = '/settings/integrations';
 
   // Watchface
   static const String watchfaceBackground = '/watchface-background';
@@ -125,6 +127,10 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.aiModels,
         builder: (context, state) => const AiModelsSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.integrations,
+        builder: (context, state) => const IcaIntegrationScreen(),
       ),
       GoRoute(
         path: AppRoutes.companionRuntime,

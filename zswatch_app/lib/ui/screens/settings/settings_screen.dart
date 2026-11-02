@@ -82,6 +82,19 @@ class SettingsScreen extends ConsumerWidget {
           ),
 
           const Divider(height: 32),
+          const _SectionHeader(title: 'Integrations'),
+          _SettingsTile(
+            leading: const Icon(
+              Icons.shopping_basket_outlined,
+              color: AppTheme.primaryColor,
+            ),
+            title: 'ICA shopping lists',
+            subtitle: 'Connect with an email code and add items',
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.integrations),
+          ),
+
+          const Divider(height: 32),
 
           // About Section
           const _SectionHeader(title: 'About'),

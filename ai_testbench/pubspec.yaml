@@ -42,6 +42,8 @@ dependencies:
   chrono_dart: ^2.0.2
   chrono_ai_flow:
     path: ../packages/chrono_ai_flow
+  llm_integrations:
+    path: ../packages/llm_integrations
 
 dev_dependencies:
   flutter_test:

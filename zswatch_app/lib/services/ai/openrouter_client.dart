@@ -175,6 +175,32 @@ class OpenRouterClient {
     OpenRouterRequest.conversation(model, system, messages),
   )).trim();
 
+  /// Returns model-proposed tool calls without executing them. No integration
+  /// credentials or account data should be included in [transcript].
+  Future<Object?> proposeTools(
+    String model,
+    String system,
+    String transcript,
+    List<Map<String, Object?>> tools,
+  ) async {
+    final body = await _chatBody(
+      OpenRouterRequest.toolProposal(model, system, transcript, tools),
+    );
+    final choices = body['choices'];
+    if (choices is! List || choices.isEmpty || choices.first is! Map) {
+      throw const OpenRouterFailure(OpenRouterFailureKind.retry, 'No choices');
+    }
+    final choice = choices.first as Map;
+    if (choice['error'] != null) {
+      throw OpenRouterFailure.fromResponse(200, {'error': choice['error']});
+    }
+    final message = choice['message'];
+    if (message is! Map) {
+      throw const OpenRouterFailure(OpenRouterFailureKind.retry, 'No message');
+    }
+    return message['tool_calls'];
+  }
+
   Future<OpenRouterKeyInfo> keyInfo() async {
     final response = await _send(
       () => _http.get(
@@ -227,6 +253,11 @@ class OpenRouterClient {
   }
 
   Future<String> _chat(Map<String, Object?> request) async {
+    final body = await _chatBody(request);
+    return OpenRouterRequest.contentOf(200, body);
+  }
+
+  Future<Map<String, Object?>> _chatBody(Map<String, Object?> request) async {
     final response = await _send(
       () => _http.post(
         Uri.parse('${OpenRouterRequest.baseUrl}/chat/completions'),
@@ -247,7 +278,7 @@ class OpenRouterClient {
     if (usage is Map && usage['cost'] is num) {
       totalCost += (usage['cost']! as num).toDouble();
     }
-    return OpenRouterRequest.contentOf(response.statusCode, body);
+    return body;
   }
 
   Future<http.Response> _send(Future<http.Response> Function() call) async {

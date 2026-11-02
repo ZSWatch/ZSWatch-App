@@ -47,6 +47,28 @@ abstract final class OpenRouterRequest {
     'usage': {'include': true},
   };
 
+  /// OpenRouter function calling. The tool definition is data; this request
+  /// only asks the model for a proposal and does not execute anything.
+  static Map<String, Object?> toolProposal(
+    String model,
+    String system,
+    String transcript,
+    List<Map<String, Object?>> tools,
+  ) => {
+    'model': model,
+    'messages': [
+      {'role': 'system', 'content': system},
+      {'role': 'user', 'content': transcript},
+    ],
+    'tools': tools,
+    'tool_choice': 'auto',
+    'parallel_tool_calls': false,
+    'max_tokens': 1024,
+    'temperature': 0.2,
+    'provider': privateRouting,
+    'usage': {'include': true},
+  };
+
   /// Speech-to-text through an audio-capable chat model. [format] is the
   /// container name OpenRouter expects (`ogg` for the watch's Ogg Opus).
   static Map<String, Object?> transcription(
