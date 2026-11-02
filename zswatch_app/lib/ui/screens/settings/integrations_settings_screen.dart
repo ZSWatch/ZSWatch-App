@@ -208,7 +208,8 @@ class _IcaLoginDialogState extends State<_IcaLoginDialog> {
           autofillHints: const [AutofillHints.email],
           decoration: const InputDecoration(labelText: 'ICA account email'),
         ),
-        if (_codeSent)
+        if (_codeSent) ...[
+          const SizedBox(height: 24),
           TextField(
             controller: _code,
             enabled: !_busy,
@@ -218,6 +219,7 @@ class _IcaLoginDialogState extends State<_IcaLoginDialog> {
             maxLength: 6,
             decoration: const InputDecoration(labelText: 'Code from email'),
           ),
+        ],
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
