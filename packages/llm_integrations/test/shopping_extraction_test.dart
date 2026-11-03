@@ -127,6 +127,30 @@ void main() {
     expect(result.drafts[1].listName, 'Hemma');
   });
 
+  test('rejects an item repeated more often than the memo says it', () {
+    final result = extractor.parse(
+      '[{"list_name":null,"items":["mjölk","mjölk"]}]',
+      transcript: 'Lägg mjölk på inköpslistan.',
+    );
+    expect(result.isValid, isFalse);
+    final twoLists = extractor.parse(
+      '[{"list_name":"Stugan","items":["mjölk"]},'
+      '{"list_name":"Hemma","items":["mjölk"]}]',
+      transcript: 'Lägg mjölk på Stugan och Hemma.',
+    );
+    expect(twoLists.isValid, isTrue);
+  });
+
+  test('keeps the memo spelling and trims list names', () {
+    final result = extractor.parse(
+      '[{"list_name":" Stugan ","items":["oatly ikaffe"]}]',
+      transcript: 'Lägg Oatly iKaffe på listan Stugan.',
+    );
+    expect(result.isValid, isTrue);
+    expect(result.drafts.single.listName, 'Stugan');
+    expect(result.drafts.single.items, ['Oatly iKaffe']);
+  });
+
   test('validates tool calls and normalizes generic list labels', () {
     final result = extractor.parseToolCalls([
       {
@@ -146,6 +170,22 @@ void main() {
     expect(result.isValid, isTrue);
     expect(result.drafts.single.listName, isNull);
     expect(result.drafts.single.items, ['6 ägg']);
+    final german = extractor.parseToolCalls([
+      {
+        'function': {
+          'name': ShoppingExtraction.toolName,
+          'arguments': jsonEncode({
+            'lists': [
+              {
+                'list_name': 'Einkaufsliste',
+                'items': ['Milch'],
+              },
+            ],
+          }),
+        },
+      },
+    ], transcript: 'Setz Milch auf die Einkaufsliste.');
+    expect(german.drafts.single.listName, isNull);
   });
 
   test('rejects extra tool calls and invented items as an entire proposal', () {

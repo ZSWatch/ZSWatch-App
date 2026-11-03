@@ -36,28 +36,31 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
   List<IcaShoppingList> _lists = const [];
   IcaShoppingList? _selected;
   ShoppingExtractionResult? _proposal;
+  String? _proposalMemo;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _memo.addListener(() {
+      if (_proposal != null && _memo.text != _proposalMemo) {
+        setState(() => _proposal = null);
+      }
+    });
+    // Disconnect stays disabled until this load and its refresh finish.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _run(_load));
   }
 
   Future<void> _load() async {
-    try {
-      final connected = await _session.hasSession;
-      final preferredId = connected ? await _session.preferredListId : null;
-      final useNewest = await _session.useNewestList;
-      if (!mounted) return;
-      setState(() {
-        _connected = connected;
-        _selectedId = preferredId;
-        _useNewestList = useNewest;
-      });
-      if (connected) await _refresh();
-    } catch (error) {
-      _showError(error);
-    }
+    final connected = await _session.hasSession;
+    final preferredId = connected ? await _session.preferredListId : null;
+    final useNewest = await _session.useNewestList;
+    if (!mounted) return;
+    setState(() {
+      _connected = connected;
+      _selectedId = preferredId;
+      _useNewestList = useNewest;
+    });
+    if (connected) await _refresh();
   }
 
   Future<void> _run(Future<void> Function() action) async {
@@ -82,9 +85,11 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
   Future<void> _refresh() async {
     final lists = await _api.lists();
     final hasSelection = lists.any((list) => list.id == _selectedId);
-    final id = _useNewestList || !hasSelection
+    final id = _useNewestList
         ? IcaShoppingListApi.newestList(lists)?.id
-        : _selectedId;
+        : hasSelection
+        ? _selectedId
+        : null;
     final selected = id == null ? null : await _api.list(id);
     await _session.setPreferredListId(id);
     if (mounted) {
@@ -101,20 +106,31 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
     if (key == null || key.isEmpty) {
       throw StateError('Add an OpenRouter key under Voice memo models first');
     }
+    setState(() => _proposal = null);
+    final memo = _memo.text;
     final client = OpenRouterClient(key);
     try {
       final service = IcaShoppingProposalService(
         client,
         ref.read(openRouterAnalysisModelProvider),
       );
-      final result = await service.propose(_memo.text);
-      if (mounted) setState(() => _proposal = result);
+      final result = await service.propose(memo);
+      if (mounted && _memo.text == memo) {
+        setState(() {
+          _proposal = result;
+          _proposalMemo = memo;
+        });
+      }
     } finally {
       client.close();
     }
   }
 
-  Future<void> _confirmAdd(List<String> items, {String? hint}) async {
+  Future<void> _confirmAdd(
+    List<String> items, {
+    String? hint,
+    ShoppingListDraft? draft,
+  }) async {
     final currentLists = await _api.lists();
     final target = hint == null
         ? _useNewestList
@@ -171,8 +187,18 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
           _selected = updated;
           _lists = currentLists;
         }
-        _item.clear();
-        _proposal = null;
+        final proposal = _proposal;
+        if (draft == null) {
+          _item.clear();
+        } else if (proposal != null) {
+          final rest = [
+            for (final other in proposal.drafts)
+              if (!identical(other, draft)) other,
+          ];
+          _proposal = rest.isEmpty
+              ? null
+              : ShoppingExtractionResult(drafts: rest);
+        }
       });
     }
   }
@@ -340,8 +366,7 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
               onPressed: _busy
                   ? null
                   : () => _run(() async {
-                      final created = await _api.create(_listName.text);
-                      _selectedId = created.id;
+                      _selectedId = await _api.create(_listName.text);
                       _listName.clear();
                       await _refresh();
                     }),
@@ -402,6 +427,7 @@ class _IcaIntegrationScreenState extends ConsumerState<IcaIntegrationScreen> {
                                 () => _confirmAdd(
                                   draft.items,
                                   hint: draft.listName,
+                                  draft: draft,
                                 ),
                               ),
                         child: const Text('Review and add'),

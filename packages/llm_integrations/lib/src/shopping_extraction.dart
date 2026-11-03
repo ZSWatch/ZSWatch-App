@@ -46,6 +46,27 @@ class ShoppingExtraction {
 
   static const toolName = 'ica_propose_add_items';
 
+  // Mean "the default list"; a draft with one of these must not be resolved
+  // as a list title.
+  static const _genericListNames = {
+    'inköpslistan',
+    'inköpslista',
+    'min inköpslista',
+    'handlingslistan',
+    'handlingslista',
+    'listan',
+    'shopping list',
+    'the shopping list',
+    'my shopping list',
+    'grocery list',
+    'the grocery list',
+    'my grocery list',
+    'the list',
+    'einkaufsliste',
+    'die einkaufsliste',
+    'meine einkaufsliste',
+  };
+
   /// OpenRouter function definition. This proposes items; the app is the only
   /// party allowed to resolve list IDs and authorize a remote write.
   Map<String, Object?> get tool => {
@@ -146,12 +167,7 @@ class ShoppingExtraction {
               'list_name': switch (entry['list_name'] is String
                   ? (entry['list_name'] as String).trim().toLowerCase()
                   : null) {
-                'inköpslistan' ||
-                'inköpslista' ||
-                'shopping list' ||
-                'the shopping list' ||
-                'grocery list' ||
-                'the grocery list' => null,
+                final String name when _genericListNames.contains(name) => null,
                 _ => entry['list_name'],
               },
             }
@@ -276,7 +292,7 @@ JSON:''';
           (name is! String ||
               name.trim().isEmpty ||
               name.length > 160 ||
-              !_grounded(name, transcript))) {
+              _matches(name, transcript).isEmpty)) {
         return invalid('List name must be copied from the memo');
       }
       final items = group['items'];
@@ -284,17 +300,29 @@ JSON:''';
         return invalid('Shopping-list items must be a nonempty array');
       }
       final texts = <String>[];
+      final uses = <String, int>{};
       for (final item in items) {
-        if (item is! String ||
-            item.trim().isEmpty ||
-            item.length > 240 ||
-            !_grounded(item, transcript)) {
+        if (item is! String || item.trim().isEmpty || item.length > 240) {
           return invalid('Every item must be copied from the memo');
         }
+        final found = _matches(item, transcript);
+        if (found.isEmpty) {
+          return invalid('Every item must be copied from the memo');
+        }
+        // A phrase said once is added once per list, however often the model
+        // repeats it.
+        final key = found.first.toLowerCase();
+        final used = uses[key] = (uses[key] ?? 0) + 1;
+        if (used > found.length) {
+          return invalid('An item is repeated more often than in the memo');
+        }
         if (++count > maxItems) return invalid('Too many shopping-list items');
-        texts.add(item.trim());
+        // The memo's spelling, so a recased brand reaches ICA as spoken.
+        texts.add(found[used - 1]);
       }
-      drafts.add(ShoppingListDraft(listName: name as String?, items: texts));
+      drafts.add(
+        ShoppingListDraft(listName: (name as String?)?.trim(), items: texts),
+      );
     }
     return ShoppingExtractionResult(drafts: drafts);
   }
@@ -307,16 +335,19 @@ JSON:''';
     }
   }
 
-  static bool _grounded(String text, String transcript) {
-    String normalize(String value) =>
-        value.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
+  /// Every occurrence of [text] in the memo, in the memo's spelling. Case and
+  /// whitespace may differ.
+  static List<String> _matches(String text, String transcript) {
+    final words = text.trim().split(RegExp(r'\s+')).map(RegExp.escape);
     // Word boundaries include Swedish letters; "mjölk" must not be accepted
     // as a substring of "havremjölk", which would change the requested product.
     return RegExp(
-      r'(^|[^\p{L}\p{N}])' +
-          RegExp.escape(normalize(text)) +
-          r'($|[^\p{L}\p{N}])',
-      unicode: true,
-    ).hasMatch(normalize(transcript));
+          r'(?<![\p{L}\p{N}])' + words.join(r'\s+') + r'(?![\p{L}\p{N}])',
+          unicode: true,
+          caseSensitive: false,
+        )
+        .allMatches(transcript)
+        .map((match) => match[0]!.replaceAll(RegExp(r'\s+'), ' '))
+        .toList();
   }
 }

@@ -198,6 +198,12 @@ class OpenRouterClient {
     if (message is! Map) {
       throw const OpenRouterFailure(OpenRouterFailureKind.retry, 'No message');
     }
+    if (choice['finish_reason'] == 'length') {
+      throw const OpenRouterFailure(
+        OpenRouterFailureKind.retry,
+        'Proposal was cut off',
+      );
+    }
     return message['tool_calls'];
   }
 

@@ -67,7 +67,13 @@ Future<void> main(List<String> args) async {
         const Duration(seconds: 90),
       );
       final body =
-          jsonDecode(await response.transform(utf8.decoder).join()) as Map;
+          jsonDecode(
+                await response
+                    .transform(utf8.decoder)
+                    .join()
+                    .timeout(const Duration(seconds: 90)),
+              )
+              as Map;
       if (response.statusCode != 200 || body['error'] != null) {
         throw OpenRouterFailure.fromResponse(
           response.statusCode,
@@ -89,10 +95,11 @@ Future<void> main(List<String> args) async {
       final expected = mode == 'explicit' && !c.explicit
           ? <List<String>>[]
           : c.items;
-      String normalize(String s) =>
-          s.toLowerCase().trim().replaceAll(RegExp(r'\s+'), ' ');
+      // Items keep their case: brands must reach ICA as spoken.
+      String collapse(String s) => s.trim().replaceAll(RegExp(r'\s+'), ' ');
+      String normalize(String s) => collapse(s).toLowerCase();
       final actual = proposal.drafts
-          .map((d) => d.items.map(normalize).toList())
+          .map((d) => d.items.map(collapse).toList())
           .toList();
       final names = proposal.drafts
           .map((d) => normalize(d.listName ?? ''))
@@ -101,7 +108,7 @@ Future<void> main(List<String> args) async {
           proposal.isValid &&
           jsonEncode(actual) ==
               jsonEncode(
-                expected.map((g) => g.map(normalize).toList()).toList(),
+                expected.map((g) => g.map(collapse).toList()).toList(),
               ) &&
           jsonEncode(names) ==
               jsonEncode(

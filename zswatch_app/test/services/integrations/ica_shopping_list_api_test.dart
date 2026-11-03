@@ -77,15 +77,10 @@ void main() {
       });
       final api = IcaShoppingListApi(() async => 'test-token', client: client);
       final created = await api.create('Test list');
-      final updated = await api.addItems(created.id, ['två liter mjölk']);
+      final updated = await api.addItems(created, ['två liter mjölk']);
       expect(updated.rows.single.text, 'två liter mjölk');
-      expect(listReads, 2);
-      expect(requests.map((r) => r.split(' ').first), [
-        'POST',
-        'GET',
-        'POST',
-        'GET',
-      ]);
+      expect(listReads, 1);
+      expect(requests.map((r) => r.split(' ').first), ['POST', 'POST', 'GET']);
       api.close();
       client.close();
     },

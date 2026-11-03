@@ -90,7 +90,9 @@ class IcaShoppingListApi {
     await _request('GET', '/${Uri.encodeComponent(id)}'),
   );
 
-  Future<IcaShoppingList> create(String title) async {
+  /// Returns the new list's ID without reading it back, so a failed read
+  /// cannot make the caller post the same title again.
+  Future<String> create(String title) async {
     final trimmed = title.trim();
     if (trimmed.isEmpty || trimmed.length > 160) {
       throw const FormatException('Enter a list name up to 160 characters');
@@ -108,7 +110,7 @@ class IcaShoppingListApi {
         'latestChange': _timestamp(),
       },
     );
-    return list(id);
+    return id;
   }
 
   Future<IcaShoppingList> addItems(String listId, List<String> items) async {

@@ -15,6 +15,12 @@ class IcaShoppingProposalService {
     if (ShoppingExtraction.isNoSpeech(transcript)) {
       return ShoppingExtractionResult(drafts: const []);
     }
+    if (transcript.length > ShoppingExtraction.maxTranscriptLength) {
+      return ShoppingExtractionResult(
+        drafts: const [],
+        problem: 'Transcript is too long',
+      );
+    }
     final calls = await _client.proposeTools(
       _model,
       extractor.toolPrompt(),

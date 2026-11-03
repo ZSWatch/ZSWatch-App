@@ -30,6 +30,8 @@ class IcaSessionService {
   String? _state;
   String? _emailStep;
   Future<void>? _refreshing;
+  // Bumped by disconnect so a refresh still in flight cannot restore the session.
+  int _generation = 0;
 
   Future<bool> get hasSession async {
     await _load();
@@ -226,6 +228,7 @@ class IcaSessionService {
 
   Future<void> _refresh() async {
     final current = _saved!;
+    final generation = _generation;
     final basic = base64Encode(
       utf8.encode('${current['client_id']}:${current['client_secret']}'),
     );
@@ -239,6 +242,9 @@ class IcaSessionService {
       authorization: 'Basic $basic',
     );
     _check(response);
+    if (generation != _generation) {
+      throw StateError('Connect your ICA account first');
+    }
     final value = jsonDecode(response.body) as Map<String, dynamic>;
     _saved = {
       ...current,
@@ -254,6 +260,7 @@ class IcaSessionService {
       _storage.write(key: _stateKey, value: jsonEncode(_saved));
 
   Future<void> disconnect() async {
+    _generation++;
     _saved = null;
     await _storage.delete(key: _stateKey);
     await _storage.delete(key: _preferredListKey);
@@ -293,7 +300,7 @@ class IcaSessionService {
   }) async {
     final parsed = Uri.parse(url);
     final uri = query == null ? parsed : parsed.replace(queryParameters: query);
-    if (uri.host != 'ims.icagruppen.se') {
+    if (uri.scheme != 'https' || uri.host != 'ims.icagruppen.se') {
       throw StateError('Unexpected ICA host');
     }
     final request = await _http

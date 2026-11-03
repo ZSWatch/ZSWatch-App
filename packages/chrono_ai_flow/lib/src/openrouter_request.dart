@@ -63,7 +63,7 @@ abstract final class OpenRouterRequest {
     'tools': tools,
     'tool_choice': 'auto',
     'parallel_tool_calls': false,
-    'max_tokens': 1024,
+    'max_tokens': 8192,
     'temperature': 0.2,
     'provider': privateRouting,
     'usage': {'include': true},
