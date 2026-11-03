@@ -199,7 +199,7 @@ class IcaSessionService {
   }) async {
     final parsed = Uri.parse(url);
     final uri = query == null ? parsed : parsed.replace(queryParameters: query);
-    if (uri.host != 'ims.icagruppen.se') {
+    if (uri.scheme != 'https' || uri.host != 'ims.icagruppen.se') {
       throw StateError('Unexpected ICA host');
     }
     final request = await _http
