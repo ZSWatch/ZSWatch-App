@@ -195,7 +195,6 @@ class IcaSessionService {
     Map<String, String>? form,
     Map<String, Object?>? json,
     String? bearer,
-    String? authorization,
   }) async {
     final parsed = Uri.parse(url);
     final uri = query == null ? parsed : parsed.replace(queryParameters: query);
@@ -209,9 +208,6 @@ class IcaSessionService {
     if (_cookies.isNotEmpty) request.cookies.addAll(_cookies.values);
     if (bearer != null) {
       request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $bearer');
-    }
-    if (authorization != null) {
-      request.headers.set(HttpHeaders.authorizationHeader, authorization);
     }
     if (form != null) {
       request.headers.contentType = ContentType(

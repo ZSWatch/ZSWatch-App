@@ -57,12 +57,15 @@ object CompanionVoiceActions {
         val jobs = PrototypeJobs(PrototypeHub.jobJournal(context))
         require(input.getString("actionType") == "shopping")
         require(shoppingItems(input) != null) { "Invalid shopping items" }
+        val key = busy(id, index)
         val alreadyConfirmed = jobs.state(id).optJSONObject("action_states")?.has(index.toString()) == true
         // A retry recovers the confirmed items, never a changed draft.
-        val items = shoppingItems(jobs.beginAction(id, index, input).getJSONObject("draft"))!!
+        val items = try { shoppingItems(jobs.beginAction(id, index, input).getJSONObject("draft"))!! }
+        catch (error: Exception) { shoppingBusy.remove(key); throw error }
         IcaShoppingList.executor.execute {
             val outcome = runCatching { IcaShoppingList(context).add(token(id, index), items) }
             PrototypeHub.worker.post {
+                shoppingBusy.remove(key)
                 val result = outcome.mapCatching { response ->
                     jobs.finishAction(id, index, response)
                     PrototypeStore.asMap(response)
@@ -78,20 +81,30 @@ object CompanionVoiceActions {
 
     fun undoShopping(context: Context, id: String, index: Int, done: (Result<Unit>) -> Unit) {
         val jobs = PrototypeJobs(PrototypeHub.jobJournal(context))
-        val response = jobs.beginUndoAction(id, index).getJSONObject("response")
+        val key = busy(id, index)
+        val response = try { jobs.beginUndoAction(id, index).getJSONObject("response") }
+        catch (error: Exception) { shoppingBusy.remove(key); throw error }
         val rows = response.getJSONArray("rowIds").let { ids -> (0 until ids.length()).map { ids.getString(it) } }
         IcaShoppingList.executor.execute {
             val outcome = runCatching { IcaShoppingList(context).remove(response.getString("platformId"), rows) }
-            PrototypeHub.worker.post { done(outcome.mapCatching { jobs.finishUndoAction(id, index) }) }
+            PrototypeHub.worker.post {
+                shoppingBusy.remove(key)
+                done(outcome.mapCatching { jobs.finishUndoAction(id, index) })
+            }
         }
     }
 
-    private fun shoppingItems(draft: JSONObject): List<String>? {
-        val items = draft.optJSONArray("items") ?: return null
-        if (items.length() !in 1..IcaShoppingList.MAX_ITEMS) return null
-        return (0 until items.length()).map { items.opt(it) as? String ?: return null }
-            .takeIf { list -> list.all { it.isNotBlank() && it.length <= 240 } }
+    // Worker-owned. An auto-add and a tap on the same action must not overlap:
+    // the first one's release could drop the rows the second one wrote.
+    private val shoppingBusy = mutableSetOf<String>()
+
+    private fun busy(id: String, index: Int): String {
+        val key = "$id.$index"
+        if (!shoppingBusy.add(key)) throw ActionFailure("BUSY", "Action already in progress")
+        return key
     }
+
+    private fun shoppingItems(draft: JSONObject) = IcaShoppingList.validItems(draft.optJSONArray("items"))
 
     fun undoCreated(context: Context, id: String, index: Int) {
         val jobs = PrototypeJobs(PrototypeHub.jobJournal(context))

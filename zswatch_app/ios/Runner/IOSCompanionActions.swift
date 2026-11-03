@@ -147,7 +147,7 @@ final class IOSCompanionActions: NSObject, EKEventViewDelegate {
   private func create(_ id: String, _ index: Int, _ key: String, _ action: [String: Any], _ reply: @escaping (Any?) -> Void) {
     guard let draft = action["draft"] as? [String: Any], let type = draft["actionType"] as? String, let title = draft["title"] as? String else { unknown(reply); return }
     if ["timer", "alarm"].contains(type) { notification(id, index, key, action, draft, reply); return }
-    if type == "shopping" { shopping(id, index, draft, reply); return }
+    if type == "shopping" { shopping(id, index, action, draft, reply); return }
     authorize(type) { granted in
       guard granted else { self.reject(id, index, "Calendar or Reminders permission denied", reply); return }
       let marker = URL(string: "zswatch-action://" + key)!
@@ -194,18 +194,23 @@ final class IOSCompanionActions: NSObject, EKEventViewDelegate {
   }
   /// Row IDs come from the action, so a retry after an interruption finds
   /// the rows it already wrote instead of adding them twice.
-  private func shopping(_ id: String, _ index: Int, _ draft: [String: Any], _ reply: @escaping (Any?) -> Void) {
+  /// An attempt that proves it changed nothing releases the action, unless an
+  /// earlier attempt was admitted: its rows may be on the list.
+  private func shopping(_ id: String, _ index: Int, _ action: [String: Any], _ draft: [String: Any], _ reply: @escaping (Any?) -> Void) {
     guard let items = draft["items"] as? [String] else { reject(id, index, "Shopping items required", reply); return }
-    IOSIcaShoppingList.queue.async {
-      do {
-        let response = try IOSIcaShoppingList.add(token: "zswatch://voice-action/\(id)/\(index)", items: items)
-        self.complete(id, index, response, reply)
-      } catch let failure as IOSIcaShoppingList.Failure where failure.noEffect {
-        self.owner.queue.async {
-          try? self.owner.voice?.jobs.releaseAction(id, index: index); self.owner.journalChanged()
-          reply(Self.icaError(failure))
-        }
-      } catch { reply(Self.icaError(error)) }
+    let retry = action["effect_admitted"] as? Bool == true
+    admit(id, index, reply) {
+      IOSIcaShoppingList.queue.async {
+        do {
+          let response = try IOSIcaShoppingList.add(token: "zswatch://voice-action/\(id)/\(index)", items: items)
+          self.complete(id, index, response, reply)
+        } catch let failure as IOSIcaShoppingList.Failure where failure.noEffect && !retry {
+          self.owner.queue.async {
+            try? self.owner.voice?.jobs.releaseAction(id, index: index); self.owner.journalChanged()
+            reply(Self.icaError(failure))
+          }
+        } catch { reply(Self.icaError(error)) }
+      }
     }
   }
   private static func icaError(_ error: Error) -> FlutterError {
