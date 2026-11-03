@@ -82,9 +82,9 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
     allowForget: true,
     forgetDescription:
         ref.read(companionSnapshotProvider).asData?.value.isIos == true
-        ? 'This removes the watch and its saved history from this app. To remove '
-              'the Bluetooth pairing, open iPhone Settings > Bluetooth > ZSWatch > '
-              'Forget This Device. Use Add Watch to set it up again.'
+        ? 'This removes the watch and its saved history from this app. iPhone '
+              'then asks to remove its Bluetooth pairing; if you cancel, the watch '
+              'stays under Add Watch. Use Add Watch to set it up again.'
         : 'This removes the watch and its saved history from this app '
               'and removes its Android companion association. The Bluetooth pairing '
               'is kept. Use Add Watch to set it up again.',
