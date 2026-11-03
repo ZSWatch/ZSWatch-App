@@ -669,6 +669,9 @@ class CompanionPrototypeBridge(activity: Activity, messenger: BinaryMessenger) {
             status["error"] = error.code
         } catch (error: java.io.IOException) {
             status["error"] = "ICA_OFFLINE"
+        } catch (error: Exception) {
+            // An unexpected body must not hide a stored session.
+            status["error"] = "ICA_HTTP"
         }
         return status
     }

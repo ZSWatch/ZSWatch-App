@@ -13,7 +13,14 @@ enum IOSIcaShoppingList {
   struct Row { let id: String; let text: String; let checked: Bool }
   struct ShoppingList { let id: String; let serverId: Int?; let title: String; let rows: [Row] }
 
+  /// Same limits as Dart's ShoppingIntent.
   static let maxItems = 64
+  static let maxItemLength = 240
+  static func validItems(_ value: Any?) -> [String]? {
+    guard let items = value as? [String], (1...maxItems).contains(items.count),
+          items.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.count <= maxItemLength }) else { return nil }
+    return items
+  }
   /// One at a time, so token refreshes never race.
   static let queue = DispatchQueue(label: "dev.zswatch.app.ica")
   private static let tokenURL = "https://ims.icagruppen.se/oauth/v2/token"
@@ -74,10 +81,10 @@ enum IOSIcaShoppingList {
   }
   static func clear() { SecItemDelete(keychain as CFDictionary) }
 
-  /// The list voice actions add to: the newest one, or the chosen one.
+  /// The list voice actions add to: the newest one, or the chosen one. A
+  /// fixed target without a list adds nothing until one is chosen.
   static func setTarget(newest: Bool, listId: String?) throws {
     guard var session = stored() else { throw notConnected }
-    guard newest || !(listId ?? "").isEmpty else { throw CompanionFailure.invalid("Choose an ICA list") }
     session["newest"] = newest; session["list_id"] = listId ?? NSNull()
     try store(session)
   }
@@ -111,6 +118,10 @@ enum IOSIcaShoppingList {
       ["offlineId": id, "productName": item, "sourceId": -1, "isStrikedOver": false, "recipes": [Any]()]
     }
     let unknown = Failure(code: "ICA_OUTCOME_UNKNOWN", message: "ICA did not answer. The items may have been added.", noEffect: false)
+    // Refresh before the write: a refresh that fails cannot have added anything.
+    do { _ = try accessToken(force: false) } catch let failure as Failure { throw failure } catch {
+      throw Failure(code: "ICA_OFFLINE", message: "Could not reach ICA", noEffect: true)
+    }
     let status: Int
     do { status = try api("POST", "\(listsURL)/\(encode(target.id))/sync", ["createdRows": rows], check: false).status }
     catch let failure as Failure { throw failure } catch { throw unknown }
@@ -124,9 +135,20 @@ enum IOSIcaShoppingList {
   }
 
   /// Removes the rows a voice action added. Rows already gone count as removed.
+  /// A deleted list (HTTP 404) has no rows left either.
   static func remove(listId: String, ids: [String]) throws {
-    _ = try api("POST", "\(listsURL)/\(encode(listId))/sync", ["deletedRows": ids])
-    if try list(listId).rows.contains(where: { ids.contains($0.id) }) {
+    let path = "\(listsURL)/\(encode(listId))"
+    let status = try api("POST", "\(path)/sync", ["deletedRows": ids], check: false).status
+    if status == 404 { return }
+    guard (200...299).contains(status) else {
+      throw Failure(code: "ICA_HTTP", message: "ICA shopping lists returned HTTP \(status)", noEffect: false)
+    }
+    let reply = try api("GET", path, nil, check: false)
+    if reply.status == 404 { return }
+    guard (200...299).contains(reply.status) else {
+      throw Failure(code: "ICA_HTTP", message: "ICA shopping lists returned HTTP \(reply.status)", noEffect: true)
+    }
+    if try parseList(reply.json).rows.contains(where: { ids.contains($0.id) }) {
       throw Failure(code: "ICA_OUTCOME_UNKNOWN", message: "ICA did not confirm the removal", noEffect: false)
     }
   }

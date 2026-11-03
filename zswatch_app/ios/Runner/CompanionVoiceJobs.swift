@@ -269,11 +269,8 @@ final class CompanionVoiceJobs {
             let title = action["title"] as? String, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             Set(action.keys).isSubset(of: ["type", "title", "due_date", "start_time", "notes", "location", "duration_seconds", "items"]),
             (action["items"] != nil) == (type == "shopping") else { throw CompanionFailure.invalid("Invalid action draft") }
-      if let items = action["items"] {
-        guard let items = items as? [String], (1...IOSIcaShoppingList.maxItems).contains(items.count),
-              items.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && $0.count <= 240 }) else {
-          throw CompanionFailure.invalid("Invalid shopping items")
-        }
+      if let items = action["items"], IOSIcaShoppingList.validItems(items) == nil {
+        throw CompanionFailure.invalid("Invalid shopping items")
       }
       for key in ["due_date", "start_time", "notes", "location"] where action[key] != nil { guard action[key] is String else { throw CompanionFailure.invalid("Invalid action field") } }
       if action["duration_seconds"] != nil { guard let seconds = CompanionRecordingFiles.integer(action["duration_seconds"]), seconds > 0 else { throw CompanionFailure.invalid("Invalid action duration") } }
@@ -308,9 +305,12 @@ final class CompanionVoiceJobs {
     let item = try actionItem(id, index: index)
     guard ["result_ready", "delivered"].contains(item["state"] as? String ?? "") else { throw CompanionFailure.invalid("Accepted action draft required") }
     let actions = (item["result"] as! [String: Any])["actions"] as! [[String: Any]]
+    // A shopping title lists every item, so only the result's own bound applies.
+    let shopping = draft["actionType"] as? String == "shopping"
     guard draft["actionType"] as? String == actions[index]["type"] as? String,
           let title = draft["title"] as? String, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-          title.utf8.count <= 4096, (try Self.canonical(draft)).utf8.count <= 32768 else { throw CompanionFailure.invalid("Invalid confirmed action") }
+          shopping || title.utf8.count <= 4096,
+          (try Self.canonical(draft)).utf8.count <= (shopping ? 65536 : 32768) else { throw CompanionFailure.invalid("Invalid confirmed action") }
     if let previous = (item["action_states"] as? [String: [String: Any]])?[String(index)] {
       guard previous["state"] as? String == "creating" else { throw CompanionFailure.unavailable("Action already handled") }
       return previous

@@ -174,14 +174,15 @@ class _IcaLoginDialogState extends State<_IcaLoginDialog> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit({bool resend = false}) async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      if (!_codeSent) {
+      if (!_codeSent || resend) {
         await _service.startEmailLogin(_email.text);
+        _code.clear();
         if (mounted) setState(() => _codeSent = true);
       } else {
         final session = await _service.finishEmailLogin(_code.text.trim());
@@ -235,6 +236,11 @@ class _IcaLoginDialogState extends State<_IcaLoginDialog> {
         onPressed: _busy ? null : () => Navigator.of(context).pop(),
         child: const Text('Cancel'),
       ),
+      if (_codeSent)
+        TextButton(
+          onPressed: _busy ? null : () => _submit(resend: true),
+          child: const Text('Send new code'),
+        ),
       FilledButton(
         onPressed: _busy ? null : _submit,
         child: Text(_codeSent ? 'Connect' : 'Send code'),

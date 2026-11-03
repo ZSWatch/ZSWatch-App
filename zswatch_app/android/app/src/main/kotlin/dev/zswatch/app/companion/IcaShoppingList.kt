@@ -25,7 +25,16 @@ class IcaShoppingList(private val context: Context) {
         private const val FIELD = "ica_session"
         private const val TOKEN_URL = "https://ims.icagruppen.se/oauth/v2/token"
         private const val LISTS_URL = "https://apimgw-pub.ica.se/sverige/digx/mobile/shoppinglistservice/v1/shoppinglists"
+        // Same limits as Dart's ShoppingIntent.
         const val MAX_ITEMS = 64
+        const val MAX_ITEM_LENGTH = 240
+
+        /** The items of a shopping action, or null when any of them is invalid. */
+        fun validItems(items: JSONArray?): List<String>? {
+            if (items == null || items.length() !in 1..MAX_ITEMS) return null
+            return (0 until items.length()).map { items.opt(it) as? String ?: return null }
+                .takeIf { list -> list.all { it.isNotBlank() && it.length <= MAX_ITEM_LENGTH } }
+        }
 
         /** One at a time, so token refreshes never race. */
         val executor = Executors.newSingleThreadExecutor { Thread(it, "ZSWatchIca").apply { isDaemon = true } }
@@ -75,10 +84,9 @@ class IcaShoppingList(private val context: Context) {
     fun store(session: JSONObject) = CompanionCloudCredential.write(context, session.toString(), FIELD)
     fun clear() = CompanionCloudCredential.clear(context, FIELD)
 
-    /** The list voice actions add to: the newest one, or the chosen one. */
+    /** The list voice actions add to: the newest one, or the chosen one. A fixed target without a list adds nothing until one is chosen. */
     fun setTarget(newest: Boolean, listId: String?) {
         val session = stored() ?: throw notConnected()
-        require(newest || !listId.isNullOrBlank()) { "Choose an ICA list" }
         store(session.put("newest", newest).put("list_id", listId ?: JSONObject.NULL))
     }
 
@@ -104,6 +112,10 @@ class IcaShoppingList(private val context: Context) {
         // An interrupted earlier attempt may have written the rows already.
         lists.firstOrNull { list -> list.rows.any { it.id == ids.first() } }?.let { return response(it, ids) }
         val target = target(lists) ?: throw IcaFailure("ICA_NO_LIST", "No ICA list to add to. Create one or choose a list.", true)
+        // Refresh before the write: a refresh that fails cannot have added anything.
+        try { accessToken(false) } catch (error: IOException) {
+            throw IcaFailure("ICA_OFFLINE", "Could not reach ICA", true)
+        }
         val status = try {
             api("POST", "$LISTS_URL/${encode(target.id)}/sync", createdRows(ids, items), check = false).first
         } catch (error: IOException) {
@@ -118,10 +130,16 @@ class IcaShoppingList(private val context: Context) {
         return response(written, ids)
     }
 
-    /** Removes the rows a voice action added. Rows already gone count as removed. */
+    /** Removes the rows a voice action added. Rows already gone, or a deleted list (HTTP 404), count as removed. */
     fun remove(listId: String, ids: List<String>) {
-        api("POST", "$LISTS_URL/${encode(listId)}/sync", JSONObject().put("deletedRows", JSONArray(ids)))
-        if (list(listId).rows.any { it.id in ids }) throw IcaFailure("ICA_OUTCOME_UNKNOWN", "ICA did not confirm the removal", false)
+        val path = "$LISTS_URL/${encode(listId)}"
+        val status = api("POST", "$path/sync", JSONObject().put("deletedRows", JSONArray(ids)), check = false).first
+        if (status == 404) return
+        if (status !in 200..299) throw IcaFailure("ICA_HTTP", "ICA shopping lists returned HTTP $status", false)
+        val (listStatus, text) = api("GET", path, null, check = false)
+        if (listStatus == 404) return
+        if (listStatus !in 200..299) throw IcaFailure("ICA_HTTP", "ICA shopping lists returned HTTP $listStatus", true)
+        if (parseList(JSONObject(text)).rows.any { it.id in ids }) throw IcaFailure("ICA_OUTCOME_UNKNOWN", "ICA did not confirm the removal", false)
     }
 
     private fun list(id: String) = parseList(JSONObject(api("GET", "$LISTS_URL/${encode(id)}", null).second))

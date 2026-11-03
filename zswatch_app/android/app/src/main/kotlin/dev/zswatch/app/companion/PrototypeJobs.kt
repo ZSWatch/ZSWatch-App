@@ -537,9 +537,7 @@ class PrototypeJobs(private val store: PrototypeStore) {
                 require(action.has("items") == (action.getString("type") == "shopping"))
                 if (action.has("items")) {
                     val items = action.get("items") as? JSONArray ?: throw IllegalArgumentException("result_items_type")
-                    require(items.length() in 1..IcaShoppingList.MAX_ITEMS && (0 until items.length()).all {
-                        (items.get(it) as? String)?.let { item -> item.isNotBlank() && item.length <= 240 } == true
-                    }) { "result_items" }
+                    require(IcaShoppingList.validItems(items) != null) { "result_items" }
                 }
                 for (field in listOf("due_date", "start_time", "notes", "location"))
                     require(!action.has(field) || action.get(field) is String)
