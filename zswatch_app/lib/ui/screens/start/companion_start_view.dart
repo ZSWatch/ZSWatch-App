@@ -76,21 +76,34 @@ class _CompanionStartViewState extends ConsumerState<CompanionStartView> {
     }
   }
 
-  Future<void> configureWatch(WatchEntity watch) => WatchConfigDialog.show(
-    context: context,
-    watch: watch,
-    allowForget: true,
-    forgetDescription:
-        ref.read(companionSnapshotProvider).asData?.value.isIos == true
-        ? 'This removes the watch and its saved history from this app. iPhone '
-              'then asks to remove its Bluetooth pairing; if you cancel, the watch '
-              'stays under Add Watch. Use Add Watch to set it up again.'
-        : 'This removes the watch and its saved history from this app '
-              'and removes its Android companion association. The Bluetooth pairing '
-              'is kept. Use Add Watch to set it up again.',
-    onRename: ref.read(companionRenameWatchProvider),
-    onForget: ref.read(companionForgetWatchProvider),
-  );
+  Future<void> configureWatch(WatchEntity watch) {
+    final snapshot = ref.read(companionSnapshotProvider).asData?.value;
+    final String forgetDescription;
+    if (snapshot?.isIos != true) {
+      forgetDescription =
+          'This removes the watch and its saved history from this app '
+          'and removes its Android companion association. The Bluetooth pairing '
+          'is kept. Use Add Watch to set it up again.';
+    } else if (snapshot?.fields['accessory_setup_available'] == true) {
+      forgetDescription =
+          'This removes the watch and its saved history from this app. iPhone '
+          'then asks to remove its Bluetooth pairing; if you cancel, the watch '
+          'stays under Add Watch. Use Add Watch to set it up again.';
+    } else {
+      forgetDescription =
+          'This removes the watch and its saved history from this app. To remove '
+          'the Bluetooth pairing, open iPhone Settings > Bluetooth > ZSWatch > '
+          'Forget This Device. Use Add Watch to set it up again.';
+    }
+    return WatchConfigDialog.show(
+      context: context,
+      watch: watch,
+      allowForget: true,
+      forgetDescription: forgetDescription,
+      onRename: ref.read(companionRenameWatchProvider),
+      onForget: ref.read(companionForgetWatchProvider),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
