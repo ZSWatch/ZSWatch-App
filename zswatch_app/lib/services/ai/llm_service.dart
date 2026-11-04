@@ -1634,6 +1634,12 @@ JSON:
 
   bool _shouldRetryStructuredOutput(String raw, TranscriptResult result) {
     final cleaned = _sanitizeModelOutput(raw);
+    // A shopping entry was dropped as invalid; retry instead of losing it.
+    if (shoppingList &&
+        cleaned.contains('"shopping"') &&
+        !result.actions.any((a) => a.type == ShoppingIntent.intent)) {
+      return true;
+    }
     // "[]" or only empty notes: the memo had nothing to extract.
     if (result.summary.isEmpty &&
         result.actions.isEmpty &&
@@ -1930,7 +1936,8 @@ JSON:
       final parsedActions = parsed['actions'];
       if (parsedActions is List) {
         for (final action in parsedActions.whereType<Map<String, dynamic>>()) {
-          if (action['type'] == ShoppingIntent.intent) {
+          final type = (action['type'] as String?)?.trim().toLowerCase();
+          if (type == ShoppingIntent.intent) {
             final items = shoppingList
                 ? ShoppingIntent.items(action['items'])
                 : null;

@@ -73,11 +73,14 @@ enum IOSIcaShoppingList {
     guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess, let data = item as? Data else { return nil }
     return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
   }
+  /// Updates in place, so a failed write never loses the stored session.
   static func store(_ session: [String: Any]) throws {
-    SecItemDelete(keychain as CFDictionary)
-    var q = keychain; q[kSecValueData as String] = try JSONSerialization.data(withJSONObject: session)
-    q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-    guard SecItemAdd(q as CFDictionary, nil) == errSecSuccess else { throw CompanionFailure.storage("Could not save the ICA session") }
+    let data = try JSONSerialization.data(withJSONObject: session)
+    let attributes: [String: Any] = [kSecValueData as String: data,
+      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+    var status = SecItemUpdate(keychain as CFDictionary, attributes as CFDictionary)
+    if status == errSecItemNotFound { status = SecItemAdd(keychain.merging(attributes) { $1 } as CFDictionary, nil) }
+    guard status == errSecSuccess else { throw CompanionFailure.storage("Could not save the ICA session") }
   }
   static func clear() { SecItemDelete(keychain as CFDictionary) }
 
@@ -90,8 +93,10 @@ enum IOSIcaShoppingList {
   }
 
   static func lists() throws -> [ShoppingList] {
-    let body = try api("GET", listsURL, nil).json
-    return try (body["shoppingLists"] as? [[String: Any]] ?? []).map(parseList)
+    guard let lists = try api("GET", listsURL, nil).json["shoppingLists"] as? [[String: Any]] else {
+      throw Failure(code: "ICA_HTTP", message: "Unexpected ICA list response", noEffect: true)
+    }
+    return try lists.map(parseList)
   }
 
   static func target(_ lists: [ShoppingList]) throws -> ShoppingList? {
@@ -108,12 +113,14 @@ enum IOSIcaShoppingList {
     do { all = try lists() } catch let failure as Failure { throw failure } catch {
       throw Failure(code: "ICA_OFFLINE", message: "Could not reach ICA", noEffect: true)
     }
-    // An interrupted earlier attempt may have written the rows already.
-    if let done = all.first(where: { $0.rows.contains { $0.id == ids[0] } }) { return response(done, ids) }
-    guard let target = try target(all) else {
+    // An interrupted earlier attempt may have written some or all rows already.
+    let earlier = all.first { $0.rows.contains { ids.contains($0.id) } }
+    let present = Set(earlier?.rows.map(\.id) ?? [])
+    if let earlier, present.isSuperset(of: ids) { return response(earlier, ids) }
+    guard let target = try earlier ?? target(all) else {
       throw Failure(code: "ICA_NO_LIST", message: "No ICA list to add to. Create one or choose a list.", noEffect: true)
     }
-    let rows: [[String: Any]] = zip(ids, items).map { id, item in
+    let rows: [[String: Any]] = zip(ids, items).filter { !present.contains($0.0) }.map { id, item in
       // ICA's app marks free-text rows with a negative source ID.
       ["offlineId": id, "productName": item, "sourceId": -1, "isStrikedOver": false, "recipes": [Any]()]
     }

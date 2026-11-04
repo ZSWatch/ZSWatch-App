@@ -109,15 +109,18 @@ class IcaShoppingList(private val context: Context) {
         val lists = try { lists() } catch (error: IOException) {
             throw IcaFailure("ICA_OFFLINE", "Could not reach ICA", true)
         }
-        // An interrupted earlier attempt may have written the rows already.
-        lists.firstOrNull { list -> list.rows.any { it.id == ids.first() } }?.let { return response(it, ids) }
-        val target = target(lists) ?: throw IcaFailure("ICA_NO_LIST", "No ICA list to add to. Create one or choose a list.", true)
+        // An interrupted earlier attempt may have written some or all rows already.
+        val earlier = lists.firstOrNull { list -> list.rows.any { it.id in ids } }
+        val present = earlier?.rows?.map { it.id }?.toSet() ?: emptySet()
+        if (earlier != null && present.containsAll(ids)) return response(earlier, ids)
+        val target = earlier ?: target(lists) ?: throw IcaFailure("ICA_NO_LIST", "No ICA list to add to. Create one or choose a list.", true)
+        val missing = ids.zip(items).filter { it.first !in present }
         // Refresh before the write: a refresh that fails cannot have added anything.
         try { accessToken(false) } catch (error: IOException) {
             throw IcaFailure("ICA_OFFLINE", "Could not reach ICA", true)
         }
         val status = try {
-            api("POST", "$LISTS_URL/${encode(target.id)}/sync", createdRows(ids, items), check = false).first
+            api("POST", "$LISTS_URL/${encode(target.id)}/sync", createdRows(missing.map { it.first }, missing.map { it.second }), check = false).first
         } catch (error: IOException) {
             throw IcaFailure("ICA_OUTCOME_UNKNOWN", "ICA did not answer. The items may have been added.", false)
         }
