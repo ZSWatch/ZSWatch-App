@@ -27,7 +27,12 @@ class IcaSessionService {
     if (email.trim().isEmpty || !email.contains('@')) {
       throw const FormatException('Enter your ICA account email');
     }
+    // A failed resend must not leave Connect posting to the old flow.
     _cookies.clear();
+    _clientRegistration = null;
+    _verifier = null;
+    _state = null;
+    _emailStep = null;
     final bootstrap = await _request(
       'POST',
       '$_ims/oauth/v2/token',

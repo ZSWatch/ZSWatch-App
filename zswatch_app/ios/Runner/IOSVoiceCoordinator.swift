@@ -345,7 +345,8 @@ final class IOSVoiceCoordinator {
       var input: [String: Any] = ["recording": metadata]
       if cloud { input["credentials"] = credentials }
       // Only cloud analysis offers the shopping intent; the add itself runs natively, not in Dart.
-      if cloud && IOSIcaShoppingList.stored() != nil { input["integrations"] = ["shopping_list": true] }
+      let analysis = (claimed.spec["model"] as? String)?.split(separator: "|").dropFirst().first.map(String.init) ?? ""
+      if CompanionVoiceJobs.isCloud(analysis) && IOSIcaShoppingList.stored() != nil { input["integrations"] = ["shopping_list": true] }
       if let transcript = jobs.jobs[id]?["transcript"] as? String { input["transcript"] = transcript }
       worker.execute(id: id, spec: claimed.spec, input: input,
         checkpoint: { [weak self] text in
