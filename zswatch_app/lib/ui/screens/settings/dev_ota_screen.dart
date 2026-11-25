@@ -50,8 +50,7 @@ class _DevOtaScreenState extends ConsumerState<DevOtaScreen> {
         children: [
           const Text(
             'Firmware built on your dev machine and published with '
-            'scripts/dev_ota/dev_ota.py. Use the Tailscale HTTPS URL, '
-            'e.g. https://mac.tailnet.ts.net/zswatch-ota.',
+            'scripts/dev_ota/dev_ota.py. The server URL must use HTTPS.',
           ),
           const SizedBox(height: AppTheme.spacingMd),
           TextField(
