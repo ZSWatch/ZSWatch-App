@@ -50,8 +50,10 @@ zip (`dfu_application.zip` + `lvgl_resources_raw.bin`) and the app uploads the
 resources before the firmware. `--repo` must point at the firmware repo.
 
 The app shows a dialog for each new build while it is open. When it is not,
-the companion service (if running) long-polls too and posts a notification that
-opens the app. **Install** runs
+the companion service (if running) long-polls too and posts a notification.
+Tapping it opens the app; its **Install** button installs the build in the
+background through the native firmware owner, shows progress in the
+notification and reports the same states. In the app dialog, **Install** runs
 the normal firmware update (resources first, then firmware) and opens the
 firmware screen; **Not now** skips that build. The app reports
 `downloading`, `uploading`, `completed`, then `running` (watch reconnected and

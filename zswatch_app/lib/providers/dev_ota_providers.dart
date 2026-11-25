@@ -98,7 +98,7 @@ class DevOtaController extends StateNotifier<DevOtaState> {
     _lifecycle = AppLifecycleListener(
       onResume: () {
         _foreground = true;
-        _restart();
+        unawaited(_resume());
       },
       onPause: () {
         _foreground = false;
@@ -109,6 +109,12 @@ class DevOtaController extends StateNotifier<DevOtaState> {
   }
 
   String? get _handled => _prefs?.getString(_Keys.handled);
+
+  // The notification can install a build natively and mark it handled.
+  Future<void> _resume() async {
+    await _prefs?.reload();
+    _restart();
+  }
 
   Future<void> configure(String url, String token) async {
     final cleanUrl = url.trim();

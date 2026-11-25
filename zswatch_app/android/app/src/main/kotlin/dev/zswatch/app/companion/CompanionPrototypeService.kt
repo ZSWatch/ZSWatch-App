@@ -92,6 +92,7 @@ class CompanionPrototypeService : Service() {
     }
 
     private val devOta by lazy { DevOtaNotifier(applicationContext) }
+    internal val devOtaInstaller by lazy { DevOtaInstaller(applicationContext, devOta) }
 
     override fun onBind(intent: Intent?): IBinder? = null
 

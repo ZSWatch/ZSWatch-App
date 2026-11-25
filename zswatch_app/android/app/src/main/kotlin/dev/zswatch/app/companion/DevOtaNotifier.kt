@@ -27,7 +27,44 @@ class DevOtaNotifier(private val context: Context) {
 
         fun cancel(context: Context) =
             context.getSystemService(NotificationManager::class.java)?.cancel(NOTIFICATION_ID)
+
+        private fun channel(context: Context): NotificationManager? {
+            val manager = context.getSystemService(NotificationManager::class.java) ?: return null
+            manager.createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "Dev firmware", NotificationManager.IMPORTANCE_HIGH))
+            return manager
+        }
+
+        private fun post(context: Context, builder: NotificationCompat.Builder) {
+            val manager = channel(context) ?: return
+            try {
+                manager.notify(NOTIFICATION_ID, builder.build())
+            } catch (error: SecurityException) {
+                Log.w(TAG, "notification permission missing")
+            }
+        }
+
+        private fun openApp(context: Context) = PendingIntent.getActivity(context, NOTIFICATION_ID,
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        fun showResult(context: Context, title: String, text: String) = post(context,
+            NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setContentIntent(openApp(context))
+                .setAutoCancel(true))
     }
+
+    fun showProgress(text: String) = post(context,
+        NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle("Installing dev firmware")
+            .setContentText(text)
+            .setProgress(0, 0, true)
+            .setOnlyAlertOnce(true)
+            .setOngoing(true))
 
     @Volatile private var running = false
     private var thread: Thread? = null
@@ -87,27 +124,21 @@ class DevOtaNotifier(private val context: Context) {
     }
 
     private fun notify(build: JSONObject) {
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Dev firmware", NotificationManager.IMPORTANCE_HIGH))
-        val open = PendingIntent.getActivity(context, NOTIFICATION_ID,
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val title = listOf(build.optString("branch"), build.optString("commit").take(8))
             .filter { it.isNotEmpty() }.joinToString(" · ")
         val note = build.optString("note")
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val install = PendingIntent.getBroadcast(context, NOTIFICATION_ID,
+            Intent(context, DevOtaInstaller.Receiver::class.java)
+                .setAction(DevOtaInstaller.ACTION_INSTALL)
+                .putExtra(DevOtaInstaller.EXTRA_BUILD, build.toString()),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        post(context, NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
             .setContentTitle("New dev firmware")
             .setContentText(if (note.isNotEmpty()) note else title)
             .setStyle(NotificationCompat.BigTextStyle().bigText(listOf(title, note).filter { it.isNotEmpty() }.joinToString("\n")))
-            .setContentIntent(open)
-            .setAutoCancel(true)
-            .build()
-        try {
-            manager.notify(NOTIFICATION_ID, notification)
-        } catch (error: SecurityException) {
-            Log.w(TAG, "notification permission missing")
-        }
+            .setContentIntent(openApp(context))
+            .addAction(0, "Install", install)
+            .setAutoCancel(true))
     }
 }
