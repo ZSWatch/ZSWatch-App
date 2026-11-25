@@ -91,6 +91,8 @@ class CompanionPrototypeService : Service() {
         }
     }
 
+    private val devOta by lazy { DevOtaNotifier(applicationContext) }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -99,6 +101,7 @@ class CompanionPrototypeService : Service() {
         LifecycleLogger.recordHistoricalExitReasons(applicationContext)
         LifecycleLogger.log("CompanionPrototype", "service_created pid=${android.os.Process.myPid()}")
         instance = this
+        devOta.start()
         media = AndroidPrototypeMedia(applicationContext,
             send = { generation, packet -> transport?.sendMedia(generation, packet) == true },
             observe = { kind, generation, accepted ->
@@ -348,6 +351,7 @@ class CompanionPrototypeService : Service() {
     override fun onDestroy() {
         LifecycleLogger.log("CompanionPrototype", "service_destroyed explicitStop=${runtime?.store?.control()?.get("desired_running") == false}")
         if (instance === this) instance = null
+        devOta.stop()
         media?.close()
         if (receiverRegistered) { unregisterReceiver(systemEvents); receiverRegistered = false }
         PrototypeHub.worker.removeCallbacks(notificationMaintenance)

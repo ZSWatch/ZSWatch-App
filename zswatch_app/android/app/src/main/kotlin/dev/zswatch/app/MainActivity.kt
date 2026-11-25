@@ -36,6 +36,8 @@ class MainActivity : FlutterActivity() {
         private const val FOREGROUND_SERVICE_CHANNEL = "dev.zswatch.app/foreground_service"
         private const val LLM_COMPUTE_CHANNEL = "dev.zswatch.app/llm_compute"
         private const val PRODUCTIVITY_CHANNEL = "dev.zswatch.app/productivity"
+        @Volatile var isResumed = false
+            private set
     }
 
     private val productivity by lazy { ProductivityActions(this) }
@@ -63,11 +65,14 @@ class MainActivity : FlutterActivity() {
 
     override fun onResume() {
         super.onResume()
+        isResumed = true
+        dev.zswatch.app.companion.DevOtaNotifier.cancel(this)
         LifecycleLogger.log("MainActivity", "onResume")
     }
 
     override fun onPause() {
         LifecycleLogger.log("MainActivity", "onPause")
+        isResumed = false
         super.onPause()
     }
 

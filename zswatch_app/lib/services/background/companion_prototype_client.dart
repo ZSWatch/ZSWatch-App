@@ -90,6 +90,12 @@ class CompanionPrototypeSnapshot {
     };
   }
 
+  /// Git describe of the connected watch firmware, if it reports one.
+  String? get firmwareSha => _watchInfo?['firmware_sha'] as String?;
+
+  /// When the watch last sent its version message (ms since epoch).
+  int? get versionObservedMs => _watchInfo?['version_observed_ms'] as int?;
+
   Map<Object?, Object?>? get _watchInfo {
     final info = fields['watch_info'];
     return info is Map && info['address'] == fields['address'] ? info : null;

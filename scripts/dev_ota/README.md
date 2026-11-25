@@ -30,6 +30,11 @@ For a plain-LAN setup without Tailscale, put an HTTPS proxy in front of
 
 ## Use
 
+The watch reports its git sha (`APP_BUILD_VERSION`), and the app checks it
+against the published commit. Zephyr only regenerates that header when
+`app/VERSION` changes, so delete it before building a new commit:
+`rm app/build_dbg/app/zephyr/include/generated/zephyr/app_version.h`.
+
 ```sh
 # after building and smoke-testing on the dev kit
 scripts/dev_ota/dev_ota.py publish ZSWatch/app/build_dbg/dfu_application.zip \
@@ -37,11 +42,14 @@ scripts/dev_ota/dev_ota.py publish ZSWatch/app/build_dbg/dfu_application.zip \
 scripts/dev_ota/dev_ota.py status --wait <id>   # exit 0 = running on the watch
 ```
 
-The app shows a dialog for each new build while it is open. **Install** runs
+The app shows a dialog for each new build while it is open. When it is not,
+the companion service (if running) long-polls too and posts a notification that
+opens the app. **Install** runs
 the normal firmware update (resources first, then firmware) and opens the
 firmware screen; **Not now** skips that build. The app reports
-`downloading`, `uploading`, `completed`, then `running` (watch reconnected,
-with its firmware version) or `failed` / `cancelled` / `declined`.
+`downloading`, `uploading`, `completed`, then `running` (watch reconnected and
+reports the published sha), `mismatch` (it reports another sha), or `failed` /
+`cancelled` / `declined`.
 
 **Smoke-test on the dev kit before publishing.** The watch uses MCUboot
 overwrite-only, so a build that cannot come back on BLE has no automatic

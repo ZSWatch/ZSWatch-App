@@ -34,7 +34,7 @@ DEFAULT_PORT = 8787
 KEEP_BUILDS = 10
 MAX_WAIT_S = 30
 MAX_STATUS_BYTES = 4096
-TERMINAL_STATES = {'running', 'failed', 'cancelled', 'declined'}
+TERMINAL_STATES = {'running', 'mismatch', 'failed', 'cancelled', 'declined'}
 ID_RE = re.compile(r'^[0-9A-Za-z_-]{1,64}$')
 
 

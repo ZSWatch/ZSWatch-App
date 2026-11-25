@@ -86,6 +86,7 @@ class DevOtaController extends StateNotifier<DevOtaState> {
   bool _foreground = true;
   ProviderSubscription<DfuStatus>? _dfuWatch;
   ProviderSubscription<Object?>? _connectionWatch;
+  int _uploadStartedMs = 0;
 
   DevOtaController(this._ref, this._prefs)
     : super(
@@ -201,6 +202,7 @@ class DevOtaController extends StateNotifier<DevOtaState> {
       await dfu.loadLocalFile(file.path);
       _throwDfuError();
       _watchDfu(build);
+      _uploadStartedMs = DateTime.now().millisecondsSinceEpoch;
       state = state.copyWith(phase: () => 'Updating watch');
       await _report(build.id, 'uploading');
       if (_ref.read(dfuNotifierProvider).hasFilesystem) {
@@ -228,9 +230,9 @@ class DevOtaController extends StateNotifier<DevOtaState> {
       switch (status) {
         case DfuStatus.completed:
           _dfuWatch?.close();
-          unawaited(_report(build.id, 'completed'));
           state = state.copyWith(phase: () => 'Waiting for the watch');
           _awaitReconnect(build);
+          unawaited(_report(build.id, 'completed'));
         case DfuStatus.failed:
           final error = _ref.read(dfuStateProvider).errorMessage;
           unawaited(_finish(build, 'failed', error ?? 'DFU failed'));
@@ -242,16 +244,36 @@ class DevOtaController extends StateNotifier<DevOtaState> {
     });
   }
 
+  /// Waits for the watch to report its version after the update. Firmware
+  /// that reports its git sha is checked against the published commit.
   void _awaitReconnect(DevOtaBuild build) {
     _connectionWatch?.close();
+    Timer? noSha;
+    void done() {
+      noSha?.cancel();
+      _connectionWatch?.close();
+      final snapshot = _ref.read(companionSnapshotProvider).valueOrNull;
+      final version = snapshot?.watch?.firmwareVersion;
+      final fresh = (snapshot?.versionObservedMs ?? 0) > _uploadStartedMs;
+      final sha = fresh ? snapshot?.firmwareSha : null;
+      final detail = [
+        if (version != null) 'fw $version',
+        if (sha != null) 'sha $sha',
+      ].join(' ');
+      final matches =
+          sha == null ||
+          build.commit.isEmpty ||
+          sha.startsWith(build.shortCommit);
+      unawaited(_finish(build, matches ? 'running' : 'mismatch', detail));
+    }
+
     void check() {
       final snapshot = _ref.read(companionSnapshotProvider).valueOrNull;
       if (snapshot == null || !snapshot.protocolReady) return;
-      _connectionWatch?.close();
-      final version = snapshot.watch?.firmwareVersion;
-      unawaited(
-        _finish(build, 'running', version == null ? null : 'fw $version'),
-      );
+      final fresh = (snapshot.versionObservedMs ?? 0) > _uploadStartedMs;
+      if (fresh && snapshot.firmwareSha != null) return done();
+      // Older firmware sends no sha; give the version message time to arrive.
+      noSha ??= Timer(const Duration(seconds: 20), done);
     }
 
     _connectionWatch = _ref.listen<Object?>(
@@ -267,16 +289,26 @@ class DevOtaController extends StateNotifier<DevOtaState> {
     state = state.copyWith(
       installingId: () => null,
       phase: () => result == 'running' ? 'Installed ${build.id}' : null,
-      error: () => result == 'failed' ? detail : null,
+      error: () => switch (result) {
+        'failed' => detail,
+        'mismatch' => 'Watch reports a different build: $detail',
+        _ => null,
+      },
     );
     await _report(build.id, result, detail: detail);
   }
 
   Future<void> _report(String id, String result, {String? detail}) async {
-    try {
-      await _client?.report(id, result, detail: detail);
-    } catch (error) {
-      debugPrint('[DevOtaController] status report failed: $error');
+    for (var attempt = 1; attempt <= 4; attempt++) {
+      try {
+        await _client?.report(id, result, detail: detail);
+        return;
+      } catch (error) {
+        debugPrint(
+          '[DevOtaController] report $result attempt $attempt: $error',
+        );
+        await Future<void>.delayed(Duration(seconds: 2 * attempt));
+      }
     }
   }
 
