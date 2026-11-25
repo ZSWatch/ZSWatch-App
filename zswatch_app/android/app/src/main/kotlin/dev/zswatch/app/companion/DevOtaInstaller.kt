@@ -123,15 +123,21 @@ internal class DevOtaInstaller(private val context: Context, private val notifie
     private fun start(service: CompanionPrototypeService, images: List<Pair<Int, ByteArray>>, resources: ByteArray?): String {
         val latch = CountDownLatch(1)
         var outcome: Result<String> = Result.failure(IllegalStateException("Start timed out"))
+        fun finish(result: Result<String>) { outcome = result; latch.countDown() }
         PrototypeHub.worker.post {
-            outcome = runCatching {
+            try {
                 val owner = service.firmware ?: error("Native firmware owner required")
+                val link = service.transport ?: error("Watch not connected")
                 val runtime = service.runtime ?: error("Watch not connected")
-                owner.start(runtime.generation, images, resources).first
-            }
-            latch.countDown()
+                // The firmware owner takes the SMP transport the app prepares first.
+                link.prepareShell(runtime.generation) { prepared ->
+                    PrototypeHub.worker.post {
+                        finish(prepared.mapCatching { generation -> owner.start(generation, images, resources).first })
+                    }
+                }
+            } catch (error: Exception) { finish(Result.failure(error)) }
         }
-        latch.await(30, TimeUnit.SECONDS)
+        latch.await(60, TimeUnit.SECONDS)
         return outcome.getOrThrow()
     }
 
