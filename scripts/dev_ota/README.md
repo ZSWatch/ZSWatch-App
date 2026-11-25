@@ -42,6 +42,13 @@ scripts/dev_ota/dev_ota.py publish ZSWatch/app/build_dbg/dfu_application.zip \
 scripts/dev_ota/dev_ota.py status --wait <id>   # exit 0 = running on the watch
 ```
 
+`publish` also builds the resource image (`lvgl_resources_raw.bin` from the
+firmware repo's `app/src/images/binaries/S/`) and includes it when it differs
+from the one the watch last got through dev OTA (`--resources auto`, default;
+`always` / `never` override). With resources, the package is a release-style
+zip (`dfu_application.zip` + `lvgl_resources_raw.bin`) and the app uploads the
+resources before the firmware. `--repo` must point at the firmware repo.
+
 The app shows a dialog for each new build while it is open. When it is not,
 the companion service (if running) long-polls too and posts a notification that
 opens the app. **Install** runs

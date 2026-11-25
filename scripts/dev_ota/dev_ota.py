@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import hmac
+import io
 import json
 import os
 import re
@@ -35,6 +36,7 @@ KEEP_BUILDS = 10
 MAX_WAIT_S = 30
 MAX_STATUS_BYTES = 4096
 TERMINAL_STATES = {'running', 'mismatch', 'failed', 'cancelled', 'declined'}
+RESOURCES_NAME = 'lvgl_resources_raw.bin'
 ID_RE = re.compile(r'^[0-9A-Za-z_-]{1,64}$')
 
 
@@ -61,11 +63,21 @@ class Store:
         except (FileNotFoundError, json.JSONDecodeError):
             return None
 
-    def publish(self, zip_path: Path, note: str, branch: str, commit: str) -> dict:
-        data = zip_path.read_bytes()
+    def publish(self, zip_path: Path, note: str, branch: str, commit: str,
+                resources: Path | None = None, resources_included: bool = False) -> dict:
+        firmware = zip_path.read_bytes()
         with zipfile.ZipFile(zip_path) as archive:
             if 'manifest.json' not in archive.namelist():
                 raise SystemExit(f'{zip_path} has no manifest.json; expected dfu_application.zip')
+        if resources_included:
+            # Release-style archive, which the app's local-file loader already unpacks.
+            buffer = io.BytesIO()
+            with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr('dfu_application.zip', firmware)
+                archive.write(resources, RESOURCES_NAME)
+            data = buffer.getvalue()
+        else:
+            data = firmware
         digest = hashlib.sha256(data).hexdigest()
         stamp = datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')
         build_id = f'{stamp}-{(commit or digest)[:10]}'
@@ -78,7 +90,10 @@ class Store:
             'branch': branch,
             'commit': commit,
             'created': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+            'resources_sha256': hashlib.sha256(resources.read_bytes()).hexdigest() if resources else '',
+            'resources_included': resources_included,
         }
+        (self.builds / f'{build_id}.json').write_text(json.dumps(manifest, indent=2))
         tmp = self.manifest_path.with_suffix('.tmp')
         tmp.write_text(json.dumps(manifest, indent=2))
         tmp.replace(self.manifest_path)
@@ -89,6 +104,20 @@ class Store:
         builds = sorted(self.builds.glob('*.zip'))
         for old in builds[:-KEEP_BUILDS]:
             old.unlink(missing_ok=True)
+            old.with_suffix('.json').unlink(missing_ok=True)
+
+    def installed_resources(self) -> str | None:
+        """Resource hash of the newest build the watch reported running with resources."""
+        for status in reversed(self.statuses()):
+            if status.get('state') != 'running' or not ID_RE.match(str(status.get('id'))):
+                continue
+            try:
+                manifest = json.loads((self.builds / f"{status['id']}.json").read_text())
+            except (FileNotFoundError, json.JSONDecodeError):
+                continue
+            if manifest.get('resources_included'):
+                return manifest.get('resources_sha256')
+        return None
 
     def add_status(self, status: dict) -> None:
         status['received'] = datetime.now(timezone.utc).isoformat(timespec='seconds')
@@ -232,7 +261,21 @@ def cmd_publish(args, store: Store) -> None:
     repo = Path(args.repo).resolve() if args.repo else zip_path.parent
     commit = args.commit or git(repo, 'rev-parse', '--short=12', 'HEAD')
     branch = args.branch or git(repo, 'rev-parse', '--abbrev-ref', 'HEAD')
-    manifest = store.publish(zip_path, args.note, branch, commit)
+    resources = None
+    include = False
+    if args.resources != 'never':
+        source = repo / 'app/src/images/binaries/S'
+        script = repo / 'app/scripts/create_custom_resource_image.py'
+        if not source.is_dir() or not script.is_file():
+            raise SystemExit(f'--repo {repo} is not the firmware repo; pass --resources never to skip resources')
+        resources = store.root / 'resources_raw.bin'
+        subprocess.run([sys.executable, str(script), '--img-filename', str(resources), str(source)],
+                       check=True, stdout=subprocess.DEVNULL)
+        digest = hashlib.sha256(resources.read_bytes()).hexdigest()
+        include = args.resources == 'always' or digest != store.installed_resources()
+        print(f'[dev_ota] resources {digest[:12]}: {"included" if include else "unchanged, skipped"}',
+              file=sys.stderr)
+    manifest = store.publish(zip_path, args.note, branch, commit, resources, include)
     print(json.dumps(manifest, indent=2))
 
 
@@ -277,6 +320,9 @@ def main() -> None:
     publish.add_argument('--repo', help='firmware repo for branch/commit (default: zip directory)')
     publish.add_argument('--branch', default='')
     publish.add_argument('--commit', default='')
+    publish.add_argument('--resources', choices=['auto', 'always', 'never'], default='auto',
+                         help='resource image (S/ files): auto = when it differs from what the watch last '
+                              'got through dev OTA (default)')
 
     status = sub.add_parser('status')
     status.add_argument('--wait', metavar='ID', help='follow this build until a final state')
