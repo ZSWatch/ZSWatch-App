@@ -144,7 +144,7 @@ USB/DTR bootstrap, explicit probe selection and one reader per serial port.
 
 **TODO: dev OTA (`scripts/dev_ota/`).** Android only today. The Dart client
 (`lib/providers/dev_ota_providers.dart`) and DFU path are shared, but on iOS:
-show the Developer Tools tile (gated by `Platform.isAndroid`), check that the
+show the Settings tile (gated by `Platform.isAndroid`), check that the
 long-poll stops and resumes cleanly with the app lifecycle, and run one install
 end to end. A background notification would need the Swift companion.
 

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -68,6 +70,18 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ),
+          // TODO(iOS): untested there; see IOS_COMPANION_DELIVERY.md.
+          if (Platform.isAndroid)
+            _SettingsTile(
+              leading: const Icon(
+                Icons.cloud_download_outlined,
+                color: AppTheme.textSecondary,
+              ),
+              title: 'Dev Firmware Server',
+              subtitle: 'Install builds published from your dev machine',
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(AppRoutes.devOta),
+            ),
 
           const Divider(height: 32),
 

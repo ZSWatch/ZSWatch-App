@@ -21,7 +21,7 @@ read `~/Documents`), runs it at login on `127.0.0.1:8787`, mounts it with
 `tailscale serve` at `https://<mac>.<tailnet>.ts.net/zswatch-ota`, and prints
 the URL and token. Rerun it after changing `dev_ota.py`.
 
-In the app: Developer Tools → **Dev Firmware**, paste URL and token, Save.
+In the app: Settings → Firmware Update → **Dev Firmware Server**, paste URL and token, Save.
 
 HTTPS through Tailscale works at home and away, so one URL is enough. The app
 only allows HTTPS (plus localhost), which keeps the watch HTTP relay policy.

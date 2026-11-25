@@ -10,13 +10,13 @@ import '../screens/crash_report/crash_report_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/developer/comm_log_screen.dart';
 import '../screens/developer/companion_prototype_app.dart';
-import '../screens/developer/dev_ota_screen.dart';
 import '../screens/developer/developer_screen.dart';
 import '../screens/developer/file_system_screen.dart';
 import '../screens/developer/log_viewer_screen.dart';
 import '../screens/developer/sensor_debug_screen.dart';
 import '../screens/developer/shell_screen.dart';
 import '../screens/firmware/firmware_update_screen.dart';
+import '../screens/settings/dev_ota_screen.dart';
 import '../screens/health/health_screen.dart';
 import '../screens/health/heart_rate_screen.dart';
 import '../screens/notifications/notification_settings_screen.dart';
@@ -56,10 +56,10 @@ abstract final class AppRoutes {
   static const String commLog = '/developer/comm-log';
   static const String fileSystem = '/developer/file-system';
   static const String companionRuntime = '/developer/companion-runtime';
-  static const String devOta = '/developer/dev-ota';
 
   // Settings sub-routes
   static const String aiModels = '/settings/ai-models';
+  static const String devOta = '/settings/dev-firmware';
   static const String integrations = '/settings/integrations';
 
   // Watchface

@@ -18,7 +18,7 @@ import 'providers/demo_mode_provider.dart';
 import 'providers/dev_ota_providers.dart';
 
 import 'ui/navigation/app_router.dart';
-import 'ui/screens/developer/dev_ota_screen.dart';
+import 'ui/screens/settings/dev_ota_screen.dart';
 
 /// Main application widget
 ///

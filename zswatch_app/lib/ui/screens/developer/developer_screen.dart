@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -94,15 +92,6 @@ class _DeveloperToolsBody extends ConsumerWidget {
             ? () => context.push(AppRoutes.fileSystem)
             : null,
       ),
-      // TODO(iOS): untested there; see IOS_COMPANION_DELIVERY.md.
-      if (Platform.isAndroid)
-        _BlendToolTile(
-          icon: Icons.cloud_download_outlined,
-          title: 'Dev Firmware',
-          subtitle: 'From dev server',
-          accent: Colors.lightBlueAccent.shade200,
-          onTap: () => context.push(AppRoutes.devOta),
-        ),
     ];
 
     return ListView(
