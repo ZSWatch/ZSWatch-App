@@ -45,6 +45,10 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         val notices = entries()
         val old = notices.optJSONObject(key)
         if (old == null && notices.length() >= CAPACITY) {
+            // Expired entries only keep an ID for removal from the watch.
+            notices.keys().asSequence().toList().forEach { if (notices.getJSONObject(it).optBoolean("expired")) notices.remove(it) }
+        }
+        if (old == null && notices.length() >= CAPACITY) {
             store.update("notification_capacity_reached")
             return false
         }
@@ -63,7 +67,7 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         if (data["canReply"] == true) packet.put("reply", true)
         val wire = "GB($packet)"
         require(wire.toByteArray(Charsets.UTF_8).size <= 2000)
-        if (old != null && !old.optBoolean("removed") && old.getString("packet") == wire) return false
+        if (old != null && !old.optBoolean("removed") && old.optString("packet") == wire) return false
         notices.put(key, JSONObject().put("id", id).put("package", source).put("packet", wire)
             .put("revision", (old?.optLong("revision") ?: 0) + 1).put("removed", false)
             .put("expires_ms", postedAt + RETENTION_MS))
@@ -97,7 +101,7 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         val notices = entries()
         return notices.keys().asSequence().filter { key ->
             val item = notices.getJSONObject(key)
-            !item.optBoolean("removed") && item.getLong("expires_ms") > now &&
+            !item.optBoolean("removed") &&
                 item.getString("package") !in blocked && item.optLong("delivered_generation", -1) == generation &&
                 (action == "DISMISS_ALL" || item.getLong("id") == (id as Number).toLong())
         }.toList()
@@ -115,7 +119,7 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         val notices = entries()
         val key = notices.keys().asSequence().firstOrNull { key ->
             val item = notices.getJSONObject(key)
-            !item.optBoolean("removed") && item.getLong("expires_ms") > now && item.getString("package") !in blocked &&
+            !item.optBoolean("removed") && item.getString("package") !in blocked &&
                 item.optLong("delivered_generation", -1) == generation && item.getLong("id") == (id as Number).toLong()
         }
         return Reply((id as Number).toLong(), key, text.trim())
@@ -132,15 +136,20 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         if (changed) store.update("notifications_reconciled", mapOf("notifications" to notices))
     }
 
-    /** Purge obsolete/empty text even while disconnected. Keep only removal IDs. */
+    /** Purge obsolete/empty text even while disconnected. A notice already on the
+     * watch stays there until Android removes it; only its ID is kept for that.
+     */
     fun expire(now: Long) {
         val notices = entries()
         var changed = false
         notices.keys().asSequence().toList().forEach { key ->
             val item = notices.getJSONObject(key)
-            if (!item.optBoolean("removed") &&
-                (item.getLong("expires_ms") <= now || !hasStoredDisplayText(item))) {
+            if (item.optBoolean("removed") || item.optBoolean("expired")) return@forEach
+            if (!hasStoredDisplayText(item)) {
                 removeItem(item); changed = true
+            } else if (item.getLong("expires_ms") <= now) {
+                if (item.has("delivered_revision")) item.put("expired", true).remove("packet") else notices.remove(key)
+                changed = true
             }
         }
         if (changed) store.update("notifications_pruned", mapOf("notifications" to notices))
@@ -159,6 +168,7 @@ class PrototypeNotifications(private val store: PrototypeStore) {
         val notices = entries()
         for (key in notices.keys()) {
             val item = notices.getJSONObject(key)
+            if (item.optBoolean("expired") && !item.optBoolean("removed")) continue
             if (item.optLong("delivered_generation", -1) != generation ||
                 item.optLong("delivered_revision", -1) != item.getLong("revision")) {
                 val id = item.getLong("id")
@@ -185,7 +195,7 @@ class PrototypeNotifications(private val store: PrototypeStore) {
 
     private fun removeItem(item: JSONObject) {
         item.put("removed", true).put("revision", item.getLong("revision") + 1)
-        item.remove("packet")
+        item.remove("packet"); item.remove("expired")
     }
 
     companion object {

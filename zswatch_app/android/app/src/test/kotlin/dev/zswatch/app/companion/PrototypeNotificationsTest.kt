@@ -144,14 +144,23 @@ class PrototypeNotificationsTest {
         assertTrue(reopened.next(2, 0)!!.packet.contains("notify-"))
     }
 
-    @Test fun expiryAndDisablingRemoveOldWatchStateWithoutReplayingText() {
+    @Test fun expiryKeepsWatchStateWithoutReplayingTextAndDisablingRemovesIt() {
         val inbox = PrototypeNotifications(store()); inbox.configure(true, emptyList())
         inbox.post(notification(), 0)
-        val expired = inbox.next(1, PrototypeNotifications.RETENTION_MS)!!
-        assertTrue(expired.packet.contains("notify-")); assertFalse(expired.packet.contains("Fixture text"))
-        inbox.written(expired, 1)
-        inbox.post(notification(), 1); inbox.configure(false, emptyList())
-        assertTrue(inbox.next(1, 2)!!.packet.contains("notify-"))
+        // Never delivered: expiry drops it without touching the watch.
+        assertNull(inbox.next(1, PrototypeNotifications.RETENTION_MS))
+        inbox.post(notification(), PrototypeNotifications.RETENTION_MS)
+        inbox.written(inbox.next(1, PrototypeNotifications.RETENTION_MS)!!, 1)
+        // Delivered: stays on the watch and is not replayed on a new session.
+        assertNull(inbox.next(1, 2 * PrototypeNotifications.RETENTION_MS))
+        assertNull(inbox.next(2, 2 * PrototypeNotifications.RETENTION_MS))
+        // Android removing it still removes it from the watch.
+        assertTrue(inbox.remove("first"))
+        val removal = inbox.next(2, 2 * PrototypeNotifications.RETENTION_MS)!!
+        assertTrue(removal.packet.contains("notify-")); assertFalse(removal.packet.contains("Fixture text"))
+        inbox.written(removal, 2)
+        inbox.post(notification(), 3 * PrototypeNotifications.RETENTION_MS); inbox.configure(false, emptyList())
+        assertTrue(inbox.next(2, 3 * PrototypeNotifications.RETENTION_MS)!!.packet.contains("notify-"))
     }
 
     @Test fun unicodeAndJsonEscapesFitFirmwareReceiveBuffer() {
@@ -167,12 +176,16 @@ class PrototypeNotificationsTest {
     @Test fun offlineMaintenancePurgesTextWithoutATransport() {
         val journal = store(); val inbox = PrototypeNotifications(journal)
         inbox.configure(true, emptyList()); inbox.post(notification(), 0)
+        inbox.written(inbox.next(1, 0)!!, 1)
         inbox.expire(PrototypeNotifications.RETENTION_MS)
         val saved = journal.control()["notifications"] as Map<*, *>
         val item = saved.values.single() as Map<*, *>
-        assertEquals(true, item["removed"])
+        assertEquals(true, item["expired"])
         assertFalse(item.containsKey("packet"))
-        assertTrue(PrototypeNotifications(PrototypeStore(temporary.root)).next(2, 0)!!.packet.contains("notify-"))
+        val reopened = PrototypeNotifications(PrototypeStore(temporary.root))
+        assertNull(reopened.next(2, PrototypeNotifications.RETENTION_MS))
+        reopened.reconcile(emptySet())
+        assertTrue(reopened.next(2, PrototypeNotifications.RETENTION_MS)!!.packet.contains("notify-"))
     }
 
     @Test fun listenerRestartCannotResurrectExpiredAndroidNotificationText() {
@@ -180,8 +193,7 @@ class PrototypeNotificationsTest {
         inbox.configure(true, emptyList())
         val notice = notification() + mapOf("postedAt" to 0L)
         assertTrue(inbox.post(notice, 0))
-        val expired = inbox.next(1, PrototypeNotifications.RETENTION_MS)!!
-        inbox.written(expired, 1)
+        assertNull(inbox.next(1, PrototypeNotifications.RETENTION_MS))
         val reopened = PrototypeNotifications(PrototypeStore(temporary.root))
         assertFalse(reopened.post(notice, PrototypeNotifications.RETENTION_MS + 1))
         assertNull(reopened.next(2, PrototypeNotifications.RETENTION_MS + 1))
@@ -194,6 +206,13 @@ class PrototypeNotificationsTest {
         repeat(PrototypeNotifications.CAPACITY) { assertTrue(inbox.post(notification("key$it"), 0)) }
         assertFalse(inbox.post(notification("overflow"), 0))
         assertFalse(inbox.remove("unknown"))
+    }
+
+    @Test fun expiredWatchNoticesMakeRoomForNewOnes() {
+        val inbox = PrototypeNotifications(store()); inbox.configure(true, emptyList())
+        repeat(PrototypeNotifications.CAPACITY) { inbox.post(notification("key$it"), 0); inbox.written(inbox.next(1, 0)!!, 1) }
+        inbox.expire(PrototypeNotifications.RETENTION_MS)
+        assertTrue(inbox.post(notification("new"), PrototypeNotifications.RETENTION_MS))
     }
 
     @Test fun stopClearsPendingContentAndLaterEventsCannotUndoStop() {
@@ -223,14 +242,15 @@ class PrototypeNotificationsTest {
         assertEquals(listOf("first"), inbox.dismissalKeys(action, 2, 0))
     }
 
-    @Test fun dismissAllIsScopedToAllowedUnexpiredForwardedNoticesAndStopDisablesActions() {
+    @Test fun dismissAllIsScopedToAllowedForwardedNoticesAndStopDisablesActions() {
         val journal = store(); journal.update("session", mapOf("generation" to 1L))
         val inbox = PrototypeNotifications(journal); inbox.configure(true, emptyList())
         inbox.post(notification("first"), 0); inbox.written(inbox.next(1, 0)!!, 1)
         inbox.post(notification("second"), 0)
         val all = JSONObject("""{"t":"notify","n":"DISMISS_ALL"}""")
         assertEquals(listOf("first"), inbox.dismissalKeys(all, 1, 0))
-        assertTrue(inbox.dismissalKeys(all, 1, PrototypeNotifications.RETENTION_MS).isEmpty())
+        // A notice still shown on the watch can be dismissed after it expires.
+        assertEquals(listOf("first"), inbox.dismissalKeys(all, 1, PrototypeNotifications.RETENTION_MS))
         inbox.configure(false, emptyList())
         assertTrue(inbox.dismissalKeys(all, 1, 0).isEmpty())
         journal.update("stop", mapOf("desired_running" to false))
@@ -259,7 +279,7 @@ class PrototypeNotificationsTest {
         inbox.written(delivery, 1)
         val found = inbox.reply(reply(delivery.id), 1, 0)!!
         assertEquals("first", found.key); assertEquals(delivery.id, found.id); assertEquals("Ja gärna!", found.text)
-        assertNull(inbox.reply(reply(delivery.id), 1, PrototypeNotifications.RETENTION_MS)!!.key)
+        assertEquals("first", inbox.reply(reply(delivery.id), 1, PrototypeNotifications.RETENTION_MS)!!.key)
         assertNull(inbox.reply(reply(999), 1, 0)!!.key)
         assertNull(inbox.reply(reply(delivery.id), 2, 0))
         assertNull(inbox.reply(reply(delivery.id, "  "), 1, 0))
