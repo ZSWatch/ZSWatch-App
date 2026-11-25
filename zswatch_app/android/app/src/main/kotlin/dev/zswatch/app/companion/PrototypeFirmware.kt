@@ -122,8 +122,9 @@ internal class PrototypeFirmware(
         try {
             publish(next)
             // Full resource readback is already done. Postflight only reconnects
-            // and checks active images/the fresh mount, so use the same bound.
-            later(90000L) { if (request?.id == id && request?.phase in setOf("reconnecting", "verifying")) fail(id, "boot_check_timeout") }
+            // and checks active images/the fresh mount. MCUboot copying three
+            // images (net core included) can take well over a minute before it boots.
+            later(180000L) { if (request?.id == id && request?.phase in setOf("reconnecting", "verifying")) fail(id, "boot_check_timeout") }
             reconnect(next)
         } catch (error: Exception) { fail(id, "reconnect_failed") }
     }

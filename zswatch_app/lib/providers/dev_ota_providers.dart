@@ -235,7 +235,11 @@ class DevOtaController extends StateNotifier<DevOtaState> {
           unawaited(_report(build.id, 'completed'));
         case DfuStatus.failed:
           final error = _ref.read(dfuStateProvider).errorMessage;
-          unawaited(_finish(build, 'failed', error ?? 'DFU failed'));
+          _dfuWatch?.close();
+          // The image may be installed even when native verification gives up;
+          // the sha the watch reports when it reconnects decides.
+          state = state.copyWith(phase: () => 'Waiting for the watch');
+          _awaitReconnect(build, failure: error ?? 'DFU failed');
         case DfuStatus.cancelled:
           unawaited(_finish(build, 'cancelled', null));
         default:
@@ -246,11 +250,13 @@ class DevOtaController extends StateNotifier<DevOtaState> {
 
   /// Waits for the watch to report its version after the update. Firmware
   /// that reports its git sha is checked against the published commit.
-  void _awaitReconnect(DevOtaBuild build) {
+  void _awaitReconnect(DevOtaBuild build, {String? failure}) {
     _connectionWatch?.close();
     Timer? noSha;
+    Timer? giveUp;
     void done() {
       noSha?.cancel();
+      giveUp?.cancel();
       _connectionWatch?.close();
       final snapshot = _ref.read(companionSnapshotProvider).valueOrNull;
       final version = snapshot?.watch?.firmwareVersion;
@@ -259,12 +265,15 @@ class DevOtaController extends StateNotifier<DevOtaState> {
       final detail = [
         if (version != null) 'fw $version',
         if (sha != null) 'sha $sha',
+        if (failure != null) '(app: $failure)',
       ].join(' ');
-      final matches =
-          sha == null ||
-          build.commit.isEmpty ||
-          sha.startsWith(build.shortCommit);
-      unawaited(_finish(build, matches ? 'running' : 'mismatch', detail));
+      final matches = build.commit.isNotEmpty && sha != null
+          ? sha.startsWith(build.shortCommit)
+          : failure == null;
+      final result = matches
+          ? 'running'
+          : (failure != null ? 'failed' : 'mismatch');
+      unawaited(_finish(build, result, detail));
     }
 
     void check() {
@@ -280,6 +289,7 @@ class DevOtaController extends StateNotifier<DevOtaState> {
       companionSnapshotProvider,
       (_, _) => check(),
     );
+    if (failure != null) giveUp = Timer(const Duration(minutes: 3), done);
     check();
   }
 
