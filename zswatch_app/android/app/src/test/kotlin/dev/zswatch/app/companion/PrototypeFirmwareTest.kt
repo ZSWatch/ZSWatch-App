@@ -80,7 +80,7 @@ class PrototypeFirmwareTest {
     @Test fun verificationReconnectsKeepTheOriginalDeadlineAndStopWins() {
         val r=Rig();val id=r.start();r.owner.sdkCompleted(id)
         r.owner.ready("AA:BB:CC:DD:EE:FF")
-        r.advance(89000);r.owner.connectionRetry()
+        r.advance(179000);r.owner.connectionRetry()
         r.owner.ready("AA:BB:CC:DD:EE:FF")
         r.advance(1000)
         assertEquals("boot_check_timeout",r.states.last().error)
@@ -94,7 +94,7 @@ class PrototypeFirmwareTest {
     }
     @Test fun bootConnectionRetriesKeepOriginalDeadlineAndStopStillWins() {
         val r=Rig();val id=r.start();r.owner.sdkCompleted(id)
-        r.advance(89000);r.owner.connectionRetry();r.advance(1001)
+        r.advance(179000);r.owner.connectionRetry();r.advance(1001)
         assertEquals("boot_check_timeout",r.states.last().error)
         val stopped=Rig();val stoppedId=stopped.start();stopped.owner.sdkCompleted(stoppedId)
         stopped.owner.connectionRetry();stopped.owner.close()
@@ -170,7 +170,7 @@ class PrototypeFirmwareTest {
     @Test fun overallAndBootCheckDeadlinesReleaseExactlyOnce() {
         val r=Rig();val id=r.start();r.advance(20*60*1000L)
         assertEquals("deadline",r.states.last().error);r.owner.sdkCompleted(id);assertEquals(1,r.releases.size)
-        val boot=Rig();val bootId=boot.start();boot.owner.sdkCompleted(bootId);boot.advance(90000)
+        val boot=Rig();val bootId=boot.start();boot.owner.sdkCompleted(bootId);boot.advance(180000)
         assertEquals("boot_check_timeout",boot.states.last().error);assertEquals(1,boot.releases.size)
         boot.advance(20*60*1000L);assertEquals(1,boot.releases.size)
     }

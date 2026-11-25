@@ -80,7 +80,7 @@ class PrototypeResourceUpdateTest {
         val r=Rig();val id=r.start();r.progress!!(1,63)
         assertEquals("invalid_progress",r.states.last().error);assertFalse(r.owner.busy)
         val boot=Rig();val bootId=boot.start();boot.verified();boot.owner.sdkCompleted(bootId)
-        boot.advance(89999);assertTrue(boot.owner.busy)
+        boot.advance(179999);assertTrue(boot.owner.busy)
         boot.advance(1);assertEquals("boot_check_timeout",boot.states.last().error);assertEquals(1,boot.releases.size)
         r.owner.sdkCompleted(id);assertTrue(r.reconnects.isEmpty())
     }
