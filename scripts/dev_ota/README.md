@@ -58,6 +58,13 @@ firmware screen; **Not now** skips that build. The app reports
 reports the published sha), `mismatch` (it reports another sha), or `failed` /
 `cancelled` / `declined`.
 
+**Heart rate (HR) variant:** the driver is the west module `Zephyr-MAX32664C`
+(pinned in `ZSWatch/app/west.yml`), and the local NCS has the upstream driver
+patched out. Without the module the build silently drops the driver (Kconfig
+warning only). Clone it to `ZSWatch/modules/lib/max32664c` at the pinned commit
+and pass `-DZEPHYR_EXTRA_MODULES=$PWD/modules/lib/max32664c`; check
+`CONFIG_SENSOR_MAX32664C=y` in `app/zephyr/.config`.
+
 **Smoke-test on the dev kit before publishing.** The watch uses MCUboot
 overwrite-only, so a build that cannot come back on BLE has no automatic
 rollback and needs USB to recover.
