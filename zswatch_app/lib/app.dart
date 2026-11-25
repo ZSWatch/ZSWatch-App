@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,8 +15,10 @@ import 'providers/companion_voice_policy_providers.dart';
 import 'providers/companion_watch_providers.dart';
 
 import 'providers/demo_mode_provider.dart';
+import 'providers/dev_ota_providers.dart';
 
 import 'ui/navigation/app_router.dart';
+import 'ui/screens/developer/dev_ota_screen.dart';
 
 /// Main application widget
 ///
@@ -75,6 +79,17 @@ class _ZSWatchAppState extends ConsumerState<ZSWatchApp>
     ref.watch(companionTelemetryUpdatesProvider);
     ref.watch(companionVoicePolicySyncProvider);
     ref.watch(companionPermissionsStatusProvider);
+    ref.listen(devOtaProvider.select((state) => state.offer), (_, build) async {
+      final context = _router.routerDelegate.navigatorKey.currentContext;
+      if (build == null || context == null) return;
+      final controller = ref.read(devOtaProvider.notifier);
+      if (await showDevOtaOffer(context, build) == true) {
+        unawaited(controller.install(build));
+        unawaited(_router.push(AppRoutes.firmware));
+      } else {
+        unawaited(controller.decline(build));
+      }
+    });
     // Make dropped (too large) watch messages visible so we notice if they happen.
     ref.listen(companionSnapshotProvider, (previous, next) {
       final previousSnapshot = previous?.asData?.value;

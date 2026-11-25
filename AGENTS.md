@@ -107,6 +107,9 @@ Python HIL tools: `scripts/companion_hil/requirements-watch.txt` in a venv
   in a restart loop (it left the phone unusable).
 - `hil.py capture`: timestamped watch UART (+ Android logcat).
 - `ios_ui/`: XCUITest driver for the real app on a phone.
+- `scripts/dev_ota/`: publish a firmware build to the user's phone (Android).
+  `dev_ota.py publish <dfu_application.zip> --repo ZSWatch --note ...`, then
+  `dev_ota.py status --wait <id>`. Smoke-test on the dev kit first. See its README.
 
 Rules: the watch releases USB 20 s after boot unless the host holds the CDC
 port, so keep it open 25 s after a reboot. Do not flash, reset or recover the

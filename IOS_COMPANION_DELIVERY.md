@@ -142,6 +142,12 @@ USB/DTR bootstrap, explicit probe selection and one reader per serial port.
 
 ## Remaining physical acceptance and iOS limits
 
+**TODO: dev OTA (`scripts/dev_ota/`).** Android only today. The Dart client
+(`lib/providers/dev_ota_providers.dart`) and DFU path are shared, but on iOS:
+show the Developer Tools tile (gated by `Platform.isAndroid`), check that the
+long-poll stops and resumes cleanly with the app lifecycle, and run one install
+end to end. A background notification would need the Swift companion.
+
 The first-launch installation used separate app storage and the same release
 executable. After XCTest accepted the phone authentication, normal UI passed:
 Connect your watch → Add watch → Find watch, explicit OS Bluetooth denial and

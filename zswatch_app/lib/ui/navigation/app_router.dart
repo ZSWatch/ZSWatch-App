@@ -10,6 +10,7 @@ import '../screens/crash_report/crash_report_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/developer/comm_log_screen.dart';
 import '../screens/developer/companion_prototype_app.dart';
+import '../screens/developer/dev_ota_screen.dart';
 import '../screens/developer/developer_screen.dart';
 import '../screens/developer/file_system_screen.dart';
 import '../screens/developer/log_viewer_screen.dart';
@@ -55,6 +56,7 @@ abstract final class AppRoutes {
   static const String commLog = '/developer/comm-log';
   static const String fileSystem = '/developer/file-system';
   static const String companionRuntime = '/developer/companion-runtime';
+  static const String devOta = '/developer/dev-ota';
 
   // Settings sub-routes
   static const String aiModels = '/settings/ai-models';
@@ -163,6 +165,10 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.shell,
         builder: (context, state) => const ShellScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.devOta,
+        builder: (context, state) => const DevOtaScreen(),
       ),
       GoRoute(
         path: AppRoutes.fileSystem,
