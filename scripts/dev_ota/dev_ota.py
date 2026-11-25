@@ -46,6 +46,7 @@ class Store:
         self.status_path = root / 'status.jsonl'
         self.token_path = root / 'token'
         self.builds.mkdir(parents=True, exist_ok=True)
+        (root / 'files').mkdir(exist_ok=True)
         self._lock = threading.Lock()
 
     def token(self) -> str:
@@ -141,6 +142,10 @@ def make_handler(store: Store, token: str):
 
         def do_GET(self):
             path, query = self._path()
+            if path.startswith('/files/'):
+                # No token, so a phone browser can download (tailnet-only via `tailscale serve`).
+                self._file(store.root / 'files', path[len('/files/'):])
+                return
             if not self._authorized():
                 return
             if path == '/api/latest':
@@ -168,6 +173,20 @@ def make_handler(store: Store, token: str):
                 self._json(200, {'statuses': store.statuses()[-20:]})
             else:
                 self._json(404, {'error': 'not found'})
+
+        def _file(self, folder: Path, name: str) -> None:
+            file = folder / name
+            if not re.match(r'^[0-9A-Za-z_.-]{1,128}$', name) or name.startswith('.') or not file.is_file():
+                self._json(404, {'error': 'no such file'})
+                return
+            kind = 'application/vnd.android.package-archive' if name.endswith('.apk') else 'application/octet-stream'
+            self.send_response(200)
+            self.send_header('Content-Type', kind)
+            self.send_header('Content-Length', str(file.stat().st_size))
+            self.send_header('Content-Disposition', f'attachment; filename="{name}"')
+            self.end_headers()
+            with file.open('rb') as src:
+                shutil.copyfileobj(src, self.wfile)
 
         def do_POST(self):
             path, _ = self._path()

@@ -57,5 +57,6 @@ All requests need `Authorization: Bearer <token>`. Paths may have any prefix.
 | `GET /api/builds/<id>.zip` | the firmware package (last 10 kept) |
 | `POST /api/status` | `{"id", "state", "detail"?}`, appended to `status.jsonl` |
 | `GET /api/status` | last 20 statuses |
+| `GET /files/<name>` | **no token**: files in `~/.zswatch_dev_ota/files/`, e.g. an APK to open in the phone browser. Only reachable on the tailnet. |
 
 Data lives in `~/.zswatch_dev_ota/` (`ZSWATCH_DEV_OTA_DIR` overrides).
