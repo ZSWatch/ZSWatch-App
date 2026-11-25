@@ -3,17 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../data/models/health_sample.dart';
 import '../../../providers/health_providers.dart';
 import '../../../providers/watch_service_provider.dart';
 import '../../widgets/real_time_chart.dart';
 
-/// Heart rate screen with live streaming
-///
-/// Features:
-/// - Real-time heart rate display
-/// - Live scrolling chart
-/// - Min/max/average statistics
-/// - Start/stop streaming control
+/// Heart rate of a whole day from the stored readings, plus the live stream.
 class HeartRateScreen extends ConsumerStatefulWidget {
   const HeartRateScreen({super.key});
 
@@ -23,6 +18,7 @@ class HeartRateScreen extends ConsumerStatefulWidget {
 
 class _HeartRateScreenState extends ConsumerState<HeartRateScreen> {
   static const int _timeWindowSeconds = 60;
+  DateTime _day = DateUtils.dateOnly(DateTime.now());
 
   @override
   Widget build(BuildContext context) {
@@ -43,89 +39,94 @@ class _HeartRateScreenState extends ConsumerState<HeartRateScreen> {
             ),
         ],
       ),
-      body: Padding(
+      body: ListView(
         padding: const EdgeInsets.all(AppTheme.spacingMd),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Current BPM display
-            _CurrentBpmCard(
-              currentBpm: hrState.currentBpm,
-              hasData: hrState.recentReadings.isNotEmpty,
-            ),
+        children: [
+          // Current BPM display
+          _CurrentBpmCard(
+            currentBpm: hrState.currentBpm,
+            hasData: hrState.recentReadings.isNotEmpty,
+          ),
 
-            const SizedBox(height: AppTheme.spacingMd),
+          const SizedBox(height: AppTheme.spacingMd),
 
-            // Real-time chart
-            Expanded(
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppTheme.spacingMd),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.show_chart,
-                            color: hrState.recentReadings.isNotEmpty
-                                ? AppTheme.errorColor
-                                : AppTheme.textSecondary,
+          _DayCard(
+            day: _day,
+            onDayChanged: (day) => setState(() => _day = day),
+          ),
+
+          const SizedBox(height: AppTheme.spacingMd),
+
+          // Real-time chart
+          SizedBox(
+            height: 260,
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(AppTheme.spacingMd),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.show_chart,
+                          color: hrState.recentReadings.isNotEmpty
+                              ? AppTheme.errorColor
+                              : AppTheme.textSecondary,
+                        ),
+                        const SizedBox(width: AppTheme.spacingSm),
+                        Text(
+                          'Heart Rate',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const Spacer(),
+                        if (hrState.recentReadings.isNotEmpty &&
+                            hrState.lastUpdate != null &&
+                            DateTime.now()
+                                    .difference(hrState.lastUpdate!)
+                                    .inSeconds <
+                                10) ...[
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppTheme.errorColor,
+                            ),
                           ),
-                          const SizedBox(width: AppTheme.spacingSm),
+                          const SizedBox(width: 6),
                           Text(
-                            'Heart Rate',
-                            style: Theme.of(context).textTheme.titleMedium,
+                            'Live',
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(color: AppTheme.errorColor),
                           ),
-                          const Spacer(),
-                          if (hrState.recentReadings.isNotEmpty &&
-                              hrState.lastUpdate != null &&
-                              DateTime.now()
-                                      .difference(hrState.lastUpdate!)
-                                      .inSeconds <
-                                  10) ...[
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppTheme.errorColor,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Live',
-                              style: Theme.of(context).textTheme.labelSmall
-                                  ?.copyWith(color: AppTheme.errorColor),
-                            ),
-                          ],
                         ],
-                      ),
-                      const SizedBox(height: AppTheme.spacingMd),
-                      Expanded(child: _buildChart(hrState)),
-                    ],
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: AppTheme.spacingMd),
+                    Expanded(child: _buildChart(hrState)),
+                  ],
                 ),
               ),
             ),
+          ),
 
-            const SizedBox(height: AppTheme.spacingMd),
+          const SizedBox(height: AppTheme.spacingMd),
 
-            // Statistics
-            if (hrState.recentReadings.isNotEmpty)
-              _StatisticsCard(
-                average: hrState.averageBpm,
-                min: hrState.minBpm,
-                max: hrState.maxBpm,
-                sampleCount: hrState.recentReadings.length,
-              ),
+          // Statistics
+          if (hrState.recentReadings.isNotEmpty)
+            _StatisticsCard(
+              average: hrState.averageBpm,
+              min: hrState.minBpm,
+              max: hrState.maxBpm,
+              sampleCount: hrState.recentReadings.length,
+            ),
 
-            const SizedBox(height: AppTheme.spacingMd),
+          const SizedBox(height: AppTheme.spacingMd),
 
-            // Info message when not connected
-            if (!isConnected) _ConnectionWarning(),
-          ],
-        ),
+          // Info message when not connected
+          if (!isConnected) _ConnectionWarning(),
+        ],
       ),
     );
   }
@@ -186,6 +187,214 @@ class _HeartRateScreenState extends ConsumerState<HeartRateScreen> {
       maxY: 200,
       yAxisLabel: 'BPM',
       showGradient: true,
+    );
+  }
+}
+
+class _DayCard extends ConsumerWidget {
+  final DateTime day;
+  final ValueChanged<DateTime> onDayChanged;
+
+  const _DayCard({required this.day, required this.onDayChanged});
+
+  static const int _bucketMinutes = 5;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final samples = ref.watch(heartRateDayProvider(day));
+    final today = DateUtils.dateOnly(DateTime.now());
+    final textTheme = Theme.of(context).textTheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppTheme.spacingMd),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chevron_left),
+                  tooltip: 'Previous day',
+                  onPressed: () =>
+                      onDayChanged(day.subtract(const Duration(days: 1))),
+                ),
+                Expanded(
+                  child: Text(
+                    day == today
+                        ? 'Today'
+                        : MaterialLocalizations.of(
+                            context,
+                          ).formatMediumDate(day),
+                    textAlign: TextAlign.center,
+                    style: textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chevron_right),
+                  tooltip: 'Next day',
+                  onPressed: day == today
+                      ? null
+                      : () => onDayChanged(day.add(const Duration(days: 1))),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.spacingSm),
+            SizedBox(
+              height: 200,
+              child: samples.when(
+                data: (list) => _buildChart(context, list),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Center(child: Text('$error')),
+              ),
+            ),
+            if (samples.valueOrNull?.isNotEmpty ?? false) ...[
+              const SizedBox(height: AppTheme.spacingMd),
+              _buildStats(samples.value!),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChart(BuildContext context, List<HealthSample> samples) {
+    if (samples.isEmpty) {
+      return Center(
+        child: Text(
+          'No heart rate stored for this day',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
+        ),
+      );
+    }
+    final buckets = bucketHeartRate(
+      samples,
+      day,
+      bucketMinutes: _bucketMinutes,
+    );
+    final spots = <FlSpot>[
+      for (var i = 0; i < buckets.length; i++)
+        buckets[i] == null
+            ? FlSpot.nullSpot
+            : FlSpot((i * _bucketMinutes).toDouble(), buckets[i]!),
+    ];
+    final values = buckets.whereType<double>();
+    final minY =
+        ((values.reduce((a, b) => a < b ? a : b) - 10) / 10).floor() * 10;
+    final maxY =
+        ((values.reduce((a, b) => a > b ? a : b) + 10) / 10).ceil() * 10;
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: 24 * 60,
+        minY: minY.toDouble(),
+        maxY: maxY.toDouble(),
+        gridData: FlGridData(
+          verticalInterval: 6 * 60,
+          horizontalInterval: 20,
+          getDrawingHorizontalLine: (_) => FlLine(
+            color: AppTheme.textSecondary.withValues(alpha: 0.15),
+            strokeWidth: 1,
+          ),
+          getDrawingVerticalLine: (_) => FlLine(
+            color: AppTheme.textSecondary.withValues(alpha: 0.15),
+            strokeWidth: 1,
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(),
+          rightTitles: const AxisTitles(),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: 20,
+              reservedSize: 32,
+              getTitlesWidget: (value, meta) => Text(
+                value.toInt().toString(),
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: 6 * 60,
+              getTitlesWidget: (value, meta) => Text(
+                (value ~/ 60).toString().padLeft(2, '0'),
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (spots) => [
+              for (final spot in spots)
+                LineTooltipItem(
+                  '${(spot.x ~/ 60).toString().padLeft(2, '0')}:'
+                  '${(spot.x.toInt() % 60).toString().padLeft(2, '0')}  '
+                  '${spot.y.round()} bpm',
+                  const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+            ],
+          ),
+        ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            color: AppTheme.errorColor,
+            barWidth: 2,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              color: AppTheme.errorColor.withValues(alpha: 0.12),
+            ),
+          ),
+        ],
+      ),
+      duration: Duration.zero,
+    );
+  }
+
+  Widget _buildStats(List<HealthSample> samples) {
+    final values = samples.map((s) => s.value);
+    final min = values.reduce((a, b) => a < b ? a : b).round();
+    final max = values.reduce((a, b) => a > b ? a : b).round();
+    final avg = (values.reduce((a, b) => a + b) / samples.length).round();
+    return Row(
+      children: [
+        Expanded(
+          child: _StatItem(
+            label: 'Average',
+            value: avg,
+            color: AppTheme.primaryColor,
+          ),
+        ),
+        Expanded(
+          child: _StatItem(
+            label: 'Min',
+            value: min,
+            color: AppTheme.successColor,
+          ),
+        ),
+        Expanded(
+          child: _StatItem(
+            label: 'Max',
+            value: max,
+            color: AppTheme.errorColor,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -686,6 +686,54 @@ final heartRateHistoryProvider =
       return HeartRateHistoryNotifier(healthRepository, healthSyncService, ref);
     });
 
+// ==================== Heart Rate Day ====================
+
+/// Average bpm per [bucketMinutes] of [day], null where there is no reading.
+List<double?> bucketHeartRate(
+  List<HealthSample> samples,
+  DateTime day, {
+  int bucketMinutes = 5,
+}) {
+  final start = DateTime(day.year, day.month, day.day);
+  final buckets = (24 * 60) ~/ bucketMinutes;
+  final sums = List<double>.filled(buckets, 0);
+  final counts = List<int>.filled(buckets, 0);
+  for (final sample in samples) {
+    final minute = sample.timestamp.difference(start).inMinutes;
+    if (minute < 0 || minute >= 24 * 60) continue;
+    final index = minute ~/ bucketMinutes;
+    sums[index] += sample.value;
+    counts[index]++;
+  }
+  return [
+    for (var i = 0; i < buckets; i++)
+      counts[i] == 0 ? null : sums[i] / counts[i],
+  ];
+}
+
+/// Heart rate samples of one day. Today's list refreshes at most once a minute
+/// while readings arrive.
+final heartRateDayProvider = FutureProvider.autoDispose
+    .family<List<HealthSample>, DateTime>((ref, day) async {
+      final watchId = ref.watch(currentWatchProvider)?.id;
+      if (watchId == null) return const [];
+      final now = DateTime.now();
+      if (day.year == now.year &&
+          day.month == now.month &&
+          day.day == now.day) {
+        ref.watch(
+          heartRateStreamingProvider.select(
+            (s) => s.lastUpdate == null
+                ? null
+                : s.lastUpdate!.millisecondsSinceEpoch ~/ 60000,
+          ),
+        );
+      }
+      return ref
+          .watch(healthRepositoryProvider)
+          .getDailyHeartRate(watchId: watchId, date: day);
+    });
+
 // ==================== Data Cleanup Provider ====================
 
 /// Provider for running data cleanup
